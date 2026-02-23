@@ -38,7 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import AppNav from "@/components/AppNav";
+
 import {
   BarChart3,
   Table2,
@@ -174,9 +174,9 @@ export default function Home() {
     simulator.inputs.coastersPerRestaurant * simulator.inputs.activeRestaurants;
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <div className="h-full flex overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-[300px] xl:w-[320px] flex-shrink-0 border-r border-border/30 bg-sidebar flex-col h-screen">
+      <aside className="hidden lg:flex w-[300px] xl:w-[320px] flex-shrink-0 border-r border-border/30 bg-sidebar flex-col">
         <ScrollArea className="h-full">
           <InputPanel
             inputs={simulator.inputs}
@@ -188,7 +188,6 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <AppNav />
 
         {/* Mobile sidebar trigger */}
         <div className="lg:hidden border-b border-border/30 bg-card/30 px-4 py-2">

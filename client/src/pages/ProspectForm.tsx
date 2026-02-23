@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
-import AppNav from "@/components/AppNav";
+
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -279,8 +279,7 @@ export default function ProspectForm() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <AppNav />
+    <div className="h-full flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto">
         <div className="border-b border-border/20 bg-card/30 px-4 lg:px-6 py-4">
           <div className="flex items-center gap-3">

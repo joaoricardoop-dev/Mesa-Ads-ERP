@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import AppNav from "./components/AppNav";
 import Home from "./pages/Home";
 import Prospecting from "./pages/Restaurants";
 import ProspectForm from "./pages/ProspectForm";
@@ -44,7 +45,12 @@ function App() {
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <div className="h-screen flex flex-col overflow-hidden">
+            <AppNav />
+            <div className="flex-1 overflow-hidden">
+              <Router />
+            </div>
+          </div>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

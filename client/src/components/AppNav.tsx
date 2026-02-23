@@ -29,7 +29,7 @@ export default function AppNav() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="border-b border-border/30 bg-card/50 backdrop-blur-sm flex-shrink-0 z-10">
+    <header className="border-b border-border/30 bg-card/80 backdrop-blur-md flex-shrink-0 z-50">
       <div className="flex items-center justify-between px-4 lg:px-6 h-14">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">

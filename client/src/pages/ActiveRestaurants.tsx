@@ -1,6 +1,6 @@
 import { useState, Fragment } from "react";
 import { useLocation } from "wouter";
-import AppNav from "@/components/AppNav";
+
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -293,8 +293,7 @@ export default function ActiveRestaurantsPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <AppNav />
+    <div className="h-full flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>

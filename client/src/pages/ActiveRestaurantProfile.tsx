@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
-import AppNav from "@/components/AppNav";
+
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -210,8 +210,7 @@ export default function ActiveRestaurantProfile() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex flex-col overflow-hidden">
-        <AppNav />
+      <div className="h-full flex flex-col overflow-hidden">
         <div className="flex-1 flex items-center justify-center text-muted-foreground">Carregando...</div>
       </div>
     );
@@ -219,8 +218,7 @@ export default function ActiveRestaurantProfile() {
 
   if (!restaurant) {
     return (
-      <div className="h-screen flex flex-col overflow-hidden">
-        <AppNav />
+      <div className="h-full flex flex-col overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <p className="text-muted-foreground">Restaurante não encontrado</p>
           <Button variant="outline" onClick={() => navigate("/restaurantes")}>Voltar</Button>
@@ -233,8 +231,7 @@ export default function ActiveRestaurantProfile() {
   const excludedCategories = restaurant.excludedCategories ? (() => { try { return JSON.parse(restaurant.excludedCategories); } catch { return []; } })() : [];
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <AppNav />
+    <div className="h-full flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto">
         <div className="border-b border-border/20 bg-card/30 px-4 lg:px-6 py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

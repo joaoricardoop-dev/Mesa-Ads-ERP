@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
-import AppNav from "@/components/AppNav";
+
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -362,8 +362,7 @@ export default function CampaignDetail() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex flex-col overflow-hidden">
-        <AppNav />
+      <div className="h-full flex flex-col overflow-hidden">
         <div className="flex-1 flex items-center justify-center text-muted-foreground">Carregando...</div>
       </div>
     );
@@ -371,8 +370,7 @@ export default function CampaignDetail() {
 
   if (!campaign) {
     return (
-      <div className="h-screen flex flex-col overflow-hidden">
-        <AppNav />
+      <div className="h-full flex flex-col overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <p className="text-muted-foreground">Campanha não encontrada</p>
           <Button variant="outline" onClick={() => navigate("/campanhas")}>Voltar</Button>
@@ -412,8 +410,7 @@ export default function CampaignDetail() {
   const progressPct = Math.min(100, (daysElapsed / totalDays) * 100);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <AppNav />
+    <div className="h-full flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto">
         <div className="border-b border-border/20 bg-card/30 px-4 lg:px-6 py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
