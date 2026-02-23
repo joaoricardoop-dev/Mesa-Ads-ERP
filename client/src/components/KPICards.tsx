@@ -10,7 +10,7 @@ import {
   Target,
   HandCoins,
   Users,
-  Calendar,
+  Factory,
   FileText,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -143,11 +143,11 @@ export default function KPICards({
         delay={0.3}
       />
       <KPICard
-        title="Faturamento Anual Projetado"
-        value={formatCompact(unitEconomics.annualRevenue)}
-        subtitle={`Lucro: ${formatCompact(unitEconomics.annualProfit)}`}
-        icon={<Calendar className="w-3.5 h-3.5" />}
-        trend="up"
+        title="Custo de Produção / Rest."
+        value={formatCurrency(perRestaurant.productionCost)}
+        subtitle={`Unitário: ${formatCurrency(perRestaurant.unitProductionCost)}`}
+        icon={<Factory className="w-3.5 h-3.5" />}
+        trend="down"
         delay={0.35}
       />
     </div>
