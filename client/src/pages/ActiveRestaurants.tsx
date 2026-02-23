@@ -1,4 +1,5 @@
 import { useState, Fragment } from "react";
+import { useLocation } from "wouter";
 import AppNav from "@/components/AppNav";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -172,6 +173,7 @@ const emptyForm: FormData = {
 };
 
 export default function ActiveRestaurantsPage() {
+  const [, navigate] = useLocation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -316,7 +318,7 @@ export default function ActiveRestaurantsPage() {
               Restaurantes parceiros ativos da Mesa Ads
             </p>
           </div>
-          <Button onClick={handleNew} className="gap-2">
+          <Button onClick={() => navigate("/restaurantes/novo")} className="gap-2">
             <Plus className="w-4 h-4" /> Novo Restaurante
           </Button>
         </div>
@@ -359,7 +361,7 @@ export default function ActiveRestaurantsPage() {
                       <span>{r.monthlyCustomers?.toLocaleString("pt-BR")} clientes/mês</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(r); }}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); navigate(`/restaurantes/${r.id}`); }}>
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteId(r.id); }}>

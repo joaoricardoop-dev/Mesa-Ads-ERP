@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import Prospecting from "./pages/Restaurants";
 import ProspectForm from "./pages/ProspectForm";
 import ActiveRestaurantsPage from "./pages/ActiveRestaurants";
+import ActiveRestaurantForm from "./pages/ActiveRestaurantForm";
 import Clients from "./pages/Clients";
 import Campaigns from "./pages/Campaigns";
 import CampaignDetail from "./pages/CampaignDetail";
@@ -21,6 +22,8 @@ function Router() {
       <Route path={"/prospeccao/novo"} component={ProspectForm} />
       <Route path={"/prospeccao/:id"} component={ProspectForm} />
       <Route path={"/prospeccao"} component={Prospecting} />
+      <Route path={"/restaurantes/novo"} component={ActiveRestaurantForm} />
+      <Route path={"/restaurantes/:id"} component={ActiveRestaurantForm} />
       <Route path={"/restaurantes"} component={ActiveRestaurantsPage} />
       <Route path={"/clientes"} component={Clients} />
       <Route path={"/campanhas/:id"} component={CampaignDetail} />
