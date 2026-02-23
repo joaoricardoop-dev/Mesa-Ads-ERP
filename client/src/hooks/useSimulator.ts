@@ -44,6 +44,7 @@ export interface PerRestaurantMetrics {
   sellerCommissionValue: number;
   taxValue: number;
   custoBruto: number;
+  totalCosts: number;
   markupValue: number;
   sellingPrice: number;
   grossProfit: number;
@@ -189,6 +190,7 @@ interface PricingResult {
   sellerCommissionValue: number;
   taxValue: number;
   custoBruto: number;
+  totalCosts: number;
   markupValue: number;
   sellingPrice: number;
   grossProfit: number;
@@ -236,8 +238,9 @@ function calcPricing(
   const actualSellerComm = sellingPrice * sellerRate;
   const actualTax = sellingPrice * taxRateDecimal;
 
-  const grossProfit =
-    sellingPrice - productionCost - actualRestCommission - actualSellerComm - actualTax;
+  const totalCosts =
+    productionCost + actualRestCommission + actualSellerComm + actualTax;
+  const grossProfit = sellingPrice - totalCosts;
   const grossMargin = sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
 
   return {
@@ -247,6 +250,7 @@ function calcPricing(
     sellerCommissionValue: actualSellerComm,
     taxValue: actualTax,
     custoBruto,
+    totalCosts,
     markupValue: sellingPrice - custoBruto,
     sellingPrice,
     grossProfit,
