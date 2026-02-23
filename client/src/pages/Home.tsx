@@ -58,8 +58,6 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
-const HERO_IMAGE =
-  "https://private-us-east-1.manuscdn.com/sessionFile/xFsIMOlg6RXkkA0R0TNR43/sandbox/ao5JNk3zjreuIUnpPCeSVH-img-1_1771615098000_na1fn_bWVzYS1hZHMtaGVybw.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUveEZzSU1PbGc2Ulhra0EwUjBUTlI0My9zYW5kYm94L2FvNUpOazN6anJldUlVbnBQQ2VTVkgtaW1nLTFfMTc3MTYxNTA5ODAwMF9uYTFmbl9iV1Z6WVMxaFpITXRhR1Z5YncucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=DXVBTz1MUPDN~nnAuV2IQzvxqAeSmrb6OEQLG6xf7bSwGEjOwWlyQ5g67qpNrs5fDJlcqrx9t45B8HxiNZXMPaTkchwRAQNgEYdNc77cRSvSxFJWwI5N7LTKAcImpuQyoZ3ahG4N3qIWr8eTQbW03yOJSV78gbnmu~9nPIHpMs3UhjmkSV9kiQEdMfOWrCBNr4OjvBml2jTzd3uoapQCCZWpr3dF8bZ~VzhQEUGgNlczzHCmYDgMGvpoLoCwkwaBEbaC5ZY6OgpKh8BmxNmbhr-fQ5jYuFf9RVrI7HakurXlPy7-XQy7WRry4sPpzvafkTo0LouUUbOWJ51UVSiRPA__";
 
 export default function Home() {
   // ─── Budget selection state ────────────────────────────────────────
@@ -325,35 +323,6 @@ export default function Home() {
           <div className="flex-1 overflow-y-auto">
             <div className="p-4 lg:p-6">
               <TabsContent value="overview" className="mt-0 space-y-6">
-                {/* Hero Banner */}
-                <div className="relative rounded-xl overflow-hidden h-40 md:h-48">
-                  <img
-                    src={HERO_IMAGE}
-                    alt="Mesa Ads - Mídia em Coasters"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/60 to-transparent" />
-                  <div className="absolute inset-0 flex items-center p-6 md:p-8">
-                    <div className="flex-1">
-                      <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-1">
-                        Simulador Financeiro
-                      </h2>
-                      <p className="text-sm text-muted-foreground max-w-md mb-3">
-                        Faturamento e lucro da Mesa Ads. Restaurantes parceiros
-                        recebem comissão sobre a mídia veiculada nos coasters.
-                      </p>
-                      <Button
-                        onClick={handleOpenCampaignDialog}
-                        className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
-                        size="sm"
-                      >
-                        <Rocket className="w-4 h-4" />
-                        Criar Campanha com estes valores
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Budget Selector Card */}
                 <div className="bg-card/50 border border-border/30 rounded-xl p-4">
                   <div className="flex items-center gap-3 mb-3">
