@@ -1,0 +1,116 @@
+E-mail do financeiro/administrador
+Tipo: texto (email)
+Nome do estabelecimento (obrigatório)
+Tipo: texto curto
+Endereço completo (obrigatório)
+Tipo: texto (curto ou parágrafo)
+Bairro/Zona (obrigatório)
+Tipo: texto curto
+Contato do responsável
+Tipo: seleção única
+Opções:
+Proprietário
+Gerente
+Marketing
+Outro
+Link do Google Maps
+Tipo: texto (URL)
+Instagram
+Tipo: texto (usuário ou link)
+Nome do responsável (obrigatório)
+Tipo: texto curto
+Cargo (obrigatório)
+Tipo: texto curto
+WhatsApp (obrigatório)
+Tipo: texto (telefone)
+Classe social predominante do público (obrigatório)
+Tipo: seleção única
+Opções:
+A
+B
+C
+Misto (A/B)
+Misto (B/C)
+Não sei
+E-mail (aparece novamente no formulário)
+Tipo: texto (email)
+Quantidade de mesas (obrigatório)
+Tipo: número
+Quantidade de assentos (obrigatório)
+Tipo: número
+Clientes por mês (estimativa) (obrigatório)
+Tipo: número
+Dias de maior movimento
+Tipo: múltipla seleção
+Opções:
+Seg
+Ter
+Qua
+Qui
+Sex
+Sáb
+Dom
+Horários de maior movimento
+Tipo: texto (ex.: “18h–22h”)
+Quais categorias sua casa NÃO gostaria de anunciar? (obrigatório)
+Tipo: múltipla seleção
+Opções:
+Concorrentes diretos
+Bebidas alcoólicas
+Bebidas não alcoólicas (água, refrigerante, suco, energético, café pronto)
+Alimentação (marcas de comida, snacks, congelados, molhos, etc.)
+Cafeterias e docerias
+Sorveterias / açaí / sobremesas
+Apps de delivery e marketplaces (comida/serviços)
+Supermercados / atacarejos / lojas de conveniência
+Varejo em geral (lojas locais, shopping, e-commerce)
+Moda (roupas, calçados, acessórios)
+Beleza e cuidados pessoais (cosméticos, perfumaria, skincare “regular”)
+Salão / barbearia / estética
+Óticas
+Joias / relógios / acessórios premium
+Produtos e serviços pet (pet shop, ração, banho e tosa, veterinária)
+Academias e estúdios (pilates, yoga, funcional)
+Saúde (clínicas, odontologia, fisioterapia, laboratórios, farmácias/OTC)
+Planos e seguros (saúde, vida, auto, residencial)
+Bancos e fintechs “mainstream” (conta, cartão, cashback, pontos)
+Pagamentos (maquininha, carteiras digitais, adquirentes)
+Cripto/investimentos de alto risco
+Empréstimos agressivos
+Contabilidade e serviços B2B para empresas
+Telefonia / internet / provedores locais
+Eletrônicos e acessórios (celulares, fones, smartwatches, informática)
+Softwares e ferramentas (apps, SaaS, ERP/PDV/CRM)
+Transporte e mobilidade (apps, táxi, locação)
+Automotivo (concessionária, seminovos, oficina, pneus, autopeças, lava-jato)
+Turismo e viagens (agências, hotéis, pousadas, passeios)
+Eventos e entretenimento (shows, festivais, cinemas, teatros)
+Cultura e lazer (museus, exposições, feiras)
+Educação (idiomas, cursos, faculdades, preparatórios)
+Casa e construção (móveis, decoração, material de obra, reforma)
+Imobiliário (imobiliárias, lançamentos, aluguel, coworking)
+Serviços residenciais (limpeza, manutenção, elétrica, hidráulica, chaveiro)
+Logística e serviços locais (frete, mudanças, delivery local)
+Energia e utilidades (energia solar, gás, água, serviços de assinatura)
+Sustentabilidade (reciclagem, logística reversa, marcas “verdes”)
+Tecnologia/serviços profissionais (agências, consultorias, fotografia, vídeo, design)
+Saúde e bem-estar “lifestyle” (spa, massagem, terapia, meditação)
+Esportes e hobbies (lojas esportivas, equipamentos, clubes, aulas)
+Gastronomia e experiências (chefs, eventos gastronômicos, assinaturas de comida)
+Gaming/bets/Apostas
+Política
+Religião
+Conteúdo adulto/sexual
+Se marcou “Outros”, descreva quais
+Tipo: texto (parágrafo)
+Autorizo o uso de fotos de prova da veiculação (sem expor clientes) para auditoria e relatório ao anunciante. (obrigatório)
+Tipo: seleção única
+Opções:
+Sim
+Não
+Fotos do local (adicional)
+Tipo: upload de imagens (múltiplas fotos)
+Localização (endereço do Google Maps) (adicional)
+Tipo: texto (URL)
+23. Dados bancários 
+Chave Pix

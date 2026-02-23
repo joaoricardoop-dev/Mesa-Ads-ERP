@@ -133,6 +133,44 @@ export const campaignHistory = pgTable("campaign_history", {
 export type CampaignHistory = typeof campaignHistory.$inferSelect;
 export type InsertCampaignHistory = typeof campaignHistory.$inferInsert;
 
+export const contactTypeEnum = pgEnum("contact_type", ["proprietario", "gerente", "marketing", "outro"]);
+export const socialClassEnum = pgEnum("social_class", ["A", "B", "C", "misto_ab", "misto_bc", "nao_sei"]);
+
+export const activeRestaurants = pgTable("active_restaurants", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  address: text("address").notNull(),
+  neighborhood: varchar("neighborhood", { length: 255 }).notNull(),
+  googleMapsLink: text("googleMapsLink"),
+  instagram: varchar("instagram", { length: 255 }),
+  contactType: contactTypeEnum("contactType").default("gerente").notNull(),
+  contactName: varchar("contactName", { length: 255 }).notNull(),
+  contactRole: varchar("contactRole", { length: 255 }).notNull(),
+  whatsapp: varchar("whatsapp", { length: 50 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  financialEmail: varchar("financialEmail", { length: 320 }),
+  socialClass: socialClassEnum("socialClass").default("misto_ab").notNull(),
+  tableCount: integer("tableCount").notNull(),
+  seatCount: integer("seatCount").notNull(),
+  monthlyCustomers: integer("monthlyCustomers").notNull(),
+  busyDays: text("busyDays"),
+  busyHours: varchar("busyHours", { length: 100 }),
+  excludedCategories: text("excludedCategories"),
+  excludedOther: text("excludedOther"),
+  photoAuthorization: varchar("photoAuthorization", { length: 3 }).default("sim").notNull(),
+  photoUrls: text("photoUrls"),
+  pixKey: varchar("pixKey", { length: 255 }),
+  coastersAllocated: integer("coastersAllocated").default(500).notNull(),
+  commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("20.00").notNull(),
+  status: statusEnum("status").default("active").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type ActiveRestaurant = typeof activeRestaurants.$inferSelect;
+export type InsertActiveRestaurant = typeof activeRestaurants.$inferInsert;
+
 export const suppliers = pgTable("suppliers", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),

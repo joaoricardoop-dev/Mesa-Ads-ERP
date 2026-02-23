@@ -10,6 +10,7 @@ import {
   campaigns,
   campaignRestaurants,
   campaignHistory,
+  activeRestaurants,
   suppliers,
   budgets,
   budgetItems,
@@ -17,6 +18,7 @@ import {
   type InsertClient,
   type InsertCampaign,
   type InsertCampaignRestaurant,
+  type InsertActiveRestaurant,
   type InsertSupplier,
   type InsertBudget,
   type InsertBudgetItem,
@@ -676,4 +678,37 @@ export async function listActiveBudgetsWithItems() {
   }
 
   return result;
+}
+
+export async function listActiveRestaurants() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(activeRestaurants).orderBy(activeRestaurants.name);
+}
+
+export async function getActiveRestaurant(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(activeRestaurants).where(eq(activeRestaurants.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createActiveRestaurant(data: InsertActiveRestaurant) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(activeRestaurants).values(data).returning();
+  return result[0];
+}
+
+export async function updateActiveRestaurant(id: number, data: Partial<InsertActiveRestaurant>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.update(activeRestaurants).set({ ...data, updatedAt: new Date() }).where(eq(activeRestaurants.id, id)).returning();
+  return result[0];
+}
+
+export async function deleteActiveRestaurant(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(activeRestaurants).where(eq(activeRestaurants.id, id));
 }

@@ -238,10 +238,10 @@ export default function Restaurants() {
         <div>
           <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
             <Store className="w-5 h-5 text-primary" />
-            Restaurantes Parceiros
+            Prospecção de Restaurantes
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Base de dados dos restaurantes parceiros da Mesa Ads
+            Leads e prospecção de novos restaurantes parceiros
           </p>
         </div>
         <Button onClick={handleNew} className="gap-2">

@@ -9,12 +9,15 @@ import {
   Factory,
   Sun,
   Moon,
+  Search,
+  UtensilsCrossed,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
 const NAV_ITEMS = [
   { path: "/", label: "Simulador", icon: BarChart3 },
-  { path: "/restaurantes", label: "Restaurantes", icon: Store },
+  { path: "/prospeccao", label: "Prospecção", icon: Search },
+  { path: "/restaurantes", label: "Restaurantes", icon: UtensilsCrossed },
   { path: "/clientes", label: "Clientes", icon: Building2 },
   { path: "/campanhas", label: "Campanhas", icon: Megaphone },
   { path: "/economics", label: "Economics", icon: DollarSign },

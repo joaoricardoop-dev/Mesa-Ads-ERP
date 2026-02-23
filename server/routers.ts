@@ -35,6 +35,11 @@ import {
   deleteBudget,
   getBudgetItems,
   listActiveBudgetsWithItems,
+  listActiveRestaurants,
+  getActiveRestaurant,
+  createActiveRestaurant,
+  updateActiveRestaurant,
+  deleteActiveRestaurant,
 } from "./db";
 
 export const appRouter = router({
@@ -109,6 +114,88 @@ export const appRouter = router({
     delete: publicProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteRestaurant(input.id)),
+  }),
+
+  // ─── Active Restaurants (Restaurantes Ativos) ────────────────────────
+  activeRestaurant: router({
+    list: publicProcedure.query(() => listActiveRestaurants()),
+
+    get: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(({ input }) => getActiveRestaurant(input.id)),
+
+    create: publicProcedure
+      .input(
+        z.object({
+          name: z.string().min(1),
+          address: z.string().min(1),
+          neighborhood: z.string().min(1),
+          googleMapsLink: z.string().optional(),
+          instagram: z.string().optional(),
+          contactType: z.enum(["proprietario", "gerente", "marketing", "outro"]).optional(),
+          contactName: z.string().min(1),
+          contactRole: z.string().min(1),
+          whatsapp: z.string().min(1),
+          email: z.string().optional(),
+          financialEmail: z.string().optional(),
+          socialClass: z.enum(["A", "B", "C", "misto_ab", "misto_bc", "nao_sei"]).optional(),
+          tableCount: z.number().int().min(0),
+          seatCount: z.number().int().min(0),
+          monthlyCustomers: z.number().int().min(0),
+          busyDays: z.string().optional(),
+          busyHours: z.string().optional(),
+          excludedCategories: z.string().optional(),
+          excludedOther: z.string().optional(),
+          photoAuthorization: z.string().optional(),
+          photoUrls: z.string().optional(),
+          pixKey: z.string().optional(),
+          coastersAllocated: z.number().int().optional(),
+          commissionPercent: z.string().optional(),
+          notes: z.string().optional(),
+        }),
+      )
+      .mutation(({ input }) => createActiveRestaurant(input)),
+
+    update: publicProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().min(1).optional(),
+          address: z.string().optional(),
+          neighborhood: z.string().optional(),
+          googleMapsLink: z.string().optional(),
+          instagram: z.string().optional(),
+          contactType: z.enum(["proprietario", "gerente", "marketing", "outro"]).optional(),
+          contactName: z.string().optional(),
+          contactRole: z.string().optional(),
+          whatsapp: z.string().optional(),
+          email: z.string().optional(),
+          financialEmail: z.string().optional(),
+          socialClass: z.enum(["A", "B", "C", "misto_ab", "misto_bc", "nao_sei"]).optional(),
+          tableCount: z.number().int().optional(),
+          seatCount: z.number().int().optional(),
+          monthlyCustomers: z.number().int().optional(),
+          busyDays: z.string().optional(),
+          busyHours: z.string().optional(),
+          excludedCategories: z.string().optional(),
+          excludedOther: z.string().optional(),
+          photoAuthorization: z.string().optional(),
+          photoUrls: z.string().optional(),
+          pixKey: z.string().optional(),
+          coastersAllocated: z.number().int().optional(),
+          commissionPercent: z.string().optional(),
+          status: z.enum(["active", "inactive"]).optional(),
+          notes: z.string().optional(),
+        }),
+      )
+      .mutation(({ input }) => {
+        const { id, ...data } = input;
+        return updateActiveRestaurant(id, data);
+      }),
+
+    delete: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => deleteActiveRestaurant(input.id)),
   }),
 
   // ─── Clients (Anunciantes) ────────────────────────────────────────────
