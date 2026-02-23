@@ -118,9 +118,9 @@ export default function KPICards({
         delay={0.15}
       />
       <KPICard
-        title="Valor Global do Contrato"
-        value={formatCompact(unitEconomics.contractValue)}
-        subtitle={`Venda × ${contractDuration} meses`}
+        title="Preço Final do Contrato"
+        value={formatCurrency(perRestaurant.sellingPrice * activeRestaurants * contractDuration)}
+        subtitle={`${activeRestaurants} rest. × ${contractDuration} meses`}
         icon={<FileText className="w-3.5 h-3.5" />}
         trend="up"
         highlight
