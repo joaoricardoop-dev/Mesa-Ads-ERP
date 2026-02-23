@@ -105,21 +105,6 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 export default function InputPanel({ inputs, updateInput, grossMargin = 0 }: InputPanelProps) {
   return (
     <div className="space-y-6 p-5 pb-24">
-      {/* Logo / Title */}
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-          <Megaphone className="w-4 h-4 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-sm font-bold tracking-tight">Mesa Ads</h1>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-            Simulador Financeiro
-          </p>
-        </div>
-      </div>
-
-      <Separator className="bg-border/30" />
-
       {/* Operacionais */}
       <div>
         <SectionTitle>Operacional</SectionTitle>
