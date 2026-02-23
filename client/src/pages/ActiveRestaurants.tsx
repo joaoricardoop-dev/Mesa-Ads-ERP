@@ -40,18 +40,6 @@ import {
   Search,
   Pencil,
   Trash2,
-  MapPin,
-  Phone,
-  Instagram,
-  ChevronDown,
-  ChevronUp,
-  Users,
-  BarChart3,
-  ShieldAlert,
-  CreditCard,
-  Mail,
-  ExternalLink,
-  Eye,
 } from "lucide-react";
 
 const CONTACT_TYPE_LABELS: Record<string, string> = {
@@ -180,7 +168,6 @@ export default function ActiveRestaurantsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState<FormData>(emptyForm);
   const [search, setSearch] = useState("");
-  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const utils = trpc.useUtils();
   const { data: restaurants = [] } = trpc.activeRestaurant.list.useQuery();
@@ -343,95 +330,57 @@ export default function ActiveRestaurantsPage() {
             </div>
           ) : (
             filtered.map((r) => {
-              const isExpanded = expandedId === r.id;
               return (
                 <div key={r.id} className="bg-card border border-border/30 rounded-lg overflow-hidden">
-                  <div className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/5" onClick={() => setExpandedId(isExpanded ? null : r.id)}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm truncate">{r.name}</p>
-                        <Badge variant="outline" className={r.status === "active" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]" : "bg-gray-500/20 text-gray-400 border-gray-500/30 text-[10px]"}>
-                          {r.status === "active" ? "Ativo" : "Inativo"}
-                        </Badge>
+                  <div
+                    className="p-4 cursor-pointer hover:bg-card/80 transition-colors"
+                    onClick={() => navigate(`/restaurantes/perfil/${r.id}`)}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-sm truncate">{r.name}</h3>
+                            <Badge variant="outline" className={r.status === "active" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]" : "bg-gray-500/20 text-gray-400 border-gray-500/30 text-[10px]"}>
+                              {r.status === "active" ? "Ativo" : "Inativo"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {r.neighborhood} · {SOCIAL_CLASS_LABELS[r.socialClass] || r.socialClass}
+                            {r.contactName ? ` · ${r.contactName}` : ""}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">{r.neighborhood} · {SOCIAL_CLASS_LABELS[r.socialClass] || r.socialClass}</p>
-                    </div>
-                    <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>{r.tableCount} mesas</span>
-                      <span>{r.seatCount} assentos</span>
-                      <span>{r.monthlyCustomers?.toLocaleString("pt-BR")} clientes/mês</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver perfil" onClick={(e) => { e.stopPropagation(); navigate(`/restaurantes/perfil/${r.id}`); }}>
-                        <Eye className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Editar" onClick={(e) => { e.stopPropagation(); navigate(`/restaurantes/${r.id}`); }}>
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Excluir" onClick={(e) => { e.stopPropagation(); setDeleteId(r.id); }}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                      {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+
+                      <div className="hidden md:flex items-center gap-6 text-sm">
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Mesas</p>
+                          <p className="font-mono font-semibold">{r.tableCount}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Assentos</p>
+                          <p className="font-mono font-semibold">{r.seatCount}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Clientes/Mês</p>
+                          <p className="font-mono font-semibold">{r.monthlyCustomers?.toLocaleString("pt-BR")}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground">Coasters</p>
+                          <p className="font-mono">{r.coastersAllocated}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar" onClick={() => navigate(`/restaurantes/${r.id}`)}>
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" title="Excluir" onClick={() => setDeleteId(r.id)}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-
-                  {isExpanded && (
-                    <div className="border-t border-border/20 p-4 space-y-4 bg-muted/5">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1"><MapPin className="w-3 h-3" /> Local</h4>
-                          <DetailRow label="Endereço" value={r.address} />
-                          <DetailRow label="Bairro" value={r.neighborhood} />
-                          {r.googleMapsLink && (
-                            <a href={r.googleMapsLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1 hover:underline">
-                              <ExternalLink className="w-3 h-3" /> Google Maps
-                            </a>
-                          )}
-                          {r.instagram && <DetailRow label="Instagram" value={r.instagram} />}
-                        </div>
-                        <div className="space-y-2">
-                          <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1"><Phone className="w-3 h-3" /> Contato</h4>
-                          <DetailRow label="Responsável" value={`${r.contactName} (${CONTACT_TYPE_LABELS[r.contactType] || r.contactType})`} />
-                          <DetailRow label="Cargo" value={r.contactRole} />
-                          <DetailRow label="WhatsApp" value={r.whatsapp} />
-                          {r.email && <DetailRow label="Email" value={r.email} />}
-                          {r.financialEmail && <DetailRow label="Email Financeiro" value={r.financialEmail} />}
-                        </div>
-                        <div className="space-y-2">
-                          <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1"><BarChart3 className="w-3 h-3" /> Operação</h4>
-                          <DetailRow label="Classe Social" value={SOCIAL_CLASS_LABELS[r.socialClass] || r.socialClass} />
-                          <DetailRow label="Mesas / Assentos" value={`${r.tableCount} / ${r.seatCount}`} />
-                          <DetailRow label="Clientes/Mês" value={r.monthlyCustomers?.toLocaleString("pt-BR")} />
-                          <DetailRow label="Dias de Pico" value={r.busyDays?.replace(/,/g, ", ")} />
-                          <DetailRow label="Horários de Pico" value={r.busyHours} />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1"><CreditCard className="w-3 h-3" /> Financeiro</h4>
-                          <DetailRow label="Chave Pix" value={r.pixKey} />
-                          <DetailRow label="Fotos autorizadas" value={r.photoAuthorization === "sim" ? "Sim" : "Não"} />
-                        </div>
-                        {r.excludedCategories && (
-                          <div className="space-y-2">
-                            <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Categorias Excluídas</h4>
-                            <div className="flex flex-wrap gap-1">
-                              {r.excludedCategories.split("||").map((cat, i) => (
-                                <Badge key={i} variant="outline" className="text-[10px] bg-red-500/10 text-red-400 border-red-500/20">{cat}</Badge>
-                              ))}
-                            </div>
-                            {r.excludedOther && <p className="text-xs text-muted-foreground mt-1">Outros: {r.excludedOther}</p>}
-                          </div>
-                        )}
-                      </div>
-                      {r.notes && (
-                        <div className="space-y-1">
-                          <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Observações</h4>
-                          <p className="text-xs text-muted-foreground">{r.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })
@@ -659,12 +608,3 @@ function StatCard({ label, value, accent }: { label: string; value: number; acce
   );
 }
 
-function DetailRow({ label, value }: { label: string; value?: string | number | null }) {
-  if (!value) return null;
-  return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="text-xs mt-0.5">{value}</p>
-    </div>
-  );
-}
