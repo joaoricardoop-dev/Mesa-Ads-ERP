@@ -29,7 +29,7 @@ import {
 import { formatCurrency } from "@/lib/format";
 import InputPanel from "@/components/InputPanel";
 import KPICards from "@/components/KPICards";
-import CPMTable from "@/components/CPMTable";
+import MarkupTable from "@/components/CPMTable";
 import DiscountTable from "@/components/DiscountTable";
 import ScenarioComparison from "@/components/ScenarioComparison";
 import DashboardCharts from "@/components/DashboardCharts";
@@ -108,7 +108,7 @@ export default function Home() {
   });
 
   const handleOpenCampaignDialog = () => {
-    setCampaignName(`Campanha CPM ${simulator.inputs.cpm}`);
+    setCampaignName(`Campanha Markup ${simulator.inputs.pricingType === "variable" ? simulator.inputs.markupPercent + "%" : "Fixo R$" + simulator.inputs.fixedPrice}`);
     setSelectedClientId("none");
     const today = new Date();
     const endDate = new Date();
@@ -134,11 +134,11 @@ export default function Home() {
     createCampaignMutation.mutate({
       clientId: parseInt(selectedClientId),
       name: campaignName,
-      cpm: simulator.inputs.cpm.toFixed(2),
+      cpm: "0.00",
       startDate: campaignStartDate,
       endDate: campaignEndDate,
       status: "draft",
-      notes: `Criada a partir do simulador. Coasters/rest: ${simulator.inputs.coastersPerRestaurant}, Uso/dia: ${simulator.inputs.usagePerDay}, Comissão rest: ${simulator.inputs.restaurantCommission}%, Margem projetada: ${simulator.perRestaurant.grossMargin.toFixed(1)}%, Custo unit. produção: R$ ${simulator.effectiveUnitCost.toFixed(3)}${selectedBudget ? ` (Orçamento: ${selectedBudget.code || selectedBudget.description})` : " (Manual)"}`,
+      notes: `Criada a partir do simulador. Coasters/rest: ${simulator.inputs.coastersPerRestaurant}, Uso/dia: ${simulator.inputs.usagePerDay}, Markup: ${simulator.inputs.pricingType === "variable" ? simulator.inputs.markupPercent + "%" : "Fixo R$" + simulator.inputs.fixedPrice}, Comissão rest: ${simulator.inputs.commissionType === "variable" ? simulator.inputs.restaurantCommission + "%" : "Fixo R$" + simulator.inputs.fixedCommission}, Margem projetada: ${simulator.perRestaurant.grossMargin.toFixed(1)}%, Custo unit. produção: R$ ${simulator.effectiveUnitCost.toFixed(3)}${selectedBudget ? ` (Orçamento: ${selectedBudget.code || selectedBudget.description})` : " (Manual)"}`,
     });
   };
 
@@ -472,7 +472,7 @@ export default function Home() {
                 {/* Quick Charts */}
                 <DashboardCharts
                   revenueVsRestaurants={simulator.revenueVsRestaurants}
-                  marginVsCpm={simulator.marginVsCpm}
+                  marginVsMarkup={simulator.marginVsMarkup}
                   cumulativeProfit={simulator.cumulativeProfit}
                   discountSensitivity={simulator.discountSensitivity}
                   minMargin={simulator.inputs.minMargin}
@@ -480,9 +480,9 @@ export default function Home() {
               </TabsContent>
 
               <TabsContent value="tables" className="mt-0 space-y-6">
-                <CPMTable
-                  data={simulator.cpmTable}
-                  currentCPM={simulator.inputs.cpm}
+                <MarkupTable
+                  data={simulator.markupTable}
+                  currentMarkup={simulator.inputs.markupPercent}
                   minMargin={simulator.inputs.minMargin}
                 />
                 <DiscountTable
@@ -506,7 +506,7 @@ export default function Home() {
               <TabsContent value="charts" className="mt-0 space-y-6">
                 <DashboardCharts
                   revenueVsRestaurants={simulator.revenueVsRestaurants}
-                  marginVsCpm={simulator.marginVsCpm}
+                  marginVsMarkup={simulator.marginVsMarkup}
                   cumulativeProfit={simulator.cumulativeProfit}
                   discountSensitivity={simulator.discountSensitivity}
                   minMargin={simulator.inputs.minMargin}
@@ -540,9 +540,9 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">CPM:</span>
+                <span className="text-muted-foreground">Markup:</span>
                 <span className="font-mono font-medium text-primary">
-                  R$ {simulator.inputs.cpm.toFixed(2)}
+                  {simulator.inputs.pricingType === "variable" ? `${simulator.inputs.markupPercent}%` : `Fixo R$ ${simulator.inputs.fixedPrice.toFixed(2)}`}
                 </span>
               </div>
               <div className="flex justify-between">

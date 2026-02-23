@@ -29,7 +29,7 @@ interface DashboardChartsProps {
     revenue: number;
     profit: number;
   }>;
-  marginVsCpm: Array<{ cpm: number; margin: number; profit: number }>;
+  marginVsMarkup: Array<{ markup: number; margin: number; profit: number }>;
   cumulativeProfit: Array<{
     month: number;
     profit: number;
@@ -80,7 +80,7 @@ function CustomTooltip({ active, payload, label, formatter }: any) {
 
 export default function DashboardCharts({
   revenueVsRestaurants,
-  marginVsCpm,
+  marginVsMarkup,
   cumulativeProfit,
   discountSensitivity,
   minMargin,
@@ -152,25 +152,25 @@ export default function DashboardCharts({
         </CardContent>
       </Card>
 
-      {/* Margem vs CPM */}
+      {/* Margem vs Markup */}
       <Card className="border-border/40 bg-card/80 backdrop-blur-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <Percent className="w-4 h-4 text-primary" />
-            Margem Mesa Ads vs CPM
+            Margem Mesa Ads vs Markup
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={marginVsCpm}>
+              <LineChart data={marginVsMarkup}>
                 <CartesianGrid stroke={CHART_COLORS.grid} strokeDasharray="3 3" />
                 <XAxis
-                  dataKey="cpm"
+                  dataKey="markup"
                   stroke={CHART_COLORS.axis}
                   tick={{ fontSize: 10, fill: CHART_COLORS.axis }}
                   tickLine={false}
-                  tickFormatter={(v) => `R$${v}`}
+                  tickFormatter={(v) => `${v}%`}
                 />
                 <YAxis
                   stroke={CHART_COLORS.axis}

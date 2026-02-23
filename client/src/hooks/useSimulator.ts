@@ -1,24 +1,23 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 
 export type CommissionType = "variable" | "fixed";
+export type PricingType = "variable" | "fixed";
 
 export interface SimulatorInputs {
-  // Operacionais
   coastersPerRestaurant: number;
   usagePerDay: number;
   daysPerMonth: number;
   activeRestaurants: number;
   batchSize: number;
   batchCost: number;
-  // Mídia
-  cpm: number;
-  // Comissão restaurante
+  pricingType: PricingType;
+  markupPercent: number;
+  fixedPrice: number;
   commissionType: CommissionType;
-  restaurantCommission: number; // % se variável
-  fixedCommission: number; // R$ se fixo
+  restaurantCommission: number;
+  fixedCommission: number;
   minMargin: number;
   maxDiscount: number;
-  // Comerciais
   cacPerRestaurant: number;
   contractDuration: number;
 }
@@ -45,8 +44,8 @@ export interface PerRestaurantMetrics {
   grossMargin: number;
 }
 
-export interface CPMTableRow {
-  cpm: number;
+export interface MarkupTableRow {
+  markup: number;
   revenue: number;
   commission: number;
   production: number;
@@ -75,7 +74,7 @@ export interface UnitEconomics {
 
 export interface ScenarioData {
   name: string;
-  cpm: number;
+  markup: number;
   revenue: number;
   profit: number;
   margin: number;
@@ -93,7 +92,9 @@ const DEFAULT_INPUTS: SimulatorInputs = {
   activeRestaurants: 10,
   batchSize: 10000,
   batchCost: 1200,
-  cpm: 50,
+  pricingType: "variable",
+  markupPercent: 150,
+  fixedPrice: 1500,
   commissionType: "variable",
   restaurantCommission: 20,
   fixedCommission: 200,
@@ -146,9 +147,6 @@ export function saveBudgetId(id: number | null) {
   }
 }
 
-/**
- * Interpola o custo unitário a partir da tabela de preços do orçamento.
- */
 function interpolateUnitCost(
   items: Array<{ quantity: number; unitPrice: string }>,
   quantity: number
@@ -180,9 +178,6 @@ function interpolateUnitCost(
   return parseFloat(sorted[sorted.length - 1].unitPrice);
 }
 
-/**
- * Calcula a comissão com base no tipo (fixo ou variável).
- */
 function calcCommission(
   revenue: number,
   inputs: SimulatorInputs
@@ -193,10 +188,30 @@ function calcCommission(
   return revenue * (inputs.restaurantCommission / 100);
 }
 
+function calcRevenue(
+  productionCost: number,
+  inputs: SimulatorInputs
+): number {
+  if (inputs.pricingType === "fixed") {
+    return inputs.fixedPrice;
+  }
+  return productionCost * (1 + inputs.markupPercent / 100);
+}
+
+function calcRevenueWithMarkup(
+  productionCost: number,
+  markupPercent: number,
+  inputs: SimulatorInputs
+): number {
+  if (inputs.pricingType === "fixed") {
+    return inputs.fixedPrice;
+  }
+  return productionCost * (1 + markupPercent / 100);
+}
+
 export function useSimulator(selectedBudget?: BudgetOption | null) {
   const [inputs, setInputs] = useState<SimulatorInputs>(loadInputs);
 
-  // Persist inputs to localStorage on every change
   useEffect(() => {
     saveInputs(inputs);
   }, [inputs]);
@@ -208,7 +223,6 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
     []
   );
 
-  // Calculate the effective unit production cost
   const effectiveUnitCost = useMemo(() => {
     if (selectedBudget && selectedBudget.items.length > 0) {
       const totalCoasters =
@@ -224,14 +238,13 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
     inputs.batchSize,
   ]);
 
-  // Per-restaurant metrics
   const perRestaurant = useMemo<PerRestaurantMetrics>(() => {
     const impressions =
       inputs.coastersPerRestaurant * inputs.usagePerDay * inputs.daysPerMonth;
-    const revenue = (impressions / 1000) * inputs.cpm;
-    const commission = calcCommission(revenue, inputs);
     const unitProductionCost = effectiveUnitCost;
     const productionCost = inputs.coastersPerRestaurant * unitProductionCost;
+    const revenue = calcRevenue(productionCost, inputs);
+    const commission = calcCommission(revenue, inputs);
     const grossProfit = revenue - commission - productionCost;
     const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
@@ -246,30 +259,25 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
     };
   }, [inputs, effectiveUnitCost]);
 
-  // CPM pricing table (30 to 80)
-  const cpmTable = useMemo<CPMTableRow[]>(() => {
-    const rows: CPMTableRow[] = [];
-    const impressions =
-      inputs.coastersPerRestaurant * inputs.usagePerDay * inputs.daysPerMonth;
+  const markupTable = useMemo<MarkupTableRow[]>(() => {
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
+    const rows: MarkupTableRow[] = [];
 
-    for (let cpm = 30; cpm <= 80; cpm += 5) {
-      const revenue = (impressions / 1000) * cpm;
+    const markups = [50, 75, 100, 125, 150, 175, 200, 250, 300];
+    for (const markup of markups) {
+      const revenue = calcRevenueWithMarkup(production, markup, inputs);
       const commission = calcCommission(revenue, inputs);
       const profit = revenue - commission - production;
       const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
-      rows.push({ cpm, revenue, commission, production, profit, margin });
+      rows.push({ markup, revenue, commission, production, profit, margin });
     }
     return rows;
   }, [inputs, effectiveUnitCost]);
 
-  // Discount table (1 to 50 restaurants)
   const discountTable = useMemo<DiscountTableRow[]>(() => {
     const rows: DiscountTableRow[] = [];
-    const impressions =
-      inputs.coastersPerRestaurant * inputs.usagePerDay * inputs.daysPerMonth;
-    const baseRevenue = (impressions / 1000) * inputs.cpm;
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
+    const baseRevenue = calcRevenue(production, inputs);
 
     const tiers = [1, 2, 3, 5, 8, 10, 15, 20, 25, 30, 40, 50];
 
@@ -327,7 +335,6 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
     return rows;
   }, [inputs, effectiveUnitCost]);
 
-  // Unit Economics
   const unitEconomics = useMemo<UnitEconomics>(() => {
     const monthlyProfit = perRestaurant.grossProfit;
     const ltv = monthlyProfit * inputs.contractDuration;
@@ -349,20 +356,17 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
     };
   }, [perRestaurant, inputs]);
 
-  // Scenarios
   const scenarios = useMemo<ScenarioData[]>(() => {
-    const impressions =
-      inputs.coastersPerRestaurant * inputs.usagePerDay * inputs.daysPerMonth;
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
 
     const scenarioConfigs = [
-      { name: "Conservador", cpm: 35 },
-      { name: "Base", cpm: inputs.cpm },
-      { name: "Premium", cpm: 75 },
+      { name: "Conservador", markup: 80 },
+      { name: "Base", markup: inputs.pricingType === "variable" ? inputs.markupPercent : 150 },
+      { name: "Premium", markup: 250 },
     ];
 
     return scenarioConfigs.map((s) => {
-      const revenue = (impressions / 1000) * s.cpm;
+      const revenue = production * (1 + s.markup / 100);
       const commission = calcCommission(revenue, inputs);
       const profit = revenue - commission - production;
       const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
@@ -371,7 +375,7 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
 
       return {
         name: s.name,
-        cpm: s.cpm,
+        markup: s.markup,
         revenue,
         profit,
         margin,
@@ -381,7 +385,6 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
     });
   }, [inputs, effectiveUnitCost]);
 
-  // Chart data: Revenue vs Restaurants
   const revenueVsRestaurants = useMemo(() => {
     const data = [];
     for (let r = 1; r <= 50; r++) {
@@ -394,23 +397,19 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
     return data;
   }, [perRestaurant]);
 
-  // Chart data: Margin vs CPM
-  const marginVsCpm = useMemo(() => {
-    const impressions =
-      inputs.coastersPerRestaurant * inputs.usagePerDay * inputs.daysPerMonth;
+  const marginVsMarkup = useMemo(() => {
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
     const data = [];
-    for (let cpm = 20; cpm <= 100; cpm += 5) {
-      const revenue = (impressions / 1000) * cpm;
+    for (let markup = 0; markup <= 300; markup += 10) {
+      const revenue = production * (1 + markup / 100);
       const commission = calcCommission(revenue, inputs);
       const profit = revenue - commission - production;
       const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
-      data.push({ cpm, margin, profit });
+      data.push({ markup, margin, profit });
     }
     return data;
   }, [inputs, effectiveUnitCost]);
 
-  // Chart data: Cumulative profit over months
   const cumulativeProfit = useMemo(() => {
     const monthlyProfit =
       perRestaurant.grossProfit * inputs.activeRestaurants;
@@ -426,12 +425,9 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
     return data;
   }, [perRestaurant, inputs]);
 
-  // Chart data: Discount sensitivity
   const discountSensitivity = useMemo(() => {
-    const impressions =
-      inputs.coastersPerRestaurant * inputs.usagePerDay * inputs.daysPerMonth;
-    const baseRevenue = (impressions / 1000) * inputs.cpm;
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
+    const baseRevenue = calcRevenue(production, inputs);
     const data = [];
     for (let d = 0; d <= 40; d += 2) {
       const discountedRevenue = baseRevenue * (1 - d / 100);
@@ -455,12 +451,12 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
     setInputs,
     effectiveUnitCost,
     perRestaurant,
-    cpmTable,
+    markupTable,
     discountTable,
     unitEconomics,
     scenarios,
     revenueVsRestaurants,
-    marginVsCpm,
+    marginVsMarkup,
     cumulativeProfit,
     discountSensitivity,
   };

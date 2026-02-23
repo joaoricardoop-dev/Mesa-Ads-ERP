@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
-import type { SimulatorInputs, CommissionType } from "@/hooks/useSimulator";
+import type { SimulatorInputs, CommissionType, PricingType } from "@/hooks/useSimulator";
 import {
   Package,
   Eye,
@@ -22,6 +22,7 @@ import {
   Target,
   Clock,
   DollarSign,
+  TrendingUp,
 } from "lucide-react";
 
 interface InputPanelProps {
@@ -164,20 +165,89 @@ export default function InputPanel({ inputs, updateInput }: InputPanelProps) {
 
       <Separator className="bg-border/30" />
 
-      {/* Mídia */}
+      {/* Precificação */}
       <div>
-        <SectionTitle>Mídia</SectionTitle>
+        <SectionTitle>Precificação</SectionTitle>
         <div className="space-y-3">
-          <InputField
-            label="CPM"
-            value={inputs.cpm}
-            onChange={(v) => updateInput("cpm", v)}
-            icon={<Megaphone className="w-3 h-3" />}
-            suffix="R$"
-            min={10}
-            max={150}
-            showSlider
-          />
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
+              <TrendingUp className="w-3 h-3" />
+              Markup sobre custo de produção
+            </Label>
+            <div className="flex rounded-md overflow-hidden border border-border/50">
+              <button
+                type="button"
+                onClick={() => updateInput("pricingType", "fixed" as PricingType)}
+                className={`flex-1 text-[10px] uppercase tracking-wider py-1.5 font-medium transition-colors ${
+                  inputs.pricingType === "fixed"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background/50 text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                <DollarSign className="w-3 h-3 inline mr-1" />
+                Fixo (R$)
+              </button>
+              <button
+                type="button"
+                onClick={() => updateInput("pricingType", "variable" as PricingType)}
+                className={`flex-1 text-[10px] uppercase tracking-wider py-1.5 font-medium transition-colors ${
+                  inputs.pricingType === "variable"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background/50 text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                <Percent className="w-3 h-3 inline mr-1" />
+                Variável (%)
+              </button>
+            </div>
+
+            {inputs.pricingType === "fixed" ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={inputs.fixedPrice}
+                  onChange={(e) =>
+                    updateInput("fixedPrice", Number(e.target.value))
+                  }
+                  className="font-mono text-sm bg-background/50 border-border/50 h-9 tabular-nums"
+                  min={0}
+                  max={50000}
+                  step={50}
+                />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  R$/rest.
+                </span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={inputs.markupPercent}
+                    onChange={(e) =>
+                      updateInput("markupPercent", Number(e.target.value))
+                    }
+                    className="font-mono text-sm bg-background/50 border-border/50 h-9 tabular-nums"
+                    min={0}
+                    max={300}
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    %
+                  </span>
+                </div>
+                <Slider
+                  value={[inputs.markupPercent]}
+                  onValueChange={([v]) =>
+                    updateInput("markupPercent", v)
+                  }
+                  min={0}
+                  max={300}
+                  step={5}
+                  className="mt-1"
+                />
+              </>
+            )}
+          </div>
 
           {/* Comissão do Restaurante - Seletor Fixo/Variável */}
           <div className="space-y-2">
