@@ -31,6 +31,7 @@ interface InputPanelProps {
     key: K,
     value: SimulatorInputs[K]
   ) => void;
+  grossMargin?: number;
 }
 
 interface InputFieldProps {
@@ -101,7 +102,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function InputPanel({ inputs, updateInput }: InputPanelProps) {
+export default function InputPanel({ inputs, updateInput, grossMargin = 0 }: InputPanelProps) {
   return (
     <div className="space-y-6 p-5 pb-24">
       {/* Logo / Title */}
@@ -331,16 +332,20 @@ export default function InputPanel({ inputs, updateInput }: InputPanelProps) {
             )}
           </div>
 
-          <InputField
-            label="Margem mínima"
-            value={inputs.minMargin}
-            onChange={(v) => updateInput("minMargin", v)}
-            icon={<Shield className="w-3 h-3" />}
-            suffix="%"
-            min={5}
-            max={80}
-            showSlider
-          />
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
+              <Shield className="w-3 h-3" />
+              Margem bruta atual
+            </Label>
+            <div className="flex items-center gap-2 bg-background/50 border border-border/50 rounded-md h-9 px-3">
+              <span className={`font-mono text-sm font-semibold tabular-nums ${
+                grossMargin >= 40 ? "text-primary" : grossMargin >= 20 ? "text-amber-400" : "text-destructive"
+              }`}>
+                {grossMargin.toFixed(1)}
+              </span>
+              <span className="text-xs text-muted-foreground">%</span>
+            </div>
+          </div>
           <InputField
             label="Desconto máximo"
             value={inputs.maxDiscount}

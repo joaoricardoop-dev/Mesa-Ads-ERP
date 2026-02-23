@@ -6,7 +6,7 @@
 
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useSimulator, type BudgetOption } from "@/hooks/useSimulator";
+import { useSimulator, type BudgetOption, loadSavedBudgetId, saveBudgetId } from "@/hooks/useSimulator";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -62,8 +62,11 @@ import { useTheme } from "@/contexts/ThemeContext";
 export default function Home() {
   // ─── Budget selection state ────────────────────────────────────────
   const { theme, toggleTheme } = useTheme();
-  const [selectedBudgetId, setSelectedBudgetId] = useState<string>("manual");
   const { data: budgetsList = [] } = trpc.budget.listActiveWithItems.useQuery();
+  const [selectedBudgetId, setSelectedBudgetId] = useState<string>(() => {
+    const savedId = loadSavedBudgetId();
+    return savedId !== null ? String(savedId) : "manual";
+  });
 
   const selectedBudget = useMemo<BudgetOption | null>(() => {
     if (selectedBudgetId === "manual") return null;
@@ -152,6 +155,7 @@ export default function Home() {
           <InputPanel
             inputs={simulator.inputs}
             updateInput={simulator.updateInput}
+            grossMargin={simulator.perRestaurant.grossMargin}
           />
         </ScrollArea>
       </aside>
@@ -178,6 +182,7 @@ export default function Home() {
                     <InputPanel
                       inputs={simulator.inputs}
                       updateInput={simulator.updateInput}
+                      grossMargin={simulator.perRestaurant.grossMargin}
                     />
                   </ScrollArea>
                 </SheetContent>
@@ -369,7 +374,10 @@ export default function Home() {
                       </Label>
                       <Select
                         value={selectedBudgetId}
-                        onValueChange={setSelectedBudgetId}
+                        onValueChange={(v) => {
+                          setSelectedBudgetId(v);
+                          saveBudgetId(v === "manual" ? null : parseInt(v));
+                        }}
                       >
                         <SelectTrigger className="bg-background/50 border-border/50 h-9 text-sm">
                           <SelectValue placeholder="Selecione um orçamento" />
