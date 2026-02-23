@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import AppNav from "@/components/AppNav";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -43,17 +43,31 @@ import {
   Pencil,
   Trash2,
   Building2,
-  Mail,
   Phone,
   Search,
   Tag,
+  MapPin,
+  Instagram,
+  ChevronDown,
+  ArrowUpDown,
+  ChevronUp,
+  Mail,
 } from "lucide-react";
 
 interface ClientForm {
   name: string;
   company: string;
+  razaoSocial: string;
+  cnpj: string;
+  instagram: string;
   contactEmail: string;
   contactPhone: string;
+  address: string;
+  addressNumber: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  cep: string;
   segment: string;
   status: "active" | "inactive";
 }
@@ -61,8 +75,17 @@ interface ClientForm {
 const emptyForm: ClientForm = {
   name: "",
   company: "",
+  razaoSocial: "",
+  cnpj: "",
+  instagram: "",
   contactEmail: "",
   contactPhone: "",
+  address: "",
+  addressNumber: "",
+  neighborhood: "",
+  city: "",
+  state: "",
+  cep: "",
   segment: "",
   status: "active",
 };
@@ -80,8 +103,15 @@ const SEGMENTS = [
   "Varejo",
   "Automotivo",
   "Turismo",
+  "Construção",
+  "Imobiliário",
+  "Serviços",
+  "Academia",
   "Outro",
 ];
+
+type SortKey = "name" | "neighborhood" | "contactPhone" | "status";
+type SortDir = "asc" | "desc";
 
 export default function Clients() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -89,6 +119,9 @@ export default function Clients() {
   const [form, setForm] = useState<ClientForm>(emptyForm);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const utils = trpc.useUtils();
   const { data: clientsList = [], isLoading } = trpc.advertiser.list.useQuery();
@@ -140,8 +173,17 @@ export default function Clients() {
     setForm({
       name: c.name,
       company: c.company || "",
+      razaoSocial: c.razaoSocial || "",
+      cnpj: c.cnpj || "",
+      instagram: c.instagram || "",
       contactEmail: c.contactEmail || "",
       contactPhone: c.contactPhone || "",
+      address: c.address || "",
+      addressNumber: c.addressNumber || "",
+      neighborhood: c.neighborhood || "",
+      city: c.city || "",
+      state: c.state || "",
+      cep: c.cep || "",
       segment: c.segment || "",
       status: c.status,
     });
@@ -154,14 +196,56 @@ export default function Clients() {
     setIsDialogOpen(true);
   };
 
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
   const filtered = clientsList.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       (c.company || "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.segment || "").toLowerCase().includes(search.toLowerCase())
+      (c.razaoSocial || "").toLowerCase().includes(search.toLowerCase()) ||
+      (c.neighborhood || "").toLowerCase().includes(search.toLowerCase())
   );
 
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    switch (sortKey) {
+      case "name":
+        return a.name.localeCompare(b.name) * dir;
+      case "neighborhood":
+        return (a.neighborhood || "").localeCompare(b.neighborhood || "") * dir;
+      case "contactPhone":
+        return (a.contactPhone || "").localeCompare(b.contactPhone || "") * dir;
+      case "status":
+        return a.status.localeCompare(b.status) * dir;
+      default:
+        return 0;
+    }
+  });
+
   const activeCount = clientsList.filter((c) => c.status === "active").length;
+
+  const SortHeader = ({ label, col, className = "" }: { label: string; col: SortKey; className?: string }) => (
+    <TableHead
+      className={`text-xs text-muted-foreground font-medium cursor-pointer select-none hover:text-foreground transition-colors ${className}`}
+      onClick={() => handleSort(col)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {sortKey === col ? (
+          sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+        ) : (
+          <ArrowUpDown className="w-3 h-3 opacity-40" />
+        )}
+      </div>
+    </TableHead>
+  );
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -175,7 +259,7 @@ export default function Clients() {
             Clientes (Anunciantes)
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Gerencie os anunciantes que compram mídia da Mesa Ads
+            Base de dados dos anunciantes da Mesa Ads
           </p>
         </div>
         <Button onClick={handleNew} className="gap-2">
@@ -185,7 +269,7 @@ export default function Clients() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div className="bg-card border border-border/30 rounded-lg p-4">
           <p className="text-xs text-muted-foreground">Total Clientes</p>
           <p className="text-2xl font-bold font-mono">{clientsList.length}</p>
@@ -194,12 +278,6 @@ export default function Clients() {
           <p className="text-xs text-muted-foreground">Ativos</p>
           <p className="text-2xl font-bold font-mono text-primary">
             {activeCount}
-          </p>
-        </div>
-        <div className="bg-card border border-border/30 rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Segmentos</p>
-          <p className="text-2xl font-bold font-mono">
-            {new Set(clientsList.map((c) => c.segment).filter(Boolean)).size}
           </p>
         </div>
       </div>
@@ -220,21 +298,10 @@ export default function Clients() {
         <Table>
           <TableHeader>
             <TableRow className="border-border/30 hover:bg-transparent">
-              <TableHead className="text-xs text-muted-foreground font-medium">
-                CLIENTE
-              </TableHead>
-              <TableHead className="text-xs text-muted-foreground font-medium hidden md:table-cell">
-                EMPRESA
-              </TableHead>
-              <TableHead className="text-xs text-muted-foreground font-medium hidden lg:table-cell">
-                CONTATO
-              </TableHead>
-              <TableHead className="text-xs text-muted-foreground font-medium hidden md:table-cell">
-                SEGMENTO
-              </TableHead>
-              <TableHead className="text-xs text-muted-foreground font-medium text-center">
-                STATUS
-              </TableHead>
+              <SortHeader label="CLIENTE" col="name" />
+              <SortHeader label="LOCALIZAÇÃO" col="neighborhood" className="hidden md:table-cell" />
+              <SortHeader label="CONTATO" col="contactPhone" className="hidden lg:table-cell" />
+              <SortHeader label="STATUS" col="status" className="text-center" />
               <TableHead className="text-xs text-muted-foreground font-medium text-right">
                 AÇÕES
               </TableHead>
@@ -243,91 +310,163 @@ export default function Clients() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
-            ) : filtered.length === 0 ? (
+            ) : sorted.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   {search
                     ? "Nenhum cliente encontrado"
                     : "Nenhum cliente cadastrado. Clique em \"Novo Cliente\" para começar."}
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((c) => (
-                <TableRow key={c.id} className="border-border/20 hover:bg-card/80">
-                  <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                    <div className="flex items-center gap-1">
-                      <Building2 className="w-3 h-3" />
-                      {c.company || "—"}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
-                    <div className="flex flex-col gap-0.5">
-                      {c.contactEmail && (
-                        <div className="flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          {c.contactEmail}
-                        </div>
-                      )}
-                      {c.contactPhone && (
-                        <div className="flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
-                          {c.contactPhone}
-                        </div>
-                      )}
-                      {!c.contactEmail && !c.contactPhone && "—"}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {c.segment ? (
+              sorted.map((c) => (
+                <Fragment key={c.id}>
+                  <TableRow
+                    className="border-border/20 hover:bg-card/80 cursor-pointer"
+                    onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                  >
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === c.id ? "rotate-180" : ""}`} />
+                        {c.name}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {c.neighborhood || c.city || "—"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+                      <div className="flex items-center gap-1">
+                        <Phone className="w-3 h-3" />
+                        {c.contactPhone || "—"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
                       <Badge
-                        variant="outline"
-                        className="border-border/40 text-xs"
+                        variant={c.status === "active" ? "default" : "secondary"}
+                        className={
+                          c.status === "active"
+                            ? "bg-primary/20 text-primary border-primary/30"
+                            : "bg-muted text-muted-foreground"
+                        }
                       >
-                        <Tag className="w-3 h-3 mr-1" />
-                        {c.segment}
+                        {c.status === "active" ? "Ativo" : "Inativo"}
                       </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge
-                      variant={c.status === "active" ? "default" : "secondary"}
-                      className={
-                        c.status === "active"
-                          ? "bg-primary/20 text-primary border-primary/30"
-                          : "bg-muted text-muted-foreground"
-                      }
-                    >
-                      {c.status === "active" ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleEdit(c)}
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteId(c.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEdit(c)}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteId(c.id)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {expandedId === c.id && (
+                    <TableRow className="border-border/10 bg-background/50 hover:bg-background/50">
+                      <TableCell colSpan={5} className="p-0">
+                        <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                          <div className="space-y-3">
+                            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Identificação</p>
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="text-muted-foreground">Razão Social:</span>
+                                <span className="truncate">{c.razaoSocial || "—"}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="text-muted-foreground">CNPJ:</span>
+                                <span>{c.cnpj || "—"}</span>
+                              </div>
+                              {c.company && (
+                                <div className="flex items-center gap-2">
+                                  <Tag className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span className="text-muted-foreground">Nome Fantasia:</span>
+                                  <span>{c.company}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Endereço</p>
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span>
+                                  {[c.address, c.addressNumber].filter(Boolean).join(", ") || "—"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-3.5 h-3.5 text-muted-foreground invisible" />
+                                <span>
+                                  {[c.neighborhood, c.city, c.state].filter(Boolean).join(" — ") || "—"}
+                                </span>
+                              </div>
+                              {c.cep && (
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-3.5 h-3.5 text-muted-foreground invisible" />
+                                  <span className="text-muted-foreground">CEP:</span>
+                                  <span>{c.cep}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Contato</p>
+                            <div className="space-y-1.5">
+                              {c.contactPhone && (
+                                <div className="flex items-center gap-2">
+                                  <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span>{c.contactPhone}</span>
+                                </div>
+                              )}
+                              {c.contactEmail && (
+                                <div className="flex items-center gap-2">
+                                  <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span>{c.contactEmail}</span>
+                                </div>
+                              )}
+                              {c.instagram && (
+                                <div className="flex items-center gap-2">
+                                  <Instagram className="w-3.5 h-3.5 text-pink-500" />
+                                  <span>{c.instagram}</span>
+                                </div>
+                              )}
+                              {c.segment && (
+                                <div className="flex items-center gap-2">
+                                  <Tag className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span className="text-muted-foreground">Segmento:</span>
+                                  <span>{c.segment}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
               ))
             )}
           </TableBody>
@@ -336,56 +475,154 @@ export default function Clients() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-lg bg-card border-border/30">
+        <DialogContent className="sm:max-w-2xl bg-card border-border/30 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingId ? "Editar Cliente" : "Novo Cliente"}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label>Nome do Contato *</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Nome do contato principal"
-                className="bg-background border-border/30"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Empresa</Label>
-              <Input
-                value={form.company}
-                onChange={(e) => setForm({ ...form, company: e.target.value })}
-                placeholder="Nome da empresa"
-                className="bg-background border-border/30"
-              />
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Identificação</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Nome / Marca *</Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Nome do cliente"
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Nome Fantasia</Label>
+                <Input
+                  value={form.company}
+                  onChange={(e) => setForm({ ...form, company: e.target.value })}
+                  placeholder="Nome fantasia"
+                  className="bg-background border-border/30"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Razão Social</Label>
+                <Input
+                  value={form.razaoSocial}
+                  onChange={(e) => setForm({ ...form, razaoSocial: e.target.value })}
+                  placeholder="Razão social"
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>CNPJ</Label>
+                <Input
+                  value={form.cnpj}
+                  onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
+                  placeholder="00.000.000/0000-00"
+                  className="bg-background border-border/30"
+                />
+              </div>
+            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Endereço</p>
+            <div className="grid grid-cols-[1fr_100px] gap-4">
+              <div className="grid gap-2">
+                <Label>Logradouro</Label>
+                <Input
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  placeholder="Rua, Av, etc."
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>N°</Label>
+                <Input
+                  value={form.addressNumber}
+                  onChange={(e) => setForm({ ...form, addressNumber: e.target.value })}
+                  placeholder="123"
+                  className="bg-background border-border/30"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label>Bairro</Label>
+                <Input
+                  value={form.neighborhood}
+                  onChange={(e) => setForm({ ...form, neighborhood: e.target.value })}
+                  placeholder="Bairro"
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Cidade</Label>
+                <Input
+                  value={form.city}
+                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                  placeholder="Cidade"
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid grid-cols-[1fr_80px] gap-2">
+                <div className="grid gap-2">
+                  <Label>CEP</Label>
+                  <Input
+                    value={form.cep}
+                    onChange={(e) => setForm({ ...form, cep: e.target.value })}
+                    placeholder="00000-000"
+                    className="bg-background border-border/30"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>UF</Label>
+                  <Input
+                    value={form.state}
+                    onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase().slice(0, 2) })}
+                    placeholder="AM"
+                    maxLength={2}
+                    className="bg-background border-border/30"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Contato</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Telefone</Label>
+                <Input
+                  value={form.contactPhone}
+                  onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
+                  placeholder="(92) 3333-3333"
+                  className="bg-background border-border/30"
+                />
+              </div>
               <div className="grid gap-2">
                 <Label>E-mail</Label>
                 <Input
                   type="email"
                   value={form.contactEmail}
-                  onChange={(e) =>
-                    setForm({ ...form, contactEmail: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
                   placeholder="email@empresa.com"
                   className="bg-background border-border/30"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label>Telefone</Label>
-                <Input
-                  value={form.contactPhone}
-                  onChange={(e) =>
-                    setForm({ ...form, contactPhone: e.target.value })
-                  }
-                  placeholder="(11) 99999-9999"
-                  className="bg-background border-border/30"
-                />
-              </div>
             </div>
+            <div className="grid gap-2">
+              <Label className="flex items-center gap-1.5">
+                <Instagram className="w-3.5 h-3.5 text-pink-500" />
+                Instagram
+              </Label>
+              <Input
+                value={form.instagram}
+                onChange={(e) => setForm({ ...form, instagram: e.target.value })}
+                placeholder="@cliente"
+                className="bg-background border-border/30"
+              />
+            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Classificação</p>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Segmento</Label>

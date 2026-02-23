@@ -22,7 +22,7 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 
 - `users` — Auth users
 - `restaurants` — Partner restaurants
-- `clients` — Advertisers
+- `clients` — Advertisers (47 imported with full address/contact/CNPJ data)
 - `campaigns` — Ad campaigns
 - `campaign_restaurants` — N:N campaign-restaurant relationship
 - `suppliers` — Production suppliers (print shops)
