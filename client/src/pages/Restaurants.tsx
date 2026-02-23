@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import AppNav from "@/components/AppNav";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -44,11 +44,14 @@ import {
   Trash2,
   Store,
   MapPin,
-  Phone,
-  User,
   Search,
   Instagram,
   MessageCircle,
+  ChevronDown,
+  ChevronUp,
+  ArrowUpDown,
+  Building2,
+  Phone,
 } from "lucide-react";
 
 interface RestaurantForm {
@@ -89,12 +92,18 @@ const emptyForm: RestaurantForm = {
   status: "active",
 };
 
+type SortKey = "name" | "neighborhood" | "whatsapp" | "status";
+type SortDir = "asc" | "desc";
+
 export default function Restaurants() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<RestaurantForm>(emptyForm);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const utils = trpc.useUtils();
   const { data: restaurants = [], isLoading } = trpc.restaurant.list.useQuery();
@@ -170,6 +179,15 @@ export default function Restaurants() {
     setIsDialogOpen(true);
   };
 
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
   const filtered = restaurants.filter(
     (r) =>
       r.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -177,7 +195,39 @@ export default function Restaurants() {
       (r.city || "").toLowerCase().includes(search.toLowerCase())
   );
 
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    switch (sortKey) {
+      case "name":
+        return a.name.localeCompare(b.name) * dir;
+      case "neighborhood":
+        return (a.neighborhood || "").localeCompare(b.neighborhood || "") * dir;
+      case "whatsapp":
+        return (a.whatsapp || "").localeCompare(b.whatsapp || "") * dir;
+      case "status":
+        return a.status.localeCompare(b.status) * dir;
+      default:
+        return 0;
+    }
+  });
+
   const activeCount = restaurants.filter((r) => r.status === "active").length;
+
+  const SortHeader = ({ label, col, className = "" }: { label: string; col: SortKey; className?: string }) => (
+    <TableHead
+      className={`text-xs text-muted-foreground font-medium cursor-pointer select-none hover:text-foreground transition-colors ${className}`}
+      onClick={() => handleSort(col)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {sortKey === col ? (
+          sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+        ) : (
+          <ArrowUpDown className="w-3 h-3 opacity-40" />
+        )}
+      </div>
+    </TableHead>
+  );
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -201,7 +251,7 @@ export default function Restaurants() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div className="bg-card border border-border/30 rounded-lg p-4">
           <p className="text-xs text-muted-foreground">Total</p>
           <p className="text-2xl font-bold font-mono">{restaurants.length}</p>
@@ -210,20 +260,6 @@ export default function Restaurants() {
           <p className="text-xs text-muted-foreground">Ativos</p>
           <p className="text-2xl font-bold font-mono text-primary">
             {activeCount}
-          </p>
-        </div>
-        <div className="bg-card border border-border/30 rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Comissão Média</p>
-          <p className="text-2xl font-bold font-mono">
-            {restaurants.length > 0
-              ? (
-                  restaurants.reduce(
-                    (sum, r) => sum + parseFloat(String(r.commissionPercent)),
-                    0
-                  ) / restaurants.length
-                ).toFixed(1)
-              : "0"}
-            %
           </p>
         </div>
       </div>
@@ -244,21 +280,10 @@ export default function Restaurants() {
         <Table>
           <TableHeader>
             <TableRow className="border-border/30 hover:bg-transparent">
-              <TableHead className="text-xs text-muted-foreground font-medium">
-                RESTAURANTE
-              </TableHead>
-              <TableHead className="text-xs text-muted-foreground font-medium hidden md:table-cell">
-                LOCALIZAÇÃO
-              </TableHead>
-              <TableHead className="text-xs text-muted-foreground font-medium hidden lg:table-cell">
-                WHATSAPP
-              </TableHead>
-              <TableHead className="text-xs text-muted-foreground font-medium text-right">
-                COMISSÃO
-              </TableHead>
-              <TableHead className="text-xs text-muted-foreground font-medium text-center">
-                STATUS
-              </TableHead>
+              <SortHeader label="RESTAURANTE" col="name" />
+              <SortHeader label="LOCALIZAÇÃO" col="neighborhood" className="hidden md:table-cell" />
+              <SortHeader label="WHATSAPP" col="whatsapp" className="hidden lg:table-cell" />
+              <SortHeader label="STATUS" col="status" className="text-center" />
               <TableHead className="text-xs text-muted-foreground font-medium text-right">
                 AÇÕES
               </TableHead>
@@ -267,70 +292,148 @@ export default function Restaurants() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
-            ) : filtered.length === 0 ? (
+            ) : sorted.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   {search
                     ? "Nenhum restaurante encontrado"
                     : "Nenhum restaurante cadastrado. Clique em \"Novo Restaurante\" para começar."}
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((r) => (
-                <TableRow key={r.id} className="border-border/20 hover:bg-card/80">
-                  <TableCell className="font-medium">{r.name}</TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      {r.neighborhood || r.city || "—"}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
-                    <div className="flex items-center gap-1">
-                      <MessageCircle className="w-3 h-3 text-green-500" />
-                      {r.whatsapp || "—"}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm text-primary">
-                    {parseFloat(String(r.commissionPercent)).toFixed(1)}%
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge
-                      variant={r.status === "active" ? "default" : "secondary"}
-                      className={
-                        r.status === "active"
-                          ? "bg-primary/20 text-primary border-primary/30"
-                          : "bg-muted text-muted-foreground"
-                      }
-                    >
-                      {r.status === "active" ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleEdit(r)}
+              sorted.map((r) => (
+                <Fragment key={r.id}>
+                  <TableRow
+                    className="border-border/20 hover:bg-card/80 cursor-pointer"
+                    onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                  >
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === r.id ? "rotate-180" : ""}`} />
+                        {r.name}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {r.neighborhood || r.city || "—"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+                      <div className="flex items-center gap-1">
+                        <MessageCircle className="w-3 h-3 text-green-500" />
+                        {r.whatsapp || "—"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        variant={r.status === "active" ? "default" : "secondary"}
+                        className={
+                          r.status === "active"
+                            ? "bg-primary/20 text-primary border-primary/30"
+                            : "bg-muted text-muted-foreground"
+                        }
                       >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteId(r.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                        {r.status === "active" ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEdit(r)}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteId(r.id)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {expandedId === r.id && (
+                    <TableRow className="border-border/10 bg-background/50 hover:bg-background/50">
+                      <TableCell colSpan={5} className="p-0">
+                        <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                          <div className="space-y-3">
+                            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Identificação</p>
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="text-muted-foreground">Razão Social:</span>
+                                <span>{r.razaoSocial || "—"}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="text-muted-foreground">CNPJ:</span>
+                                <span>{r.cnpj || "—"}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Endereço</p>
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span>
+                                  {[r.address, r.addressNumber].filter(Boolean).join(", ") || "—"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-3.5 h-3.5 text-muted-foreground invisible" />
+                                <span>
+                                  {[r.neighborhood, r.city, r.state].filter(Boolean).join(" — ") || "—"}
+                                </span>
+                              </div>
+                              {r.cep && (
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-3.5 h-3.5 text-muted-foreground invisible" />
+                                  <span className="text-muted-foreground">CEP:</span>
+                                  <span>{r.cep}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Contato</p>
+                            <div className="space-y-1.5">
+                              {r.contactName && (
+                                <div className="flex items-center gap-2">
+                                  <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span>{r.contactName}</span>
+                                  {r.contactPhone && <span className="text-muted-foreground">({r.contactPhone})</span>}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2">
+                                <MessageCircle className="w-3.5 h-3.5 text-green-500" />
+                                <span>{r.whatsapp || "—"}</span>
+                              </div>
+                              {r.instagram && (
+                                <div className="flex items-center gap-2">
+                                  <Instagram className="w-3.5 h-3.5 text-pink-500" />
+                                  <span>{r.instagram}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
               ))
             )}
           </TableBody>
@@ -494,32 +597,8 @@ export default function Restaurants() {
               </div>
             </div>
 
-            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Operacional</p>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <Label>Coasters</Label>
-                <Input
-                  type="number"
-                  value={form.coastersAllocated}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      coastersAllocated: parseInt(e.target.value) || 0,
-                    })
-                  }
-                  className="bg-background border-border/30"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Comissão %</Label>
-                <Input
-                  value={form.commissionPercent}
-                  onChange={(e) =>
-                    setForm({ ...form, commissionPercent: e.target.value })
-                  }
-                  className="bg-background border-border/30"
-                />
-              </div>
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Status</p>
+            <div className="grid grid-cols-1 gap-4">
               <div className="grid gap-2">
                 <Label>Status</Label>
                 <Select
