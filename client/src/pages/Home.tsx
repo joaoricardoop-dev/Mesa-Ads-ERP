@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import AppNav from "@/components/AppNav";
 import {
   BarChart3,
   Table2,
@@ -187,121 +188,32 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top Bar - Fixed */}
-        <header className="border-b border-border/30 bg-card/50 backdrop-blur-sm flex-shrink-0 z-10">
-          <div className="flex items-center justify-between px-4 lg:px-6 h-14">
-            <div className="flex items-center gap-3">
-              {/* Mobile sidebar trigger */}
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="lg:hidden h-8 w-8 border-border/40"
-                  >
-                    <SlidersHorizontal className="w-4 h-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-[320px] p-0 bg-sidebar">
-                  <ScrollArea className="h-full">
-                    <InputPanel
-                      inputs={simulator.inputs}
-                      updateInput={simulator.updateInput}
-                      grossMargin={simulator.perRestaurant.grossMargin}
-                    />
-                  </ScrollArea>
-                </SheetContent>
-              </Sheet>
+        <AppNav />
 
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
-                  <Megaphone className="w-3.5 h-3.5 text-primary" />
-                </div>
-                <div className="hidden sm:block">
-                  <h1 className="text-sm font-bold tracking-tight">
-                    Mesa Ads
-                  </h1>
-                  <p className="text-[10px] text-muted-foreground">
-                    Plataforma de Gestão
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Navigation links */}
-            <div className="flex items-center gap-1">
+        {/* Mobile sidebar trigger */}
+        <div className="lg:hidden border-b border-border/30 bg-card/30 px-4 py-2">
+          <Sheet>
+            <SheetTrigger asChild>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="text-xs gap-1.5 text-primary"
-                onClick={() => navigate("/")}
+                className="gap-2 border-border/40"
               >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Simulador</span>
+                <SlidersHorizontal className="w-4 h-4" />
+                Parâmetros
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs gap-1.5"
-                onClick={() => navigate("/restaurantes")}
-              >
-                <Store className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Restaurantes</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs gap-1.5"
-                onClick={() => navigate("/clientes")}
-              >
-                <Building2 className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Clientes</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs gap-1.5"
-                onClick={() => navigate("/campanhas")}
-              >
-                <Megaphone className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Campanhas</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs gap-1.5"
-                onClick={() => navigate("/economics")}
-              >
-                <DollarSign className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Economics</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs gap-1.5"
-                onClick={() => navigate("/producao")}
-              >
-                <Factory className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Produção</span>
-              </Button>
-
-              <div className="w-px h-5 bg-border/50 mx-1" />
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-8 h-8 p-0"
-                onClick={toggleTheme}
-              >
-                {theme === "dark" ? (
-                  <Sun className="w-3.5 h-3.5" />
-                ) : (
-                  <Moon className="w-3.5 h-3.5" />
-                )}
-              </Button>
-            </div>
-          </div>
-        </header>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[320px] p-0 bg-sidebar">
+              <ScrollArea className="h-full">
+                <InputPanel
+                  inputs={simulator.inputs}
+                  updateInput={simulator.updateInput}
+                  grossMargin={simulator.perRestaurant.grossMargin}
+                />
+              </ScrollArea>
+            </SheetContent>
+          </Sheet>
+        </div>
 
         {/* Tabs Navigation - Fixed */}
         <Tabs

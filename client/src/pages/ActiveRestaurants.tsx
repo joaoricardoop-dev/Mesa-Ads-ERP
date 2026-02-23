@@ -141,8 +141,6 @@ interface FormData {
   excludedOther: string;
   photoAuthorization: string;
   pixKey: string;
-  coastersAllocated: number;
-  commissionPercent: string;
   notes: string;
   status: string;
 }
@@ -169,8 +167,6 @@ const emptyForm: FormData = {
   excludedOther: "",
   photoAuthorization: "sim",
   pixKey: "",
-  coastersAllocated: 500,
-  commissionPercent: "20.00",
   notes: "",
   status: "active",
 };
@@ -243,8 +239,6 @@ export default function ActiveRestaurantsPage() {
       excludedOther: r.excludedOther || "",
       photoAuthorization: r.photoAuthorization || "sim",
       pixKey: r.pixKey || "",
-      coastersAllocated: r.coastersAllocated,
-      commissionPercent: r.commissionPercent || "20.00",
       notes: r.notes || "",
       status: r.status,
     });
@@ -274,8 +268,6 @@ export default function ActiveRestaurantsPage() {
       excludedOther: form.excludedOther || undefined,
       photoAuthorization: form.photoAuthorization,
       pixKey: form.pixKey || undefined,
-      coastersAllocated: form.coastersAllocated,
-      commissionPercent: form.commissionPercent,
       notes: form.notes || undefined,
     };
 
@@ -412,8 +404,6 @@ export default function ActiveRestaurantsPage() {
                         <div className="space-y-2">
                           <h4 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1"><CreditCard className="w-3 h-3" /> Financeiro</h4>
                           <DetailRow label="Chave Pix" value={r.pixKey} />
-                          <DetailRow label="Coasters" value={`${r.coastersAllocated}`} />
-                          <DetailRow label="Comissão" value={`${Number(r.commissionPercent)}%`} />
                           <DetailRow label="Fotos autorizadas" value={r.photoAuthorization === "sim" ? "Sim" : "Não"} />
                         </div>
                         {r.excludedCategories && (
@@ -607,16 +597,6 @@ export default function ActiveRestaurantsPage() {
                   <div className="space-y-2">
                     <Label className="text-xs">Chave Pix</Label>
                     <Input value={form.pixKey} onChange={(e) => setForm(p => ({ ...p, pixKey: e.target.value }))} placeholder="CPF, CNPJ, email ou telefone" className="bg-background border-border/30" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Comissão (%)</Label>
-                    <Input value={form.commissionPercent} onChange={(e) => setForm(p => ({ ...p, commissionPercent: e.target.value }))} className="bg-background border-border/30" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Coasters Alocados</Label>
-                    <Input type="number" value={form.coastersAllocated} onChange={(e) => setForm(p => ({ ...p, coastersAllocated: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30" />
                   </div>
                   {editingId && (
                     <div className="space-y-2">

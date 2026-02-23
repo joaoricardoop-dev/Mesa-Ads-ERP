@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   Plus,
@@ -52,6 +55,8 @@ import {
   ArrowUpDown,
   Building2,
   Phone,
+  ArrowRightCircle,
+  UtensilsCrossed,
 } from "lucide-react";
 
 interface RestaurantForm {
@@ -92,6 +97,107 @@ const emptyForm: RestaurantForm = {
   status: "active",
 };
 
+interface ConvertForm {
+  name: string;
+  address: string;
+  neighborhood: string;
+  googleMapsLink: string;
+  instagram: string;
+  contactType: string;
+  contactName: string;
+  contactRole: string;
+  whatsapp: string;
+  email: string;
+  financialEmail: string;
+  socialClass: string;
+  tableCount: number;
+  seatCount: number;
+  monthlyCustomers: number;
+  busyDays: string[];
+  busyHours: string;
+  excludedCategories: string[];
+  excludedOther: string;
+  photoAuthorization: string;
+  pixKey: string;
+  notes: string;
+}
+
+const emptyConvertForm: ConvertForm = {
+  name: "",
+  address: "",
+  neighborhood: "",
+  googleMapsLink: "",
+  instagram: "",
+  contactType: "gerente",
+  contactName: "",
+  contactRole: "",
+  whatsapp: "",
+  email: "",
+  financialEmail: "",
+  socialClass: "misto_ab",
+  tableCount: 0,
+  seatCount: 0,
+  monthlyCustomers: 0,
+  busyDays: [],
+  busyHours: "",
+  excludedCategories: [],
+  excludedOther: "",
+  photoAuthorization: "sim",
+  pixKey: "",
+  notes: "",
+};
+
+const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+
+const EXCLUDED_CATEGORIES = [
+  "Concorrentes diretos",
+  "Bebidas alcoólicas",
+  "Bebidas não alcoólicas",
+  "Alimentação (marcas de comida, snacks, etc.)",
+  "Cafeterias e docerias",
+  "Sorveterias / açaí / sobremesas",
+  "Apps de delivery e marketplaces",
+  "Supermercados / atacarejos",
+  "Varejo em geral",
+  "Moda (roupas, calçados, acessórios)",
+  "Beleza e cuidados pessoais",
+  "Salão / barbearia / estética",
+  "Óticas",
+  "Joias / relógios / acessórios premium",
+  "Produtos e serviços pet",
+  "Academias e estúdios",
+  "Saúde (clínicas, odontologia, etc.)",
+  "Planos e seguros",
+  "Bancos e fintechs",
+  "Pagamentos (maquininha, carteiras digitais)",
+  "Cripto/investimentos de alto risco",
+  "Empréstimos agressivos",
+  "Contabilidade e serviços B2B",
+  "Telefonia / internet",
+  "Eletrônicos e acessórios",
+  "Softwares e ferramentas (SaaS, ERP)",
+  "Transporte e mobilidade",
+  "Automotivo",
+  "Turismo e viagens",
+  "Eventos e entretenimento",
+  "Cultura e lazer",
+  "Educação",
+  "Casa e construção",
+  "Imobiliário",
+  "Serviços residenciais",
+  "Logística e serviços locais",
+  "Energia e utilidades",
+  "Sustentabilidade",
+  "Tecnologia/serviços profissionais",
+  "Saúde e bem-estar lifestyle",
+  "Esportes e hobbies",
+  "Gastronomia e experiências",
+  "Gaming/bets/Apostas",
+  "Política",
+  "Religião",
+  "Conteúdo adulto/sexual",
+];
+
 type SortKey = "name" | "neighborhood" | "whatsapp" | "status";
 type SortDir = "asc" | "desc";
 
@@ -104,6 +210,9 @@ export default function Restaurants() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [isConvertOpen, setIsConvertOpen] = useState(false);
+  const [convertingProspectId, setConvertingProspectId] = useState<number | null>(null);
+  const [convertForm, setConvertForm] = useState<ConvertForm>(emptyConvertForm);
 
   const utils = trpc.useUtils();
   const { data: restaurants = [], isLoading } = trpc.restaurant.list.useQuery();
@@ -136,6 +245,19 @@ export default function Restaurants() {
       toast.success("Restaurante removido!");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const createActiveMutation = trpc.activeRestaurant.create.useMutation({
+    onSuccess: () => {
+      utils.activeRestaurant.list.invalidate();
+      if (convertingProspectId) {
+        updateMutation.mutate({ id: convertingProspectId, status: "inactive" });
+      }
+      setIsConvertOpen(false);
+      setConvertingProspectId(null);
+      toast.success("Restaurante convertido para ativo com sucesso!");
+    },
+    onError: (err: any) => toast.error(`Erro na conversão: ${err.message}`),
   });
 
   const handleSubmit = () => {
@@ -177,6 +299,69 @@ export default function Restaurants() {
     setEditingId(null);
     setForm(emptyForm);
     setIsDialogOpen(true);
+  };
+
+  const handleConvert = (r: (typeof restaurants)[0]) => {
+    setConvertingProspectId(r.id);
+    const fullAddress = [r.address, r.addressNumber].filter(Boolean).join(", ");
+    setConvertForm({
+      ...emptyConvertForm,
+      name: r.name,
+      address: fullAddress,
+      neighborhood: r.neighborhood || "",
+      instagram: r.instagram || "",
+      contactName: r.contactName || "",
+      contactRole: "",
+      whatsapp: r.whatsapp || "",
+      email: "",
+      financialEmail: "",
+    });
+    setIsConvertOpen(true);
+  };
+
+  const handleSubmitConvert = () => {
+    if (!convertForm.name || !convertForm.address || !convertForm.neighborhood || !convertForm.contactName || !convertForm.contactRole || !convertForm.whatsapp) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+    createActiveMutation.mutate({
+      name: convertForm.name,
+      address: convertForm.address,
+      neighborhood: convertForm.neighborhood,
+      googleMapsLink: convertForm.googleMapsLink || undefined,
+      instagram: convertForm.instagram || undefined,
+      contactType: convertForm.contactType as any,
+      contactName: convertForm.contactName,
+      contactRole: convertForm.contactRole,
+      whatsapp: convertForm.whatsapp,
+      email: convertForm.email || undefined,
+      financialEmail: convertForm.financialEmail || undefined,
+      socialClass: convertForm.socialClass as any,
+      tableCount: convertForm.tableCount,
+      seatCount: convertForm.seatCount,
+      monthlyCustomers: convertForm.monthlyCustomers,
+      busyDays: convertForm.busyDays.length > 0 ? convertForm.busyDays.join(",") : undefined,
+      busyHours: convertForm.busyHours || undefined,
+      excludedCategories: convertForm.excludedCategories.length > 0 ? convertForm.excludedCategories.join("||") : undefined,
+      excludedOther: convertForm.excludedOther || undefined,
+      photoAuthorization: convertForm.photoAuthorization,
+      pixKey: convertForm.pixKey || undefined,
+      notes: convertForm.notes || undefined,
+    });
+  };
+
+  const toggleBusyDay = (day: string) => {
+    setConvertForm(prev => ({
+      ...prev,
+      busyDays: prev.busyDays.includes(day) ? prev.busyDays.filter(d => d !== day) : [...prev.busyDays, day],
+    }));
+  };
+
+  const toggleCategory = (cat: string) => {
+    setConvertForm(prev => ({
+      ...prev,
+      excludedCategories: prev.excludedCategories.includes(cat) ? prev.excludedCategories.filter(c => c !== cat) : [...prev.excludedCategories, cat],
+    }));
   };
 
   const handleSort = (key: SortKey) => {
@@ -233,7 +418,6 @@ export default function Restaurants() {
     <div className="h-screen flex flex-col overflow-hidden">
       <AppNav />
       <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
@@ -250,7 +434,6 @@ export default function Restaurants() {
         </Button>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-card border border-border/30 rounded-lg p-4">
           <p className="text-xs text-muted-foreground">Total</p>
@@ -264,7 +447,6 @@ export default function Restaurants() {
         </div>
       </div>
 
-      {/* Search */}
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
@@ -275,7 +457,6 @@ export default function Restaurants() {
         />
       </div>
 
-      {/* Table */}
       <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
@@ -343,6 +524,15 @@ export default function Restaurants() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-emerald-400 hover:text-emerald-300"
+                          title="Converter para Ativo"
+                          onClick={() => handleConvert(r)}
+                        >
+                          <ArrowRightCircle className="w-3.5 h-3.5" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -430,6 +620,13 @@ export default function Restaurants() {
                             </div>
                           </div>
                         </div>
+
+                        <div className="px-6 pb-4">
+                          <Button size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-xs" onClick={() => handleConvert(r)}>
+                            <ArrowRightCircle className="w-3.5 h-3.5" />
+                            Converter para Restaurante Ativo
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )}
@@ -440,7 +637,6 @@ export default function Restaurants() {
         </Table>
       </div>
 
-      {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-2xl bg-card border-border/30 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -590,8 +786,10 @@ export default function Restaurants() {
                 </Label>
                 <Input
                   value={form.instagram}
-                  onChange={(e) => setForm({ ...form, instagram: e.target.value })}
-                  placeholder="@restaurante"
+                  onChange={(e) =>
+                    setForm({ ...form, instagram: e.target.value })
+                  }
+                  placeholder="@usuario"
                   className="bg-background border-border/30"
                 />
               </div>
@@ -632,7 +830,196 @@ export default function Restaurants() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
+      <Dialog open={isConvertOpen} onOpenChange={setIsConvertOpen}>
+        <DialogContent className="sm:max-w-3xl bg-card border-border/30 max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightCircle className="w-5 h-5 text-emerald-400" />
+              Converter para Restaurante Ativo
+            </DialogTitle>
+          </DialogHeader>
+
+          <p className="text-xs text-muted-foreground">
+            Preencha os dados adicionais para ativar este restaurante como parceiro Mesa Ads.
+          </p>
+
+          <Tabs defaultValue="local" className="space-y-4">
+            <TabsList className="grid grid-cols-5 w-full">
+              <TabsTrigger value="local" className="text-xs">Local</TabsTrigger>
+              <TabsTrigger value="contato" className="text-xs">Contato</TabsTrigger>
+              <TabsTrigger value="operacao" className="text-xs">Operação</TabsTrigger>
+              <TabsTrigger value="restricoes" className="text-xs">Restrições</TabsTrigger>
+              <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="local" className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs">Nome do Estabelecimento *</Label>
+                <Input value={convertForm.name} onChange={(e) => setConvertForm(p => ({ ...p, name: e.target.value }))} className="bg-background border-border/30" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Endereço Completo *</Label>
+                <Input value={convertForm.address} onChange={(e) => setConvertForm(p => ({ ...p, address: e.target.value }))} className="bg-background border-border/30" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">Bairro/Zona *</Label>
+                  <Input value={convertForm.neighborhood} onChange={(e) => setConvertForm(p => ({ ...p, neighborhood: e.target.value }))} className="bg-background border-border/30" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Instagram</Label>
+                  <Input value={convertForm.instagram} onChange={(e) => setConvertForm(p => ({ ...p, instagram: e.target.value }))} placeholder="@usuario" className="bg-background border-border/30" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Link do Google Maps</Label>
+                <Input value={convertForm.googleMapsLink} onChange={(e) => setConvertForm(p => ({ ...p, googleMapsLink: e.target.value }))} placeholder="https://maps.google.com/..." className="bg-background border-border/30" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="contato" className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">Nome do Responsável *</Label>
+                  <Input value={convertForm.contactName} onChange={(e) => setConvertForm(p => ({ ...p, contactName: e.target.value }))} className="bg-background border-border/30" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Cargo *</Label>
+                  <Input value={convertForm.contactRole} onChange={(e) => setConvertForm(p => ({ ...p, contactRole: e.target.value }))} className="bg-background border-border/30" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">Tipo de Contato</Label>
+                  <Select value={convertForm.contactType} onValueChange={(v) => setConvertForm(p => ({ ...p, contactType: v }))}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="proprietario">Proprietário</SelectItem>
+                      <SelectItem value="gerente">Gerente</SelectItem>
+                      <SelectItem value="marketing">Marketing</SelectItem>
+                      <SelectItem value="outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">WhatsApp *</Label>
+                  <Input value={convertForm.whatsapp} onChange={(e) => setConvertForm(p => ({ ...p, whatsapp: e.target.value }))} className="bg-background border-border/30" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">Email</Label>
+                  <Input type="email" value={convertForm.email} onChange={(e) => setConvertForm(p => ({ ...p, email: e.target.value }))} className="bg-background border-border/30" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Email Financeiro</Label>
+                  <Input type="email" value={convertForm.financialEmail} onChange={(e) => setConvertForm(p => ({ ...p, financialEmail: e.target.value }))} className="bg-background border-border/30" />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="operacao" className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">Classe Social Predominante *</Label>
+                  <Select value={convertForm.socialClass} onValueChange={(v) => setConvertForm(p => ({ ...p, socialClass: v }))}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="A">Classe A</SelectItem>
+                      <SelectItem value="B">Classe B</SelectItem>
+                      <SelectItem value="C">Classe C</SelectItem>
+                      <SelectItem value="misto_ab">Misto (A/B)</SelectItem>
+                      <SelectItem value="misto_bc">Misto (B/C)</SelectItem>
+                      <SelectItem value="nao_sei">Não sei</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">Quantidade de Mesas *</Label>
+                  <Input type="number" value={convertForm.tableCount} onChange={(e) => setConvertForm(p => ({ ...p, tableCount: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Quantidade de Assentos *</Label>
+                  <Input type="number" value={convertForm.seatCount} onChange={(e) => setConvertForm(p => ({ ...p, seatCount: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Clientes por Mês *</Label>
+                  <Input type="number" value={convertForm.monthlyCustomers} onChange={(e) => setConvertForm(p => ({ ...p, monthlyCustomers: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Dias de Maior Movimento</Label>
+                <div className="flex flex-wrap gap-2">
+                  {BUSY_DAYS_OPTIONS.map((day) => (
+                    <Button key={day} type="button" size="sm" variant={convertForm.busyDays.includes(day) ? "default" : "outline"} className="text-xs h-7 px-3" onClick={() => toggleBusyDay(day)}>
+                      {day}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Horários de Maior Movimento</Label>
+                <Input value={convertForm.busyHours} onChange={(e) => setConvertForm(p => ({ ...p, busyHours: e.target.value }))} placeholder="Ex: 18h–22h" className="bg-background border-border/30" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="restricoes" className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs">Categorias que NÃO deseja anunciar *</Label>
+                <p className="text-[10px] text-muted-foreground">Selecione todas as categorias que o restaurante não aceita</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-1 max-h-64 overflow-y-auto border border-border/20 rounded-lg p-3">
+                  {EXCLUDED_CATEGORIES.map((cat) => (
+                    <label key={cat} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-muted/5 px-1 rounded text-xs">
+                      <Checkbox checked={convertForm.excludedCategories.includes(cat)} onCheckedChange={() => toggleCategory(cat)} />
+                      <span className="text-xs">{cat}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Outros (descreva)</Label>
+                <Textarea value={convertForm.excludedOther} onChange={(e) => setConvertForm(p => ({ ...p, excludedOther: e.target.value }))} placeholder="Categorias adicionais..." className="bg-background border-border/30 min-h-[60px]" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Autoriza uso de fotos de veiculação? *</Label>
+                <Select value={convertForm.photoAuthorization} onValueChange={(v) => setConvertForm(p => ({ ...p, photoAuthorization: v }))}>
+                  <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sim">Sim</SelectItem>
+                    <SelectItem value="nao">Não</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="financeiro" className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs">Chave Pix</Label>
+                <Input value={convertForm.pixKey} onChange={(e) => setConvertForm(p => ({ ...p, pixKey: e.target.value }))} placeholder="CPF, CNPJ, email ou telefone" className="bg-background border-border/30" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Observações</Label>
+                <Textarea value={convertForm.notes} onChange={(e) => setConvertForm(p => ({ ...p, notes: e.target.value }))} placeholder="Anotações internas..." className="bg-background border-border/30 min-h-[60px]" />
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsConvertOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={handleSubmitConvert}
+              disabled={createActiveMutation.isPending || !convertForm.name || !convertForm.address || !convertForm.neighborhood || !convertForm.contactName || !convertForm.contactRole || !convertForm.whatsapp}
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+            >
+              <UtensilsCrossed className="w-4 h-4" />
+              Converter para Ativo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent className="bg-card border-border/30">
           <AlertDialogHeader>
