@@ -398,6 +398,60 @@ export default function ActiveRestaurantProfile() {
                   </div>
                 </Card>
 
+                {(restaurant.porte || restaurant.naturezaJuridica || restaurant.atividadePrincipal || restaurant.capitalSocial) && (
+                  <Card title="Dados Empresariais" icon={<Building2 className="w-4 h-4" />}>
+                    <div className="space-y-2">
+                      <InfoRow label="Porte" value={restaurant.porte || undefined} />
+                      <InfoRow label="Natureza Jurídica" value={restaurant.naturezaJuridica || undefined} />
+                      <InfoRow label="Capital Social" value={restaurant.capitalSocial ? `R$ ${Number(restaurant.capitalSocial).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : undefined} />
+                      <InfoRow label="Data de Abertura" value={restaurant.dataAbertura || undefined} />
+                      <InfoRow label="Situação Cadastral" value={restaurant.situacaoCadastral || undefined} />
+                      <InfoRow label="CNAE Principal" value={restaurant.atividadePrincipal || undefined} />
+                      {restaurant.atividadesSecundarias && (() => {
+                        try {
+                          const ativs = JSON.parse(restaurant.atividadesSecundarias);
+                          if (Array.isArray(ativs) && ativs.length > 0) {
+                            return (
+                              <div>
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">CNAEs Secundários</p>
+                                <div className="mt-1 space-y-1">
+                                  {ativs.map((a: any, i: number) => (
+                                    <p key={i} className="text-xs text-muted-foreground">{a.id} - {a.descricao}</p>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+                        } catch { }
+                        return null;
+                      })()}
+                    </div>
+                  </Card>
+                )}
+
+                {restaurant.socios && (() => {
+                  try {
+                    const sociosList = JSON.parse(restaurant.socios);
+                    if (Array.isArray(sociosList) && sociosList.length > 0) {
+                      return (
+                        <Card title={`Quadro Societário (${sociosList.length})`} icon={<Users className="w-4 h-4" />}>
+                          <div className="space-y-2">
+                            {sociosList.map((s: any, i: number) => (
+                              <div key={i} className="p-2 bg-background/50 rounded-lg border border-border/20">
+                                <p className="text-sm font-medium">{s.nome}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">{s.qualificacao}</p>
+                                {s.dataEntrada && <p className="text-[10px] text-muted-foreground">Entrada: {s.dataEntrada}</p>}
+                                {s.faixaEtaria && <p className="text-[10px] text-muted-foreground">Faixa etária: {s.faixaEtaria}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        </Card>
+                      );
+                    }
+                  } catch { }
+                  return null;
+                })()}
+
                 <Card title="Operação" icon={<BarChart3 className="w-4 h-4" />}>
                   <div className="space-y-2">
                     <InfoRow label="Classe Social" value={SOCIAL_CLASS_LABELS[restaurant.socialClass] || restaurant.socialClass} />

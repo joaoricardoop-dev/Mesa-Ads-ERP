@@ -108,6 +108,19 @@ interface FormData {
   pixKey: string;
   notes: string;
   status: string;
+  cnpj: string;
+  razaoSocial: string;
+  city: string;
+  state: string;
+  cep: string;
+  porte: string;
+  naturezaJuridica: string;
+  atividadePrincipal: string;
+  atividadesSecundarias: string;
+  capitalSocial: string;
+  dataAbertura: string;
+  situacaoCadastral: string;
+  socios: string;
 }
 
 const emptyForm: FormData = {
@@ -134,6 +147,19 @@ const emptyForm: FormData = {
   pixKey: "",
   notes: "",
   status: "active",
+  cnpj: "",
+  razaoSocial: "",
+  city: "",
+  state: "",
+  cep: "",
+  porte: "",
+  naturezaJuridica: "",
+  atividadePrincipal: "",
+  atividadesSecundarias: "",
+  capitalSocial: "",
+  dataAbertura: "",
+  situacaoCadastral: "",
+  socios: "",
 };
 
 interface Socio {
@@ -186,6 +212,19 @@ export default function ActiveRestaurantForm() {
         excludedOther: existingRestaurant.excludedOther || "",
         photoAuthorization: existingRestaurant.photoAuthorization || "sim",
         pixKey: existingRestaurant.pixKey || "",
+        cnpj: existingRestaurant.cnpj || "",
+        razaoSocial: existingRestaurant.razaoSocial || "",
+        city: existingRestaurant.city || "",
+        state: existingRestaurant.state || "",
+        cep: existingRestaurant.cep || "",
+        porte: existingRestaurant.porte || "",
+        naturezaJuridica: existingRestaurant.naturezaJuridica || "",
+        atividadePrincipal: existingRestaurant.atividadePrincipal || "",
+        atividadesSecundarias: existingRestaurant.atividadesSecundarias || "",
+        capitalSocial: existingRestaurant.capitalSocial || "",
+        dataAbertura: existingRestaurant.dataAbertura || "",
+        situacaoCadastral: existingRestaurant.situacaoCadastral || "",
+        socios: existingRestaurant.socios || "",
         notes: existingRestaurant.notes || "",
         status: existingRestaurant.status,
       });
@@ -218,6 +257,19 @@ export default function ActiveRestaurantForm() {
         neighborhood: d.bairro,
         email: d.email,
         whatsapp: d.telefone1,
+        cnpj: d.cnpj,
+        razaoSocial: d.razaoSocial,
+        city: d.cidade,
+        state: d.uf,
+        cep: d.cep,
+        porte: d.porte,
+        naturezaJuridica: d.naturezaJuridica,
+        atividadePrincipal: d.atividadePrincipal,
+        atividadesSecundarias: JSON.stringify(d.atividadesSecundarias),
+        capitalSocial: d.capitalSocial,
+        dataAbertura: d.dataAbertura,
+        situacaoCadastral: d.situacaoCadastral,
+        socios: JSON.stringify(d.socios),
       }));
       setCnpjFetched(true);
       setStep("form");
@@ -295,6 +347,19 @@ export default function ActiveRestaurantForm() {
       excludedOther: form.excludedOther || undefined,
       photoAuthorization: form.photoAuthorization,
       pixKey: form.pixKey || undefined,
+      cnpj: form.cnpj || undefined,
+      razaoSocial: form.razaoSocial || undefined,
+      city: form.city || undefined,
+      state: form.state || undefined,
+      cep: form.cep || undefined,
+      porte: form.porte || undefined,
+      naturezaJuridica: form.naturezaJuridica || undefined,
+      atividadePrincipal: form.atividadePrincipal || undefined,
+      atividadesSecundarias: form.atividadesSecundarias || undefined,
+      capitalSocial: form.capitalSocial || undefined,
+      dataAbertura: form.dataAbertura || undefined,
+      situacaoCadastral: form.situacaoCadastral || undefined,
+      socios: form.socios || undefined,
       notes: form.notes || undefined,
       status: form.status as "active" | "inactive",
     };
