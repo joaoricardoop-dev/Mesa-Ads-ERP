@@ -46,7 +46,41 @@
 
 :root {
   --radius: 0.5rem;
-  /* Bloomberg Terminal Dark Theme */
+  --background: oklch(0.98 0.005 250);
+  --foreground: oklch(0.15 0.014 256);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.014 256);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.014 256);
+  --primary: oklch(0.55 0.19 163);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.94 0.01 250);
+  --secondary-foreground: oklch(0.25 0.014 256);
+  --muted: oklch(0.94 0.01 250);
+  --muted-foreground: oklch(0.45 0.01 250);
+  --accent: oklch(0.94 0.01 250);
+  --accent-foreground: oklch(0.15 0.014 256);
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.88 0.01 250);
+  --input: oklch(0.88 0.01 250);
+  --ring: oklch(0.55 0.19 163);
+  --chart-1: oklch(0.55 0.19 163);
+  --chart-2: oklch(0.55 0.18 250);
+  --chart-3: oklch(0.6 0.18 85);
+  --chart-4: oklch(0.55 0.2 25);
+  --chart-5: oklch(0.55 0.15 300);
+  --sidebar: oklch(0.96 0.005 250);
+  --sidebar-foreground: oklch(0.15 0.014 256);
+  --sidebar-primary: oklch(0.55 0.19 163);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.94 0.01 250);
+  --sidebar-accent-foreground: oklch(0.15 0.014 256);
+  --sidebar-border: oklch(0.88 0.01 250);
+  --sidebar-ring: oklch(0.55 0.19 163);
+}
+
+.dark {
   --background: oklch(0.145 0.014 256);
   --foreground: oklch(0.92 0.005 250);
   --card: oklch(0.18 0.014 256);
@@ -131,20 +165,19 @@
   }
 }
 
-/* Custom scrollbar for dark theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: oklch(0.18 0.014 256);
+  background: var(--card);
 }
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.35 0.014 256);
+  background: var(--border);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.45 0.014 256);
+  background: var(--muted-foreground);
 }
 
 /* Tabular numbers for financial data */

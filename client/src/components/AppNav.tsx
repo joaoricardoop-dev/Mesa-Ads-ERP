@@ -7,7 +7,10 @@ import {
   Megaphone,
   DollarSign,
   Factory,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const NAV_ITEMS = [
   { path: "/", label: "Simulador", icon: BarChart3 },
@@ -20,6 +23,7 @@ const NAV_ITEMS = [
 
 export default function AppNav() {
   const [location, navigate] = useLocation();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <header className="border-b border-border/30 bg-card/50 backdrop-blur-sm flex-shrink-0 z-10">
@@ -36,26 +40,43 @@ export default function AppNav() {
           </div>
         </div>
 
-        <nav className="flex items-center gap-1">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = location === item.path;
-            return (
-              <Button
-                key={item.path}
-                variant="ghost"
-                size="sm"
-                className={`text-xs gap-1.5 ${
-                  isActive ? "text-primary bg-primary/10" : ""
-                }`}
-                onClick={() => navigate(item.path)}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">{item.label}</span>
-              </Button>
-            );
-          })}
-        </nav>
+        <div className="flex items-center gap-1">
+          <nav className="flex items-center gap-1">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = location === item.path;
+              return (
+                <Button
+                  key={item.path}
+                  variant="ghost"
+                  size="sm"
+                  className={`text-xs gap-1.5 ${
+                    isActive ? "text-primary bg-primary/10" : ""
+                  }`}
+                  onClick={() => navigate(item.path)}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">{item.label}</span>
+                </Button>
+              );
+            })}
+          </nav>
+
+          <div className="w-px h-5 bg-border/50 mx-1" />
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-8 h-8 p-0"
+            onClick={toggleTheme}
+          >
+            {theme === "dark" ? (
+              <Sun className="w-3.5 h-3.5" />
+            ) : (
+              <Moon className="w-3.5 h-3.5" />
+            )}
+          </Button>
+        </div>
       </div>
     </header>
   );

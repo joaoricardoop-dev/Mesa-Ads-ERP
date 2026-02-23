@@ -53,13 +53,17 @@ import {
   Info,
   Factory,
   FileText,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const HERO_IMAGE =
   "https://private-us-east-1.manuscdn.com/sessionFile/xFsIMOlg6RXkkA0R0TNR43/sandbox/ao5JNk3zjreuIUnpPCeSVH-img-1_1771615098000_na1fn_bWVzYS1hZHMtaGVybw.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUveEZzSU1PbGc2Ulhra0EwUjBUTlI0My9zYW5kYm94L2FvNUpOazN6anJldUlVbnBQQ2VTVkgtaW1nLTFfMTc3MTYxNTA5ODAwMF9uYTFmbl9iV1Z6WVMxaFpITXRhR1Z5YncucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=DXVBTz1MUPDN~nnAuV2IQzvxqAeSmrb6OEQLG6xf7bSwGEjOwWlyQ5g67qpNrs5fDJlcqrx9t45B8HxiNZXMPaTkchwRAQNgEYdNc77cRSvSxFJWwI5N7LTKAcImpuQyoZ3ahG4N3qIWr8eTQbW03yOJSV78gbnmu~9nPIHpMs3UhjmkSV9kiQEdMfOWrCBNr4OjvBml2jTzd3uoapQCCZWpr3dF8bZ~VzhQEUGgNlczzHCmYDgMGvpoLoCwkwaBEbaC5ZY6OgpKh8BmxNmbhr-fQ5jYuFf9RVrI7HakurXlPy7-XQy7WRry4sPpzvafkTo0LouUUbOWJ51UVSiRPA__";
 
 export default function Home() {
   // ─── Budget selection state ────────────────────────────────────────
+  const { theme, toggleTheme } = useTheme();
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>("manual");
   const { data: budgetsList = [] } = trpc.budget.listActiveWithItems.useQuery();
 
@@ -251,6 +255,21 @@ export default function Home() {
               >
                 <Factory className="w-3.5 h-3.5" />
                 <span className="hidden md:inline">Produção</span>
+              </Button>
+
+              <div className="w-px h-5 bg-border/50 mx-1" />
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-8 h-8 p-0"
+                onClick={toggleTheme}
+              >
+                {theme === "dark" ? (
+                  <Sun className="w-3.5 h-3.5" />
+                ) : (
+                  <Moon className="w-3.5 h-3.5" />
+                )}
               </Button>
             </div>
           </div>
