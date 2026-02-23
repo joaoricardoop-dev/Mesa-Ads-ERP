@@ -84,7 +84,7 @@ export default function AppNav({ user }: AppNavProps) {
                     variant="ghost"
                     size="sm"
                     className={`text-xs gap-1.5 ${
-                      isActive ? "text-amber-400 bg-amber-500/10" : "text-amber-400/60"
+                      isActive ? "text-primary bg-primary/10" : ""
                     }`}
                     onClick={() => navigate(item.path)}
                   >
