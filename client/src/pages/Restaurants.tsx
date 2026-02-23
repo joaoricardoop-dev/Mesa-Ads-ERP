@@ -1,4 +1,5 @@
 import { useState, Fragment } from "react";
+import { useLocation } from "wouter";
 import AppNav from "@/components/AppNav";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -202,6 +203,7 @@ type SortKey = "name" | "neighborhood" | "whatsapp" | "status";
 type SortDir = "asc" | "desc";
 
 export default function Restaurants() {
+  const [, navigate] = useLocation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<RestaurantForm>(emptyForm);
@@ -428,7 +430,7 @@ export default function Restaurants() {
             Leads e prospecção de novos restaurantes parceiros
           </p>
         </div>
-        <Button onClick={handleNew} className="gap-2">
+        <Button onClick={() => navigate("/prospeccao/novo")} className="gap-2">
           <Plus className="w-4 h-4" />
           Novo Restaurante
         </Button>
@@ -537,7 +539,7 @@ export default function Restaurants() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => handleEdit(r)}
+                          onClick={() => navigate(`/prospeccao/${r.id}`)}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
