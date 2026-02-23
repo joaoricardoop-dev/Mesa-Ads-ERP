@@ -53,6 +53,61 @@ export const appRouter = router({
     }),
   }),
 
+  // ─── CNPJ Lookup ────────────────────────────────────────────────────────
+  cnpj: router({
+    lookup: publicProcedure
+      .input(z.object({ cnpj: z.string().min(14) }))
+      .query(async ({ input }) => {
+        const cleanCnpj = input.cnpj.replace(/\D/g, "");
+        if (cleanCnpj.length !== 14) throw new Error("CNPJ inválido");
+
+        const res = await fetch(`https://publica.cnpj.ws/cnpj/${cleanCnpj}`);
+        if (!res.ok) {
+          if (res.status === 429) throw new Error("Muitas consultas. Aguarde alguns segundos.");
+          throw new Error("CNPJ não encontrado");
+        }
+        const data = await res.json();
+
+        const est = data.estabelecimento || {};
+        const socios = (data.socios || []).map((s: any) => ({
+          nome: s.nome,
+          qualificacao: s.qualificacao_socio?.descricao || "",
+          dataEntrada: s.data_entrada,
+          faixaEtaria: s.faixa_etaria,
+        }));
+
+        const atividadesSecundarias = (est.atividades_secundarias || []).map((a: any) => ({
+          id: a.id,
+          descricao: a.descricao,
+        }));
+
+        return {
+          cnpj: cleanCnpj,
+          razaoSocial: data.razao_social || "",
+          nomeFantasia: est.nome_fantasia || "",
+          porte: data.porte?.descricao || "",
+          naturezaJuridica: data.natureza_juridica?.descricao || "",
+          capitalSocial: data.capital_social || "",
+          atividadePrincipal: est.atividade_principal ? `${est.atividade_principal.id} - ${est.atividade_principal.descricao}` : "",
+          atividadesSecundarias,
+          dataAbertura: est.data_inicio_atividade || "",
+          situacaoCadastral: est.situacao_cadastral || "",
+          tipoEstabelecimento: est.tipo || "",
+          logradouro: est.logradouro || "",
+          numero: est.numero || "",
+          complemento: est.complemento || "",
+          bairro: est.bairro || "",
+          cidade: est.cidade?.nome || "",
+          uf: est.estado?.sigla || "",
+          cep: est.cep || "",
+          telefone1: est.ddd1 && est.telefone1 ? `(${est.ddd1}) ${est.telefone1}` : "",
+          telefone2: est.ddd2 && est.telefone2 ? `(${est.ddd2}) ${est.telefone2}` : "",
+          email: est.email || "",
+          socios,
+        };
+      }),
+  }),
+
   // ─── Restaurants ────────────────────────────────────────────────────────
   restaurant: router({
     list: publicProcedure.query(() => listRestaurants()),
@@ -69,14 +124,25 @@ export const appRouter = router({
           cnpj: z.string().optional(),
           address: z.string().optional(),
           addressNumber: z.string().optional(),
+          complemento: z.string().optional(),
           neighborhood: z.string().optional(),
           city: z.string().optional(),
           state: z.string().optional(),
           cep: z.string().optional(),
+          email: z.string().optional(),
           contactName: z.string().optional(),
           contactPhone: z.string().optional(),
           whatsapp: z.string().optional(),
           instagram: z.string().optional(),
+          porte: z.string().optional(),
+          naturezaJuridica: z.string().optional(),
+          atividadePrincipal: z.string().optional(),
+          atividadesSecundarias: z.string().optional(),
+          capitalSocial: z.string().optional(),
+          dataAbertura: z.string().optional(),
+          situacaoCadastral: z.string().optional(),
+          tipoEstabelecimento: z.string().optional(),
+          socios: z.string().optional(),
           coastersAllocated: z.number().int().min(1).default(500),
           commissionPercent: z.string().default("20.00"),
           status: z.enum(["active", "inactive"]).default("active"),
@@ -93,14 +159,25 @@ export const appRouter = router({
           cnpj: z.string().optional(),
           address: z.string().optional(),
           addressNumber: z.string().optional(),
+          complemento: z.string().optional(),
           neighborhood: z.string().optional(),
           city: z.string().optional(),
           state: z.string().optional(),
           cep: z.string().optional(),
+          email: z.string().optional(),
           contactName: z.string().optional(),
           contactPhone: z.string().optional(),
           whatsapp: z.string().optional(),
           instagram: z.string().optional(),
+          porte: z.string().optional(),
+          naturezaJuridica: z.string().optional(),
+          atividadePrincipal: z.string().optional(),
+          atividadesSecundarias: z.string().optional(),
+          capitalSocial: z.string().optional(),
+          dataAbertura: z.string().optional(),
+          situacaoCadastral: z.string().optional(),
+          tipoEstabelecimento: z.string().optional(),
+          socios: z.string().optional(),
           coastersAllocated: z.number().int().min(1).optional(),
           commissionPercent: z.string().optional(),
           status: z.enum(["active", "inactive"]).optional(),

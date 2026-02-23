@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Prospecting from "./pages/Restaurants";
+import ProspectForm from "./pages/ProspectForm";
 import ActiveRestaurantsPage from "./pages/ActiveRestaurants";
 import Clients from "./pages/Clients";
 import Campaigns from "./pages/Campaigns";
@@ -17,6 +18,8 @@ function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/prospeccao/novo"} component={ProspectForm} />
+      <Route path={"/prospeccao/:id"} component={ProspectForm} />
       <Route path={"/prospeccao"} component={Prospecting} />
       <Route path={"/restaurantes"} component={ActiveRestaurantsPage} />
       <Route path={"/clientes"} component={Clients} />
