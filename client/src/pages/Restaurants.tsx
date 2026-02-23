@@ -178,10 +178,6 @@ export default function Restaurants() {
   );
 
   const activeCount = restaurants.filter((r) => r.status === "active").length;
-  const totalCoasters = restaurants.reduce(
-    (sum, r) => sum + r.coastersAllocated,
-    0
-  );
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -195,7 +191,7 @@ export default function Restaurants() {
             Restaurantes Parceiros
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Gerencie os restaurantes que recebem coasters e comissão da Mesa Ads
+            Base de dados dos restaurantes parceiros da Mesa Ads
           </p>
         </div>
         <Button onClick={handleNew} className="gap-2">
@@ -205,7 +201,7 @@ export default function Restaurants() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div className="bg-card border border-border/30 rounded-lg p-4">
           <p className="text-xs text-muted-foreground">Total</p>
           <p className="text-2xl font-bold font-mono">{restaurants.length}</p>
@@ -214,12 +210,6 @@ export default function Restaurants() {
           <p className="text-xs text-muted-foreground">Ativos</p>
           <p className="text-2xl font-bold font-mono text-primary">
             {activeCount}
-          </p>
-        </div>
-        <div className="bg-card border border-border/30 rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Coasters Alocados</p>
-          <p className="text-2xl font-bold font-mono">
-            {totalCoasters.toLocaleString("pt-BR")}
           </p>
         </div>
         <div className="bg-card border border-border/30 rounded-lg p-4">
@@ -261,10 +251,7 @@ export default function Restaurants() {
                 LOCALIZAÇÃO
               </TableHead>
               <TableHead className="text-xs text-muted-foreground font-medium hidden lg:table-cell">
-                CONTATO
-              </TableHead>
-              <TableHead className="text-xs text-muted-foreground font-medium text-right">
-                COASTERS
+                WHATSAPP
               </TableHead>
               <TableHead className="text-xs text-muted-foreground font-medium text-right">
                 COMISSÃO
@@ -280,13 +267,13 @@ export default function Restaurants() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   {search
                     ? "Nenhum restaurante encontrado"
                     : "Nenhum restaurante cadastrado. Clique em \"Novo Restaurante\" para começar."}
@@ -304,12 +291,9 @@ export default function Restaurants() {
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
                     <div className="flex items-center gap-1">
-                      <User className="w-3 h-3" />
-                      {r.contactName || "—"}
+                      <MessageCircle className="w-3 h-3 text-green-500" />
+                      {r.whatsapp || "—"}
                     </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
-                    {r.coastersAllocated.toLocaleString("pt-BR")}
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm text-primary">
                     {parseFloat(String(r.commissionPercent)).toFixed(1)}%
