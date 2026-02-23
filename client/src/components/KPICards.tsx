@@ -95,7 +95,7 @@ export default function KPICards({
       <KPICard
         title="Preço de Venda / Rest."
         value={formatCurrency(perRestaurant.totalCosts + perRestaurant.markupValue)}
-        subtitle={`Custo bruto: ${formatCurrency(perRestaurant.totalCosts)}`}
+        subtitle={`${formatCurrency(perRestaurant.totalCosts)} custos + ${formatCurrency(perRestaurant.markupValue)} markup`}
         icon={<DollarSign className="w-3.5 h-3.5" />}
         trend="up"
         delay={0.05}
