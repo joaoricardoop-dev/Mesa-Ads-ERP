@@ -24,7 +24,8 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - `restaurants` — Partner restaurants
 - `clients` — Advertisers (47 imported with full address/contact/CNPJ data)
 - `campaigns` — Ad campaigns with full financial parameters (grossup pricing, commissions, taxes, markup)
-- `campaign_restaurants` — N:N campaign-restaurant relationship
+- `campaign_restaurants` — N:N campaign-restaurant relationship with coasters/usage allocation
+- `campaign_history` — Audit trail for campaign status changes and updates
 - `suppliers` — Production suppliers (print shops)
 - `budgets` — Production budgets from suppliers
 - `budget_items` — Price tiers within budgets
@@ -40,6 +41,16 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 
 - Server: `server/_core/index.ts`
 - Client: `client/src/main.tsx`
+
+## Campaign Workflow
+
+- Statuses: draft → quotation → active (approved) / archived
+- Active campaigns can be paused, resumed, completed, or reactivated
+- Simulator creates quotations (status "quotation"), not active campaigns
+- Campaign detail page at `/campanhas/:id` with tabs: Painel, Financeiro, Distribuição, Cliente, Histórico
+- Restaurant allocation enforces max count from campaign's `activeRestaurants` parameter
+- Campaign history tracks all status changes with timestamps
+- Pricing uses grossup formula: CustoBruto = CustoPD / (1 - varRates), then SellingPrice = CustoBruto × (1 + markup%)
 
 ## Theme
 
