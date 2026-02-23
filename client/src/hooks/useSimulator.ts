@@ -97,7 +97,7 @@ const DEFAULT_INPUTS: SimulatorInputs = {
   fixedPrice: 1500,
   commissionType: "variable",
   restaurantCommission: 20,
-  fixedCommission: 200,
+  fixedCommission: 0.05,
   minMargin: 30,
   maxDiscount: 25,
   cacPerRestaurant: 300,
@@ -182,10 +182,13 @@ function calcCommission(
   revenue: number,
   inputs: SimulatorInputs
 ): number {
+  const sellingPricePerCoaster = inputs.coastersPerRestaurant > 0
+    ? revenue / inputs.coastersPerRestaurant
+    : 0;
   if (inputs.commissionType === "fixed") {
-    return inputs.fixedCommission;
+    return inputs.fixedCommission * inputs.coastersPerRestaurant;
   }
-  return revenue * (inputs.restaurantCommission / 100);
+  return sellingPricePerCoaster * (inputs.restaurantCommission / 100) * inputs.coastersPerRestaurant;
 }
 
 function calcRevenue(
@@ -308,10 +311,10 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
           inputs.commissionType === "fixed"
             ? 0
             : inputs.restaurantCommission / 100;
-        const fixedComm =
-          inputs.commissionType === "fixed" ? inputs.fixedCommission : 0;
+        const fixedCommTotal =
+          inputs.commissionType === "fixed" ? inputs.fixedCommission * inputs.coastersPerRestaurant : 0;
         const minRevenue =
-          (production + fixedComm) / (1 - commRate - inputs.minMargin / 100);
+          (production + fixedCommTotal) / (1 - commRate - inputs.minMargin / 100);
         if (minRevenue <= baseRevenue) {
           finalDiscount = ((baseRevenue - minRevenue) / baseRevenue) * 100;
           finalRevenue = minRevenue;

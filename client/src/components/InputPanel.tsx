@@ -253,7 +253,7 @@ export default function InputPanel({ inputs, updateInput }: InputPanelProps) {
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
               <Percent className="w-3 h-3" />
-              Comissão paga ao rest.
+              Comissão por coaster
             </Label>
             {/* Toggle Fixo / Variável */}
             <div className="flex rounded-md overflow-hidden border border-border/50">
@@ -293,11 +293,11 @@ export default function InputPanel({ inputs, updateInput }: InputPanelProps) {
                   }
                   className="font-mono text-sm bg-background/50 border-border/50 h-9 tabular-nums"
                   min={0}
-                  max={10000}
-                  step={10}
+                  max={5}
+                  step={0.01}
                 />
                 <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  R$/rest.
+                  R$/coaster
                 </span>
               </div>
             ) : (
