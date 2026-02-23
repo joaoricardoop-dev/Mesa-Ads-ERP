@@ -370,17 +370,37 @@ export default function CampaignDetail() {
               />
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-              <MetricCard label="Custo Produção" value={formatCurrency(pricing.productionCost)} sub={`Unit: R$ ${pricing.unitCost.toFixed(3)}`} />
-              <MetricCard label="Comissão Rest." value={formatCurrency(pricing.actualRestCommission)}
-                sub={campaign.commissionType === "variable" ? `${Number(campaign.restaurantCommission)}%` : `R$ ${Number(campaign.fixedCommission).toFixed(2)}/un`}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              <MetricCard label="Custo Produção Total" value={formatCurrency(pricing.productionCost * campaign.activeRestaurants)}
+                sub={`${formatCurrency(pricing.productionCost)}/rest. · Unit: R$ ${pricing.unitCost.toFixed(3)}`}
               />
-              <MetricCard label="Comissão Vendedor" value={formatCurrency(pricing.actualSellerComm)} sub={`${Number(campaign.sellerCommission)}%`} />
-              <MetricCard label="Impostos" value={formatCurrency(pricing.actualTax)} sub={`${Number(campaign.taxRate)}%`} />
-              <MetricCard label="Custo Bruto" value={formatCurrency(pricing.totalCosts)} highlight />
-              <MetricCard label="Preço de Venda" value={formatCurrency(pricing.sellingPrice)} accent />
+              <MetricCard label="Comissão Rest. Total" value={formatCurrency(pricing.actualRestCommission * campaign.activeRestaurants)}
+                sub={`${formatCurrency(pricing.actualRestCommission)}/rest. · ${campaign.commissionType === "variable" ? `${Number(campaign.restaurantCommission)}%` : `R$ ${Number(campaign.fixedCommission).toFixed(2)}/un`}`}
+              />
+              <MetricCard label="Comissão Vendedor Total" value={formatCurrency(pricing.actualSellerComm * campaign.activeRestaurants)}
+                sub={`${formatCurrency(pricing.actualSellerComm)}/rest. · ${Number(campaign.sellerCommission)}%`}
+              />
+              <MetricCard label="Impostos Total" value={formatCurrency(pricing.actualTax * campaign.activeRestaurants)}
+                sub={`${formatCurrency(pricing.actualTax)}/rest. · ${Number(campaign.taxRate)}%`}
+              />
+              <MetricCard label="Custo Bruto Total" value={formatCurrency(pricing.totalCosts * campaign.activeRestaurants)}
+                sub={`${formatCurrency(pricing.totalCosts)}/rest.`}
+                highlight
+              />
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <MetricCard label="Preço de Venda/Rest." value={formatCurrency(pricing.sellingPrice)} accent />
               <MetricCard label="Lucro/Rest." value={formatCurrency(pricing.markupValue)}
                 sub={`Margem: ${pricing.grossMargin.toFixed(1)}%`}
+                accent={pricing.grossMargin >= 15} warn={pricing.grossMargin < 15}
+              />
+              <MetricCard label="Preço Venda Total" value={formatCurrency(pricing.sellingPrice * campaign.activeRestaurants)}
+                sub={`${campaign.activeRestaurants} restaurantes`}
+                accent
+              />
+              <MetricCard label="Lucro Total Mensal" value={formatCurrency(pricing.monthlyProfit)}
+                sub={`${campaign.activeRestaurants} restaurantes`}
                 accent={pricing.grossMargin >= 15} warn={pricing.grossMargin < 15}
               />
             </div>
