@@ -366,14 +366,15 @@ export default function InputPanel({ inputs, updateInput, grossMargin = 0 }: Inp
         <SectionTitle>Comercial</SectionTitle>
         <div className="space-y-3">
           <InputField
-            label="CAC / restaurante"
-            value={inputs.cacPerRestaurant}
-            onChange={(v) => updateInput("cacPerRestaurant", v)}
-            icon={<Target className="w-3 h-3" />}
-            suffix="R$"
+            label="Comissão vendedor"
+            value={inputs.sellerCommission}
+            onChange={(v) => updateInput("sellerCommission", v)}
+            icon={<Megaphone className="w-3 h-3" />}
+            suffix="%"
             min={0}
-            max={5000}
-            step={50}
+            max={30}
+            step={1}
+            showSlider
           />
           <InputField
             label="Duração contrato"

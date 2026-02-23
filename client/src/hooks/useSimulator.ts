@@ -18,7 +18,7 @@ export interface SimulatorInputs {
   fixedCommission: number;
   minMargin: number;
   maxDiscount: number;
-  cacPerRestaurant: number;
+  sellerCommission: number;
   contractDuration: number;
 }
 
@@ -64,8 +64,9 @@ export interface DiscountTableRow {
 }
 
 export interface UnitEconomics {
-  ltv: number;
-  ltvCacRatio: number;
+  contractValue: number;
+  contractProfit: number;
+  sellerCommissionValue: number;
   monthlyRevenue: number;
   monthlyProfit: number;
   annualRevenue: number;
@@ -100,7 +101,7 @@ const DEFAULT_INPUTS: SimulatorInputs = {
   fixedCommission: 0.05,
   minMargin: 30,
   maxDiscount: 25,
-  cacPerRestaurant: 300,
+  sellerCommission: 10,
   contractDuration: 6,
 };
 
@@ -339,19 +340,19 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
   }, [inputs, effectiveUnitCost]);
 
   const unitEconomics = useMemo<UnitEconomics>(() => {
-    const monthlyProfit = perRestaurant.grossProfit;
-    const ltv = monthlyProfit * inputs.contractDuration;
-    const ltvCacRatio =
-      inputs.cacPerRestaurant > 0 ? ltv / inputs.cacPerRestaurant : 0;
     const monthlyRevenue = perRestaurant.revenue * inputs.activeRestaurants;
     const monthlyTotalProfit =
       perRestaurant.grossProfit * inputs.activeRestaurants;
+    const contractValue = monthlyRevenue * inputs.contractDuration;
+    const contractProfit = monthlyTotalProfit * inputs.contractDuration;
+    const sellerCommissionValue = perRestaurant.revenue * (inputs.sellerCommission / 100);
     const annualRevenue = monthlyRevenue * 12;
     const annualProfit = monthlyTotalProfit * 12;
 
     return {
-      ltv,
-      ltvCacRatio,
+      contractValue,
+      contractProfit,
+      sellerCommissionValue,
       monthlyRevenue,
       monthlyProfit: monthlyTotalProfit,
       annualRevenue,
@@ -416,12 +417,11 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
   const cumulativeProfit = useMemo(() => {
     const monthlyProfit =
       perRestaurant.grossProfit * inputs.activeRestaurants;
-    const totalCac = inputs.cacPerRestaurant * inputs.activeRestaurants;
     const data = [];
     for (let m = 0; m <= 24; m++) {
       data.push({
         month: m,
-        profit: monthlyProfit * m - totalCac,
+        profit: monthlyProfit * m,
         revenue: perRestaurant.revenue * inputs.activeRestaurants * m,
       });
     }

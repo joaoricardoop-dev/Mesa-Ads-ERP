@@ -467,6 +467,7 @@ export default function Home() {
                   perRestaurant={simulator.perRestaurant}
                   unitEconomics={simulator.unitEconomics}
                   activeRestaurants={simulator.inputs.activeRestaurants}
+                  contractDuration={simulator.inputs.contractDuration}
                 />
 
                 {/* Quick Charts */}
@@ -498,7 +499,7 @@ export default function Home() {
               <TabsContent value="unit-economics" className="mt-0 space-y-6">
                 <UnitEconomicsPanel
                   data={simulator.unitEconomics}
-                  cacPerRestaurant={simulator.inputs.cacPerRestaurant}
+                  sellerCommission={simulator.inputs.sellerCommission}
                   contractDuration={simulator.inputs.contractDuration}
                 />
               </TabsContent>

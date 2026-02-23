@@ -1,9 +1,3 @@
-/*
- * Design: Bloomberg Terminal Reimaginado
- * Cards de KPI com números grandes em JetBrains Mono
- * Indicadores de cor: verde para positivo, vermelho para alerta
- */
-
 import { Card, CardContent } from "@/components/ui/card";
 import type { PerRestaurantMetrics, UnitEconomics } from "@/hooks/useSimulator";
 import { formatCurrency, formatNumber, formatPercent, formatCompact } from "@/lib/format";
@@ -14,8 +8,10 @@ import {
   DollarSign,
   BarChart3,
   Target,
-  Zap,
+  HandCoins,
+  Users,
   Calendar,
+  FileText,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -23,6 +19,7 @@ interface KPICardsProps {
   perRestaurant: PerRestaurantMetrics;
   unitEconomics: UnitEconomics;
   activeRestaurants: number;
+  contractDuration: number;
 }
 
 interface KPICardProps {
@@ -83,6 +80,7 @@ export default function KPICards({
   perRestaurant,
   unitEconomics,
   activeRestaurants,
+  contractDuration,
 }: KPICardsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -97,7 +95,7 @@ export default function KPICards({
       <KPICard
         title="Faturamento Mesa Ads / Rest."
         value={formatCurrency(perRestaurant.revenue)}
-        subtitle={`Receita bruta por ponto`}
+        subtitle="Receita bruta por ponto"
         icon={<DollarSign className="w-3.5 h-3.5" />}
         trend="up"
         delay={0.05}
@@ -105,7 +103,7 @@ export default function KPICards({
       <KPICard
         title="Lucro Mesa Ads / Rest."
         value={formatCurrency(perRestaurant.grossProfit)}
-        subtitle={`Após comissão e produção`}
+        subtitle="Após comissão e produção"
         icon={<BarChart3 className="w-3.5 h-3.5" />}
         trend={perRestaurant.grossProfit > 0 ? "up" : "down"}
         highlight={perRestaurant.grossProfit > 0}
@@ -120,28 +118,28 @@ export default function KPICards({
         delay={0.15}
       />
       <KPICard
-        title="LTV"
-        value={formatCurrency(unitEconomics.ltv)}
-        subtitle={`LTV/CAC: ${unitEconomics.ltvCacRatio.toFixed(1)}x`}
-        icon={<Zap className="w-3.5 h-3.5" />}
-        trend={unitEconomics.ltvCacRatio >= 3 ? "up" : "down"}
-        highlight={unitEconomics.ltvCacRatio >= 3}
+        title="Valor Global do Contrato"
+        value={formatCompact(unitEconomics.contractValue)}
+        subtitle={`Faturamento × ${contractDuration} meses`}
+        icon={<FileText className="w-3.5 h-3.5" />}
+        trend="up"
+        highlight
         delay={0.2}
       />
       <KPICard
-        title="Faturamento Mensal Mesa Ads"
-        value={formatCompact(unitEconomics.monthlyRevenue)}
-        subtitle={`${activeRestaurants} restaurantes ativos`}
-        icon={<DollarSign className="w-3.5 h-3.5" />}
-        trend="up"
+        title="Comissão / Restaurante"
+        value={formatCurrency(perRestaurant.commission)}
+        subtitle="Pago ao restaurante/mês"
+        icon={<HandCoins className="w-3.5 h-3.5" />}
+        trend="neutral"
         delay={0.25}
       />
       <KPICard
-        title="Lucro Mensal Mesa Ads"
-        value={formatCompact(unitEconomics.monthlyProfit)}
-        subtitle="após comissões e produção"
-        icon={<TrendingUp className="w-3.5 h-3.5" />}
-        trend={unitEconomics.monthlyProfit > 0 ? "up" : "down"}
+        title="Comissão Vendedor / Rest."
+        value={formatCurrency(unitEconomics.sellerCommissionValue)}
+        subtitle="Comissão sobre faturamento"
+        icon={<Users className="w-3.5 h-3.5" />}
+        trend="neutral"
         delay={0.3}
       />
       <KPICard
