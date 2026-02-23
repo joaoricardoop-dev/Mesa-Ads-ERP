@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO budget_items (budgetId, quantity, unitPrice, totalPrice) VALUES \n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 1000, '2.760', '2760.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 2000, '2.255', '4510.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 3000, '2.076', '6228.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 4000, '2.000', '8000.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 5000, '1.954', '9770.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 10000, '1.850', '18500.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 15000, '1.824', '27360.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 20000, '1.805', '36100.00');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3kK8hgf6cczSK3w.0d3a91e92bc9 --database Cd7uKUKUmrNC4bfMufpSJz --execute INSERT INTO budget_items (budgetId, quantity, unitPrice, totalPrice) VALUES \n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 1000, '2.760', '2760.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 2000, '2.255', '4510.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 3000, '2.076', '6228.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 4000, '2.000', '8000.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 5000, '1.954', '9770.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 10000, '1.850', '18500.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 15000, '1.824', '27360.00'),\n  ((SELECT id FROM budgets WHERE code = '038075' LIMIT 1), 20000, '1.805', '36100.00');",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 75
+}

@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO budgets (supplierId, code, description, productSpec, validUntil, status, notes) \nVALUES (\n  (SELECT id FROM suppliers WHERE cnpj = '06.108.422/0001-61' LIMIT 1),\n  '038075',\n  'Bolacha Para Copo (TAM. 8,5X8,5CM)',\n  'Lado 1: 8,5x8,5cm, 4x0 cores, Tinta Escala em Reciclado 240g, Saída em CTP. Paraná 8,5x8,5cm, sem impressão em Cartão Paraná 1.90. Lado 2: 8,5x8,5cm, 4x0 cores, Tinta Escala em Reciclado 240g, Saída em CTP. Corte/Vinco, Laminação Fosca, Nro de Lados 1 (lado 1, lado 2). Arte não inclusa.',\n  '2026-03-07',\n  'active',\n  'Orçamento recebido em 20/02/2026. Destinatário: Maricota''s Craft, At. Eduardo Marques.'\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3kK8hgf6cczSK3w.0d3a91e92bc9 --database Cd7uKUKUmrNC4bfMufpSJz --execute INSERT INTO budgets (supplierId, code, description, productSpec, validUntil, status, notes) \nVALUES (\n  (SELECT id FROM suppliers WHERE cnpj = '06.108.422/0001-61' LIMIT 1),\n  '038075',\n  'Bolacha Para Copo (TAM. 8,5X8,5CM)',\n  'Lado 1: 8,5x8,5cm, 4x0 cores, Tinta Escala em Reciclado 240g, Saída em CTP. Paraná 8,5x8,5cm, sem impressão em Cartão Paraná 1.90. Lado 2: 8,5x8,5cm, 4x0 cores, Tinta Escala em Reciclado 240g, Saída em CTP. Corte/Vinco, Laminação Fosca, Nro de Lados 1 (lado 1, lado 2). Arte não inclusa.',\n  '2026-03-07',\n  'active',\n  'Orçamento recebido em 20/02/2026. Destinatário: Maricota''s Craft, At. Eduardo Marques.'\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 77
+}

@@ -1,0 +1,13 @@
+{
+  "query": "SELECT id FROM suppliers WHERE cnpj = '06.108.422/0001-61' LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3kK8hgf6cczSK3w.0d3a91e92bc9 --database Cd7uKUKUmrNC4bfMufpSJz --execute SELECT id FROM suppliers WHERE cnpj = '06.108.422/0001-61' LIMIT 1;",
+  "rows": [
+    {
+      "id": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\n1\n",
+  "stderr": "",
+  "execution_time_ms": 53
+}
