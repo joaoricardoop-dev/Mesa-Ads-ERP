@@ -269,3 +269,5 @@ export const budgetItems = pgTable("budget_items", {
 
 export type BudgetItem = typeof budgetItems.$inferSelect;
 export type InsertBudgetItem = typeof budgetItems.$inferInsert;
+
+export * from "../shared/models/auth";

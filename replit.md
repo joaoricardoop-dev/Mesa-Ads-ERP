@@ -6,6 +6,7 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 
 - **Frontend**: React 19, Vite, Tailwind CSS 4, shadcn/ui, TanStack Query, tRPC, Recharts, wouter
 - **Backend**: Node.js, Express, tRPC, Drizzle ORM
+- **Auth**: Replit Auth (OpenID Connect) — supports Google, GitHub, Apple, email login
 - **Database**: PostgreSQL (Replit built-in, via @neondatabase/serverless + drizzle-orm/neon-serverless)
 - **Package Manager**: pnpm
 
@@ -14,13 +15,25 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - `client/` — React frontend
 - `server/` — Backend (Express + tRPC)
 - `server/_core/` — Server entry point, OAuth, Vite config
+- `server/replit_integrations/auth/` — Auth module (Replit Auth OIDC)
 - `server/db.ts` — Database connection and query functions
 - `shared/` — Shared types/constants
+- `shared/models/auth.ts` — Auth schema (users, sessions tables)
 - `drizzle/` — Database schema and migrations
+
+## Authentication
+
+- Replit Auth via OpenID Connect (supports Google, GitHub, Apple, email)
+- Landing page shown when not logged in (`client/src/pages/LandingPage.tsx`)
+- AppNav shows user avatar, name, and logout button when logged in
+- Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
+- Session stored in PostgreSQL `sessions` table
+- Auth hook: `client/src/hooks/use-auth.ts`
 
 ## Database Tables
 
-- `users` — Auth users
+- `users` — Auth users (Replit Auth)
+- `sessions` — Auth sessions (Replit Auth)
 - `restaurants` — Prospecting/leads for partner restaurants
 - `active_restaurants` — Onboarded active restaurants with full operational data (tables, seats, customers, excluded ad categories, Pix, etc.)
 - `clients` — Advertisers (47 imported with full address/contact/CNPJ data)

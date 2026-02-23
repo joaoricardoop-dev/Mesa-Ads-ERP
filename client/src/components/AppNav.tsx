@@ -11,8 +11,10 @@ import {
   Moon,
   Search,
   UtensilsCrossed,
+  LogOut,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import type { User } from "@shared/models/auth";
 
 const NAV_ITEMS = [
   { path: "/", label: "Simulador", icon: BarChart3 },
@@ -24,7 +26,11 @@ const NAV_ITEMS = [
   { path: "/producao", label: "Produção", icon: Factory },
 ];
 
-export default function AppNav() {
+interface AppNavProps {
+  user?: User | null;
+}
+
+export default function AppNav({ user }: AppNavProps) {
   const [location, navigate] = useLocation();
   const { theme, toggleTheme } = useTheme();
 
@@ -79,6 +85,39 @@ export default function AppNav() {
               <Moon className="w-3.5 h-3.5" />
             )}
           </Button>
+
+          {user && (
+            <>
+              <div className="w-px h-5 bg-border/50 mx-1" />
+              <div className="flex items-center gap-2">
+                {user.profileImageUrl ? (
+                  <img
+                    src={user.profileImageUrl}
+                    alt=""
+                    className="w-7 h-7 rounded-full border border-border/30"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                    {(user.firstName || user.email || "U")[0].toUpperCase()}
+                  </div>
+                )}
+                <span className="hidden lg:inline text-xs text-muted-foreground max-w-[100px] truncate">
+                  {user.firstName || user.email}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-8 h-8 p-0 text-muted-foreground hover:text-destructive"
+                  asChild
+                >
+                  <a href="/api/logout" title="Sair">
+                    <LogOut className="w-3.5 h-3.5" />
+                  </a>
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>
