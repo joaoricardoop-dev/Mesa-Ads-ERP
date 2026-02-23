@@ -98,18 +98,28 @@ export default function Home() {
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
   const utils = trpc.useUtils();
 
+  const addHistoryMutation = trpc.campaign.addHistory.useMutation();
+
   const createCampaignMutation = trpc.campaign.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const campaignId = (data as any).id ?? (data as any)[0]?.id;
+      if (campaignId) {
+        addHistoryMutation.mutate({
+          campaignId,
+          action: "created",
+          details: `Cotação criada a partir do simulador — ${simulator.inputs.pricingType === "variable" ? `Markup ${simulator.inputs.markupPercent}%` : `Fixo R$${simulator.inputs.fixedPrice}`}, ${simulator.inputs.activeRestaurants} restaurantes`,
+        });
+      }
       utils.campaign.list.invalidate();
       setIsCampaignDialogOpen(false);
-      toast.success("Campanha criada com sucesso! Redirecionando...");
+      toast.success("Cotação criada com sucesso! Redirecionando...");
       setTimeout(() => navigate("/campanhas"), 1000);
     },
-    onError: (err) => toast.error(`Erro ao criar campanha: ${err.message}`),
+    onError: (err) => toast.error(`Erro ao criar cotação: ${err.message}`),
   });
 
   const handleOpenCampaignDialog = () => {
-    setCampaignName(`Campanha Markup ${simulator.inputs.pricingType === "variable" ? simulator.inputs.markupPercent + "%" : "Fixo R$" + simulator.inputs.fixedPrice}`);
+    setCampaignName(`Cotação Markup ${simulator.inputs.pricingType === "variable" ? simulator.inputs.markupPercent + "%" : "Fixo R$" + simulator.inputs.fixedPrice}`);
     setSelectedClientId("none");
     const today = new Date();
     const endDate = new Date();
@@ -137,7 +147,7 @@ export default function Home() {
       name: campaignName,
       startDate: campaignStartDate,
       endDate: campaignEndDate,
-      status: "draft",
+      status: "quotation",
       notes: selectedBudget ? `Orçamento: ${selectedBudget.code || selectedBudget.description}` : "",
       coastersPerRestaurant: simulator.inputs.coastersPerRestaurant,
       usagePerDay: simulator.inputs.usagePerDay,
@@ -360,7 +370,7 @@ export default function Home() {
                         size="sm"
                       >
                         <Rocket className="w-4 h-4" />
-                        Criar Campanha com estes valores
+                        Criar Cotação com estes valores
                       </Button>
                     </div>
                   </div>
@@ -539,7 +549,7 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Rocket className="w-5 h-5 text-primary" />
-              Criar Campanha a partir do Simulador
+              Nova Cotação
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
               Os valores do simulador serão usados como base para a nova campanha.
@@ -683,7 +693,7 @@ export default function Home() {
               <Rocket className="w-4 h-4" />
               {createCampaignMutation.isPending
                 ? "Criando..."
-                : "Criar Campanha"}
+                : "Criar Cotação"}
             </Button>
           </DialogFooter>
         </DialogContent>

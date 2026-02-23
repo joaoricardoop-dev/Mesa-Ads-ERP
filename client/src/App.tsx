@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import Restaurants from "./pages/Restaurants";
 import Clients from "./pages/Clients";
 import Campaigns from "./pages/Campaigns";
+import CampaignDetail from "./pages/CampaignDetail";
 import Economics from "./pages/Economics";
 import Production from "./pages/Production";
 
@@ -17,6 +18,7 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path={"/restaurantes"} component={Restaurants} />
       <Route path={"/clientes"} component={Clients} />
+      <Route path={"/campanhas/:id"} component={CampaignDetail} />
       <Route path={"/campanhas"} component={Campaigns} />
       <Route path={"/economics"} component={Economics} />
       <Route path={"/producao"} component={Production} />

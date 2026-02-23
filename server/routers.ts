@@ -21,6 +21,9 @@ import {
   deleteCampaign,
   getCampaignRestaurants,
   setCampaignRestaurants,
+  getCampaignHistory,
+  addCampaignHistory,
+  getClientHistory,
   getMonthlyEconomics,
   listSuppliers,
   createSupplier,
@@ -184,7 +187,7 @@ export const appRouter = router({
           name: z.string().min(1),
           startDate: z.string(),
           endDate: z.string(),
-          status: z.enum(["draft", "active", "paused", "completed"]).default("draft"),
+          status: z.enum(["draft", "active", "paused", "completed", "quotation", "archived"]).default("quotation"),
           notes: z.string().optional(),
           coastersPerRestaurant: z.number().int().default(500),
           usagePerDay: z.number().int().default(3),
@@ -214,7 +217,7 @@ export const appRouter = router({
           name: z.string().min(1).optional(),
           startDate: z.string().optional(),
           endDate: z.string().optional(),
-          status: z.enum(["draft", "active", "paused", "completed"]).optional(),
+          status: z.enum(["draft", "active", "paused", "completed", "quotation", "archived"]).optional(),
           notes: z.string().optional(),
           coastersPerRestaurant: z.number().int().optional(),
           usagePerDay: z.number().int().optional(),
@@ -263,6 +266,35 @@ export const appRouter = router({
       .mutation(({ input }) =>
         setCampaignRestaurants(input.campaignId, input.restaurants)
       ),
+
+    getHistory: publicProcedure
+      .input(z.object({ campaignId: z.number() }))
+      .query(({ input }) => getCampaignHistory(input.campaignId)),
+
+    addHistory: publicProcedure
+      .input(z.object({ campaignId: z.number(), action: z.string(), details: z.string().optional() }))
+      .mutation(({ input }) => addCampaignHistory(input.campaignId, input.action, input.details)),
+
+    approve: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await updateCampaign(input.id, { status: "active" });
+        await addCampaignHistory(input.id, "approved", "Cotação aprovada — campanha ativada");
+      }),
+
+    archive: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await updateCampaign(input.id, { status: "archived" });
+        await addCampaignHistory(input.id, "archived", "Cotação arquivada");
+      }),
+  }),
+
+  // ─── Client History ─────────────────────────────────────────────────
+  clientHistory: router({
+    get: publicProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(({ input }) => getClientHistory(input.clientId)),
   }),
 
   // ─── Economics ────────────────────────────────────────────────────────

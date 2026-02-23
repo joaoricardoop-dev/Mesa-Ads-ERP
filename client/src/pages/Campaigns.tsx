@@ -38,27 +38,20 @@ import {
   Megaphone,
   Search,
   Store,
-  Calendar,
   DollarSign,
-  TrendingUp,
-  ChevronDown,
-  ChevronUp,
   Package,
   Users,
   Percent,
-  FileText,
-  BarChart3,
-  Target,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
-import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "wouter";
 
 interface CampaignForm {
   clientId: number | null;
   name: string;
   startDate: string;
   endDate: string;
-  status: "draft" | "active" | "paused" | "completed";
+  status: "draft" | "active" | "paused" | "completed" | "quotation" | "archived";
   notes: string;
   coastersPerRestaurant: number;
   usagePerDay: number;
@@ -114,6 +107,8 @@ const STATUS_LABELS: Record<string, string> = {
   active: "Ativa",
   paused: "Pausada",
   completed: "Concluída",
+  quotation: "Cotação",
+  archived: "Arquivada",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -121,6 +116,8 @@ const STATUS_COLORS: Record<string, string> = {
   active: "bg-primary/20 text-primary border-primary/30",
   paused: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  quotation: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  archived: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
 function calcCampaignPricing(c: {
@@ -203,8 +200,8 @@ export default function Campaigns() {
   const [form, setForm] = useState<CampaignForm>(emptyForm);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [managingCampaignId, setManagingCampaignId] = useState<number | null>(null);
+  const [, setLocation] = useLocation();
   const [restaurantSelections, setRestaurantSelections] = useState<RestaurantSelection[]>([]);
 
   const utils = trpc.useUtils();
@@ -377,6 +374,7 @@ export default function Campaigns() {
   );
 
   const activeCount = campaignsList.filter((c) => c.status === "active").length;
+  const quotationCount = campaignsList.filter((c) => c.status === "quotation").length;
 
   const totals = useMemo(() => {
     let totalContract = 0;
@@ -411,10 +409,14 @@ export default function Campaigns() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <div className="bg-card border border-border/30 rounded-lg p-4">
             <p className="text-xs text-muted-foreground">Total</p>
             <p className="text-2xl font-bold font-mono">{campaignsList.length}</p>
+          </div>
+          <div className="bg-card border border-border/30 rounded-lg p-4">
+            <p className="text-xs text-muted-foreground">Cotações</p>
+            <p className="text-2xl font-bold font-mono text-orange-400">{quotationCount}</p>
           </div>
           <div className="bg-card border border-border/30 rounded-lg p-4">
             <p className="text-xs text-muted-foreground">Ativas</p>
@@ -458,19 +460,15 @@ export default function Campaigns() {
           ) : (
             filtered.map((c) => {
               const pricing = calcCampaignPricing(c);
-              const isExpanded = expandedId === c.id;
 
               return (
                 <div key={c.id} className="bg-card border border-border/30 rounded-lg overflow-hidden">
                   <div
                     className="p-4 cursor-pointer hover:bg-card/80 transition-colors"
-                    onClick={() => setExpandedId(isExpanded ? null : c.id)}
+                    onClick={() => setLocation(`/campanhas/${c.id}`)}
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </div>
                         <div className="min-w-0">
                           <h3 className="font-semibold text-sm truncate">{c.name}</h3>
                           <p className="text-xs text-muted-foreground truncate">
@@ -516,74 +514,6 @@ export default function Campaigns() {
                       </div>
                     </div>
                   </div>
-
-                  <AnimatePresence>
-                    {isExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="border-t border-border/20 p-4 space-y-4">
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <InfoCard icon={<Calendar className="w-4 h-4" />} label="Período"
-                              value={`${c.startDate ? new Date(c.startDate).toLocaleDateString("pt-BR") : "—"} → ${c.endDate ? new Date(c.endDate).toLocaleDateString("pt-BR") : "—"}`}
-                              sub={`${c.contractDuration} meses`}
-                            />
-                            <InfoCard icon={<Store className="w-4 h-4" />} label="Restaurantes"
-                              value={`${c.activeRestaurants} ativos`}
-                              sub={`${c.coastersPerRestaurant} coasters/rest.`}
-                            />
-                            <InfoCard icon={<Package className="w-4 h-4" />} label="Impressões/Rest."
-                              value={pricing.impressions.toLocaleString("pt-BR")}
-                              sub={`${c.usagePerDay}x/dia × ${c.daysPerMonth} dias`}
-                            />
-                            <InfoCard icon={<Target className="w-4 h-4" />} label="Markup"
-                              value={c.pricingType === "variable" ? `${Number(c.markupPercent)}%` : `R$ ${Number(c.fixedPrice).toFixed(2)}`}
-                              sub={c.pricingType === "variable" ? "Variável (%)" : "Fixo (R$)"}
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                            <MetricCard label="Custo Produção" value={formatCurrency(pricing.productionCost)} sub={`Unit: R$ ${pricing.unitCost.toFixed(3)}`} />
-                            <MetricCard label="Comissão Rest." value={formatCurrency(pricing.actualRestCommission)}
-                              sub={c.commissionType === "variable" ? `${Number(c.restaurantCommission)}%` : `R$ ${Number(c.fixedCommission).toFixed(2)}/un`}
-                            />
-                            <MetricCard label="Comissão Vendedor" value={formatCurrency(pricing.actualSellerComm)} sub={`${Number(c.sellerCommission)}%`} />
-                            <MetricCard label="Impostos" value={formatCurrency(pricing.actualTax)} sub={`${Number(c.taxRate)}%`} />
-                            <MetricCard label="Custo Bruto" value={formatCurrency(pricing.totalCosts)} highlight />
-                            <MetricCard label="Preço de Venda" value={formatCurrency(pricing.sellingPrice)} accent />
-                            <MetricCard label="Lucro/Rest." value={formatCurrency(pricing.markupValue)}
-                              sub={`Margem: ${pricing.grossMargin.toFixed(1)}%`}
-                              accent={pricing.grossMargin >= 15}
-                              warn={pricing.grossMargin < 15}
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <SummaryCard icon={<DollarSign className="w-4 h-4" />} label="Receita Mensal" value={formatCurrency(pricing.monthlyRevenue)} />
-                            <SummaryCard icon={<TrendingUp className="w-4 h-4" />} label="Lucro Mensal" value={formatCurrency(pricing.monthlyProfit)} accent />
-                            <SummaryCard icon={<FileText className="w-4 h-4" />} label="Contrato Total" value={formatCurrency(pricing.contractTotal)} />
-                            <SummaryCard icon={<BarChart3 className="w-4 h-4" />} label="Lucro do Contrato" value={formatCurrency(pricing.contractProfit)} accent />
-                          </div>
-
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={(e) => { e.stopPropagation(); handleManageRestaurants(c.id); }}>
-                              <Store className="w-3 h-3" /> Gerenciar Restaurantes
-                            </Button>
-                          </div>
-
-                          {c.notes && (
-                            <p className="text-xs text-muted-foreground italic border-t border-border/20 pt-3">
-                              {c.notes}
-                            </p>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
               );
             })
@@ -624,9 +554,11 @@ export default function Campaigns() {
                         <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="draft">Rascunho</SelectItem>
+                          <SelectItem value="quotation">Cotação</SelectItem>
                           <SelectItem value="active">Ativa</SelectItem>
                           <SelectItem value="paused">Pausada</SelectItem>
                           <SelectItem value="completed">Concluída</SelectItem>
+                          <SelectItem value="archived">Arquivada</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -795,43 +727,6 @@ export default function Campaigns() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </div>
-  );
-}
-
-function InfoCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
-  return (
-    <div className="bg-background/50 border border-border/20 rounded-lg p-3">
-      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-        {icon}
-        <span className="text-[10px] uppercase tracking-wider font-medium">{label}</span>
-      </div>
-      <p className="text-sm font-semibold">{value}</p>
-      {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
-    </div>
-  );
-}
-
-function MetricCard({ label, value, sub, highlight, accent, warn }: {
-  label: string; value: string; sub?: string; highlight?: boolean; accent?: boolean; warn?: boolean;
-}) {
-  return (
-    <div className={`rounded-lg p-3 border ${highlight ? "bg-muted/50 border-border/40" : accent ? "bg-primary/5 border-primary/20" : warn ? "bg-red-500/5 border-red-500/20" : "bg-background/30 border-border/20"}`}>
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
-      <p className={`text-sm font-mono font-bold mt-1 ${accent ? "text-primary" : warn ? "text-red-400" : ""}`}>{value}</p>
-      {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
-    </div>
-  );
-}
-
-function SummaryCard({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: string; accent?: boolean }) {
-  return (
-    <div className={`rounded-lg p-3 border ${accent ? "bg-emerald-500/5 border-emerald-500/20" : "bg-background/40 border-border/30"}`}>
-      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-        {icon}
-        <span className="text-[10px] uppercase tracking-wider font-medium">{label}</span>
-      </div>
-      <p className={`text-base font-mono font-bold ${accent ? "text-emerald-400" : ""}`}>{value}</p>
     </div>
   );
 }

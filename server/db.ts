@@ -9,6 +9,7 @@ import {
   clients,
   campaigns,
   campaignRestaurants,
+  campaignHistory,
   suppliers,
   budgets,
   budgetItems,
@@ -305,6 +306,48 @@ export async function setCampaignRestaurants(
       }))
     );
   }
+}
+
+// ─── Campaign History ───────────────────────────────────────────────────────
+
+export async function getCampaignHistory(campaignId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(campaignHistory)
+    .where(eq(campaignHistory.campaignId, campaignId))
+    .orderBy(desc(campaignHistory.createdAt));
+}
+
+export async function addCampaignHistory(campaignId: number, action: string, details?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(campaignHistory).values({ campaignId, action, details });
+}
+
+export async function getClientHistory(clientId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const clientCampaigns = await db
+    .select({ id: campaigns.id })
+    .from(campaigns)
+    .where(eq(campaigns.clientId, clientId));
+  if (clientCampaigns.length === 0) return [];
+  const campaignIds = clientCampaigns.map((c) => c.id);
+  return db
+    .select({
+      id: campaignHistory.id,
+      campaignId: campaignHistory.campaignId,
+      campaignName: campaigns.name,
+      action: campaignHistory.action,
+      details: campaignHistory.details,
+      createdAt: campaignHistory.createdAt,
+    })
+    .from(campaignHistory)
+    .leftJoin(campaigns, eq(campaignHistory.campaignId, campaigns.id))
+    .where(sql`${campaignHistory.campaignId} IN (${sql.join(campaignIds.map(id => sql`${id}`), sql`, `)})`)
+    .orderBy(desc(campaignHistory.createdAt));
 }
 
 // ─── Monthly Economics ──────────────────────────────────────────────────────

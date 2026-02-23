@@ -12,7 +12,7 @@ import {
 
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const statusEnum = pgEnum("status", ["active", "inactive"]);
-export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "paused", "completed"]);
+export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "paused", "completed", "quotation", "archived"]);
 export const budgetStatusEnum = pgEnum("budget_status", ["active", "expired", "rejected"]);
 
 export const users = pgTable("users", {
@@ -121,6 +121,17 @@ export const campaignRestaurants = pgTable("campaign_restaurants", {
 
 export type CampaignRestaurant = typeof campaignRestaurants.$inferSelect;
 export type InsertCampaignRestaurant = typeof campaignRestaurants.$inferInsert;
+
+export const campaignHistory = pgTable("campaign_history", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaignId").notNull(),
+  action: varchar("action", { length: 50 }).notNull(),
+  details: text("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CampaignHistory = typeof campaignHistory.$inferSelect;
+export type InsertCampaignHistory = typeof campaignHistory.$inferInsert;
 
 export const suppliers = pgTable("suppliers", {
   id: serial("id").primaryKey(),
