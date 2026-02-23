@@ -47,15 +47,24 @@ import {
   Phone,
   User,
   Search,
+  Instagram,
+  MessageCircle,
 } from "lucide-react";
 
 interface RestaurantForm {
   name: string;
+  razaoSocial: string;
+  cnpj: string;
   address: string;
+  addressNumber: string;
   neighborhood: string;
   city: string;
+  state: string;
+  cep: string;
   contactName: string;
   contactPhone: string;
+  whatsapp: string;
+  instagram: string;
   coastersAllocated: number;
   commissionPercent: string;
   status: "active" | "inactive";
@@ -63,11 +72,18 @@ interface RestaurantForm {
 
 const emptyForm: RestaurantForm = {
   name: "",
+  razaoSocial: "",
+  cnpj: "",
   address: "",
+  addressNumber: "",
   neighborhood: "",
   city: "",
+  state: "",
+  cep: "",
   contactName: "",
   contactPhone: "",
+  whatsapp: "",
+  instagram: "",
   coastersAllocated: 500,
   commissionPercent: "20.00",
   status: "active",
@@ -129,11 +145,18 @@ export default function Restaurants() {
     setEditingId(r.id);
     setForm({
       name: r.name,
+      razaoSocial: r.razaoSocial || "",
+      cnpj: r.cnpj || "",
       address: r.address || "",
+      addressNumber: r.addressNumber || "",
       neighborhood: r.neighborhood || "",
       city: r.city || "",
+      state: r.state || "",
+      cep: r.cep || "",
       contactName: r.contactName || "",
       contactPhone: r.contactPhone || "",
+      whatsapp: r.whatsapp || "",
+      instagram: r.instagram || "",
       coastersAllocated: r.coastersAllocated,
       commissionPercent: String(r.commissionPercent),
       status: r.status,
@@ -332,23 +355,66 @@ export default function Restaurants() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-lg bg-card border-border/30">
+        <DialogContent className="sm:max-w-2xl bg-card border-border/30 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingId ? "Editar Restaurante" : "Novo Restaurante"}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Identificação</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Nome Fantasia *</Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Nome do restaurante"
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Razão Social</Label>
+                <Input
+                  value={form.razaoSocial}
+                  onChange={(e) => setForm({ ...form, razaoSocial: e.target.value })}
+                  placeholder="Razão social"
+                  className="bg-background border-border/30"
+                />
+              </div>
+            </div>
             <div className="grid gap-2">
-              <Label>Nome *</Label>
+              <Label>CNPJ</Label>
               <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Nome do restaurante"
+                value={form.cnpj}
+                onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
+                placeholder="00.000.000/0000-00"
                 className="bg-background border-border/30"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Endereço</p>
+            <div className="grid grid-cols-[1fr_100px] gap-4">
+              <div className="grid gap-2">
+                <Label>Logradouro</Label>
+                <Input
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  placeholder="Rua, Av, etc."
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>N°</Label>
+                <Input
+                  value={form.addressNumber}
+                  onChange={(e) => setForm({ ...form, addressNumber: e.target.value })}
+                  placeholder="123"
+                  className="bg-background border-border/30"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label>Bairro</Label>
                 <Input
@@ -369,16 +435,30 @@ export default function Restaurants() {
                   className="bg-background border-border/30"
                 />
               </div>
+              <div className="grid grid-cols-[1fr_80px] gap-2">
+                <div className="grid gap-2">
+                  <Label>CEP</Label>
+                  <Input
+                    value={form.cep}
+                    onChange={(e) => setForm({ ...form, cep: e.target.value })}
+                    placeholder="00000-000"
+                    className="bg-background border-border/30"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>UF</Label>
+                  <Input
+                    value={form.state}
+                    onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase().slice(0, 2) })}
+                    placeholder="AM"
+                    maxLength={2}
+                    className="bg-background border-border/30"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label>Endereço</Label>
-              <Input
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-                placeholder="Endereço completo"
-                className="bg-background border-border/30"
-              />
-            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Contato</p>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Contato</Label>
@@ -398,11 +478,39 @@ export default function Restaurants() {
                   onChange={(e) =>
                     setForm({ ...form, contactPhone: e.target.value })
                   }
-                  placeholder="(11) 99999-9999"
+                  placeholder="(92) 3333-3333"
                   className="bg-background border-border/30"
                 />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label className="flex items-center gap-1.5">
+                  <MessageCircle className="w-3.5 h-3.5 text-green-500" />
+                  WhatsApp
+                </Label>
+                <Input
+                  value={form.whatsapp}
+                  onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
+                  placeholder="(92) 99999-9999"
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="flex items-center gap-1.5">
+                  <Instagram className="w-3.5 h-3.5 text-pink-500" />
+                  Instagram
+                </Label>
+                <Input
+                  value={form.instagram}
+                  onChange={(e) => setForm({ ...form, instagram: e.target.value })}
+                  placeholder="@restaurante"
+                  className="bg-background border-border/30"
+                />
+              </div>
+            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Operacional</p>
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label>Coasters</Label>
