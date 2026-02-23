@@ -94,7 +94,7 @@ export default function KPICards({
       />
       <KPICard
         title="Preço de Venda / Rest."
-        value={formatCurrency(perRestaurant.sellingPrice)}
+        value={formatCurrency(perRestaurant.totalCosts + perRestaurant.markupValue)}
         subtitle={`Custo bruto: ${formatCurrency(perRestaurant.totalCosts)}`}
         icon={<DollarSign className="w-3.5 h-3.5" />}
         trend="up"
@@ -119,8 +119,8 @@ export default function KPICards({
       />
       <KPICard
         title="Preço Final do Contrato"
-        value={formatCurrency(perRestaurant.sellingPrice * activeRestaurants * contractDuration)}
-        subtitle={`${activeRestaurants} rest. × ${contractDuration} meses`}
+        value={formatCurrency((perRestaurant.totalCosts + perRestaurant.markupValue) * activeRestaurants * contractDuration)}
+        subtitle={`Custos + markup × ${activeRestaurants} rest. × ${contractDuration} meses`}
         icon={<FileText className="w-3.5 h-3.5" />}
         trend="up"
         highlight

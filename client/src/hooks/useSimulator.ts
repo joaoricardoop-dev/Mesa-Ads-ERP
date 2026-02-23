@@ -240,7 +240,8 @@ function calcPricing(
 
   const totalCosts =
     productionCost + actualRestCommission + actualSellerComm + actualTax;
-  const grossProfit = sellingPrice - totalCosts;
+  const markupValue = sellingPrice - totalCosts;
+  const grossProfit = markupValue;
   const grossMargin = sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
 
   return {
@@ -251,7 +252,7 @@ function calcPricing(
     taxValue: actualTax,
     custoBruto,
     totalCosts,
-    markupValue: sellingPrice - custoBruto,
+    markupValue,
     sellingPrice,
     grossProfit,
     grossMargin,
