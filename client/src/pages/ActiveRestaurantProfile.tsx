@@ -1,0 +1,861 @@
+import { useState, useMemo } from "react";
+import { useRoute, useLocation } from "wouter";
+import AppNav from "@/components/AppNav";
+import { trpc } from "@/lib/trpc";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { formatCurrency } from "@/lib/format";
+import {
+  ArrowLeft,
+  Pencil,
+  MapPin,
+  Phone,
+  Instagram,
+  Mail,
+  Globe,
+  Users,
+  BarChart3,
+  Megaphone,
+  DollarSign,
+  Camera,
+  Clock,
+  Building2,
+  ExternalLink,
+  CreditCard,
+  Calendar,
+  Package,
+  Eye,
+  TrendingUp,
+  Banknote,
+  Target,
+  ShieldCheck,
+  Plus,
+  Trash2,
+  Link2,
+  Unlink,
+  CheckCircle2,
+  AlertTriangle,
+  MessageCircle,
+  Store,
+  Hash,
+  FileText,
+  Armchair,
+  UtensilsCrossed,
+} from "lucide-react";
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Rascunho", quotation: "Cotação", active: "Ativa",
+  paused: "Pausada", completed: "Concluída", archived: "Arquivada",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  draft: "bg-muted text-muted-foreground",
+  quotation: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  active: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  paused: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  archived: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: "Pendente", paid: "Pago", overdue: "Atrasado", cancelled: "Cancelado",
+};
+
+const PAYMENT_STATUS_COLORS: Record<string, string> = {
+  pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  paid: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  overdue: "bg-red-500/20 text-red-400 border-red-500/30",
+  cancelled: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+};
+
+const SOCIAL_CLASS_LABELS: Record<string, string> = {
+  A: "Classe A", B: "Classe B", C: "Classe C",
+  misto_ab: "Misto (A/B)", misto_bc: "Misto (B/C)", nao_sei: "Não sei",
+};
+
+const CONTACT_TYPE_LABELS: Record<string, string> = {
+  proprietario: "Proprietário", gerente: "Gerente", marketing: "Marketing", outro: "Outro",
+};
+
+function calcRestaurantRevenue(c: any) {
+  const coasters = c.coastersCount || c.coastersPerRestaurant || 500;
+  const unitCost = Number(c.batchCost) / c.batchSize;
+  const productionCost = coasters * unitCost;
+  const sellerRate = Number(c.sellerCommission) / 100;
+  const taxRate = Number(c.taxRate) / 100;
+  const restCommFixed = c.commissionType === "fixed" ? Number(c.fixedCommission) * coasters : 0;
+  const custoPD = productionCost + restCommFixed;
+  const restVarRate = c.commissionType === "variable" ? Number(c.restaurantCommission) / 100 : 0;
+  const totalVarRate = sellerRate + taxRate + restVarRate;
+  const denom = 1 - totalVarRate;
+  const custoBruto = denom > 0 ? custoPD / denom : custoPD;
+  let sellingPrice: number;
+  if (c.pricingType === "fixed") {
+    sellingPrice = custoBruto + Number(c.fixedPrice);
+  } else {
+    sellingPrice = custoBruto * (1 + Number(c.markupPercent) / 100);
+  }
+  const restComm = c.commissionType === "fixed"
+    ? Number(c.fixedCommission) * coasters
+    : sellingPrice * (Number(c.restaurantCommission) / 100);
+  const impressions = coasters * (c.usagePerDay || 3) * (c.daysPerMonth || 26);
+  return { sellingPrice, restComm, impressions, productionCost };
+}
+
+export default function ActiveRestaurantProfile() {
+  const [, navigate] = useLocation();
+  const [match, params] = useRoute("/restaurantes/perfil/:id");
+  const restaurantId = match ? parseInt(params!.id) : 0;
+
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
+  const [isBranchDialogOpen, setIsBranchDialogOpen] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({ campaignId: "", amount: "", referenceMonth: "", paymentDate: "", status: "pending", notes: "" });
+  const [photoForm, setPhotoForm] = useState({ url: "", caption: "", photoType: "veiculacao" });
+  const [selectedBranch, setSelectedBranch] = useState("");
+
+  const utils = trpc.useUtils();
+  const { data: restaurant, isLoading } = trpc.activeRestaurant.get.useQuery({ id: restaurantId }, { enabled: restaurantId > 0 });
+  const { data: campaignsData = [] } = trpc.activeRestaurant.getCampaigns.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
+  const { data: photos = [] } = trpc.activeRestaurant.getPhotos.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
+  const { data: payments = [] } = trpc.activeRestaurant.getPayments.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
+  const { data: allRestaurants = [] } = trpc.activeRestaurant.list.useQuery();
+
+  const branches = useMemo(() =>
+    allRestaurants.filter(r => r.parentRestaurantId === restaurantId),
+    [allRestaurants, restaurantId]
+  );
+
+  const parentRestaurant = useMemo(() =>
+    restaurant?.parentRestaurantId ? allRestaurants.find(r => r.id === restaurant.parentRestaurantId) : null,
+    [restaurant, allRestaurants]
+  );
+
+  const availableForBranch = useMemo(() =>
+    allRestaurants.filter(r => r.id !== restaurantId && !r.parentRestaurantId && !branches.find(b => b.id === r.id)),
+    [allRestaurants, restaurantId, branches]
+  );
+
+  const addPaymentMutation = trpc.activeRestaurant.addPayment.useMutation({
+    onSuccess: () => { utils.activeRestaurant.getPayments.invalidate(); setIsPaymentDialogOpen(false); toast.success("Pagamento registrado!"); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const deletePaymentMutation = trpc.activeRestaurant.deletePayment.useMutation({
+    onSuccess: () => { utils.activeRestaurant.getPayments.invalidate(); toast.success("Pagamento removido!"); },
+  });
+
+  const updatePaymentMutation = trpc.activeRestaurant.updatePayment.useMutation({
+    onSuccess: () => { utils.activeRestaurant.getPayments.invalidate(); toast.success("Pagamento atualizado!"); },
+  });
+
+  const addPhotoMutation = trpc.activeRestaurant.addPhoto.useMutation({
+    onSuccess: () => { utils.activeRestaurant.getPhotos.invalidate(); setIsPhotoDialogOpen(false); toast.success("Foto adicionada!"); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const deletePhotoMutation = trpc.activeRestaurant.deletePhoto.useMutation({
+    onSuccess: () => { utils.activeRestaurant.getPhotos.invalidate(); toast.success("Foto removida!"); },
+  });
+
+  const linkBranchMutation = trpc.activeRestaurant.linkBranch.useMutation({
+    onSuccess: () => { utils.activeRestaurant.list.invalidate(); setIsBranchDialogOpen(false); toast.success("Filial vinculada!"); },
+  });
+
+  const unlinkBranchMutation = trpc.activeRestaurant.unlinkBranch.useMutation({
+    onSuccess: () => { utils.activeRestaurant.list.invalidate(); toast.success("Filial desvinculada!"); },
+  });
+
+  const stats = useMemo(() => {
+    let totalRevenue = 0;
+    let totalCommission = 0;
+    let totalImpressions = 0;
+    let activeCampaigns = 0;
+    let completedCampaigns = 0;
+
+    for (const c of campaignsData) {
+      if (!c.campaignName) continue;
+      const r = calcRestaurantRevenue(c);
+      const months = c.contractDuration || 1;
+      totalRevenue += r.sellingPrice * months;
+      totalCommission += r.restComm * months;
+      totalImpressions += r.impressions * months;
+      if (c.status === "active") activeCampaigns++;
+      if (c.status === "completed") completedCampaigns++;
+    }
+
+    const totalPaid = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
+    const totalPending = payments.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.amount), 0);
+
+    return { totalRevenue, totalCommission, totalImpressions, activeCampaigns, completedCampaigns, totalPaid, totalPending, totalCampaigns: campaignsData.length };
+  }, [campaignsData, payments]);
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <AppNav />
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <AppNav />
+        <div className="flex-1 flex flex-col items-center justify-center gap-4">
+          <p className="text-muted-foreground">Restaurante não encontrado</p>
+          <Button variant="outline" onClick={() => navigate("/restaurantes")}>Voltar</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const busyDays = restaurant.busyDays ? (() => { try { return JSON.parse(restaurant.busyDays); } catch { return []; } })() : [];
+  const excludedCategories = restaurant.excludedCategories ? (() => { try { return JSON.parse(restaurant.excludedCategories); } catch { return []; } })() : [];
+
+  return (
+    <div className="h-screen flex flex-col overflow-hidden">
+      <AppNav />
+      <div className="flex-1 overflow-y-auto">
+        <div className="border-b border-border/20 bg-card/30 px-4 lg:px-6 py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/restaurantes")}>
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-bold tracking-tight">{restaurant.name}</h1>
+                  <Badge variant="outline" className={restaurant.status === "active" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-muted text-muted-foreground"}>
+                    {restaurant.status === "active" ? "Ativo" : "Inativo"}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                  <MapPin className="w-3 h-3" /> {restaurant.neighborhood} · ID #{restaurant.id}
+                  {parentRestaurant && (
+                    <span className="flex items-center gap-1 text-primary cursor-pointer" onClick={() => navigate(`/restaurantes/perfil/${parentRestaurant.id}`)}>
+                      <Link2 className="w-3 h-3" /> Filial de {parentRestaurant.name}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => navigate(`/restaurantes/${restaurant.id}`)}>
+                <Pencil className="w-3.5 h-3.5" /> Editar
+              </Button>
+              {restaurant.instagram && (
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => window.open(`https://instagram.com/${restaurant.instagram!.replace("@", "")}`, "_blank")}>
+                  <Instagram className="w-3.5 h-3.5" /> Instagram
+                </Button>
+              )}
+              {restaurant.googleMapsLink && (
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => window.open(restaurant.googleMapsLink!, "_blank")}>
+                  <Globe className="w-3.5 h-3.5" /> Mapa
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 lg:p-6 space-y-5">
+          <Tabs defaultValue="painel" className="space-y-4">
+            <TabsList className="bg-card border border-border/30">
+              <TabsTrigger value="painel" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>
+              <TabsTrigger value="info" className="gap-1.5 text-xs"><Building2 className="w-3.5 h-3.5" /> Informações</TabsTrigger>
+              <TabsTrigger value="campanhas" className="gap-1.5 text-xs"><Megaphone className="w-3.5 h-3.5" /> Campanhas</TabsTrigger>
+              <TabsTrigger value="financeiro" className="gap-1.5 text-xs"><DollarSign className="w-3.5 h-3.5" /> Financeiro</TabsTrigger>
+              <TabsTrigger value="fotos" className="gap-1.5 text-xs"><Camera className="w-3.5 h-3.5" /> Fotos</TabsTrigger>
+              <TabsTrigger value="filiais" className="gap-1.5 text-xs"><Link2 className="w-3.5 h-3.5" /> Filiais</TabsTrigger>
+            </TabsList>
+
+            {/* ─── PAINEL ─── */}
+            <TabsContent value="painel" className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <KPICard label="Faturamento Gerado" value={formatCurrency(stats.totalRevenue)} icon={<Banknote className="w-5 h-5" />} />
+                <KPICard label="Comissão Total" value={formatCurrency(stats.totalCommission)} icon={<DollarSign className="w-5 h-5" />} accent />
+                <KPICard label="Impressões Geradas" value={stats.totalImpressions.toLocaleString("pt-BR")} icon={<Eye className="w-5 h-5" />} />
+                <KPICard label="Total Campanhas" value={String(stats.totalCampaigns)} icon={<Megaphone className="w-5 h-5" />} />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <Card title="Operação">
+                  <div className="grid grid-cols-2 gap-2">
+                    <MiniStat label="Mesas" value={String(restaurant.tableCount)} />
+                    <MiniStat label="Assentos" value={String(restaurant.seatCount)} />
+                    <MiniStat label="Clientes/Mês" value={restaurant.monthlyCustomers.toLocaleString("pt-BR")} />
+                    <MiniStat label="Classe" value={SOCIAL_CLASS_LABELS[restaurant.socialClass] || restaurant.socialClass} />
+                  </div>
+                  {busyDays.length > 0 && (
+                    <div className="pt-2">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Dias Movimentados</p>
+                      <div className="flex gap-1">
+                        {busyDays.map((d: string) => (
+                          <Badge key={d} variant="outline" className="text-[10px]">{d}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {restaurant.busyHours && <MiniStat label="Horário Pico" value={restaurant.busyHours} />}
+                </Card>
+
+                <Card title="Financeiro">
+                  <div className="grid grid-cols-2 gap-2">
+                    <MiniStat label="Comissão Paga" value={formatCurrency(stats.totalPaid)} accent />
+                    <MiniStat label="Pendente" value={formatCurrency(stats.totalPending)} warn={stats.totalPending > 0} />
+                    <MiniStat label="Coasters Alocados" value={String(restaurant.coastersAllocated)} />
+                    <MiniStat label="Comissão %" value={`${restaurant.commissionPercent}%`} />
+                  </div>
+                  {restaurant.pixKey && <MiniStat label="Chave Pix" value={restaurant.pixKey} />}
+                </Card>
+
+                <Card title="Contato">
+                  <div className="space-y-2">
+                    <MiniStat label="Responsável" value={`${restaurant.contactName} (${CONTACT_TYPE_LABELS[restaurant.contactType] || restaurant.contactType})`} />
+                    <MiniStat label="Cargo" value={restaurant.contactRole} />
+                    <MiniStat label="WhatsApp" value={restaurant.whatsapp} />
+                    {restaurant.email && <MiniStat label="Email" value={restaurant.email} />}
+                    {restaurant.financialEmail && <MiniStat label="Email Financeiro" value={restaurant.financialEmail} />}
+                    {restaurant.instagram && <MiniStat label="Instagram" value={restaurant.instagram} />}
+                  </div>
+                </Card>
+              </div>
+
+              {campaignsData.length > 0 && (
+                <Card title="Campanhas Recentes">
+                  <div className="space-y-2">
+                    {campaignsData.slice(0, 3).map((c) => {
+                      const rev = calcRestaurantRevenue(c);
+                      return (
+                        <div key={c.campaignId} className="flex items-center justify-between p-2 bg-background/50 rounded-lg border border-border/20 cursor-pointer hover:bg-background/80" onClick={() => navigate(`/campanhas/${c.campaignId}`)}>
+                          <div>
+                            <p className="text-sm font-medium">{c.campaignName}</p>
+                            <p className="text-[10px] text-muted-foreground">{c.clientName}</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-mono text-primary">{formatCurrency(rev.restComm)}/mês</span>
+                            <Badge variant="outline" className={STATUS_COLORS[c.status || ""] || ""}>{STATUS_LABELS[c.status || ""] || c.status}</Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+            </TabsContent>
+
+            {/* ─── INFORMAÇÕES ─── */}
+            <TabsContent value="info" className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card title="Local & Endereço" icon={<MapPin className="w-4 h-4" />}>
+                  <div className="space-y-2">
+                    <InfoRow label="Nome" value={restaurant.name} />
+                    <InfoRow label="Endereço" value={restaurant.address} />
+                    <InfoRow label="Bairro" value={restaurant.neighborhood} />
+                    {restaurant.city && <InfoRow label="Cidade" value={`${restaurant.city}${restaurant.state ? ` - ${restaurant.state}` : ""}`} />}
+                    {restaurant.cep && <InfoRow label="CEP" value={restaurant.cep} />}
+                    {restaurant.cnpj && <InfoRow label="CNPJ" value={restaurant.cnpj} mono />}
+                    {restaurant.razaoSocial && <InfoRow label="Razão Social" value={restaurant.razaoSocial} />}
+                    {restaurant.googleMapsLink && (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Google Maps</p>
+                        <a href={restaurant.googleMapsLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1 mt-0.5">
+                          Abrir no Maps <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card title="Contato" icon={<Phone className="w-4 h-4" />}>
+                  <div className="space-y-2">
+                    <InfoRow label="Tipo" value={CONTACT_TYPE_LABELS[restaurant.contactType] || restaurant.contactType} />
+                    <InfoRow label="Nome" value={restaurant.contactName} />
+                    <InfoRow label="Cargo" value={restaurant.contactRole} />
+                    <InfoRow label="WhatsApp" value={restaurant.whatsapp} />
+                    <InfoRow label="Email" value={restaurant.email || undefined} />
+                    <InfoRow label="Email Financeiro" value={restaurant.financialEmail || undefined} />
+                    <InfoRow label="Instagram" value={restaurant.instagram || undefined} />
+                  </div>
+                </Card>
+
+                <Card title="Operação" icon={<BarChart3 className="w-4 h-4" />}>
+                  <div className="space-y-2">
+                    <InfoRow label="Classe Social" value={SOCIAL_CLASS_LABELS[restaurant.socialClass] || restaurant.socialClass} />
+                    <InfoRow label="Mesas" value={String(restaurant.tableCount)} />
+                    <InfoRow label="Assentos" value={String(restaurant.seatCount)} />
+                    <InfoRow label="Clientes/Mês" value={restaurant.monthlyCustomers.toLocaleString("pt-BR")} />
+                    <InfoRow label="Dias Movimentados" value={busyDays.join(", ") || undefined} />
+                    <InfoRow label="Horário Pico" value={restaurant.busyHours || undefined} />
+                    <InfoRow label="Autoriza Fotos" value={restaurant.photoAuthorization === "sim" ? "Sim" : "Não"} />
+                  </div>
+                </Card>
+
+                <Card title="Restrições" icon={<ShieldCheck className="w-4 h-4" />}>
+                  {excludedCategories.length > 0 ? (
+                    <div className="space-y-1">
+                      {excludedCategories.map((cat: string, i: number) => (
+                        <div key={i} className="flex items-center gap-2 text-xs py-1 border-b border-border/10 last:border-0">
+                          <AlertTriangle className="w-3 h-3 text-yellow-500 shrink-0" />
+                          <span className="text-muted-foreground">{cat}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Nenhuma restrição cadastrada</p>
+                  )}
+                  {restaurant.excludedOther && (
+                    <div className="mt-2 pt-2 border-t border-border/20">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Outras Restrições</p>
+                      <p className="text-xs mt-0.5">{restaurant.excludedOther}</p>
+                    </div>
+                  )}
+                </Card>
+              </div>
+
+              {restaurant.notes && (
+                <Card title="Observações" icon={<FileText className="w-4 h-4" />}>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{restaurant.notes}</p>
+                </Card>
+              )}
+
+              <Card title="Dados do Sistema">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                  <InfoRow label="ID" value={`#${restaurant.id}`} mono />
+                  <InfoRow label="Coasters Alocados" value={String(restaurant.coastersAllocated)} />
+                  <InfoRow label="Comissão" value={`${restaurant.commissionPercent}%`} />
+                  <InfoRow label="Chave Pix" value={restaurant.pixKey || "—"} />
+                  <InfoRow label="Cadastrado em" value={new Date(restaurant.createdAt).toLocaleDateString("pt-BR")} />
+                  <InfoRow label="Atualizado em" value={new Date(restaurant.updatedAt).toLocaleDateString("pt-BR")} />
+                </div>
+              </Card>
+            </TabsContent>
+
+            {/* ─── CAMPANHAS ─── */}
+            <TabsContent value="campanhas" className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <KPICard label="Total Campanhas" value={String(stats.totalCampaigns)} icon={<Megaphone className="w-4 h-4" />} />
+                <KPICard label="Ativas Agora" value={String(stats.activeCampaigns)} icon={<Target className="w-4 h-4" />} accent />
+                <KPICard label="Concluídas" value={String(stats.completedCampaigns)} icon={<CheckCircle2 className="w-4 h-4" />} />
+                <KPICard label="Impressões Totais" value={stats.totalImpressions.toLocaleString("pt-BR")} icon={<Eye className="w-4 h-4" />} />
+              </div>
+
+              {campaignsData.length === 0 ? (
+                <div className="bg-card border border-border/30 rounded-lg p-8 text-center text-muted-foreground text-sm">
+                  Este restaurante ainda não participou de nenhuma campanha.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {campaignsData.map((c) => {
+                    const rev = calcRestaurantRevenue(c);
+                    const months = c.contractDuration || 1;
+                    return (
+                      <div key={c.campaignId} className="bg-card border border-border/30 rounded-lg p-4 cursor-pointer hover:bg-card/80 transition-colors" onClick={() => navigate(`/campanhas/${c.campaignId}`)}>
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-sm truncate">{c.campaignName}</h3>
+                              <Badge variant="outline" className={STATUS_COLORS[c.status || ""] || ""}>{STATUS_LABELS[c.status || ""] || c.status}</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {c.clientName} · {c.startDate ? new Date(c.startDate).toLocaleDateString("pt-BR") : ""} → {c.endDate ? new Date(c.endDate).toLocaleDateString("pt-BR") : ""}
+                            </p>
+                          </div>
+                          <div className="hidden md:flex items-center gap-6 text-sm shrink-0">
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">Comissão/Mês</p>
+                              <p className="font-mono font-semibold text-primary">{formatCurrency(rev.restComm)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">Comissão Total</p>
+                              <p className="font-mono font-semibold text-emerald-400">{formatCurrency(rev.restComm * months)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">Coasters</p>
+                              <p className="font-mono">{c.coastersCount?.toLocaleString("pt-BR")}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">Impressões/Mês</p>
+                              <p className="font-mono">{rev.impressions.toLocaleString("pt-BR")}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ─── FINANCEIRO ─── */}
+            <TabsContent value="financeiro" className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <KPICard label="Comissão Acumulada" value={formatCurrency(stats.totalCommission)} icon={<TrendingUp className="w-4 h-4" />} />
+                <KPICard label="Total Pago" value={formatCurrency(stats.totalPaid)} icon={<CheckCircle2 className="w-4 h-4" />} accent />
+                <KPICard label="Pendente" value={formatCurrency(stats.totalPending)} icon={<Clock className="w-4 h-4" />} warn={stats.totalPending > 0} />
+                <KPICard label="Faturamento Gerado" value={formatCurrency(stats.totalRevenue)} icon={<Banknote className="w-4 h-4" />} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Histórico de Pagamentos</h3>
+                <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => {
+                  setPaymentForm({ campaignId: "", amount: "", referenceMonth: new Date().toISOString().slice(0, 7), paymentDate: "", status: "pending", notes: "" });
+                  setIsPaymentDialogOpen(true);
+                }}>
+                  <Plus className="w-3.5 h-3.5" /> Novo Pagamento
+                </Button>
+              </div>
+
+              {payments.length === 0 ? (
+                <div className="bg-card border border-border/30 rounded-lg p-8 text-center text-muted-foreground text-sm">
+                  Nenhum pagamento registrado.
+                </div>
+              ) : (
+                <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border/20">
+                        <th className="text-left p-3 text-xs text-muted-foreground font-medium">Mês Ref.</th>
+                        <th className="text-left p-3 text-xs text-muted-foreground font-medium">Campanha</th>
+                        <th className="text-right p-3 text-xs text-muted-foreground font-medium">Valor</th>
+                        <th className="text-center p-3 text-xs text-muted-foreground font-medium">Status</th>
+                        <th className="text-left p-3 text-xs text-muted-foreground font-medium">Data Pgto.</th>
+                        <th className="text-right p-3 text-xs text-muted-foreground font-medium">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payments.map((p) => (
+                        <tr key={p.id} className="border-b border-border/10 last:border-0">
+                          <td className="p-3 font-mono text-xs">{p.referenceMonth}</td>
+                          <td className="p-3 text-xs">{p.campaignName || "—"}</td>
+                          <td className="p-3 text-right font-mono font-semibold">{formatCurrency(Number(p.amount))}</td>
+                          <td className="p-3 text-center">
+                            <Badge variant="outline" className={`text-[10px] cursor-pointer ${PAYMENT_STATUS_COLORS[p.status] || ""}`}
+                              onClick={() => {
+                                const next = p.status === "pending" ? "paid" : p.status === "paid" ? "pending" : p.status;
+                                updatePaymentMutation.mutate({ id: p.id, status: next, paymentDate: next === "paid" ? new Date().toISOString().split("T")[0] : undefined });
+                              }}>
+                              {PAYMENT_STATUS_LABELS[p.status] || p.status}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-xs">{p.paymentDate ? new Date(p.paymentDate).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td className="p-3 text-right">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deletePaymentMutation.mutate({ id: p.id })}>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ─── FOTOS ─── */}
+            <TabsContent value="fotos" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Fotos de Veiculação & Estabelecimento</h3>
+                <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => {
+                  setPhotoForm({ url: "", caption: "", photoType: "veiculacao" });
+                  setIsPhotoDialogOpen(true);
+                }}>
+                  <Plus className="w-3.5 h-3.5" /> Adicionar Foto
+                </Button>
+              </div>
+
+              {photos.length === 0 ? (
+                <div className="bg-card border border-border/30 rounded-lg p-12 text-center text-muted-foreground">
+                  <Camera className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">Nenhuma foto cadastrada</p>
+                  <p className="text-xs mt-1">Adicione fotos de veiculação para mostrar ao seu cliente</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="bg-card border border-border/30 rounded-lg overflow-hidden group relative">
+                      <div className="aspect-[4/3] bg-muted flex items-center justify-center">
+                        <img src={photo.url} alt={photo.caption || ""} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs truncate">{photo.caption || "Sem legenda"}</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <Badge variant="outline" className="text-[9px]">{photo.photoType}</Badge>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deletePhotoMutation.mutate({ id: photo.id })}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ─── FILIAIS ─── */}
+            <TabsContent value="filiais" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold">Rede & Filiais</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Vincule outros restaurantes como filiais desta unidade</p>
+                </div>
+                <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => { setSelectedBranch(""); setIsBranchDialogOpen(true); }}>
+                  <Plus className="w-3.5 h-3.5" /> Vincular Filial
+                </Button>
+              </div>
+
+              {parentRestaurant && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Este restaurante é filial de:</p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(`/restaurantes/perfil/${parentRestaurant.id}`)}>
+                      <Store className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-semibold">{parentRestaurant.name}</span>
+                      <span className="text-xs text-muted-foreground">{parentRestaurant.neighborhood}</span>
+                    </div>
+                    <Button size="sm" variant="outline" className="gap-1.5 text-xs h-7" onClick={() => unlinkBranchMutation.mutate({ branchId: restaurant.id })}>
+                      <Unlink className="w-3 h-3" /> Desvincular
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {branches.length === 0 && !parentRestaurant ? (
+                <div className="bg-card border border-border/30 rounded-lg p-8 text-center text-muted-foreground text-sm">
+                  Nenhuma filial vinculada.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {branches.map((b) => (
+                    <div key={b.id} className="bg-card border border-border/30 rounded-lg p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate(`/restaurantes/perfil/${b.id}`)}>
+                        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <Store className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{b.name}</p>
+                          <p className="text-xs text-muted-foreground">{b.neighborhood} · {b.tableCount} mesas · {b.monthlyCustomers.toLocaleString("pt-BR")} clientes/mês</p>
+                        </div>
+                      </div>
+                      <Button size="sm" variant="ghost" className="gap-1.5 text-xs h-7 text-destructive" onClick={() => unlinkBranchMutation.mutate({ branchId: b.id })}>
+                        <Unlink className="w-3 h-3" /> Desvincular
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+
+      {/* Payment Dialog */}
+      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border/30">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" /> Novo Pagamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Mês Referência *</Label>
+                <Input type="month" value={paymentForm.referenceMonth} onChange={(e) => setPaymentForm(p => ({ ...p, referenceMonth: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Valor (R$) *</Label>
+                <Input type="number" step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm(p => ({ ...p, amount: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Campanha</Label>
+                <Select value={paymentForm.campaignId} onValueChange={(v) => setPaymentForm(p => ({ ...p, campaignId: v }))}>
+                  <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma</SelectItem>
+                    {campaignsData.map((c) => (
+                      <SelectItem key={c.campaignId} value={String(c.campaignId)}>{c.campaignName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Status</Label>
+                <Select value={paymentForm.status} onValueChange={(v) => setPaymentForm(p => ({ ...p, status: v }))}>
+                  <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="paid">Pago</SelectItem>
+                    <SelectItem value="overdue">Atrasado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Data do Pagamento</Label>
+              <Input type="date" value={paymentForm.paymentDate} onChange={(e) => setPaymentForm(p => ({ ...p, paymentDate: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Observações</Label>
+              <Input value={paymentForm.notes} onChange={(e) => setPaymentForm(p => ({ ...p, notes: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)}>Cancelar</Button>
+            <Button disabled={!paymentForm.amount || !paymentForm.referenceMonth} onClick={() => {
+              addPaymentMutation.mutate({
+                restaurantId,
+                campaignId: paymentForm.campaignId && paymentForm.campaignId !== "none" ? parseInt(paymentForm.campaignId) : undefined,
+                amount: paymentForm.amount,
+                referenceMonth: paymentForm.referenceMonth,
+                paymentDate: paymentForm.paymentDate || undefined,
+                status: paymentForm.status,
+                pixKey: restaurant.pixKey || undefined,
+                notes: paymentForm.notes || undefined,
+              });
+            }}>Registrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Photo Dialog */}
+      <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border/30">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Camera className="w-5 h-5 text-primary" /> Adicionar Foto</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">URL da Imagem *</Label>
+              <Input value={photoForm.url} onChange={(e) => setPhotoForm(p => ({ ...p, url: e.target.value }))} placeholder="https://..." className="bg-background border-border/30 h-9 text-sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Legenda</Label>
+                <Input value={photoForm.caption} onChange={(e) => setPhotoForm(p => ({ ...p, caption: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Tipo</Label>
+                <Select value={photoForm.photoType} onValueChange={(v) => setPhotoForm(p => ({ ...p, photoType: v }))}>
+                  <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="veiculacao">Veiculação</SelectItem>
+                    <SelectItem value="fachada">Fachada</SelectItem>
+                    <SelectItem value="interior">Interior</SelectItem>
+                    <SelectItem value="cardapio">Cardápio</SelectItem>
+                    <SelectItem value="outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {photoForm.url && (
+              <div className="rounded-lg border border-border/30 overflow-hidden">
+                <img src={photoForm.url} alt="Preview" className="w-full max-h-48 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPhotoDialogOpen(false)}>Cancelar</Button>
+            <Button disabled={!photoForm.url} onClick={() => {
+              addPhotoMutation.mutate({
+                restaurantId,
+                url: photoForm.url,
+                caption: photoForm.caption || undefined,
+                photoType: photoForm.photoType,
+              });
+            }}>Adicionar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Branch Link Dialog */}
+      <Dialog open={isBranchDialogOpen} onOpenChange={setIsBranchDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border/30">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Link2 className="w-5 h-5 text-primary" /> Vincular Filial</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Selecione o restaurante para vincular como filial</Label>
+              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue placeholder="Selecione um restaurante" /></SelectTrigger>
+                <SelectContent>
+                  {availableForBranch.map((r) => (
+                    <SelectItem key={r.id} value={String(r.id)}>{r.name} ({r.neighborhood})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBranchDialogOpen(false)}>Cancelar</Button>
+            <Button disabled={!selectedBranch} onClick={() => {
+              linkBranchMutation.mutate({ parentId: restaurantId, branchId: parseInt(selectedBranch) });
+            }}>Vincular</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function KPICard({ label, value, icon, accent, warn }: { label: string; value: string; icon: React.ReactNode; accent?: boolean; warn?: boolean }) {
+  return (
+    <div className={`bg-card border rounded-lg p-4 ${warn ? "border-yellow-500/30" : accent ? "border-emerald-500/30" : "border-border/30"}`}>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
+        <div className={`${accent ? "text-emerald-400" : warn ? "text-yellow-400" : "text-muted-foreground"}`}>{icon}</div>
+      </div>
+      <p className={`text-xl font-bold font-mono ${accent ? "text-emerald-400" : warn ? "text-yellow-400" : ""}`}>{value}</p>
+    </div>
+  );
+}
+
+function Card({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+        {icon} {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+function MiniStat({ label, value, accent, warn }: { label: string; value: string; accent?: boolean; warn?: boolean }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={`text-xs font-medium mt-0.5 ${accent ? "text-emerald-400" : warn ? "text-yellow-400" : ""}`}>{value}</p>
+    </div>
+  );
+}
+
+function InfoRow({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
+  if (!value) return null;
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={`text-xs mt-0.5 ${mono ? "font-mono" : ""}`}>{value}</p>
+    </div>
+  );
+}

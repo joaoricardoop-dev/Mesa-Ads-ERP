@@ -51,6 +51,7 @@ import {
   CreditCard,
   Mail,
   ExternalLink,
+  Eye,
 } from "lucide-react";
 
 const CONTACT_TYPE_LABELS: Record<string, string> = {
@@ -361,10 +362,13 @@ export default function ActiveRestaurantsPage() {
                       <span>{r.monthlyCustomers?.toLocaleString("pt-BR")} clientes/mês</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); navigate(`/restaurantes/${r.id}`); }}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver perfil" onClick={(e) => { e.stopPropagation(); navigate(`/restaurantes/perfil/${r.id}`); }}>
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Editar" onClick={(e) => { e.stopPropagation(); navigate(`/restaurantes/${r.id}`); }}>
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteId(r.id); }}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Excluir" onClick={(e) => { e.stopPropagation(); setDeleteId(r.id); }}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                       {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}

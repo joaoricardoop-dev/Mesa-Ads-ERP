@@ -11,6 +11,8 @@ import {
   campaignRestaurants,
   campaignHistory,
   activeRestaurants,
+  restaurantPhotos,
+  restaurantPayments,
   suppliers,
   budgets,
   budgetItems,
@@ -19,6 +21,8 @@ import {
   type InsertCampaign,
   type InsertCampaignRestaurant,
   type InsertActiveRestaurant,
+  type InsertRestaurantPhoto,
+  type InsertRestaurantPayment,
   type InsertSupplier,
   type InsertBudget,
   type InsertBudgetItem,
@@ -711,4 +715,143 @@ export async function deleteActiveRestaurant(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.delete(activeRestaurants).where(eq(activeRestaurants.id, id));
+}
+
+// ─── Restaurant Profile (enriched queries) ─────────────────────────────────
+
+export async function getRestaurantCampaigns(restaurantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db
+    .select({
+      campaignId: campaignRestaurants.campaignId,
+      coastersCount: campaignRestaurants.coastersCount,
+      usagePerDay: campaignRestaurants.usagePerDay,
+      campaignName: campaigns.name,
+      clientId: campaigns.clientId,
+      startDate: campaigns.startDate,
+      endDate: campaigns.endDate,
+      status: campaigns.status,
+      coastersPerRestaurant: campaigns.coastersPerRestaurant,
+      pricingType: campaigns.pricingType,
+      markupPercent: campaigns.markupPercent,
+      fixedPrice: campaigns.fixedPrice,
+      commissionType: campaigns.commissionType,
+      restaurantCommission: campaigns.restaurantCommission,
+      fixedCommission: campaigns.fixedCommission,
+      sellerCommission: campaigns.sellerCommission,
+      taxRate: campaigns.taxRate,
+      contractDuration: campaigns.contractDuration,
+      batchSize: campaigns.batchSize,
+      batchCost: campaigns.batchCost,
+      daysPerMonth: campaigns.daysPerMonth,
+      activeRestaurants: campaigns.activeRestaurants,
+    })
+    .from(campaignRestaurants)
+    .leftJoin(campaigns, eq(campaigns.id, campaignRestaurants.campaignId))
+    .where(eq(campaignRestaurants.restaurantId, restaurantId))
+    .orderBy(desc(campaigns.startDate));
+
+  const clientIds = Array.from(new Set(result.map(r => r.clientId).filter(Boolean))) as number[];
+  let clientsMap: Record<number, string> = {};
+  if (clientIds.length > 0) {
+    const clientRows = await db.select({ id: clients.id, name: clients.name, company: clients.company }).from(clients);
+    for (const c of clientRows) {
+      clientsMap[c.id] = c.company ? `${c.name} (${c.company})` : c.name;
+    }
+  }
+
+  return result.map(r => ({
+    ...r,
+    clientName: r.clientId ? clientsMap[r.clientId] || "" : "",
+  }));
+}
+
+export async function getRestaurantBranches(parentId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(activeRestaurants)
+    .where(sql`${activeRestaurants.id} != ${parentId}`)
+    .orderBy(activeRestaurants.name);
+}
+
+export async function linkBranch(parentId: number, branchId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(activeRestaurants)
+    .set({ parentRestaurantId: parentId, updatedAt: new Date() })
+    .where(eq(activeRestaurants.id, branchId));
+}
+
+export async function unlinkBranch(branchId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(activeRestaurants)
+    .set({ parentRestaurantId: null, updatedAt: new Date() })
+    .where(eq(activeRestaurants.id, branchId));
+}
+
+// ─── Restaurant Photos ──────────────────────────────────────────────────────
+
+export async function listRestaurantPhotos(restaurantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(restaurantPhotos)
+    .where(eq(restaurantPhotos.restaurantId, restaurantId))
+    .orderBy(desc(restaurantPhotos.createdAt));
+}
+
+export async function addRestaurantPhoto(data: InsertRestaurantPhoto) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  return db.insert(restaurantPhotos).values(data).returning();
+}
+
+export async function deleteRestaurantPhoto(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(restaurantPhotos).where(eq(restaurantPhotos.id, id));
+}
+
+// ─── Restaurant Payments ────────────────────────────────────────────────────
+
+export async function listRestaurantPayments(restaurantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.select({
+    id: restaurantPayments.id,
+    restaurantId: restaurantPayments.restaurantId,
+    campaignId: restaurantPayments.campaignId,
+    amount: restaurantPayments.amount,
+    referenceMonth: restaurantPayments.referenceMonth,
+    paymentDate: restaurantPayments.paymentDate,
+    status: restaurantPayments.status,
+    pixKey: restaurantPayments.pixKey,
+    notes: restaurantPayments.notes,
+    createdAt: restaurantPayments.createdAt,
+    campaignName: campaigns.name,
+  })
+    .from(restaurantPayments)
+    .leftJoin(campaigns, eq(campaigns.id, restaurantPayments.campaignId))
+    .where(eq(restaurantPayments.restaurantId, restaurantId))
+    .orderBy(desc(restaurantPayments.referenceMonth));
+  return result;
+}
+
+export async function addRestaurantPayment(data: InsertRestaurantPayment) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  return db.insert(restaurantPayments).values(data).returning();
+}
+
+export async function updateRestaurantPayment(id: number, data: Partial<InsertRestaurantPayment>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  return db.update(restaurantPayments).set(data).where(eq(restaurantPayments.id, id)).returning();
+}
+
+export async function deleteRestaurantPayment(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(restaurantPayments).where(eq(restaurantPayments.id, id));
 }

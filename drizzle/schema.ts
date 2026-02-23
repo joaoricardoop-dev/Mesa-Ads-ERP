@@ -171,6 +171,12 @@ export const activeRestaurants = pgTable("active_restaurants", {
   photoAuthorization: varchar("photoAuthorization", { length: 3 }).default("sim").notNull(),
   photoUrls: text("photoUrls"),
   pixKey: varchar("pixKey", { length: 255 }),
+  cnpj: varchar("cnpj", { length: 20 }),
+  razaoSocial: varchar("razaoSocial", { length: 255 }),
+  city: varchar("city", { length: 255 }),
+  state: varchar("state", { length: 2 }),
+  cep: varchar("cep", { length: 10 }),
+  parentRestaurantId: integer("parentRestaurantId"),
   coastersAllocated: integer("coastersAllocated").default(500).notNull(),
   commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("20.00").notNull(),
   status: statusEnum("status").default("active").notNull(),
@@ -181,6 +187,34 @@ export const activeRestaurants = pgTable("active_restaurants", {
 
 export type ActiveRestaurant = typeof activeRestaurants.$inferSelect;
 export type InsertActiveRestaurant = typeof activeRestaurants.$inferInsert;
+
+export const restaurantPhotos = pgTable("restaurant_photos", {
+  id: serial("id").primaryKey(),
+  restaurantId: integer("restaurantId").notNull(),
+  url: text("url").notNull(),
+  caption: varchar("caption", { length: 255 }),
+  photoType: varchar("photoType", { length: 50 }).default("veiculacao").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RestaurantPhoto = typeof restaurantPhotos.$inferSelect;
+export type InsertRestaurantPhoto = typeof restaurantPhotos.$inferInsert;
+
+export const restaurantPayments = pgTable("restaurant_payments", {
+  id: serial("id").primaryKey(),
+  restaurantId: integer("restaurantId").notNull(),
+  campaignId: integer("campaignId"),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  referenceMonth: varchar("referenceMonth", { length: 7 }).notNull(),
+  paymentDate: date("paymentDate"),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  pixKey: varchar("pixKey", { length: 255 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RestaurantPayment = typeof restaurantPayments.$inferSelect;
+export type InsertRestaurantPayment = typeof restaurantPayments.$inferInsert;
 
 export const suppliers = pgTable("suppliers", {
   id: serial("id").primaryKey(),

@@ -40,6 +40,17 @@ import {
   createActiveRestaurant,
   updateActiveRestaurant,
   deleteActiveRestaurant,
+  getRestaurantCampaigns,
+  getRestaurantBranches,
+  linkBranch,
+  unlinkBranch,
+  listRestaurantPhotos,
+  addRestaurantPhoto,
+  deleteRestaurantPhoto,
+  listRestaurantPayments,
+  addRestaurantPayment,
+  updateRestaurantPayment,
+  deleteRestaurantPayment,
 } from "./db";
 
 export const appRouter = router({
@@ -273,6 +284,68 @@ export const appRouter = router({
     delete: publicProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteActiveRestaurant(input.id)),
+
+    getCampaigns: publicProcedure
+      .input(z.object({ restaurantId: z.number() }))
+      .query(({ input }) => getRestaurantCampaigns(input.restaurantId)),
+
+    getBranches: publicProcedure
+      .input(z.object({ restaurantId: z.number() }))
+      .query(({ input }) => getRestaurantBranches(input.restaurantId)),
+
+    linkBranch: publicProcedure
+      .input(z.object({ parentId: z.number(), branchId: z.number() }))
+      .mutation(({ input }) => linkBranch(input.parentId, input.branchId)),
+
+    unlinkBranch: publicProcedure
+      .input(z.object({ branchId: z.number() }))
+      .mutation(({ input }) => unlinkBranch(input.branchId)),
+
+    getPhotos: publicProcedure
+      .input(z.object({ restaurantId: z.number() }))
+      .query(({ input }) => listRestaurantPhotos(input.restaurantId)),
+
+    addPhoto: publicProcedure
+      .input(z.object({ restaurantId: z.number(), url: z.string(), caption: z.string().optional(), photoType: z.string().optional() }))
+      .mutation(({ input }) => addRestaurantPhoto(input)),
+
+    deletePhoto: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => deleteRestaurantPhoto(input.id)),
+
+    getPayments: publicProcedure
+      .input(z.object({ restaurantId: z.number() }))
+      .query(({ input }) => listRestaurantPayments(input.restaurantId)),
+
+    addPayment: publicProcedure
+      .input(z.object({
+        restaurantId: z.number(),
+        campaignId: z.number().optional(),
+        amount: z.string(),
+        referenceMonth: z.string(),
+        paymentDate: z.string().optional(),
+        status: z.string().optional(),
+        pixKey: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(({ input }) => addRestaurantPayment(input)),
+
+    updatePayment: publicProcedure
+      .input(z.object({
+        id: z.number(),
+        amount: z.string().optional(),
+        paymentDate: z.string().optional(),
+        status: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(({ input }) => {
+        const { id, ...data } = input;
+        return updateRestaurantPayment(id, data);
+      }),
+
+    deletePayment: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => deleteRestaurantPayment(input.id)),
   }),
 
   // ─── Clients (Anunciantes) ────────────────────────────────────────────
