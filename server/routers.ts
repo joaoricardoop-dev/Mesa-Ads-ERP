@@ -157,11 +157,7 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(({ input }) => createCampaign({
-        ...input,
-        startDate: new Date(input.startDate),
-        endDate: new Date(input.endDate),
-      })),
+      .mutation(({ input }) => createCampaign(input)),
 
     update: publicProcedure
       .input(
@@ -177,11 +173,8 @@ export const appRouter = router({
         })
       )
       .mutation(({ input }) => {
-        const { id, startDate, endDate, ...rest } = input;
-        const data: Record<string, unknown> = { ...rest };
-        if (startDate) data.startDate = new Date(startDate);
-        if (endDate) data.endDate = new Date(endDate);
-        return updateCampaign(id, data);
+        const { id, ...rest } = input;
+        return updateCampaign(id, rest);
       }),
 
     delete: publicProcedure

@@ -1,5 +1,7 @@
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import ws from "ws";
+import { Pool, neonConfig } from "@neondatabase/serverless";
 import {
   InsertUser,
   users,
@@ -7,19 +9,28 @@ import {
   clients,
   campaigns,
   campaignRestaurants,
+  suppliers,
+  budgets,
+  budgetItems,
   type InsertRestaurant,
   type InsertClient,
   type InsertCampaign,
   type InsertCampaignRestaurant,
+  type InsertSupplier,
+  type InsertBudget,
+  type InsertBudgetItem,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+
+neonConfig.webSocketConstructor = ws;
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      _db = drizzle(pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -78,7 +89,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    updateSet.updatedAt = new Date();
+
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -125,14 +139,14 @@ export async function getRestaurant(id: number) {
 export async function createRestaurant(data: Omit<InsertRestaurant, "id" | "createdAt" | "updatedAt">) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(restaurants).values(data);
-  return { id: result[0].insertId };
+  const result = await db.insert(restaurants).values(data).returning({ id: restaurants.id });
+  return { id: result[0].id };
 }
 
 export async function updateRestaurant(id: number, data: Partial<InsertRestaurant>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(restaurants).set(data).where(eq(restaurants.id, id));
+  await db.update(restaurants).set({ ...data, updatedAt: new Date() }).where(eq(restaurants.id, id));
 }
 
 export async function deleteRestaurant(id: number) {
@@ -163,14 +177,14 @@ export async function getClient(id: number) {
 export async function createClient(data: Omit<InsertClient, "id" | "createdAt" | "updatedAt">) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(clients).values(data);
-  return { id: result[0].insertId };
+  const result = await db.insert(clients).values(data).returning({ id: clients.id });
+  return { id: result[0].id };
 }
 
 export async function updateClient(id: number, data: Partial<InsertClient>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(clients).set(data).where(eq(clients.id, id));
+  await db.update(clients).set({ ...data, updatedAt: new Date() }).where(eq(clients.id, id));
 }
 
 export async function deleteClient(id: number) {
@@ -219,20 +233,19 @@ export async function getCampaign(id: number) {
 export async function createCampaign(data: Omit<InsertCampaign, "id" | "createdAt" | "updatedAt">) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(campaigns).values(data);
-  return { id: result[0].insertId };
+  const result = await db.insert(campaigns).values(data).returning({ id: campaigns.id });
+  return { id: result[0].id };
 }
 
 export async function updateCampaign(id: number, data: Partial<InsertCampaign>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(campaigns).set(data).where(eq(campaigns.id, id));
+  await db.update(campaigns).set({ ...data, updatedAt: new Date() }).where(eq(campaigns.id, id));
 }
 
 export async function deleteCampaign(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  // Delete related campaign_restaurants first
   await db.delete(campaignRestaurants).where(eq(campaignRestaurants.campaignId, id));
   await db.delete(campaigns).where(eq(campaigns.id, id));
 }
@@ -265,10 +278,8 @@ export async function setCampaignRestaurants(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Delete existing
   await db.delete(campaignRestaurants).where(eq(campaignRestaurants.campaignId, campaignId));
 
-  // Insert new
   if (items.length > 0) {
     await db.insert(campaignRestaurants).values(
       items.map((item) => ({
@@ -287,12 +298,10 @@ export async function getMonthlyEconomics(year: number, month: number) {
   const db = await getDb();
   if (!db) return { campaigns: [], totals: { revenue: 0, commission: 0, production: 0, profit: 0 } };
 
-  // Get the first and last day of the month
   const startOfMonth = `${year}-${String(month).padStart(2, "0")}-01`;
   const endOfMonth = new Date(year, month, 0);
   const endStr = `${year}-${String(month).padStart(2, "0")}-${String(endOfMonth.getDate()).padStart(2, "0")}`;
 
-  // Get active campaigns that overlap with this month
   const activeCampaigns = await db
     .select({
       id: campaigns.id,
@@ -311,7 +320,6 @@ export async function getMonthlyEconomics(year: number, month: number) {
       sql`${campaigns.startDate} <= ${endStr} AND ${campaigns.endDate} >= ${startOfMonth}`
     );
 
-  // For each campaign, get its restaurants and calculate economics
   const campaignEconomics = [];
   let totalRevenue = 0;
   let totalCommission = 0;
@@ -331,7 +339,6 @@ export async function getMonthlyEconomics(year: number, month: number) {
       .leftJoin(restaurants, eq(campaignRestaurants.restaurantId, restaurants.id))
       .where(eq(campaignRestaurants.campaignId, campaign.id));
 
-    // Calculate days in month for this campaign
     const campStart = new Date(campaign.startDate);
     const campEnd = new Date(campaign.endDate);
     const monthStart = new Date(year, month - 1, 1);
@@ -343,7 +350,6 @@ export async function getMonthlyEconomics(year: number, month: number) {
 
     const cpmValue = parseFloat(String(campaign.cpm));
 
-    // Batch cost assumptions (from simulator defaults)
     const batchSize = 10000;
     const batchCost = 1200;
     const costPerCoaster = batchCost / batchSize;
@@ -419,15 +425,6 @@ export async function getMonthlyEconomics(year: number, month: number) {
 
 // ─── Suppliers ─────────────────────────────────────────────────────────────
 
-import {
-  suppliers,
-  budgets,
-  budgetItems,
-  type InsertSupplier,
-  type InsertBudget,
-  type InsertBudgetItem,
-} from "../drizzle/schema";
-
 export async function listSuppliers() {
   const db = await getDb();
   if (!db) return [];
@@ -437,20 +434,19 @@ export async function listSuppliers() {
 export async function createSupplier(data: Omit<InsertSupplier, "id" | "createdAt" | "updatedAt">) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(suppliers).values(data);
-  return { id: result[0].insertId };
+  const result = await db.insert(suppliers).values(data).returning({ id: suppliers.id });
+  return { id: result[0].id };
 }
 
 export async function updateSupplier(id: number, data: Partial<InsertSupplier>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(suppliers).set(data).where(eq(suppliers.id, id));
+  await db.update(suppliers).set({ ...data, updatedAt: new Date() }).where(eq(suppliers.id, id));
 }
 
 export async function deleteSupplier(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  // Delete related budgets and items first
   const supplierBudgets = await db.select({ id: budgets.id }).from(budgets).where(eq(budgets.supplierId, id));
   for (const b of supplierBudgets) {
     await db.delete(budgetItems).where(eq(budgetItems.budgetId, b.id));
@@ -492,8 +488,8 @@ export async function createBudget(
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(budgets).values(data);
-  const budgetId = result[0].insertId;
+  const result = await db.insert(budgets).values(data).returning({ id: budgets.id });
+  const budgetId = result[0].id;
 
   if (items.length > 0) {
     await db.insert(budgetItems).values(
@@ -516,7 +512,7 @@ export async function updateBudget(
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(budgets).set(data).where(eq(budgets.id, id));
+  await db.update(budgets).set({ ...data, updatedAt: new Date() }).where(eq(budgets.id, id));
 
   if (items !== undefined) {
     await db.delete(budgetItems).where(eq(budgetItems.budgetId, id));
