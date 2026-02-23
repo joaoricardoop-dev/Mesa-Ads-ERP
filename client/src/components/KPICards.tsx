@@ -103,7 +103,7 @@ export default function KPICards({
       <KPICard
         title="Lucro Mesa Ads / Rest."
         value={formatCurrency(perRestaurant.grossProfit)}
-        subtitle="Após comissão e produção"
+        subtitle="Após comissões e produção"
         icon={<BarChart3 className="w-3.5 h-3.5" />}
         trend={perRestaurant.grossProfit > 0 ? "up" : "down"}
         highlight={perRestaurant.grossProfit > 0}
