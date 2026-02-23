@@ -226,7 +226,7 @@ function calcPricing(
 
   let sellingPrice: number;
   if (inputs.pricingType === "fixed") {
-    sellingPrice = inputs.fixedPrice;
+    sellingPrice = custoBruto + inputs.fixedPrice;
   } else {
     sellingPrice = custoBruto * (1 + markupPct / 100);
   }
