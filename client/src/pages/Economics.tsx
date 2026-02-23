@@ -264,8 +264,7 @@ export default function Economics() {
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        CPM R$ {campaign.cpm.toFixed(2)} · {campaign.daysInMonth}{" "}
-                        dias · {campaign.restaurantCount} restaurante(s)
+                        {campaign.daysInMonth} dias · {campaign.restaurantCount} restaurante(s)
                       </p>
                     </div>
                     <div className="hidden sm:flex items-center gap-6 text-sm">

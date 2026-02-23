@@ -203,11 +203,26 @@ export async function listCampaigns() {
       id: campaigns.id,
       clientId: campaigns.clientId,
       name: campaigns.name,
-      cpm: campaigns.cpm,
       startDate: campaigns.startDate,
       endDate: campaigns.endDate,
       status: campaigns.status,
       notes: campaigns.notes,
+      coastersPerRestaurant: campaigns.coastersPerRestaurant,
+      usagePerDay: campaigns.usagePerDay,
+      daysPerMonth: campaigns.daysPerMonth,
+      activeRestaurants: campaigns.activeRestaurants,
+      pricingType: campaigns.pricingType,
+      markupPercent: campaigns.markupPercent,
+      fixedPrice: campaigns.fixedPrice,
+      commissionType: campaigns.commissionType,
+      restaurantCommission: campaigns.restaurantCommission,
+      fixedCommission: campaigns.fixedCommission,
+      sellerCommission: campaigns.sellerCommission,
+      taxRate: campaigns.taxRate,
+      contractDuration: campaigns.contractDuration,
+      batchSize: campaigns.batchSize,
+      batchCost: campaigns.batchCost,
+      budgetId: campaigns.budgetId,
       createdAt: campaigns.createdAt,
       updatedAt: campaigns.updatedAt,
       clientName: clients.name,
@@ -307,10 +322,23 @@ export async function getMonthlyEconomics(year: number, month: number) {
       id: campaigns.id,
       name: campaigns.name,
       clientId: campaigns.clientId,
-      cpm: campaigns.cpm,
       startDate: campaigns.startDate,
       endDate: campaigns.endDate,
       status: campaigns.status,
+      coastersPerRestaurant: campaigns.coastersPerRestaurant,
+      usagePerDay: campaigns.usagePerDay,
+      daysPerMonth: campaigns.daysPerMonth,
+      activeRestaurants: campaigns.activeRestaurants,
+      pricingType: campaigns.pricingType,
+      markupPercent: campaigns.markupPercent,
+      fixedPrice: campaigns.fixedPrice,
+      commissionType: campaigns.commissionType,
+      restaurantCommission: campaigns.restaurantCommission,
+      fixedCommission: campaigns.fixedCommission,
+      sellerCommission: campaigns.sellerCommission,
+      taxRate: campaigns.taxRate,
+      batchSize: campaigns.batchSize,
+      batchCost: campaigns.batchCost,
       clientName: clients.name,
       clientCompany: clients.company,
     })
@@ -348,58 +376,69 @@ export async function getMonthlyEconomics(year: number, month: number) {
     const effectiveEnd = campEnd < monthEnd ? campEnd : monthEnd;
     const daysInMonth = Math.max(0, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
-    const cpmValue = parseFloat(String(campaign.cpm));
+    const coasters = campaign.coastersPerRestaurant;
+    const unitCost = parseFloat(String(campaign.batchCost)) / campaign.batchSize;
+    const productionCostPerRest = coasters * unitCost;
+    const sellerRate = parseFloat(String(campaign.sellerCommission)) / 100;
+    const taxRateDecimal = parseFloat(String(campaign.taxRate)) / 100;
+    const markupPct = parseFloat(String(campaign.markupPercent));
+    const restCommFixed = campaign.commissionType === "fixed" ? parseFloat(String(campaign.fixedCommission)) * coasters : 0;
+    const custoPD = productionCostPerRest + restCommFixed;
+    const restVarRate = campaign.commissionType === "variable" ? parseFloat(String(campaign.restaurantCommission)) / 100 : 0;
+    const totalVarRate = sellerRate + taxRateDecimal + restVarRate;
+    const denominator = 1 - totalVarRate;
+    const custoBruto = denominator > 0 ? custoPD / denominator : custoPD;
 
-    const batchSize = 10000;
-    const batchCost = 1200;
-    const costPerCoaster = batchCost / batchSize;
+    let sellingPrice: number;
+    if (campaign.pricingType === "fixed") {
+      sellingPrice = custoBruto + parseFloat(String(campaign.fixedPrice));
+    } else {
+      sellingPrice = custoBruto * (1 + markupPct / 100);
+    }
 
-    let campaignRevenue = 0;
-    let campaignCommission = 0;
-    let campaignProduction = 0;
+    const actualRestComm = campaign.commissionType === "fixed"
+      ? parseFloat(String(campaign.fixedCommission)) * coasters
+      : sellingPrice * (parseFloat(String(campaign.restaurantCommission)) / 100);
+    const actualSellerComm = sellingPrice * sellerRate;
+    const actualTax = sellingPrice * taxRateDecimal;
+    const totalCosts = productionCostPerRest + actualRestComm + actualSellerComm + actualTax;
+    const profit = sellingPrice - totalCosts;
 
-    const restaurantDetails = campRestaurants.map((r) => {
-      const impressions = r.coastersCount * r.usagePerDay * daysInMonth;
-      const revenue = (impressions / 1000) * cpmValue;
-      const commPercent = parseFloat(String(r.commissionPercent || "20"));
-      const commission = revenue * (commPercent / 100);
-      const production = r.coastersCount * costPerCoaster;
-      const profit = revenue - commission - production;
-
-      campaignRevenue += revenue;
-      campaignCommission += commission;
-      campaignProduction += production;
-
-      return {
-        restaurantId: r.restaurantId,
-        restaurantName: r.restaurantName,
-        coastersCount: r.coastersCount,
-        usagePerDay: r.usagePerDay,
-        impressions,
-        revenue,
-        commissionPercent: commPercent,
-        commission,
-        production,
-        profit,
-      };
-    });
-
-    const campaignProfit = campaignRevenue - campaignCommission - campaignProduction;
+    const restCount = campRestaurants.length > 0 ? campRestaurants.length : campaign.activeRestaurants;
+    const campaignRevenue = sellingPrice * restCount;
+    const campaignCommission = actualRestComm * restCount;
+    const campaignProduction = productionCostPerRest * restCount;
+    const campaignProfit = profit * restCount;
 
     totalRevenue += campaignRevenue;
     totalCommission += campaignCommission;
     totalProduction += campaignProduction;
     totalProfit += campaignProfit;
 
+    const restaurantDetails = campRestaurants.map((r) => {
+      const impressions = r.coastersCount * r.usagePerDay * daysInMonth;
+      return {
+        restaurantId: r.restaurantId,
+        restaurantName: r.restaurantName,
+        coastersCount: r.coastersCount,
+        usagePerDay: r.usagePerDay,
+        impressions,
+        revenue: sellingPrice,
+        commissionPercent: parseFloat(String(r.commissionPercent || "20")),
+        commission: actualRestComm,
+        production: productionCostPerRest,
+        profit,
+      };
+    });
+
     campaignEconomics.push({
       id: campaign.id,
       name: campaign.name,
       clientName: campaign.clientName,
       clientCompany: campaign.clientCompany,
-      cpm: cpmValue,
       status: campaign.status,
       daysInMonth,
-      restaurantCount: campRestaurants.length,
+      restaurantCount: restCount,
       revenue: campaignRevenue,
       commission: campaignCommission,
       production: campaignProduction,

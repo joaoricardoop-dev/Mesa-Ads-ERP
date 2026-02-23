@@ -135,11 +135,26 @@ export default function Home() {
     createCampaignMutation.mutate({
       clientId: parseInt(selectedClientId),
       name: campaignName,
-      cpm: "0.00",
       startDate: campaignStartDate,
       endDate: campaignEndDate,
       status: "draft",
-      notes: `Criada a partir do simulador. Coasters/rest: ${simulator.inputs.coastersPerRestaurant}, Uso/dia: ${simulator.inputs.usagePerDay}, Markup: ${simulator.inputs.pricingType === "variable" ? simulator.inputs.markupPercent + "%" : "Fixo R$" + simulator.inputs.fixedPrice}, Comissão rest: ${simulator.inputs.commissionType === "variable" ? simulator.inputs.restaurantCommission + "%" : "Fixo R$" + simulator.inputs.fixedCommission}, Margem projetada: ${simulator.perRestaurant.grossMargin.toFixed(1)}%, Custo unit. produção: R$ ${simulator.effectiveUnitCost.toFixed(3)}${selectedBudget ? ` (Orçamento: ${selectedBudget.code || selectedBudget.description})` : " (Manual)"}`,
+      notes: selectedBudget ? `Orçamento: ${selectedBudget.code || selectedBudget.description}` : "",
+      coastersPerRestaurant: simulator.inputs.coastersPerRestaurant,
+      usagePerDay: simulator.inputs.usagePerDay,
+      daysPerMonth: simulator.inputs.daysPerMonth,
+      activeRestaurants: simulator.inputs.activeRestaurants,
+      pricingType: simulator.inputs.pricingType,
+      markupPercent: String(simulator.inputs.markupPercent),
+      fixedPrice: String(simulator.inputs.fixedPrice),
+      commissionType: simulator.inputs.commissionType,
+      restaurantCommission: String(simulator.inputs.restaurantCommission),
+      fixedCommission: String(simulator.inputs.fixedCommission),
+      sellerCommission: String(simulator.inputs.sellerCommission),
+      taxRate: String(simulator.inputs.taxRate),
+      contractDuration: simulator.inputs.contractDuration,
+      batchSize: simulator.inputs.batchSize,
+      batchCost: String(simulator.inputs.batchCost),
+      budgetId: selectedBudget?.id ?? null,
     });
   };
 

@@ -182,11 +182,26 @@ export const appRouter = router({
         z.object({
           clientId: z.number(),
           name: z.string().min(1),
-          cpm: z.string().default("50.00"),
           startDate: z.string(),
           endDate: z.string(),
           status: z.enum(["draft", "active", "paused", "completed"]).default("draft"),
           notes: z.string().optional(),
+          coastersPerRestaurant: z.number().int().default(500),
+          usagePerDay: z.number().int().default(3),
+          daysPerMonth: z.number().int().default(26),
+          activeRestaurants: z.number().int().default(10),
+          pricingType: z.string().default("variable"),
+          markupPercent: z.string().default("30.00"),
+          fixedPrice: z.string().default("0.00"),
+          commissionType: z.string().default("variable"),
+          restaurantCommission: z.string().default("20.00"),
+          fixedCommission: z.string().default("0.0500"),
+          sellerCommission: z.string().default("10.00"),
+          taxRate: z.string().default("15.00"),
+          contractDuration: z.number().int().default(6),
+          batchSize: z.number().int().default(10000),
+          batchCost: z.string().default("1200.00"),
+          budgetId: z.number().nullable().optional(),
         })
       )
       .mutation(({ input }) => createCampaign(input)),
@@ -197,11 +212,26 @@ export const appRouter = router({
           id: z.number(),
           clientId: z.number().optional(),
           name: z.string().min(1).optional(),
-          cpm: z.string().optional(),
           startDate: z.string().optional(),
           endDate: z.string().optional(),
           status: z.enum(["draft", "active", "paused", "completed"]).optional(),
           notes: z.string().optional(),
+          coastersPerRestaurant: z.number().int().optional(),
+          usagePerDay: z.number().int().optional(),
+          daysPerMonth: z.number().int().optional(),
+          activeRestaurants: z.number().int().optional(),
+          pricingType: z.string().optional(),
+          markupPercent: z.string().optional(),
+          fixedPrice: z.string().optional(),
+          commissionType: z.string().optional(),
+          restaurantCommission: z.string().optional(),
+          fixedCommission: z.string().optional(),
+          sellerCommission: z.string().optional(),
+          taxRate: z.string().optional(),
+          contractDuration: z.number().int().optional(),
+          batchSize: z.number().int().optional(),
+          batchCost: z.string().optional(),
+          budgetId: z.number().nullable().optional(),
         })
       )
       .mutation(({ input }) => {
@@ -324,7 +354,7 @@ export const appRouter = router({
       .mutation(({ input }) => {
         const { items, validUntil, ...data } = input;
         return createBudget(
-          { ...data, validUntil: validUntil ? new Date(validUntil) : null },
+          { ...data, validUntil: validUntil ? validUntil : null },
           items
         );
       }),
