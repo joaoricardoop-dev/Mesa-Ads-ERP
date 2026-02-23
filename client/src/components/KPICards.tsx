@@ -93,9 +93,9 @@ export default function KPICards({
         delay={0}
       />
       <KPICard
-        title="Faturamento Mesa Ads / Rest."
-        value={formatCurrency(perRestaurant.revenue)}
-        subtitle="Receita bruta por ponto"
+        title="Preço de Venda / Rest."
+        value={formatCurrency(perRestaurant.sellingPrice)}
+        subtitle={`Custo bruto: ${formatCurrency(perRestaurant.custoBruto)}`}
         icon={<DollarSign className="w-3.5 h-3.5" />}
         trend="up"
         delay={0.05}
@@ -103,24 +103,24 @@ export default function KPICards({
       <KPICard
         title="Lucro Mesa Ads / Rest."
         value={formatCurrency(perRestaurant.grossProfit)}
-        subtitle="Após comissões e produção"
+        subtitle="Após todos os custos"
         icon={<BarChart3 className="w-3.5 h-3.5" />}
         trend={perRestaurant.grossProfit > 0 ? "up" : "down"}
         highlight={perRestaurant.grossProfit > 0}
         delay={0.1}
       />
       <KPICard
-        title="Margem Bruta"
+        title="Margem Real"
         value={formatPercent(perRestaurant.grossMargin)}
-        subtitle={perRestaurant.grossMargin >= 30 ? "Saudável" : "Atenção"}
+        subtitle={perRestaurant.grossMargin >= 15 ? "Saudável" : "Atenção"}
         icon={<Target className="w-3.5 h-3.5" />}
-        trend={perRestaurant.grossMargin >= 30 ? "up" : "down"}
+        trend={perRestaurant.grossMargin >= 15 ? "up" : "down"}
         delay={0.15}
       />
       <KPICard
         title="Valor Global do Contrato"
         value={formatCompact(unitEconomics.contractValue)}
-        subtitle={`Faturamento × ${contractDuration} meses`}
+        subtitle={`Venda × ${contractDuration} meses`}
         icon={<FileText className="w-3.5 h-3.5" />}
         trend="up"
         highlight
@@ -128,7 +128,7 @@ export default function KPICards({
       />
       <KPICard
         title="Comissão / Restaurante"
-        value={formatCurrency(perRestaurant.commission)}
+        value={formatCurrency(perRestaurant.restaurantCommission)}
         subtitle="Pago ao restaurante/mês"
         icon={<HandCoins className="w-3.5 h-3.5" />}
         trend="neutral"
@@ -136,8 +136,8 @@ export default function KPICards({
       />
       <KPICard
         title="Comissão Vendedor / Rest."
-        value={formatCurrency(unitEconomics.sellerCommissionValue)}
-        subtitle="Comissão sobre faturamento"
+        value={formatCurrency(perRestaurant.sellerCommissionValue)}
+        subtitle="Sobre preço de venda"
         icon={<Users className="w-3.5 h-3.5" />}
         trend="neutral"
         delay={0.3}

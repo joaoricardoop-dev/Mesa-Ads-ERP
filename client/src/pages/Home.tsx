@@ -555,7 +555,7 @@ export default function Home() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Receita/rest:</span>
                 <span className="font-mono font-medium text-primary">
-                  {formatCurrency(simulator.perRestaurant.revenue)}
+                  {formatCurrency(simulator.perRestaurant.sellingPrice)}
                 </span>
               </div>
               <div className="flex justify-between">

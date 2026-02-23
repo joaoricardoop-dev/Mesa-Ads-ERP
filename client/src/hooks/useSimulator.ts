@@ -19,6 +19,7 @@ export interface SimulatorInputs {
   minMargin: number;
   maxDiscount: number;
   sellerCommission: number;
+  taxRate: number;
   contractDuration: number;
 }
 
@@ -36,11 +37,15 @@ export interface BudgetOption {
 
 export interface PerRestaurantMetrics {
   impressions: number;
-  revenue: number;
-  commission: number;
-  sellerCommission: number;
-  unitProductionCost: number;
   productionCost: number;
+  unitProductionCost: number;
+  restaurantCommission: number;
+  custoPD: number;
+  sellerCommissionValue: number;
+  taxValue: number;
+  custoBruto: number;
+  markupValue: number;
+  sellingPrice: number;
   grossProfit: number;
   grossMargin: number;
 }
@@ -95,14 +100,15 @@ const DEFAULT_INPUTS: SimulatorInputs = {
   batchSize: 10000,
   batchCost: 1200,
   pricingType: "variable",
-  markupPercent: 150,
+  markupPercent: 30,
   fixedPrice: 1500,
   commissionType: "variable",
   restaurantCommission: 20,
   fixedCommission: 0.05,
-  minMargin: 30,
+  minMargin: 15,
   maxDiscount: 25,
   sellerCommission: 10,
+  taxRate: 15,
   contractDuration: 6,
 };
 
@@ -114,7 +120,6 @@ function loadInputs(): SimulatorInputs {
       return { ...DEFAULT_INPUTS, ...parsed };
     }
   } catch {
-    // ignore parse errors
   }
   return DEFAULT_INPUTS;
 }
@@ -123,7 +128,6 @@ function saveInputs(inputs: SimulatorInputs) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(inputs));
   } catch {
-    // ignore storage errors
   }
 }
 
@@ -132,7 +136,6 @@ export function loadSavedBudgetId(): number | null {
     const stored = localStorage.getItem(BUDGET_STORAGE_KEY);
     if (stored) return JSON.parse(stored);
   } catch {
-    // ignore
   }
   return null;
 }
@@ -145,7 +148,6 @@ export function saveBudgetId(id: number | null) {
       localStorage.setItem(BUDGET_STORAGE_KEY, JSON.stringify(id));
     }
   } catch {
-    // ignore
   }
 }
 
@@ -180,38 +182,76 @@ function interpolateUnitCost(
   return parseFloat(sorted[sorted.length - 1].unitPrice);
 }
 
-function calcCommission(
-  revenue: number,
-  inputs: SimulatorInputs
-): number {
-  const sellingPricePerCoaster = inputs.coastersPerRestaurant > 0
-    ? revenue / inputs.coastersPerRestaurant
-    : 0;
-  if (inputs.commissionType === "fixed") {
-    return inputs.fixedCommission * inputs.coastersPerRestaurant;
-  }
-  return sellingPricePerCoaster * (inputs.restaurantCommission / 100) * inputs.coastersPerRestaurant;
+interface PricingResult {
+  productionCost: number;
+  restaurantCommission: number;
+  custoPD: number;
+  sellerCommissionValue: number;
+  taxValue: number;
+  custoBruto: number;
+  markupValue: number;
+  sellingPrice: number;
+  grossProfit: number;
+  grossMargin: number;
 }
 
-function calcRevenue(
+function calcPricing(
   productionCost: number,
-  inputs: SimulatorInputs
-): number {
-  if (inputs.pricingType === "fixed") {
-    return inputs.fixedPrice;
-  }
-  return productionCost * (1 + inputs.markupPercent / 100);
-}
+  inputs: SimulatorInputs,
+  markupOverride?: number
+): PricingResult {
+  const coasters = inputs.coastersPerRestaurant;
+  const markupPct = markupOverride !== undefined ? markupOverride : inputs.markupPercent;
 
-function calcRevenueWithMarkup(
-  productionCost: number,
-  markupPercent: number,
-  inputs: SimulatorInputs
-): number {
+  const restCommission =
+    inputs.commissionType === "fixed"
+      ? inputs.fixedCommission * coasters
+      : 0;
+
+  const custoPD = productionCost + restCommission;
+
+  const sellerRate = inputs.sellerCommission / 100;
+  const taxRateDecimal = inputs.taxRate / 100;
+  const restVarRate =
+    inputs.commissionType === "variable"
+      ? inputs.restaurantCommission / 100
+      : 0;
+
+  const totalVarRate = sellerRate + taxRateDecimal + restVarRate;
+
+  const denominator = 1 - totalVarRate;
+  const custoBruto = denominator > 0 ? custoPD / denominator : custoPD;
+
+  let sellingPrice: number;
   if (inputs.pricingType === "fixed") {
-    return inputs.fixedPrice;
+    sellingPrice = inputs.fixedPrice;
+  } else {
+    sellingPrice = custoBruto * (1 + markupPct / 100);
   }
-  return productionCost * (1 + markupPercent / 100);
+
+  const actualRestCommission =
+    inputs.commissionType === "fixed"
+      ? inputs.fixedCommission * coasters
+      : sellingPrice * (inputs.restaurantCommission / 100);
+  const actualSellerComm = sellingPrice * sellerRate;
+  const actualTax = sellingPrice * taxRateDecimal;
+
+  const grossProfit =
+    sellingPrice - productionCost - actualRestCommission - actualSellerComm - actualTax;
+  const grossMargin = sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
+
+  return {
+    productionCost,
+    restaurantCommission: actualRestCommission,
+    custoPD,
+    sellerCommissionValue: actualSellerComm,
+    taxValue: actualTax,
+    custoBruto,
+    markupValue: sellingPrice - custoBruto,
+    sellingPrice,
+    grossProfit,
+    grossMargin,
+  };
 }
 
 export function useSimulator(selectedBudget?: BudgetOption | null) {
@@ -248,21 +288,13 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
       inputs.coastersPerRestaurant * inputs.usagePerDay * inputs.daysPerMonth;
     const unitProductionCost = effectiveUnitCost;
     const productionCost = inputs.coastersPerRestaurant * unitProductionCost;
-    const revenue = calcRevenue(productionCost, inputs);
-    const commission = calcCommission(revenue, inputs);
-    const sellerComm = revenue * (inputs.sellerCommission / 100);
-    const grossProfit = revenue - commission - sellerComm - productionCost;
-    const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+
+    const pricing = calcPricing(productionCost, inputs);
 
     return {
       impressions,
-      revenue,
-      commission,
-      sellerCommission: sellerComm,
       unitProductionCost,
-      productionCost,
-      grossProfit,
-      grossMargin,
+      ...pricing,
     };
   }, [inputs, effectiveUnitCost]);
 
@@ -272,12 +304,15 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
 
     const markups = [50, 75, 100, 125, 150, 175, 200, 250, 300];
     for (const markup of markups) {
-      const revenue = calcRevenueWithMarkup(production, markup, inputs);
-      const commission = calcCommission(revenue, inputs);
-      const sellerComm = revenue * (inputs.sellerCommission / 100);
-      const profit = revenue - commission - sellerComm - production;
-      const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
-      rows.push({ markup, revenue, commission, production, profit, margin });
+      const p = calcPricing(production, inputs, markup);
+      rows.push({
+        markup,
+        revenue: p.sellingPrice,
+        commission: p.restaurantCommission,
+        production,
+        profit: p.grossProfit,
+        margin: p.grossMargin,
+      });
     }
     return rows;
   }, [inputs, effectiveUnitCost]);
@@ -285,7 +320,8 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
   const discountTable = useMemo<DiscountTableRow[]>(() => {
     const rows: DiscountTableRow[] = [];
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
-    const baseRevenue = calcRevenue(production, inputs);
+    const baseResult = calcPricing(production, inputs);
+    const basePrice = baseResult.sellingPrice;
 
     const tiers = [1, 2, 3, 5, 8, 10, 15, 20, 25, 30, 40, 50];
 
@@ -298,46 +334,61 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
         );
       }
 
-      const discountedRevenue = baseRevenue * (1 - discountPercent / 100);
-      const commission = calcCommission(discountedRevenue, inputs);
-      const sellerComm = discountedRevenue * (inputs.sellerCommission / 100);
-      const profit = discountedRevenue - commission - sellerComm - production;
+      const discountedPrice = basePrice * (1 - discountPercent / 100);
+
+      const restComm =
+        inputs.commissionType === "fixed"
+          ? inputs.fixedCommission * inputs.coastersPerRestaurant
+          : discountedPrice * (inputs.restaurantCommission / 100);
+      const sellerComm = discountedPrice * (inputs.sellerCommission / 100);
+      const tax = discountedPrice * (inputs.taxRate / 100);
+      const profit = discountedPrice - production - restComm - sellerComm - tax;
       const margin =
-        discountedRevenue > 0 ? (profit / discountedRevenue) * 100 : 0;
+        discountedPrice > 0 ? (profit / discountedPrice) * 100 : 0;
 
       const marginWarning = margin < inputs.minMargin;
 
       let finalDiscount = discountPercent;
-      let finalRevenue = discountedRevenue;
+      let finalPrice = discountedPrice;
       let finalProfit = profit;
       let finalMargin = margin;
 
       if (marginWarning) {
-        const commRate =
-          inputs.commissionType === "fixed"
-            ? 0
-            : inputs.restaurantCommission / 100;
-        const sellerRate = inputs.sellerCommission / 100;
+        const restVarRate =
+          inputs.commissionType === "variable"
+            ? inputs.restaurantCommission / 100
+            : 0;
         const fixedCommTotal =
-          inputs.commissionType === "fixed" ? inputs.fixedCommission * inputs.coastersPerRestaurant : 0;
-        const minRevenue =
-          (production + fixedCommTotal) / (1 - commRate - sellerRate - inputs.minMargin / 100);
-        if (minRevenue <= baseRevenue) {
-          finalDiscount = ((baseRevenue - minRevenue) / baseRevenue) * 100;
-          finalRevenue = minRevenue;
-          const finalCommission = calcCommission(finalRevenue, inputs);
-          const finalSellerComm = finalRevenue * sellerRate;
-          finalProfit = finalRevenue - finalCommission - finalSellerComm - production;
+          inputs.commissionType === "fixed"
+            ? inputs.fixedCommission * inputs.coastersPerRestaurant
+            : 0;
+        const totalVarRate =
+          restVarRate +
+          inputs.sellerCommission / 100 +
+          inputs.taxRate / 100;
+        const minPrice =
+          (production + fixedCommTotal) /
+          (1 - totalVarRate - inputs.minMargin / 100);
+        if (minPrice <= basePrice) {
+          finalDiscount = ((basePrice - minPrice) / basePrice) * 100;
+          finalPrice = minPrice;
+          const fRestComm =
+            inputs.commissionType === "fixed"
+              ? fixedCommTotal
+              : finalPrice * (inputs.restaurantCommission / 100);
+          const fSellerComm = finalPrice * (inputs.sellerCommission / 100);
+          const fTax = finalPrice * (inputs.taxRate / 100);
+          finalProfit = finalPrice - production - fRestComm - fSellerComm - fTax;
           finalMargin =
-            finalRevenue > 0 ? (finalProfit / finalRevenue) * 100 : 0;
+            finalPrice > 0 ? (finalProfit / finalPrice) * 100 : 0;
         }
       }
 
       rows.push({
         restaurants: n,
         discountPercent: marginWarning ? finalDiscount : discountPercent,
-        unitPrice: marginWarning ? finalRevenue : discountedRevenue,
-        totalRevenue: (marginWarning ? finalRevenue : discountedRevenue) * n,
+        unitPrice: marginWarning ? finalPrice : discountedPrice,
+        totalRevenue: (marginWarning ? finalPrice : discountedPrice) * n,
         totalProfit: (marginWarning ? finalProfit : profit) * n,
         margin: marginWarning ? finalMargin : margin,
         marginWarning,
@@ -347,12 +398,12 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
   }, [inputs, effectiveUnitCost]);
 
   const unitEconomics = useMemo<UnitEconomics>(() => {
-    const monthlyRevenue = perRestaurant.revenue * inputs.activeRestaurants;
+    const monthlyRevenue = perRestaurant.sellingPrice * inputs.activeRestaurants;
     const monthlyTotalProfit =
       perRestaurant.grossProfit * inputs.activeRestaurants;
     const contractValue = monthlyRevenue * inputs.contractDuration;
     const contractProfit = monthlyTotalProfit * inputs.contractDuration;
-    const sellerCommissionValue = perRestaurant.revenue * (inputs.sellerCommission / 100);
+    const sellerCommissionValue = perRestaurant.sellerCommissionValue;
     const annualRevenue = monthlyRevenue * 12;
     const annualProfit = monthlyTotalProfit * 12;
 
@@ -371,26 +422,22 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
 
     const scenarioConfigs = [
-      { name: "Conservador", markup: 80 },
-      { name: "Base", markup: inputs.pricingType === "variable" ? inputs.markupPercent : 150 },
-      { name: "Premium", markup: 250 },
+      { name: "Conservador", markup: 15 },
+      { name: "Base", markup: inputs.pricingType === "variable" ? inputs.markupPercent : 30 },
+      { name: "Premium", markup: 50 },
     ];
 
     return scenarioConfigs.map((s) => {
-      const revenue = production * (1 + s.markup / 100);
-      const commission = calcCommission(revenue, inputs);
-      const sellerComm = revenue * (inputs.sellerCommission / 100);
-      const profit = revenue - commission - sellerComm - production;
-      const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
-      const monthlyTotal = profit * inputs.activeRestaurants;
+      const p = calcPricing(production, inputs, s.markup);
+      const monthlyTotal = p.grossProfit * inputs.activeRestaurants;
       const annualTotal = monthlyTotal * 12;
 
       return {
         name: s.name,
         markup: s.markup,
-        revenue,
-        profit,
-        margin,
+        revenue: p.sellingPrice,
+        profit: p.grossProfit,
+        margin: p.grossMargin,
         monthlyTotal,
         annualTotal,
       };
@@ -402,7 +449,7 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
     for (let r = 1; r <= 50; r++) {
       data.push({
         restaurants: r,
-        revenue: perRestaurant.revenue * r,
+        revenue: perRestaurant.sellingPrice * r,
         profit: perRestaurant.grossProfit * r,
       });
     }
@@ -412,13 +459,9 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
   const marginVsMarkup = useMemo(() => {
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
     const data = [];
-    for (let markup = 0; markup <= 300; markup += 10) {
-      const revenue = production * (1 + markup / 100);
-      const commission = calcCommission(revenue, inputs);
-      const sellerComm = revenue * (inputs.sellerCommission / 100);
-      const profit = revenue - commission - sellerComm - production;
-      const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
-      data.push({ markup, margin, profit });
+    for (let markup = 0; markup <= 100; markup += 5) {
+      const p = calcPricing(production, inputs, markup);
+      data.push({ markup, margin: p.grossMargin, profit: p.grossProfit });
     }
     return data;
   }, [inputs, effectiveUnitCost]);
@@ -431,7 +474,7 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
       data.push({
         month: m,
         profit: monthlyProfit * m,
-        revenue: perRestaurant.revenue * inputs.activeRestaurants * m,
+        revenue: perRestaurant.sellingPrice * inputs.activeRestaurants * m,
       });
     }
     return data;
@@ -439,15 +482,20 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
 
   const discountSensitivity = useMemo(() => {
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
-    const baseRevenue = calcRevenue(production, inputs);
+    const baseResult = calcPricing(production, inputs);
+    const basePrice = baseResult.sellingPrice;
     const data = [];
     for (let d = 0; d <= 40; d += 2) {
-      const discountedRevenue = baseRevenue * (1 - d / 100);
-      const commission = calcCommission(discountedRevenue, inputs);
-      const sellerComm = discountedRevenue * (inputs.sellerCommission / 100);
-      const profit = discountedRevenue - commission - sellerComm - production;
+      const discountedPrice = basePrice * (1 - d / 100);
+      const restComm =
+        inputs.commissionType === "fixed"
+          ? inputs.fixedCommission * inputs.coastersPerRestaurant
+          : discountedPrice * (inputs.restaurantCommission / 100);
+      const sellerComm = discountedPrice * (inputs.sellerCommission / 100);
+      const tax = discountedPrice * (inputs.taxRate / 100);
+      const profit = discountedPrice - production - restComm - sellerComm - tax;
       const margin =
-        discountedRevenue > 0 ? (profit / discountedRevenue) * 100 : 0;
+        discountedPrice > 0 ? (profit / discountedPrice) * 100 : 0;
       data.push({
         discount: d,
         margin,

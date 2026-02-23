@@ -173,7 +173,7 @@ export default function InputPanel({ inputs, updateInput, grossMargin = 0 }: Inp
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
               <TrendingUp className="w-3 h-3" />
-              Markup sobre custo de produção
+              Markup sobre custo bruto
             </Label>
             <div className="flex rounded-md overflow-hidden border border-border/50">
               <button
@@ -374,6 +374,17 @@ export default function InputPanel({ inputs, updateInput, grossMargin = 0 }: Inp
             min={0}
             max={30}
             step={1}
+            showSlider
+          />
+          <InputField
+            label="Carga tributária"
+            value={inputs.taxRate}
+            onChange={(v) => updateInput("taxRate", v)}
+            icon={<Percent className="w-3 h-3" />}
+            suffix="%"
+            min={0}
+            max={40}
+            step={0.5}
             showSlider
           />
           <InputField
