@@ -40,8 +40,6 @@ import {
   Calendar,
   Package,
   Target,
-  DollarSign,
-  TrendingUp,
   FileText,
   Percent,
   Users,
@@ -406,8 +404,6 @@ export default function CampaignDetail() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <SummaryCard icon={<DollarSign className="w-4 h-4" />} label="Receita Mensal" value={formatCurrency(pricing.monthlyRevenue)} />
-              <SummaryCard icon={<TrendingUp className="w-4 h-4" />} label="Lucro Mensal" value={formatCurrency(pricing.monthlyProfit)} accent />
               <SummaryCard icon={<FileText className="w-4 h-4" />} label="Contrato Total" value={formatCurrency(pricing.contractTotal)} />
               <SummaryCard icon={<BarChart3 className="w-4 h-4" />} label="Lucro do Contrato" value={formatCurrency(pricing.contractProfit)} accent />
             </div>
