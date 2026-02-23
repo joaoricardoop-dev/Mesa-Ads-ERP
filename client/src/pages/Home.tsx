@@ -323,6 +323,29 @@ export default function Home() {
           <div className="flex-1 overflow-y-auto">
             <div className="p-4 lg:p-6">
               <TabsContent value="overview" className="mt-0 space-y-6">
+                {/* Hero Banner */}
+                <div className="relative rounded-xl overflow-hidden h-32 md:h-36 bg-gradient-to-r from-primary/20 via-primary/10 to-card border border-border/30">
+                  <div className="absolute inset-0 flex items-center p-6 md:p-8">
+                    <div className="flex-1">
+                      <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-1">
+                        Simulador Financeiro
+                      </h2>
+                      <p className="text-sm text-muted-foreground max-w-md mb-3">
+                        Faturamento e lucro da Mesa Ads. Restaurantes parceiros
+                        recebem comissão sobre a mídia veiculada nos coasters.
+                      </p>
+                      <Button
+                        onClick={handleOpenCampaignDialog}
+                        className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
+                        size="sm"
+                      >
+                        <Rocket className="w-4 h-4" />
+                        Criar Campanha com estes valores
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Budget Selector Card */}
                 <div className="bg-card/50 border border-border/30 rounded-xl p-4">
                   <div className="flex items-center gap-3 mb-3">
