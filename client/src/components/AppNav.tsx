@@ -12,6 +12,7 @@ import {
   Search,
   UtensilsCrossed,
   LogOut,
+  UserCog,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { User } from "@shared/models/auth";
@@ -24,6 +25,10 @@ const NAV_ITEMS = [
   { path: "/campanhas", label: "Campanhas", icon: Megaphone },
   { path: "/economics", label: "Economics", icon: DollarSign },
   { path: "/producao", label: "Produção", icon: Factory },
+];
+
+const ADMIN_NAV_ITEMS = [
+  { path: "/membros", label: "Membros", icon: UserCog },
 ];
 
 interface AppNavProps {
@@ -69,6 +74,25 @@ export default function AppNav({ user }: AppNavProps) {
                 </Button>
               );
             })}
+            {user?.role === "admin" &&
+              ADMIN_NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                const isActive = location === item.path;
+                return (
+                  <Button
+                    key={item.path}
+                    variant="ghost"
+                    size="sm"
+                    className={`text-xs gap-1.5 ${
+                      isActive ? "text-amber-400 bg-amber-500/10" : "text-amber-400/60"
+                    }`}
+                    onClick={() => navigate(item.path)}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span className="hidden md:inline">{item.label}</span>
+                  </Button>
+                );
+              })}
           </nav>
 
           <div className="w-px h-5 bg-border/50 mx-1" />

@@ -17,6 +17,7 @@ import Campaigns from "./pages/Campaigns";
 import CampaignDetail from "./pages/CampaignDetail";
 import Economics from "./pages/Economics";
 import Production from "./pages/Production";
+import Members from "./pages/Members";
 import LandingPage from "./pages/LandingPage";
 
 function Router() {
@@ -35,6 +36,7 @@ function Router() {
       <Route path={"/campanhas"} component={Campaigns} />
       <Route path={"/economics"} component={Economics} />
       <Route path={"/producao"} component={Production} />
+      <Route path={"/membros"} component={Members} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

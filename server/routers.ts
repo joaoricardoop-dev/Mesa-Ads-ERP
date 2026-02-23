@@ -1,8 +1,9 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
+import { authStorage } from "./replit_integrations/auth";
 import {
   listRestaurants,
   getRestaurant,
@@ -62,6 +63,19 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+  }),
+
+  // ─── Members (Admin) ────────────────────────────────────────────────────
+  members: router({
+    list: adminProcedure.query(() => authStorage.listUsers()),
+
+    updateRole: adminProcedure
+      .input(z.object({ userId: z.string(), role: z.string() }))
+      .mutation(({ input }) => authStorage.updateUserRole(input.userId, input.role)),
+
+    toggleActive: adminProcedure
+      .input(z.object({ userId: z.string(), isActive: z.boolean() }))
+      .mutation(({ input }) => authStorage.updateUserActive(input.userId, input.isActive)),
   }),
 
   // ─── CNPJ Lookup ────────────────────────────────────────────────────────

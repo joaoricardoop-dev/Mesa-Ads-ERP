@@ -30,9 +30,18 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - Session stored in PostgreSQL `sessions` table
 - Auth hook: `client/src/hooks/use-auth.ts`
 
+## Roles & Permissions
+
+- **Administrador** (admin): Full access — manage members, approve quotations, CRUD all entities, delete records
+- **Gerente** (manager): Approve quotations, CRUD campaigns/restaurants/clients, simulator, economics — no member management or deletion
+- **Usuário** (user): Create quotations, view campaigns/restaurants/clients — no approval or deletion
+- **Visualizador** (viewer): Read-only access to campaigns/restaurants/clients — no creation or editing
+- Admin-only pages: `/membros` (Members management)
+- Admin nav items highlighted in amber in AppNav
+
 ## Database Tables
 
-- `users` — Auth users (Replit Auth)
+- `users` — Auth users with role (admin/manager/user/viewer), isActive, lastLoginAt
 - `sessions` — Auth sessions (Replit Auth)
 - `restaurants` — Prospecting/leads for partner restaurants
 - `active_restaurants` — Onboarded active restaurants with full operational data (tables, seats, customers, excluded ad categories, Pix, etc.)
