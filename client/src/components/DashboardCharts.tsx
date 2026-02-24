@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { PieChartIcon, TrendingUp, BarChart3 } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 import type { PerRestaurantMetrics, UnitEconomics } from "@/hooks/useSimulator";
 
 interface DashboardChartsProps {
@@ -35,6 +36,20 @@ interface DashboardChartsProps {
   minMargin: number;
 }
 
+const CHART_COLORS_DARK = {
+  grid: "rgba(255,255,255,0.05)",
+  axis: "rgba(255,255,255,0.3)",
+  tooltipBg: "#1a1a1a",
+  tooltipBorder: "rgba(255,255,255,0.15)",
+};
+
+const CHART_COLORS_LIGHT = {
+  grid: "rgba(0,0,0,0.08)",
+  axis: "rgba(0,0,0,0.4)",
+  tooltipBg: "#ffffff",
+  tooltipBorder: "rgba(0,0,0,0.12)",
+};
+
 const CHART_COLORS = {
   emerald: "#34d399",
   blue: "#60a5fa",
@@ -42,16 +57,17 @@ const CHART_COLORS = {
   red: "#f87171",
   purple: "#a78bfa",
   orange: "#fb923c",
-  grid: "rgba(255,255,255,0.05)",
-  axis: "rgba(255,255,255,0.3)",
 };
 
 const PIE_COLORS = ["#fb923c", "#3b82f6", "#fbbf24", "#ef4444"];
 
-function CustomTooltip({ active, payload, label, formatter }: any) {
+function CustomTooltip({ active, payload, label, formatter, tooltipBg, tooltipBorder }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#1a1a1a] border border-border/50 rounded-lg p-3 shadow-xl">
+    <div
+      className="rounded-lg p-3 shadow-xl"
+      style={{ backgroundColor: tooltipBg || "#1a1a1a", border: `1px solid ${tooltipBorder || "rgba(255,255,255,0.15)"}` }}
+    >
       <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
         {label}
       </p>
@@ -62,7 +78,7 @@ function CustomTooltip({ active, payload, label, formatter }: any) {
             style={{ backgroundColor: entry.color }}
           />
           <span className="text-muted-foreground">{entry.name}:</span>
-          <span className="font-mono font-semibold tabular-nums">
+          <span className="font-mono font-semibold tabular-nums text-foreground">
             {formatter ? formatter(entry.value) : entry.value}
           </span>
         </div>
@@ -79,6 +95,9 @@ export default function DashboardCharts({
   revenueVsRestaurants,
   minMargin,
 }: DashboardChartsProps) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const themeColors = isDark ? CHART_COLORS_DARK : CHART_COLORS_LIGHT;
   const pr = perRestaurant;
 
   const costPieData = [
@@ -132,6 +151,8 @@ export default function DashboardCharts({
                     <CustomTooltip
                       formatter={(v: number) => formatCurrency(v)}
                       label="Custos"
+                      tooltipBg={themeColors.tooltipBg}
+                      tooltipBorder={themeColors.tooltipBorder}
                     />
                   }
                 />
@@ -160,19 +181,19 @@ export default function DashboardCharts({
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={costBarData} layout="vertical" margin={{ left: 10 }}>
-                <CartesianGrid stroke={CHART_COLORS.grid} horizontal={false} />
+                <CartesianGrid stroke={themeColors.grid} horizontal={false} />
                 <XAxis
                   type="number"
-                  stroke={CHART_COLORS.axis}
-                  tick={{ fontSize: 9, fill: CHART_COLORS.axis }}
+                  stroke={themeColors.axis}
+                  tick={{ fontSize: 9, fill: themeColors.axis }}
                   tickLine={false}
                   tickFormatter={(v) => `R$${v}`}
                 />
                 <YAxis
                   type="category"
                   dataKey="name"
-                  stroke={CHART_COLORS.axis}
-                  tick={{ fontSize: 9, fill: CHART_COLORS.axis }}
+                  stroke={themeColors.axis}
+                  tick={{ fontSize: 9, fill: themeColors.axis }}
                   tickLine={false}
                   width={65}
                 />
@@ -181,6 +202,8 @@ export default function DashboardCharts({
                     <CustomTooltip
                       formatter={(v: number) => formatCurrency(v)}
                       label=""
+                      tooltipBg={themeColors.tooltipBg}
+                      tooltipBorder={themeColors.tooltipBorder}
                     />
                   }
                 />
@@ -218,17 +241,17 @@ export default function DashboardCharts({
                     <stop offset="95%" stopColor={CHART_COLORS.emerald} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke={CHART_COLORS.grid} strokeDasharray="3 3" />
+                <CartesianGrid stroke={themeColors.grid} strokeDasharray="3 3" />
                 <XAxis
                   dataKey="month"
-                  stroke={CHART_COLORS.axis}
-                  tick={{ fontSize: 9, fill: CHART_COLORS.axis }}
+                  stroke={themeColors.axis}
+                  tick={{ fontSize: 9, fill: themeColors.axis }}
                   tickLine={false}
                   tickFormatter={(v) => `M${v}`}
                 />
                 <YAxis
-                  stroke={CHART_COLORS.axis}
-                  tick={{ fontSize: 9, fill: CHART_COLORS.axis }}
+                  stroke={themeColors.axis}
+                  tick={{ fontSize: 9, fill: themeColors.axis }}
                   tickLine={false}
                   tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`}
                 />
@@ -237,10 +260,12 @@ export default function DashboardCharts({
                     <CustomTooltip
                       formatter={(v: number) => formatCurrency(v)}
                       label=""
+                      tooltipBg={themeColors.tooltipBg}
+                      tooltipBorder={themeColors.tooltipBorder}
                     />
                   }
                 />
-                <ReferenceLine y={0} stroke={CHART_COLORS.axis} strokeWidth={1} />
+                <ReferenceLine y={0} stroke={themeColors.axis} strokeWidth={1} />
                 <Area
                   type="monotone"
                   dataKey="profit"
