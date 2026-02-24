@@ -29,6 +29,7 @@ import {
 import { formatCurrency } from "@/lib/format";
 import InputPanel from "@/components/InputPanel";
 import KPICards from "@/components/KPICards";
+import SimulatorDRE from "@/components/SimulatorDRE";
 import MarkupTable from "@/components/CPMTable";
 import DiscountTable from "@/components/DiscountTable";
 import ScenarioComparison from "@/components/ScenarioComparison";
@@ -406,14 +407,26 @@ export default function Home() {
                   unitEconomics={simulator.unitEconomics}
                   activeRestaurants={simulator.inputs.activeRestaurants}
                   contractDuration={simulator.inputs.contractDuration}
+                  coastersPerRestaurant={simulator.inputs.coastersPerRestaurant}
+                  minMargin={simulator.inputs.minMargin}
                 />
 
-                {/* Quick Charts */}
+                {/* DRE - Income Statement */}
+                <SimulatorDRE
+                  perRestaurant={simulator.perRestaurant}
+                  unitEconomics={simulator.unitEconomics}
+                  activeRestaurants={simulator.inputs.activeRestaurants}
+                  contractDuration={simulator.inputs.contractDuration}
+                  minMargin={simulator.inputs.minMargin}
+                />
+
+                {/* Management Charts */}
                 <DashboardCharts
-                  revenueVsRestaurants={simulator.revenueVsRestaurants}
-                  marginVsMarkup={simulator.marginVsMarkup}
+                  perRestaurant={simulator.perRestaurant}
+                  unitEconomics={simulator.unitEconomics}
+                  activeRestaurants={simulator.inputs.activeRestaurants}
                   cumulativeProfit={simulator.cumulativeProfit}
-                  discountSensitivity={simulator.discountSensitivity}
+                  revenueVsRestaurants={simulator.revenueVsRestaurants}
                   minMargin={simulator.inputs.minMargin}
                 />
               </TabsContent>
@@ -444,10 +457,11 @@ export default function Home() {
 
               <TabsContent value="charts" className="mt-0 space-y-6">
                 <DashboardCharts
-                  revenueVsRestaurants={simulator.revenueVsRestaurants}
-                  marginVsMarkup={simulator.marginVsMarkup}
+                  perRestaurant={simulator.perRestaurant}
+                  unitEconomics={simulator.unitEconomics}
+                  activeRestaurants={simulator.inputs.activeRestaurants}
                   cumulativeProfit={simulator.cumulativeProfit}
-                  discountSensitivity={simulator.discountSensitivity}
+                  revenueVsRestaurants={simulator.revenueVsRestaurants}
                   minMargin={simulator.inputs.minMargin}
                 />
               </TabsContent>

@@ -17,6 +17,8 @@ interface KPICardsProps {
   unitEconomics: UnitEconomics;
   activeRestaurants: number;
   contractDuration: number;
+  coastersPerRestaurant: number;
+  minMargin: number;
 }
 
 function KPICard({
@@ -88,8 +90,9 @@ export default function KPICards({
   unitEconomics,
   activeRestaurants,
   contractDuration,
+  coastersPerRestaurant,
+  minMargin,
 }: KPICardsProps) {
-  const totalCoasters = perRestaurant.productionCost / (perRestaurant.unitProductionCost || 1);
   const totalImpressionsMonth = perRestaurant.impressions * activeRestaurants;
 
   return (
@@ -114,10 +117,10 @@ export default function KPICards({
       <KPICard
         label="Margem Líquida"
         value={formatPercent(perRestaurant.grossMargin)}
-        sub={perRestaurant.grossMargin >= 15 ? "Margem saudável" : "Abaixo do mínimo"}
+        sub={perRestaurant.grossMargin >= minMargin ? "Margem saudável" : "Abaixo do mínimo"}
         icon={<Target className="w-3.5 h-3.5" />}
-        accent={perRestaurant.grossMargin >= 15}
-        warn={perRestaurant.grossMargin < 15}
+        accent={perRestaurant.grossMargin >= minMargin}
+        warn={perRestaurant.grossMargin < minMargin}
         delay={0.1}
       />
       <KPICard
@@ -137,8 +140,8 @@ export default function KPICards({
       />
       <KPICard
         label="Coasters Totais"
-        value={formatNumber(Math.round(totalCoasters * activeRestaurants))}
-        sub={`${formatNumber(Math.round(totalCoasters))} / rest.`}
+        value={formatNumber(coastersPerRestaurant * activeRestaurants)}
+        sub={`${formatNumber(coastersPerRestaurant)} / rest.`}
         icon={<Package className="w-3.5 h-3.5" />}
         delay={0.25}
       />
