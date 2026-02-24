@@ -8,16 +8,6 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useSimulator, type BudgetOption, loadSavedBudgetId, saveBudgetId } from "@/hooks/useSimulator";
 import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -47,16 +37,8 @@ import {
   Zap,
   LineChart,
   SlidersHorizontal,
-  Megaphone,
-  Store,
-  Building2,
-  DollarSign,
   Rocket,
-  Info,
-  Factory,
   FileText,
-  Sun,
-  Moon,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -91,84 +73,6 @@ export default function Home() {
   const simulator = useSimulator(selectedBudget);
   const [activeTab, setActiveTab] = useState("overview");
   const [, navigate] = useLocation();
-  const [isCampaignDialogOpen, setIsCampaignDialogOpen] = useState(false);
-  const [campaignName, setCampaignName] = useState("");
-  const [selectedClientId, setSelectedClientId] = useState<string>("none");
-  const [campaignStartDate, setCampaignStartDate] = useState("");
-  const [campaignEndDate, setCampaignEndDate] = useState("");
-
-  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
-  const utils = trpc.useUtils();
-
-  const addHistoryMutation = trpc.campaign.addHistory.useMutation();
-
-  const createCampaignMutation = trpc.campaign.create.useMutation({
-    onSuccess: (data) => {
-      const campaignId = (data as any).id ?? (data as any)[0]?.id;
-      if (campaignId) {
-        addHistoryMutation.mutate({
-          campaignId,
-          action: "created",
-          details: `Cotação criada a partir do simulador — ${simulator.inputs.pricingType === "variable" ? `Markup ${simulator.inputs.markupPercent}%` : `Fixo R$${simulator.inputs.fixedPrice}`}, ${simulator.inputs.activeRestaurants} restaurantes`,
-        });
-      }
-      utils.campaign.list.invalidate();
-      setIsCampaignDialogOpen(false);
-      toast.success("Cotação criada com sucesso! Redirecionando...");
-      setTimeout(() => navigate("/campanhas"), 1000);
-    },
-    onError: (err) => toast.error(`Erro ao criar cotação: ${err.message}`),
-  });
-
-  const handleOpenCampaignDialog = () => {
-    setCampaignName(`Cotação Markup ${simulator.inputs.pricingType === "variable" ? simulator.inputs.markupPercent + "%" : "Fixo R$" + simulator.inputs.fixedPrice}`);
-    setSelectedClientId("none");
-    const today = new Date();
-    const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + simulator.inputs.contractDuration);
-    setCampaignStartDate(today.toISOString().split("T")[0]);
-    setCampaignEndDate(endDate.toISOString().split("T")[0]);
-    setIsCampaignDialogOpen(true);
-  };
-
-  const handleCreateCampaign = () => {
-    if (!campaignName.trim()) {
-      toast.error("Nome da campanha é obrigatório");
-      return;
-    }
-    if (selectedClientId === "none") {
-      toast.error("Selecione um cliente");
-      return;
-    }
-    if (!campaignStartDate || !campaignEndDate) {
-      toast.error("Datas são obrigatórias");
-      return;
-    }
-    createCampaignMutation.mutate({
-      clientId: parseInt(selectedClientId),
-      name: campaignName,
-      startDate: campaignStartDate,
-      endDate: campaignEndDate,
-      status: "quotation",
-      notes: selectedBudget ? `Orçamento: ${selectedBudget.code || selectedBudget.description}` : "",
-      coastersPerRestaurant: simulator.inputs.coastersPerRestaurant,
-      usagePerDay: simulator.inputs.usagePerDay,
-      daysPerMonth: simulator.inputs.daysPerMonth,
-      activeRestaurants: simulator.inputs.activeRestaurants,
-      pricingType: simulator.inputs.pricingType,
-      markupPercent: String(simulator.inputs.markupPercent),
-      fixedPrice: String(simulator.inputs.fixedPrice),
-      commissionType: simulator.inputs.commissionType,
-      restaurantCommission: String(simulator.inputs.restaurantCommission),
-      fixedCommission: String(simulator.inputs.fixedCommission),
-      sellerCommission: String(simulator.inputs.sellerCommission),
-      taxRate: String(simulator.inputs.taxRate),
-      contractDuration: simulator.inputs.contractDuration,
-      batchSize: simulator.inputs.batchSize,
-      batchCost: String(simulator.inputs.batchCost),
-      budgetId: selectedBudget?.id ?? null,
-    });
-  };
 
   // Total coasters for budget interpolation info
   const totalCoasters =
@@ -279,7 +183,7 @@ export default function Home() {
                         recebem comissão sobre a mídia veiculada nos coasters.
                       </p>
                       <Button
-                        onClick={handleOpenCampaignDialog}
+                        onClick={() => navigate("/cotacao/preview")}
                         className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
                         size="sm"
                       >
@@ -470,161 +374,6 @@ export default function Home() {
         </Tabs>
       </div>
 
-      {/* Create Campaign from Simulator Dialog */}
-      <Dialog open={isCampaignDialogOpen} onOpenChange={setIsCampaignDialogOpen}>
-        <DialogContent className="sm:max-w-lg bg-card border-border/30">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Rocket className="w-5 h-5 text-primary" />
-              Nova Cotação
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Os valores do simulador serão usados como base para a nova campanha.
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Summary of simulator values */}
-          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
-            <div className="flex items-center gap-2 mb-2">
-              <Info className="w-4 h-4 text-primary" />
-              <span className="text-xs font-semibold text-primary uppercase tracking-wider">
-                Valores do Simulador
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Markup:</span>
-                <span className="font-mono font-medium text-primary">
-                  {simulator.inputs.pricingType === "variable" ? `${simulator.inputs.markupPercent}%` : `Fixo R$ ${simulator.inputs.fixedPrice.toFixed(2)}`}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Coasters/rest:</span>
-                <span className="font-mono font-medium">
-                  {simulator.inputs.coastersPerRestaurant}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Receita/rest:</span>
-                <span className="font-mono font-medium text-primary">
-                  {formatCurrency(simulator.perRestaurant.sellingPrice)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Lucro/rest:</span>
-                <span className="font-mono font-medium text-primary">
-                  {formatCurrency(simulator.perRestaurant.grossProfit)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Margem:</span>
-                <span className="font-mono font-medium">
-                  {simulator.perRestaurant.grossMargin.toFixed(1)}%
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Custo/coaster:</span>
-                <span className="font-mono font-medium text-amber-400">
-                  R$ {simulator.effectiveUnitCost.toFixed(3)}
-                </span>
-              </div>
-            </div>
-            {selectedBudget && (
-              <div className="pt-2 border-t border-primary/10 mt-2">
-                <span className="text-xs text-muted-foreground">
-                  Orçamento:{" "}
-                  <span className="text-foreground font-medium">
-                    {selectedBudget.supplierName} — {selectedBudget.code}
-                  </span>
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <Label>Nome da Campanha *</Label>
-              <Input
-                value={campaignName}
-                onChange={(e) => setCampaignName(e.target.value)}
-                placeholder="Ex: Campanha Verão 2026"
-                className="bg-background border-border/30"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Cliente (Anunciante) *</Label>
-              <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                <SelectTrigger className="bg-background border-border/30">
-                  <SelectValue placeholder="Selecione um cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Selecione um cliente</SelectItem>
-                  {clientsList
-                    .filter((c) => c.status === "active")
-                    .map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                        {c.company ? ` (${c.company})` : ""}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              {clientsList.filter((c) => c.status === "active").length === 0 && (
-                <p className="text-xs text-yellow-400">
-                  Nenhum cliente cadastrado.{" "}
-                  <button
-                    className="underline hover:text-primary transition-colors"
-                    onClick={() => {
-                      setIsCampaignDialogOpen(false);
-                      navigate("/clientes");
-                    }}
-                  >
-                    Cadastre um cliente primeiro
-                  </button>
-                </p>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Data Início *</Label>
-                <Input
-                  type="date"
-                  value={campaignStartDate}
-                  onChange={(e) => setCampaignStartDate(e.target.value)}
-                  className="bg-background border-border/30"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Data Fim *</Label>
-                <Input
-                  type="date"
-                  value={campaignEndDate}
-                  onChange={(e) => setCampaignEndDate(e.target.value)}
-                  className="bg-background border-border/30"
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsCampaignDialogOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleCreateCampaign}
-              disabled={createCampaignMutation.isPending}
-              className="gap-2"
-            >
-              <Rocket className="w-4 h-4" />
-              {createCampaignMutation.isPending
-                ? "Criando..."
-                : "Criar Cotação"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

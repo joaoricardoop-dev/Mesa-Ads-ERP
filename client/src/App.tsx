@@ -15,6 +15,7 @@ import ActiveRestaurantProfile from "./pages/ActiveRestaurantProfile";
 import Clients from "./pages/Clients";
 import Campaigns from "./pages/Campaigns";
 import CampaignDetail from "./pages/CampaignDetail";
+import QuotationPreview from "./pages/QuotationPreview";
 import Economics from "./pages/Economics";
 import Production from "./pages/Production";
 import Members from "./pages/Members";
@@ -32,6 +33,7 @@ function Router() {
       <Route path={"/restaurantes/:id"} component={ActiveRestaurantForm} />
       <Route path={"/restaurantes"} component={ActiveRestaurantsPage} />
       <Route path={"/clientes"} component={Clients} />
+      <Route path={"/cotacao/preview"} component={QuotationPreview} />
       <Route path={"/campanhas/:id"} component={CampaignDetail} />
       <Route path={"/campanhas"} component={Campaigns} />
       <Route path={"/economics"} component={Economics} />
