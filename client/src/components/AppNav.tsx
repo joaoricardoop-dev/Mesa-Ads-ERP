@@ -43,12 +43,14 @@ export default function AppNav({ user }: AppNavProps) {
     <header className="border-b border-border/30 bg-card/80 backdrop-blur-md flex-shrink-0 z-50">
       <div className="flex items-center justify-between px-4 lg:px-6 h-14">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
-            <Megaphone className="w-3.5 h-3.5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-sm font-bold tracking-tight">Mesa Ads</h1>
-            <p className="text-[10px] text-muted-foreground">
+          <div className="flex flex-col">
+            <div className="flex items-baseline gap-1">
+              <span className="font-display-landing text-base font-extrabold tracking-tight">Mesa</span>
+              <span className="bg-brand text-white font-display-landing font-bold text-[10px] px-1.5 py-0.5 rounded-md leading-none">
+                Ads
+              </span>
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-tight">
               Plataforma de Gestão
             </p>
           </div>
