@@ -75,9 +75,12 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - Campaign history tracks all status changes with timestamps
 - Pricing uses grossup formula: CustoBruto = CustoPD / (1 - varRates), then SellingPrice = CustoBruto × (1 + markup%)
 
-## Theme
+## Theme & Visual Identity
 
-- Light/dark mode with toggle in navigation bar
-- Theme stored in localStorage, defaults to dark
+- Brand colors: Black (#0d0d0d) + Orange (hsl 22 100% 50%) — consistent across landing page and app
+- Light/dark mode with toggle in navigation bar, defaults to dark
+- Landing page: Separate dark-only marketing design with Outfit font, framer-motion animations
+- App: DM Sans + JetBrains Mono fonts, orange primary color, deep black backgrounds in dark mode
 - CSS variables in `client/src/index.css` (`:root` for light, `.dark` for dark)
 - ThemeContext at `client/src/contexts/ThemeContext.tsx`
+- Semantic colors preserved: emerald for positive/profit, red for negative/destructive, amber for warnings
