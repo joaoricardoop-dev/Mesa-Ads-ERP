@@ -180,6 +180,77 @@
   background: var(--muted-foreground);
 }
 
+/* ─── Landing Page Styles ─── */
+.landing-page {
+  --lp-bg: hsl(0 0% 4%);
+  --lp-fg: hsl(0 0% 95%);
+  --lp-card: hsl(0 0% 7%);
+  --lp-border: hsl(0 0% 14%);
+  --lp-muted: hsl(0 0% 50%);
+  --lp-secondary: hsl(0 0% 11%);
+  --lp-brand: hsl(22 100% 50%);
+  --lp-brand-fg: hsl(0 0% 100%);
+  font-family: "Outfit", sans-serif;
+  background: var(--lp-bg);
+  color: var(--lp-fg);
+}
+
+.landing-page .section-label {
+  color: var(--lp-brand);
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.landing-page .section-title {
+  font-family: "Outfit", sans-serif;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.landing-page .card-glass {
+  background: hsl(0 0% 11% / 0.8);
+  border: 1px solid var(--lp-border);
+  border-radius: 1rem;
+}
+
+.landing-page .stat-value {
+  font-family: "Outfit", sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.text-gradient-brand {
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-image: linear-gradient(135deg, hsl(22 100% 50%), hsl(32 100% 55%));
+}
+
+.bg-brand {
+  background: hsl(22 100% 50%);
+}
+
+.hero-overlay {
+  background: linear-gradient(
+    180deg,
+    hsl(0 0% 4% / 0.4) 0%,
+    hsl(0 0% 4% / 0.75) 50%,
+    hsl(0 0% 4% / 1) 100%
+  );
+}
+
+.glow {
+  box-shadow: 0 0 60px -10px hsl(22 100% 50% / 0.4);
+}
+
+.font-display-landing {
+  font-family: "Outfit", sans-serif;
+}
+
 /* Tabular numbers for financial data */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
