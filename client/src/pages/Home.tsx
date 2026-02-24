@@ -265,13 +265,15 @@ export default function Home() {
             <div className="p-4 lg:p-6">
               <TabsContent value="overview" className="mt-0 space-y-6">
                 {/* Hero Banner */}
-                <div className="relative rounded-xl overflow-hidden h-32 md:h-36 bg-gradient-to-r from-primary/20 via-primary/10 to-card border border-border/30">
+                <div className="relative rounded-xl overflow-hidden h-32 md:h-36 border border-border/30">
+                  <img src="/images/hero-bar.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/30" />
                   <div className="absolute inset-0 flex items-center p-6 md:p-8">
-                    <div className="flex-1">
-                      <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-1">
+                    <div className="flex-1 relative z-10">
+                      <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-1 text-white">
                         Simulador Financeiro
                       </h2>
-                      <p className="text-sm text-muted-foreground max-w-md mb-3">
+                      <p className="text-sm text-white/60 max-w-md mb-3">
                         Faturamento e lucro da Mesa Ads. Restaurantes parceiros
                         recebem comissão sobre a mídia veiculada nos coasters.
                       </p>
