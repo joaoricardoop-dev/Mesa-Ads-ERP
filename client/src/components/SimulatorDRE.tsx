@@ -55,6 +55,16 @@ function DRERow({
   );
 }
 
+function CostCard({ label, value, monthly }: { label: string; value: string; monthly: string }) {
+  return (
+    <div className="bg-background/50 border border-border/20 rounded-lg p-3 text-center">
+      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{label}</p>
+      <p className="font-mono font-bold text-sm mt-1">{value}</p>
+      <p className="text-[10px] text-muted-foreground mt-0.5">{monthly}/mês</p>
+    </div>
+  );
+}
+
 export default function SimulatorDRE({
   perRestaurant,
   unitEconomics,
@@ -176,13 +186,26 @@ export default function SimulatorDRE({
       </div>
 
       <div className="px-5 py-3 border-t border-border/20 bg-card/50">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 font-medium">
+          Custos do Contrato ({contractDuration} meses × {n} restaurantes)
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <CostCard label="Produção" value={formatCurrency(totalProduction * contractDuration)} monthly={formatCurrency(totalProduction)} />
+          <CostCard label="Com. Restaurante" value={formatCurrency(totalRestComm * contractDuration)} monthly={formatCurrency(totalRestComm)} />
+          <CostCard label="Com. Vendedor" value={formatCurrency(totalSellerComm * contractDuration)} monthly={formatCurrency(totalSellerComm)} />
+          <CostCard label="Impostos" value={formatCurrency(totalTax * contractDuration)} monthly={formatCurrency(totalTax)} />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center border-t border-border/20 pt-3">
           <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Contrato Total</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Receita Contrato</p>
             <p className="font-mono font-bold text-sm text-primary">{formatCurrency(unitEconomics.contractValue)}</p>
           </div>
           <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Lucro do Contrato</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Custos Contrato</p>
+            <p className="font-mono font-bold text-sm text-red-400">{formatCurrency(totalCosts * contractDuration)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Lucro Contrato</p>
             <p className={`font-mono font-bold text-sm ${unitEconomics.contractProfit > 0 ? "text-emerald-400" : "text-red-400"}`}>
               {formatCurrency(unitEconomics.contractProfit)}
             </p>
@@ -190,12 +213,6 @@ export default function SimulatorDRE({
           <div>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Receita Anual</p>
             <p className="font-mono font-bold text-sm">{formatCurrency(unitEconomics.annualRevenue)}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Lucro Anual</p>
-            <p className={`font-mono font-bold text-sm ${unitEconomics.annualProfit > 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {formatCurrency(unitEconomics.annualProfit)}
-            </p>
           </div>
         </div>
       </div>
