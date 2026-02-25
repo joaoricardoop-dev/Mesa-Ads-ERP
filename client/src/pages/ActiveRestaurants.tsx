@@ -43,8 +43,6 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import {
-  TIER_COLORS,
-  TIER_LABELS,
   LOCATION_RATING_LABELS,
   VENUE_TYPE_LABELS,
   DIGITAL_PRESENCE_LABELS,
@@ -120,13 +118,6 @@ const EXCLUDED_CATEGORIES = [
   "Conteúdo adulto/sexual",
 ];
 
-const TIER_FILTER_OPTIONS = [
-  { value: "bronze", label: "Bronze" },
-  { value: "prata", label: "Prata" },
-  { value: "ouro", label: "Ouro" },
-  { value: "diamante", label: "Diamante" },
-  { value: "sem_rating", label: "Sem rating" },
-];
 
 type SortOption = "name" | "ratingScore";
 
@@ -199,7 +190,6 @@ export default function ActiveRestaurantsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState<FormData>(emptyForm);
   const [search, setSearch] = useState("");
-  const [tierFilter, setTierFilter] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortOption>("name");
 
   const utils = trpc.useUtils();
@@ -311,25 +301,11 @@ export default function ActiveRestaurantsPage() {
     }
   };
 
-  const toggleTierFilter = (tier: string) => {
-    setTierFilter(prev =>
-      prev.includes(tier) ? prev.filter(t => t !== tier) : [...prev, tier]
-    );
-  };
-
   const filtered = useMemo(() => {
     let list = restaurants.filter((r) => {
       if (search) {
         const s = search.toLowerCase();
         if (!r.name.toLowerCase().includes(s) && !r.neighborhood.toLowerCase().includes(s) && !(r.whatsapp && r.whatsapp.includes(s))) return false;
-      }
-      if (tierFilter.length > 0) {
-        const tier = (r as any).ratingTier;
-        if (!tier) {
-          if (!tierFilter.includes("sem_rating")) return false;
-        } else {
-          if (!tierFilter.includes(tier)) return false;
-        }
       }
       return true;
     });
@@ -345,7 +321,7 @@ export default function ActiveRestaurantsPage() {
     }
 
     return list;
-  }, [restaurants, search, tierFilter, sortBy]);
+  }, [restaurants, search, sortBy]);
 
   const activeCount = restaurants.filter((r) => r.status === "active").length;
   const totalTables = restaurants.reduce((s, r) => s + (r.tableCount || 0), 0);
@@ -406,26 +382,6 @@ export default function ActiveRestaurantsPage() {
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground font-medium">Filtrar por tier:</span>
-          {TIER_FILTER_OPTIONS.map((opt) => (
-            <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
-              <Checkbox
-                checked={tierFilter.includes(opt.value)}
-                onCheckedChange={() => toggleTierFilter(opt.value)}
-              />
-              <span className="text-xs" style={opt.value !== "sem_rating" ? { color: TIER_COLORS[opt.value] } : undefined}>
-                {opt.label}
-              </span>
-            </label>
-          ))}
-          {tierFilter.length > 0 && (
-            <Button variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={() => setTierFilter([])}>
-              Limpar
-            </Button>
-          )}
-        </div>
-
         <div className="space-y-2">
           {filtered.length === 0 ? (
             <div className="bg-card border border-border/30 rounded-lg p-8 text-center text-muted-foreground">
@@ -447,17 +403,8 @@ export default function ActiveRestaurantsPage() {
                             <Badge variant="outline" className={r.status === "active" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]" : "bg-gray-500/20 text-gray-400 border-gray-500/30 text-[10px]"}>
                               {r.status === "active" ? "Ativo" : "Inativo"}
                             </Badge>
-                            {(r as any).ratingTier ? (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] font-bold border"
-                                style={{
-                                  color: TIER_COLORS[(r as any).ratingTier] || "#888",
-                                  borderColor: TIER_COLORS[(r as any).ratingTier] || "#888",
-                                  backgroundColor: `${TIER_COLORS[(r as any).ratingTier] || "#888"}20`,
-                                }}
-                              >
-                                {TIER_LABELS[(r as any).ratingTier]?.toUpperCase() || (r as any).ratingTier.toUpperCase()}{" "}
+                            {(r as any).ratingScore != null ? (
+                              <Badge variant="outline" className="text-[10px] font-bold font-mono border-primary/30 bg-primary/10 text-primary">
                                 {parseFloat(String((r as any).ratingScore)).toFixed(2)}
                               </Badge>
                             ) : (

@@ -47,7 +47,6 @@ import {
   DIGITAL_PRESENCE_LABELS,
   PRIMARY_DRINK_LABELS,
   RATING_DIMENSION_LABELS,
-  TIER_LABELS,
 } from "@shared/rating-config";
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -837,34 +836,22 @@ function RatingPreviewCard({ form }: { form: FormData }) {
   }
 
   const rating = calcularRating(ratingInput);
-  const tierLabel = TIER_LABELS[rating.tier] || rating.tier;
   const scorePercent = Math.min((rating.score / 5) * 100, 100);
 
   return (
     <div className="mt-3 p-4 rounded-lg border border-border/20 bg-muted/10 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Star className="w-4 h-4" style={{ color: rating.cor }} />
-          <span className="text-sm font-semibold">Classificação</span>
+          <Star className="w-4 h-4 text-primary" />
+          <span className="text-sm font-semibold">Rating Interno</span>
         </div>
-        <Badge className="text-xs font-bold px-2 py-0.5" style={{ backgroundColor: rating.cor, color: rating.tier === "prata" || rating.tier === "ouro" ? "#1a1a1a" : "#fff" }}>
-          {tierLabel.toUpperCase()} {rating.score.toFixed(2)}
-        </Badge>
+        <span className="font-mono font-bold text-lg">{rating.score.toFixed(2)} <span className="text-xs text-muted-foreground font-normal">({rating.multiplicador.toFixed(2)}x)</span></span>
       </div>
 
       <div className="space-y-1">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Score</span>
-          <span className="font-mono font-semibold">{rating.score.toFixed(2)} / 5.00</span>
-        </div>
         <div className="h-2 bg-muted rounded-full overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${scorePercent}%`, backgroundColor: rating.cor }} />
+          <div className="h-full rounded-full transition-all duration-300 bg-primary" style={{ width: `${scorePercent}%` }} />
         </div>
-      </div>
-
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">Multiplicador</span>
-        <span className="font-mono font-semibold">{rating.multiplicador.toFixed(2)}x</span>
       </div>
 
       <div className="space-y-1.5 pt-1 border-t border-border/20">
@@ -876,7 +863,7 @@ function RatingPreviewCard({ form }: { form: FormData }) {
               <span className="font-mono text-[10px]">{detail.pontos}/5 (peso {(detail.peso * 100).toFixed(0)}%)</span>
             </div>
             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${(detail.pontos / 5) * 100}%`, backgroundColor: rating.cor }} />
+              <div className="h-full rounded-full transition-all duration-300 bg-primary" style={{ width: `${(detail.pontos / 5) * 100}%` }} />
             </div>
           </div>
         ))}

@@ -29,7 +29,6 @@ import {
   VENUE_TYPE_LABELS,
   DIGITAL_PRESENCE_LABELS,
   PRIMARY_DRINK_LABELS,
-  TIER_LABELS,
   RATING_DIMENSION_LABELS,
 } from "@shared/rating-config";
 import {
@@ -374,31 +373,25 @@ export default function ActiveRestaurantProfile() {
                   );
                 }
                 const ratingData = calcularRating(restaurant);
-                const tierLabel = TIER_LABELS[ratingData.tier] || ratingData.tier;
                 return (
-                  <Card title="Classificação" icon={<Star className="w-4 h-4" />}>
+                  <Card title="Rating Interno" icon={<Star className="w-4 h-4" />}>
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="text-2xl font-bold font-mono">{ratingData.score.toFixed(2)}</div>
-                          <Badge className="text-xs font-bold border" style={{ backgroundColor: `${ratingData.cor}20`, color: ratingData.cor, borderColor: `${ratingData.cor}50` }}>
-                            {tierLabel.toUpperCase()}
-                          </Badge>
-                        </div>
+                        <div className="text-2xl font-bold font-mono">{ratingData.score.toFixed(2)}</div>
                         <div className="text-right">
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Multiplicador</p>
                           <p className="text-lg font-bold font-mono">{ratingData.multiplicador.toFixed(2)}x</p>
                         </div>
                       </div>
                       <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${(ratingData.score / 5) * 100}%`, backgroundColor: ratingData.cor }} />
+                        <div className="h-full rounded-full transition-all bg-primary" style={{ width: `${(ratingData.score / 5) * 100}%` }} />
                       </div>
                       <div className="space-y-2">
                         {Object.entries(ratingData.detalhamento).map(([key, detail]) => (
                           <div key={key} className="flex items-center gap-2">
                             <span className="text-[10px] uppercase tracking-wider text-muted-foreground w-20 shrink-0">{RATING_DIMENSION_LABELS[key] || key}</span>
                             <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full rounded-full" style={{ width: `${(detail.pontos / 5) * 100}%`, backgroundColor: ratingData.cor }} />
+                              <div className="h-full rounded-full bg-primary" style={{ width: `${(detail.pontos / 5) * 100}%` }} />
                             </div>
                             <span className="text-xs font-mono w-6 text-right">{detail.pontos}</span>
                           </div>

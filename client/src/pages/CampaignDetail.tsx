@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 
 import { trpc } from "@/lib/trpc";
-import { TIER_COLORS, TIER_LABELS } from "@shared/rating-config";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -726,9 +725,9 @@ export default function CampaignDetail() {
                           <tr key={r.id} className="border-b border-border/10 hover:bg-muted/5">
                             <td className="p-3 text-sm font-medium">{r.restaurantName || `Rest. #${r.restaurantId}`}</td>
                             <td className="p-3 text-center hidden md:table-cell">
-                              {(r as any).ratingTier ? (
-                                <span className="inline-flex items-center text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border" style={{ color: TIER_COLORS[(r as any).ratingTier] || "#888", borderColor: TIER_COLORS[(r as any).ratingTier] || "#888", backgroundColor: `${TIER_COLORS[(r as any).ratingTier] || "#888"}20` }}>
-                                  {TIER_LABELS[(r as any).ratingTier] || (r as any).ratingTier} {parseFloat((r as any).ratingScore).toFixed(2)}
+                              {(r as any).ratingScore != null ? (
+                                <span className="inline-flex items-center text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary">
+                                  {parseFloat((r as any).ratingScore).toFixed(2)}
                                 </span>
                               ) : <span className="text-xs text-muted-foreground">—</span>}
                             </td>
