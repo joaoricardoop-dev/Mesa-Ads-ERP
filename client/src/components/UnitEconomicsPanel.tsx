@@ -85,7 +85,7 @@ export default function UnitEconomicsPanel({
               {formatCurrency(data.sellerCommissionValue)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {sellerCommission}% sobre faturamento/rest.
+              {sellerCommission}% sobre faturamento global
             </p>
           </motion.div>
 

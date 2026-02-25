@@ -408,7 +408,7 @@ export function useSimulator(selectedBudget?: BudgetOption | null) {
       perRestaurant.grossProfit * inputs.activeRestaurants;
     const contractValue = monthlyRevenue * inputs.contractDuration;
     const contractProfit = monthlyTotalProfit * inputs.contractDuration;
-    const sellerCommissionValue = perRestaurant.sellerCommissionValue;
+    const sellerCommissionValue = perRestaurant.sellerCommissionValue * inputs.activeRestaurants;
     const annualRevenue = monthlyRevenue * 12;
     const annualProfit = monthlyTotalProfit * 12;
 
