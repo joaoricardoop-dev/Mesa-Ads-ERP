@@ -1,7 +1,7 @@
-import { RATING_CONFIG } from "./rating-config";
+import { RATING_CONFIG, calcularMultiplicador } from "./rating-config";
 
 interface RestauranteRating {
-  monthlyCustomers: number | null;
+  monthlyDrinksSold: number | null;
   tableCount: number | null;
   ticketMedio: number | string | null;
   locationRating: number | null;
@@ -40,7 +40,7 @@ function converterParaPontos(valor: number, faixas: { max: number; pontos: numbe
 export function temCamposRatingCompletos(restaurante: RestauranteRating): boolean {
   const ticket = typeof restaurante.ticketMedio === "string" ? parseFloat(restaurante.ticketMedio) : restaurante.ticketMedio;
   return (
-    restaurante.monthlyCustomers != null && restaurante.monthlyCustomers > 0 &&
+    restaurante.monthlyDrinksSold != null && restaurante.monthlyDrinksSold > 0 &&
     restaurante.tableCount != null && restaurante.tableCount > 0 &&
     ticket != null && ticket > 0 &&
     restaurante.locationRating != null && restaurante.locationRating >= 1 &&
@@ -55,7 +55,7 @@ export function calcularRating(restaurante: RestauranteRating): RatingResult {
   const ticketVal = typeof restaurante.ticketMedio === "string" ? parseFloat(restaurante.ticketMedio) : (restaurante.ticketMedio || 0);
 
   const pontos = {
-    fluxo: converterParaPontos(restaurante.monthlyCustomers || 0, faixas.fluxo),
+    fluxo: converterParaPontos(restaurante.monthlyDrinksSold || 0, faixas.fluxo),
     ticket: converterParaPontos(ticketVal, faixas.ticket),
     localizacao: restaurante.locationRating || 1,
     mesas: converterParaPontos(restaurante.tableCount || 0, faixas.mesas),
@@ -73,14 +73,15 @@ export function calcularRating(restaurante: RestauranteRating): RatingResult {
   ) * 100) / 100;
 
   const tierInfo = tiers.find(t => score <= t.maxScore) || tiers[tiers.length - 1];
+  const multiplicador = calcularMultiplicador(score);
 
   return {
     score,
     tier: tierInfo.nome,
-    multiplicador: tierInfo.multiplicador,
+    multiplicador,
     cor: tierInfo.cor,
     detalhamento: {
-      fluxo: { valor: restaurante.monthlyCustomers || 0, pontos: pontos.fluxo, peso: pesos.fluxo },
+      fluxo: { valor: restaurante.monthlyDrinksSold || 0, pontos: pontos.fluxo, peso: pesos.fluxo },
       ticket: { valor: ticketVal, pontos: pontos.ticket, peso: pesos.ticket },
       localizacao: { valor: restaurante.locationRating || 1, pontos: pontos.localizacao, peso: pesos.localizacao },
       mesas: { valor: restaurante.tableCount || 0, pontos: pontos.mesas, peso: pesos.mesas },

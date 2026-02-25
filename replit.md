@@ -79,15 +79,23 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 
 ## Restaurant Rating System
 
-- Restaurants are classified into tiers: Bronze (1.00x), Prata (1.40x), Ouro (1.80x), Diamante (2.30x)
-- Rating uses 7 weighted dimensions: fluxo mensal (25%), ticket médio (20%), permanência (15%), localização (15%), mesas (10%), perfil (10%), digital (5%)
+- Tiers: Bronze, Prata, Ouro, Diamante (visual labels by score band ≤2/≤3/≤4/≤5)
+- Multiplier is continuous: score ≤ 2.0 → 1.00x; score > 2.0 → 1.0 + (score-2)/3, max 2.00x at score 5.0
+- Rating uses 6 weighted dimensions:
+  - Fluxo de bebidas / monthlyDrinksSold (25%)
+  - Ticket médio / ticketMedio (20%)
+  - Localização / locationRating 1-5 (20%)
+  - Mesas / tableCount (10%)
+  - Perfil do estabelecimento / venueType 1-5 (20%)
+  - Presença digital / digitalPresence 1-5 (5%)
 - Score calculated from 1.00 to 5.00 using `calcularRating()` from `shared/rating.ts`
+- Multiplier helper: `calcularMultiplicador(score)` exported from `shared/rating-config.ts`
 - Configuration centralized in `shared/rating-config.ts` (RATING_CONFIG object)
-- Input fields added to active_restaurants: ticketMedio, avgStayMinutes, locationRating (1-5), venueType (1-5), digitalPresence (1-5), primaryDrink
+- Input fields in active_restaurants: ticketMedio, locationRating (1-5), venueType (1-5), digitalPresence (1-5), primaryDrink
 - Calculated fields: ratingScore, ratingTier, ratingMultiplier, ratingUpdatedAt
-- Auto-triggers: rating recalculates on create/update of any rating field in server/db.ts
+- Auto-triggers: rating recalculates on create/update of any of the 6 rating fields in server/db.ts
 - Admin bulk recalculation: `activeRestaurant.recalculateRatings` route (adminProcedure)
-- Form section "Perfil Publicitário" with live preview in ActiveRestaurantForm.tsx
+- Form section "Rating Interno" (merged into Operação section) with live preview in ActiveRestaurantForm.tsx
 - Rating card displayed in ActiveRestaurantProfile.tsx Painel tab
 - Rating badge shown in ActiveRestaurants.tsx list with tier filter and score sort
 - Rating badge shown in CampaignDetail.tsx Distribuição tab

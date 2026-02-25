@@ -656,7 +656,7 @@ export async function recalculateAllRatings() {
 }
 
 const RATING_FIELDS = [
-  'monthlyCustomers', 'tableCount', 'ticketMedio',
+  'monthlyDrinksSold', 'tableCount', 'ticketMedio',
   'locationRating', 'venueType', 'digitalPresence'
 ];
 

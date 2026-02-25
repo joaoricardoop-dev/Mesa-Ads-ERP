@@ -815,7 +815,7 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
 
 function RatingPreviewCard({ form }: { form: FormData }) {
   const ratingInput = {
-    monthlyCustomers: form.monthlyCustomers,
+    monthlyDrinksSold: form.monthlyDrinksSold,
     tableCount: form.tableCount,
     ticketMedio: form.ticketMedio,
     locationRating: form.locationRating,
@@ -830,7 +830,7 @@ function RatingPreviewCard({ form }: { form: FormData }) {
       <div className="mt-3 p-4 rounded-lg border border-border/20 bg-muted/10">
         <div className="flex items-center gap-2 text-muted-foreground">
           <Star className="w-4 h-4" />
-          <span className="text-xs">Preencha todos os campos acima e os dados de operação (mesas, clientes/mês) para ver a classificação ao vivo.</span>
+          <span className="text-xs">Preencha todos os campos acima e os dados de operação (mesas, bebidas vendidas/mês) para ver a classificação ao vivo.</span>
         </div>
       </div>
     );

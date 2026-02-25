@@ -1,10 +1,10 @@
 export const RATING_CONFIG = {
   pesos: {
-    fluxo: 0.30,
-    ticket: 0.25,
-    localizacao: 0.15,
-    mesas: 0.15,
-    perfil: 0.10,
+    fluxo: 0.25,
+    ticket: 0.20,
+    localizacao: 0.20,
+    mesas: 0.10,
+    perfil: 0.20,
     digital: 0.05,
   },
 
@@ -33,12 +33,17 @@ export const RATING_CONFIG = {
   },
 
   tiers: [
-    { maxScore: 2.00, nome: "bronze" as const, multiplicador: 1.00, cor: "#CD7F32" },
-    { maxScore: 3.00, nome: "prata" as const, multiplicador: 1.40, cor: "#C0C0C0" },
-    { maxScore: 4.00, nome: "ouro" as const, multiplicador: 1.80, cor: "#FFD700" },
-    { maxScore: 5.00, nome: "diamante" as const, multiplicador: 2.30, cor: "#4169E1" },
+    { maxScore: 2.00, nome: "bronze" as const, cor: "#CD7F32" },
+    { maxScore: 3.00, nome: "prata" as const, cor: "#C0C0C0" },
+    { maxScore: 4.00, nome: "ouro" as const, cor: "#FFD700" },
+    { maxScore: 5.00, nome: "diamante" as const, cor: "#4169E1" },
   ],
 };
+
+export function calcularMultiplicador(score: number): number {
+  if (score <= 2.0) return 1.00;
+  return Math.round(Math.min(2.00, 1.0 + (score - 2.0) / 3.0) * 100) / 100;
+}
 
 export const TIER_COLORS: Record<string, string> = {
   bronze: "#CD7F32",
@@ -58,8 +63,8 @@ export const LOCATION_RATING_LABELS: Record<number, string> = {
   1: "Periferia / Baixo fluxo de pedestres",
   2: "Bairro residencial de classe média",
   3: "Zona comercial ativa / Avenida movimentada",
-  4: "Bairro nobre / Polo gastronômico",
-  5: "Ponto turístico / Localização premium (orla, centro histórico)",
+  4: "Bairro nobre",
+  5: "Ponto turístico / Premium (Ponta Negra, orla, Largo do São Sebastião, Shoppings)",
 };
 
 export const VENUE_TYPE_LABELS: Record<number, string> = {
@@ -87,7 +92,7 @@ export const PRIMARY_DRINK_LABELS: Record<string, string> = {
 };
 
 export const RATING_DIMENSION_LABELS: Record<string, string> = {
-  fluxo: "Fluxo mensal",
+  fluxo: "Fluxo de bebidas",
   ticket: "Ticket médio",
   localizacao: "Localização",
   mesas: "Mesas",
