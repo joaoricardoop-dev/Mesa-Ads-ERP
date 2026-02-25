@@ -539,7 +539,7 @@ export default function ActiveRestaurantProfile() {
                   </div>
                 </Card>
 
-                <Card title="Perfil Publicitário" icon={<Wine className="w-4 h-4" />}>
+                <Card title="Rating Interno" icon={<Wine className="w-4 h-4" />}>
                   <div className="space-y-2">
                     <InfoRow label="Ticket Médio" value={restaurant.ticketMedio ? `R$ ${Number(restaurant.ticketMedio).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : undefined} />
                     <InfoRow label="Permanência" value={restaurant.avgStayMinutes ? `${restaurant.avgStayMinutes} min` : undefined} />

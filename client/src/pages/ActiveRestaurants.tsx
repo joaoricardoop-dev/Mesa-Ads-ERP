@@ -526,7 +526,7 @@ export default function ActiveRestaurantsPage() {
                 <TabsTrigger value="local" className="text-xs">Local</TabsTrigger>
                 <TabsTrigger value="contato" className="text-xs">Contato</TabsTrigger>
                 <TabsTrigger value="operacao" className="text-xs">Operação</TabsTrigger>
-                <TabsTrigger value="perfil" className="text-xs">Perfil Pub.</TabsTrigger>
+                <TabsTrigger value="perfil" className="text-xs">Rating</TabsTrigger>
                 <TabsTrigger value="restricoes" className="text-xs">Restrições</TabsTrigger>
                 <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
               </TabsList>

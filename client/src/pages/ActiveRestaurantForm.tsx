@@ -580,7 +580,7 @@ export default function ActiveRestaurantForm() {
                     <Field label="Horários de Maior Movimento" value={form.busyHours} onChange={(v) => setForm(p => ({ ...p, busyHours: v }))} placeholder="Ex: 18h–22h" />
                   </Section>
 
-                  <Section icon={<Target className="w-4 h-4" />} title="Perfil Publicitário">
+                  <Section icon={<Target className="w-4 h-4" />} title="Rating Interno">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">Ticket Médio (R$)</Label>
