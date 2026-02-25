@@ -578,87 +578,86 @@ export default function ActiveRestaurantForm() {
                       </div>
                     </div>
                     <Field label="Horários de Maior Movimento" value={form.busyHours} onChange={(v) => setForm(p => ({ ...p, busyHours: v }))} placeholder="Ex: 18h–22h" />
-                  </Section>
-
-                  <Section icon={<Target className="w-4 h-4" />} title="Rating Interno">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Ticket Médio (R$)</Label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+                    <div className="border-t border-border/20 pt-3 space-y-3">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rating Interno</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Ticket Médio (R$)</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+                            <Input
+                              type="number"
+                              min={5}
+                              step={0.01}
+                              value={form.ticketMedio || ""}
+                              onChange={(e) => setForm(p => ({ ...p, ticketMedio: parseFloat(e.target.value) || 0 }))}
+                              placeholder="0,00"
+                              className="bg-background border-border/30 h-9 text-sm pl-9"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Permanência Média (minutos)</Label>
                           <Input
                             type="number"
-                            min={5}
-                            step={0.01}
-                            value={form.ticketMedio || ""}
-                            onChange={(e) => setForm(p => ({ ...p, ticketMedio: parseFloat(e.target.value) || 0 }))}
-                            placeholder="0,00"
-                            className="bg-background border-border/30 h-9 text-sm pl-9"
+                            min={10}
+                            max={300}
+                            value={form.avgStayMinutes || ""}
+                            onChange={(e) => setForm(p => ({ ...p, avgStayMinutes: parseInt(e.target.value) || 0 }))}
+                            placeholder="Ex: 60"
+                            className="bg-background border-border/30 h-9 text-sm"
                           />
                         </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Permanência Média (minutos)</Label>
-                        <Input
-                          type="number"
-                          min={10}
-                          max={300}
-                          value={form.avgStayMinutes || ""}
-                          onChange={(e) => setForm(p => ({ ...p, avgStayMinutes: parseInt(e.target.value) || 0 }))}
-                          placeholder="Ex: 60"
-                          className="bg-background border-border/30 h-9 text-sm"
-                        />
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Localização</Label>
+                          <Select value={String(form.locationRating)} onValueChange={(v) => setForm(p => ({ ...p, locationRating: parseInt(v) }))}>
+                            <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(LOCATION_RATING_LABELS).map(([val, label]) => (
+                                <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Tipo de Estabelecimento</Label>
+                          <Select value={String(form.venueType)} onValueChange={(v) => setForm(p => ({ ...p, venueType: parseInt(v) }))}>
+                            <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(VENUE_TYPE_LABELS).map(([val, label]) => (
+                                <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Presença Digital</Label>
+                          <Select value={String(form.digitalPresence)} onValueChange={(v) => setForm(p => ({ ...p, digitalPresence: parseInt(v) }))}>
+                            <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(DIGITAL_PRESENCE_LABELS).map(([val, label]) => (
+                                <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Bebida Predominante</Label>
+                          <Select value={form.primaryDrink || "_none"} onValueChange={(v) => setForm(p => ({ ...p, primaryDrink: v === "_none" ? "" : v }))}>
+                            <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue placeholder="Selecione (opcional)" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="_none">Não informado</SelectItem>
+                              {Object.entries(PRIMARY_DRINK_LABELS).map(([val, label]) => (
+                                <SelectItem key={val} value={val}>{label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
+                      <RatingPreviewCard form={form} />
                     </div>
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Localização</Label>
-                        <Select value={String(form.locationRating)} onValueChange={(v) => setForm(p => ({ ...p, locationRating: parseInt(v) }))}>
-                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(LOCATION_RATING_LABELS).map(([val, label]) => (
-                              <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Tipo de Estabelecimento</Label>
-                        <Select value={String(form.venueType)} onValueChange={(v) => setForm(p => ({ ...p, venueType: parseInt(v) }))}>
-                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(VENUE_TYPE_LABELS).map(([val, label]) => (
-                              <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Presença Digital</Label>
-                        <Select value={String(form.digitalPresence)} onValueChange={(v) => setForm(p => ({ ...p, digitalPresence: parseInt(v) }))}>
-                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(DIGITAL_PRESENCE_LABELS).map(([val, label]) => (
-                              <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Bebida Predominante</Label>
-                        <Select value={form.primaryDrink || "_none"} onValueChange={(v) => setForm(p => ({ ...p, primaryDrink: v === "_none" ? "" : v }))}>
-                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue placeholder="Selecione (opcional)" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="_none">Não informado</SelectItem>
-                            {Object.entries(PRIMARY_DRINK_LABELS).map(([val, label]) => (
-                              <SelectItem key={val} value={val}>{label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <RatingPreviewCard form={form} />
                   </Section>
 
                   <Section icon={<ShieldAlert className="w-4 h-4" />} title="Restrições">

@@ -522,11 +522,10 @@ export default function ActiveRestaurantsPage() {
             </DialogHeader>
 
             <Tabs defaultValue="local" className="space-y-4">
-              <TabsList className="grid grid-cols-6 w-full">
+              <TabsList className="grid grid-cols-5 w-full">
                 <TabsTrigger value="local" className="text-xs">Local</TabsTrigger>
                 <TabsTrigger value="contato" className="text-xs">Contato</TabsTrigger>
                 <TabsTrigger value="operacao" className="text-xs">Operação</TabsTrigger>
-                <TabsTrigger value="perfil" className="text-xs">Rating</TabsTrigger>
                 <TabsTrigger value="restricoes" className="text-xs">Restrições</TabsTrigger>
                 <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
               </TabsList>
@@ -648,79 +647,79 @@ export default function ActiveRestaurantsPage() {
                   <Label className="text-xs">Horários de Maior Movimento</Label>
                   <Input value={form.busyHours} onChange={(e) => setForm(p => ({ ...p, busyHours: e.target.value }))} placeholder="Ex: 18h–22h" className="bg-background border-border/30" />
                 </div>
-              </TabsContent>
-
-              <TabsContent value="perfil" className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Ticket Médio (R$)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="5"
-                      value={form.ticketMedio || ""}
-                      onChange={(e) => setForm(p => ({ ...p, ticketMedio: parseFloat(e.target.value) || 0 }))}
-                      placeholder="Ex: 45.00"
-                      className="bg-background border-border/30"
-                    />
+                <div className="border-t border-border/20 pt-3 space-y-3">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rating Interno</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Ticket Médio (R$)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="5"
+                        value={form.ticketMedio || ""}
+                        onChange={(e) => setForm(p => ({ ...p, ticketMedio: parseFloat(e.target.value) || 0 }))}
+                        placeholder="Ex: 45.00"
+                        className="bg-background border-border/30"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Permanência Média (min)</Label>
+                      <Input
+                        type="number"
+                        min="10"
+                        max="300"
+                        value={form.avgStayMinutes || ""}
+                        onChange={(e) => setForm(p => ({ ...p, avgStayMinutes: parseInt(e.target.value) || 0 }))}
+                        placeholder="Ex: 60"
+                        className="bg-background border-border/30"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs">Permanência Média (min)</Label>
-                    <Input
-                      type="number"
-                      min="10"
-                      max="300"
-                      value={form.avgStayMinutes || ""}
-                      onChange={(e) => setForm(p => ({ ...p, avgStayMinutes: parseInt(e.target.value) || 0 }))}
-                      placeholder="Ex: 60"
-                      className="bg-background border-border/30"
-                    />
+                    <Label className="text-xs">Localização</Label>
+                    <Select value={String(form.locationRating)} onValueChange={(v) => setForm(p => ({ ...p, locationRating: parseInt(v) }))}>
+                      <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(LOCATION_RATING_LABELS).map(([val, label]) => (
+                          <SelectItem key={val} value={val}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Localização</Label>
-                  <Select value={String(form.locationRating)} onValueChange={(v) => setForm(p => ({ ...p, locationRating: parseInt(v) }))}>
-                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(LOCATION_RATING_LABELS).map(([val, label]) => (
-                        <SelectItem key={val} value={val}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Tipo de Estabelecimento</Label>
-                  <Select value={String(form.venueType)} onValueChange={(v) => setForm(p => ({ ...p, venueType: parseInt(v) }))}>
-                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(VENUE_TYPE_LABELS).map(([val, label]) => (
-                        <SelectItem key={val} value={val}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Presença Digital</Label>
-                  <Select value={String(form.digitalPresence)} onValueChange={(v) => setForm(p => ({ ...p, digitalPresence: parseInt(v) }))}>
-                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(DIGITAL_PRESENCE_LABELS).map(([val, label]) => (
-                        <SelectItem key={val} value={val}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Bebida Predominante</Label>
-                  <Select value={form.primaryDrink || "_none"} onValueChange={(v) => setForm(p => ({ ...p, primaryDrink: v === "_none" ? "" : v }))}>
-                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_none">Nenhuma / Não informado</SelectItem>
-                      {Object.entries(PRIMARY_DRINK_LABELS).map(([val, label]) => (
-                        <SelectItem key={val} value={val}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Tipo de Estabelecimento</Label>
+                    <Select value={String(form.venueType)} onValueChange={(v) => setForm(p => ({ ...p, venueType: parseInt(v) }))}>
+                      <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(VENUE_TYPE_LABELS).map(([val, label]) => (
+                          <SelectItem key={val} value={val}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Presença Digital</Label>
+                    <Select value={String(form.digitalPresence)} onValueChange={(v) => setForm(p => ({ ...p, digitalPresence: parseInt(v) }))}>
+                      <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(DIGITAL_PRESENCE_LABELS).map(([val, label]) => (
+                          <SelectItem key={val} value={val}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Bebida Predominante</Label>
+                    <Select value={form.primaryDrink || "_none"} onValueChange={(v) => setForm(p => ({ ...p, primaryDrink: v === "_none" ? "" : v }))}>
+                      <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none">Nenhuma / Não informado</SelectItem>
+                        {Object.entries(PRIMARY_DRINK_LABELS).map(([val, label]) => (
+                          <SelectItem key={val} value={val}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </TabsContent>
 
