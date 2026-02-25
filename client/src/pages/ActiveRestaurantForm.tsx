@@ -135,7 +135,6 @@ interface FormData {
   situacaoCadastral: string;
   socios: string;
   ticketMedio: number;
-  avgStayMinutes: number;
   locationRating: number;
   venueType: number;
   digitalPresence: number;
@@ -181,7 +180,6 @@ const emptyForm: FormData = {
   situacaoCadastral: "",
   socios: "",
   ticketMedio: 0,
-  avgStayMinutes: 0,
   locationRating: 1,
   venueType: 1,
   digitalPresence: 1,
@@ -258,7 +256,6 @@ export default function ActiveRestaurantForm() {
         situacaoCadastral: existingRestaurant.situacaoCadastral || "",
         socios: existingRestaurant.socios || "",
         ticketMedio: existingRestaurant.ticketMedio ? parseFloat(String(existingRestaurant.ticketMedio)) : 0,
-        avgStayMinutes: existingRestaurant.avgStayMinutes || 0,
         locationRating: existingRestaurant.locationRating || 1,
         venueType: existingRestaurant.venueType || 1,
         digitalPresence: existingRestaurant.digitalPresence || 1,
@@ -400,7 +397,6 @@ export default function ActiveRestaurantForm() {
       situacaoCadastral: form.situacaoCadastral || undefined,
       socios: form.socios || undefined,
       ticketMedio: String(form.ticketMedio || 0),
-      avgStayMinutes: form.avgStayMinutes || 0,
       locationRating: form.locationRating || 1,
       venueType: form.venueType || 1,
       digitalPresence: form.digitalPresence || 1,
@@ -595,18 +591,6 @@ export default function ActiveRestaurantForm() {
                               className="bg-background border-border/30 h-9 text-sm pl-9"
                             />
                           </div>
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">Permanência Média (minutos)</Label>
-                          <Input
-                            type="number"
-                            min={10}
-                            max={300}
-                            value={form.avgStayMinutes || ""}
-                            onChange={(e) => setForm(p => ({ ...p, avgStayMinutes: parseInt(e.target.value) || 0 }))}
-                            placeholder="Ex: 60"
-                            className="bg-background border-border/30 h-9 text-sm"
-                          />
                         </div>
                       </div>
                       <div className="grid grid-cols-1 gap-3">
@@ -834,7 +818,6 @@ function RatingPreviewCard({ form }: { form: FormData }) {
     monthlyCustomers: form.monthlyCustomers,
     tableCount: form.tableCount,
     ticketMedio: form.ticketMedio,
-    avgStayMinutes: form.avgStayMinutes,
     locationRating: form.locationRating,
     venueType: form.venueType,
     digitalPresence: form.digitalPresence,

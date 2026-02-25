@@ -1,10 +1,9 @@
 export const RATING_CONFIG = {
   pesos: {
-    fluxo: 0.25,
-    ticket: 0.20,
-    permanencia: 0.15,
+    fluxo: 0.30,
+    ticket: 0.25,
     localizacao: 0.15,
-    mesas: 0.10,
+    mesas: 0.15,
     perfil: 0.10,
     digital: 0.05,
   },
@@ -22,13 +21,6 @@ export const RATING_CONFIG = {
       { max: 60, pontos: 2 },
       { max: 100, pontos: 3 },
       { max: 180, pontos: 4 },
-      { max: Infinity, pontos: 5 },
-    ],
-    permanencia: [
-      { max: 20, pontos: 1 },
-      { max: 40, pontos: 2 },
-      { max: 60, pontos: 3 },
-      { max: 90, pontos: 4 },
       { max: Infinity, pontos: 5 },
     ],
     mesas: [
@@ -97,7 +89,6 @@ export const PRIMARY_DRINK_LABELS: Record<string, string> = {
 export const RATING_DIMENSION_LABELS: Record<string, string> = {
   fluxo: "Fluxo mensal",
   ticket: "Ticket médio",
-  permanencia: "Permanência",
   localizacao: "Localização",
   mesas: "Mesas",
   perfil: "Perfil",

@@ -155,7 +155,6 @@ interface FormData {
   notes: string;
   status: string;
   ticketMedio: number;
-  avgStayMinutes: number;
   locationRating: number;
   venueType: number;
   digitalPresence: number;
@@ -187,7 +186,6 @@ const emptyForm: FormData = {
   notes: "",
   status: "active",
   ticketMedio: 0,
-  avgStayMinutes: 0,
   locationRating: 1,
   venueType: 1,
   digitalPresence: 1,
@@ -267,7 +265,6 @@ export default function ActiveRestaurantsPage() {
       notes: r.notes || "",
       status: r.status,
       ticketMedio: r.ticketMedio ? parseFloat(String(r.ticketMedio)) : 0,
-      avgStayMinutes: r.avgStayMinutes || 0,
       locationRating: r.locationRating || 1,
       venueType: r.venueType || 1,
       digitalPresence: r.digitalPresence || 1,
@@ -301,7 +298,6 @@ export default function ActiveRestaurantsPage() {
       pixKey: form.pixKey || undefined,
       notes: form.notes || undefined,
       ticketMedio: form.ticketMedio ? String(form.ticketMedio) : undefined,
-      avgStayMinutes: form.avgStayMinutes || undefined,
       locationRating: form.locationRating,
       venueType: form.venueType,
       digitalPresence: form.digitalPresence,
@@ -659,18 +655,6 @@ export default function ActiveRestaurantsPage() {
                         value={form.ticketMedio || ""}
                         onChange={(e) => setForm(p => ({ ...p, ticketMedio: parseFloat(e.target.value) || 0 }))}
                         placeholder="Ex: 45.00"
-                        className="bg-background border-border/30"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Permanência Média (min)</Label>
-                      <Input
-                        type="number"
-                        min="10"
-                        max="300"
-                        value={form.avgStayMinutes || ""}
-                        onChange={(e) => setForm(p => ({ ...p, avgStayMinutes: parseInt(e.target.value) || 0 }))}
-                        placeholder="Ex: 60"
                         className="bg-background border-border/30"
                       />
                     </div>

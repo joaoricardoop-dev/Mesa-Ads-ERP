@@ -542,7 +542,6 @@ export default function ActiveRestaurantProfile() {
                 <Card title="Rating Interno" icon={<Wine className="w-4 h-4" />}>
                   <div className="space-y-2">
                     <InfoRow label="Ticket Médio" value={restaurant.ticketMedio ? `R$ ${Number(restaurant.ticketMedio).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : undefined} />
-                    <InfoRow label="Permanência" value={restaurant.avgStayMinutes ? `${restaurant.avgStayMinutes} min` : undefined} />
                     <InfoRow label="Localização" value={restaurant.locationRating ? LOCATION_RATING_LABELS[restaurant.locationRating] || String(restaurant.locationRating) : undefined} />
                     <InfoRow label="Tipo de Estabelecimento" value={restaurant.venueType ? VENUE_TYPE_LABELS[restaurant.venueType] || String(restaurant.venueType) : undefined} />
                     <InfoRow label="Presença Digital" value={restaurant.digitalPresence ? DIGITAL_PRESENCE_LABELS[restaurant.digitalPresence] || String(restaurant.digitalPresence) : undefined} />
