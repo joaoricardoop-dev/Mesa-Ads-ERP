@@ -235,11 +235,11 @@ export default function InputPanel({ inputs, updateInput, grossMargin = 0 }: Inp
             )}
           </div>
 
-          {/* Comissão do Restaurante - Seletor Fixo/Variável */}
+          {/* Comissão Agência/Parceiro */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
               <Percent className="w-3 h-3" />
-              Comissão por coaster
+              Comissão Agência/Parceiro
             </Label>
             {/* Toggle Fixo / Variável */}
             <div className="flex rounded-md overflow-hidden border border-border/50">

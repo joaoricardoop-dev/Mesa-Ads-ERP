@@ -84,6 +84,7 @@ export default function Home() {
       neighborhood: r.neighborhood,
       ratingScore: r.ratingScore,
       ratingMultiplier: r.ratingMultiplier,
+      commissionPercent: r.commissionPercent,
       status: r.status,
     })),
     [restaurantsList]

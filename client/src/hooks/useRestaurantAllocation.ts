@@ -6,6 +6,7 @@ export interface RestaurantForAllocation {
   neighborhood: string | null;
   ratingScore: string | null;
   ratingMultiplier: string | null;
+  commissionPercent: string;
   status: string;
 }
 
@@ -134,6 +135,27 @@ export function useRestaurantAllocation(
       : 0;
   }, [allocations, restaurants, allocatedTotal]);
 
+  const weightedCommission = useMemo(() => {
+    if (allocatedTotal === 0 || allocations.length === 0) return 20;
+
+    let weightedSum = 0;
+    let totalWeight = 0;
+
+    for (const alloc of allocations) {
+      if (alloc.coasters <= 0) continue;
+      const restaurant = restaurants.find(r => r.id === alloc.restaurantId);
+      if (!restaurant) continue;
+
+      const commission = safeParseFloat(restaurant.commissionPercent, 20);
+      weightedSum += commission * alloc.coasters;
+      totalWeight += alloc.coasters;
+    }
+
+    return totalWeight > 0
+      ? Math.round((weightedSum / totalWeight) * 100) / 100
+      : 20;
+  }, [allocations, restaurants, allocatedTotal]);
+
   const distributeEvenly = useCallback(() => {
     if (allocations.length === 0 || totalCoasters <= 0) return;
     const perRestaurant = Math.floor(totalCoasters / allocations.length);
@@ -158,6 +180,7 @@ export function useRestaurantAllocation(
     hasAllocations,
     weightedMultiplier,
     weightedScore,
+    weightedCommission,
     distributeEvenly,
   };
 }
