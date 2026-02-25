@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 
 import { trpc } from "@/lib/trpc";
+import { TIER_COLORS, TIER_LABELS } from "@shared/rating-config";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -708,6 +709,7 @@ export default function CampaignDetail() {
                     <thead>
                       <tr className="border-b border-border/20 bg-muted/10">
                         <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium p-3">Restaurante</th>
+                        <th className="text-center text-[10px] uppercase tracking-wider text-muted-foreground font-medium p-3 hidden md:table-cell">Rating</th>
                         <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium p-3 hidden md:table-cell">Bairro</th>
                         <th className="text-right text-[10px] uppercase tracking-wider text-muted-foreground font-medium p-3">Coasters</th>
                         <th className="text-right text-[10px] uppercase tracking-wider text-muted-foreground font-medium p-3">Uso/Dia</th>
@@ -723,6 +725,13 @@ export default function CampaignDetail() {
                         return (
                           <tr key={r.id} className="border-b border-border/10 hover:bg-muted/5">
                             <td className="p-3 text-sm font-medium">{r.restaurantName || `Rest. #${r.restaurantId}`}</td>
+                            <td className="p-3 text-center hidden md:table-cell">
+                              {(r as any).ratingTier ? (
+                                <span className="inline-flex items-center text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border" style={{ color: TIER_COLORS[(r as any).ratingTier] || "#888", borderColor: TIER_COLORS[(r as any).ratingTier] || "#888", backgroundColor: `${TIER_COLORS[(r as any).ratingTier] || "#888"}20` }}>
+                                  {TIER_LABELS[(r as any).ratingTier] || (r as any).ratingTier} {parseFloat((r as any).ratingScore).toFixed(2)}
+                                </span>
+                              ) : <span className="text-xs text-muted-foreground">—</span>}
+                            </td>
                             <td className="p-3 text-xs text-muted-foreground hidden md:table-cell">{r.restaurantNeighborhood || "—"}</td>
                             <td className="p-3 text-sm font-mono text-right">{r.coastersCount.toLocaleString("pt-BR")}</td>
                             <td className="p-3 text-sm font-mono text-right">{r.usagePerDay}x</td>
@@ -736,6 +745,7 @@ export default function CampaignDetail() {
                     <tfoot>
                       <tr className="border-t border-border/30 bg-muted/20">
                         <td className="p-3 text-sm font-semibold">Total</td>
+                        <td className="p-3 hidden md:table-cell"></td>
                         <td className="p-3 hidden md:table-cell"></td>
                         <td className="p-3 text-sm font-mono font-semibold text-right">{totalCoastersDistributed.toLocaleString("pt-BR")}</td>
                         <td className="p-3"></td>

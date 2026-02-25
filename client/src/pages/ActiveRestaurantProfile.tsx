@@ -23,6 +23,15 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
+import { calcularRating, temCamposRatingCompletos } from "@shared/rating";
+import {
+  LOCATION_RATING_LABELS,
+  VENUE_TYPE_LABELS,
+  DIGITAL_PRESENCE_LABELS,
+  PRIMARY_DRINK_LABELS,
+  TIER_LABELS,
+  RATING_DIMENSION_LABELS,
+} from "@shared/rating-config";
 import {
   ArrowLeft,
   Pencil,
@@ -59,6 +68,8 @@ import {
   FileText,
   Armchair,
   UtensilsCrossed,
+  Star,
+  Wine,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -350,6 +361,59 @@ export default function ActiveRestaurantProfile() {
                 </Card>
               </div>
 
+              {(() => {
+                const hasRating = restaurant.ratingScore != null;
+                if (!hasRating) {
+                  return (
+                    <Card title="Classificação" icon={<Star className="w-4 h-4" />}>
+                      <div className="text-center py-4">
+                        <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-yellow-500 opacity-50" />
+                        <p className="text-sm text-muted-foreground">Classificação pendente — edite o restaurante e preencha o perfil publicitário</p>
+                      </div>
+                    </Card>
+                  );
+                }
+                const ratingData = calcularRating(restaurant);
+                const tierLabel = TIER_LABELS[ratingData.tier] || ratingData.tier;
+                return (
+                  <Card title="Classificação" icon={<Star className="w-4 h-4" />}>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="text-2xl font-bold font-mono">{ratingData.score.toFixed(2)}</div>
+                          <Badge className="text-xs font-bold border" style={{ backgroundColor: `${ratingData.cor}20`, color: ratingData.cor, borderColor: `${ratingData.cor}50` }}>
+                            {tierLabel.toUpperCase()}
+                          </Badge>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Multiplicador</p>
+                          <p className="text-lg font-bold font-mono">{ratingData.multiplicador.toFixed(2)}x</p>
+                        </div>
+                      </div>
+                      <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${(ratingData.score / 5) * 100}%`, backgroundColor: ratingData.cor }} />
+                      </div>
+                      <div className="space-y-2">
+                        {Object.entries(ratingData.detalhamento).map(([key, detail]) => (
+                          <div key={key} className="flex items-center gap-2">
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground w-20 shrink-0">{RATING_DIMENSION_LABELS[key] || key}</span>
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${(detail.pontos / 5) * 100}%`, backgroundColor: ratingData.cor }} />
+                            </div>
+                            <span className="text-xs font-mono w-6 text-right">{detail.pontos}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {restaurant.ratingUpdatedAt && (
+                        <p className="text-[10px] text-muted-foreground text-right">
+                          Atualizado em {new Date(restaurant.ratingUpdatedAt).toLocaleDateString("pt-BR")} às {new Date(restaurant.ratingUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })()}
+
               {campaignsData.length > 0 && (
                 <Card title="Campanhas Recentes">
                   <div className="space-y-2">
@@ -472,6 +536,17 @@ export default function ActiveRestaurantProfile() {
                     <InfoRow label="Dias Movimentados" value={busyDays.join(", ") || undefined} />
                     <InfoRow label="Horário Pico" value={restaurant.busyHours || undefined} />
                     <InfoRow label="Autoriza Fotos" value={restaurant.photoAuthorization === "sim" ? "Sim" : "Não"} />
+                  </div>
+                </Card>
+
+                <Card title="Perfil Publicitário" icon={<Wine className="w-4 h-4" />}>
+                  <div className="space-y-2">
+                    <InfoRow label="Ticket Médio" value={restaurant.ticketMedio ? `R$ ${Number(restaurant.ticketMedio).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : undefined} />
+                    <InfoRow label="Permanência" value={restaurant.avgStayMinutes ? `${restaurant.avgStayMinutes} min` : undefined} />
+                    <InfoRow label="Localização" value={restaurant.locationRating ? LOCATION_RATING_LABELS[restaurant.locationRating] || String(restaurant.locationRating) : undefined} />
+                    <InfoRow label="Tipo de Estabelecimento" value={restaurant.venueType ? VENUE_TYPE_LABELS[restaurant.venueType] || String(restaurant.venueType) : undefined} />
+                    <InfoRow label="Presença Digital" value={restaurant.digitalPresence ? DIGITAL_PRESENCE_LABELS[restaurant.digitalPresence] || String(restaurant.digitalPresence) : undefined} />
+                    <InfoRow label="Bebida Predominante" value={restaurant.primaryDrink ? PRIMARY_DRINK_LABELS[restaurant.primaryDrink] || restaurant.primaryDrink : undefined} />
                   </div>
                 </Card>
 

@@ -19,6 +19,8 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - `server/db.ts` — Database connection and query functions
 - `shared/` — Shared types/constants
 - `shared/models/auth.ts` — Auth schema (users, sessions tables)
+- `shared/rating-config.ts` — Rating system configuration (weights, score ranges, tier definitions, label maps)
+- `shared/rating.ts` — Rating calculator functions (calcularRating, temCamposRatingCompletos)
 - `drizzle/` — Database schema and migrations
 
 ## Authentication
@@ -44,7 +46,7 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - `users` — Auth users with role (admin/manager/user/viewer), isActive, lastLoginAt
 - `sessions` — Auth sessions (Replit Auth)
 - `restaurants` — Prospecting/leads for partner restaurants
-- `active_restaurants` — Onboarded active restaurants with full operational data (tables, seats, customers, monthlyDrinksSold, excluded ad categories, Pix, etc.)
+- `active_restaurants` — Onboarded active restaurants with full operational data (tables, seats, customers, monthlyDrinksSold, excluded ad categories, Pix, rating system fields, etc.)
 - `clients` — Advertisers (47 imported with full address/contact/CNPJ data)
 - `campaigns` — Ad campaigns with full financial parameters (grossup pricing, commissions, taxes, markup)
 - `campaign_restaurants` — N:N campaign-restaurant relationship with coasters/usage allocation
@@ -74,6 +76,21 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - Restaurant allocation enforces max count from campaign's `activeRestaurants` parameter
 - Campaign history tracks all status changes with timestamps
 - Pricing uses grossup formula: CustoBruto = CustoPD / (1 - varRates), then SellingPrice = CustoBruto × (1 + markup%)
+
+## Restaurant Rating System
+
+- Restaurants are classified into tiers: Bronze (1.00x), Prata (1.40x), Ouro (1.80x), Diamante (2.30x)
+- Rating uses 7 weighted dimensions: fluxo mensal (25%), ticket médio (20%), permanência (15%), localização (15%), mesas (10%), perfil (10%), digital (5%)
+- Score calculated from 1.00 to 5.00 using `calcularRating()` from `shared/rating.ts`
+- Configuration centralized in `shared/rating-config.ts` (RATING_CONFIG object)
+- Input fields added to active_restaurants: ticketMedio, avgStayMinutes, locationRating (1-5), venueType (1-5), digitalPresence (1-5), primaryDrink
+- Calculated fields: ratingScore, ratingTier, ratingMultiplier, ratingUpdatedAt
+- Auto-triggers: rating recalculates on create/update of any rating field in server/db.ts
+- Admin bulk recalculation: `activeRestaurant.recalculateRatings` route (adminProcedure)
+- Form section "Perfil Publicitário" with live preview in ActiveRestaurantForm.tsx
+- Rating card displayed in ActiveRestaurantProfile.tsx Painel tab
+- Rating badge shown in ActiveRestaurants.tsx list with tier filter and score sort
+- Rating badge shown in CampaignDetail.tsx Distribuição tab
 
 ## Theme & Visual Identity
 

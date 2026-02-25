@@ -52,6 +52,7 @@ import {
   addRestaurantPayment,
   updateRestaurantPayment,
   deleteRestaurantPayment,
+  recalculateAllRatings,
 } from "./db";
 
 export const appRouter = router({
@@ -264,6 +265,12 @@ export const appRouter = router({
           dataAbertura: z.string().optional(),
           situacaoCadastral: z.string().optional(),
           socios: z.string().optional(),
+          ticketMedio: z.string().optional(),
+          avgStayMinutes: z.number().int().optional(),
+          locationRating: z.number().int().min(1).max(5).optional(),
+          venueType: z.number().int().min(1).max(5).optional(),
+          digitalPresence: z.number().int().min(1).max(5).optional(),
+          primaryDrink: z.string().optional(),
           coastersAllocated: z.number().int().optional(),
           commissionPercent: z.string().optional(),
           notes: z.string().optional(),
@@ -310,6 +317,12 @@ export const appRouter = router({
           dataAbertura: z.string().optional(),
           situacaoCadastral: z.string().optional(),
           socios: z.string().optional(),
+          ticketMedio: z.string().optional(),
+          avgStayMinutes: z.number().int().optional(),
+          locationRating: z.number().int().min(1).max(5).optional(),
+          venueType: z.number().int().min(1).max(5).optional(),
+          digitalPresence: z.number().int().min(1).max(5).optional(),
+          primaryDrink: z.string().optional(),
           coastersAllocated: z.number().int().optional(),
           commissionPercent: z.string().optional(),
           status: z.enum(["active", "inactive"]).optional(),
@@ -386,6 +399,9 @@ export const appRouter = router({
     deletePayment: publicProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteRestaurantPayment(input.id)),
+
+    recalculateRatings: adminProcedure
+      .mutation(() => recalculateAllRatings()),
   }),
 
   // ─── Clients (Anunciantes) ────────────────────────────────────────────

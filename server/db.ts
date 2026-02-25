@@ -26,6 +26,7 @@ import {
   type InsertBudget,
   type InsertBudgetItem,
 } from "../drizzle/schema";
+import { calcularRating, temCamposRatingCompletos } from "../shared/rating";
 
 neonConfig.webSocketConstructor = ws;
 
@@ -216,9 +217,13 @@ export async function getCampaignRestaurants(campaignId: number) {
       restaurantName: restaurants.name,
       restaurantNeighborhood: restaurants.neighborhood,
       restaurantCommission: restaurants.commissionPercent,
+      ratingScore: activeRestaurants.ratingScore,
+      ratingTier: activeRestaurants.ratingTier,
+      ratingMultiplier: activeRestaurants.ratingMultiplier,
     })
     .from(campaignRestaurants)
     .leftJoin(restaurants, eq(campaignRestaurants.restaurantId, restaurants.id))
+    .leftJoin(activeRestaurants, eq(activeRestaurants.parentRestaurantId, campaignRestaurants.restaurantId))
     .where(eq(campaignRestaurants.campaignId, campaignId));
 }
 
@@ -626,18 +631,84 @@ export async function getActiveRestaurant(id: number) {
   return result[0];
 }
 
+export async function recalculateAllRatings() {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const all = await db.select().from(activeRestaurants);
+  let atualizados = 0, ignorados = 0;
+
+  for (const r of all) {
+    if (!temCamposRatingCompletos(r)) {
+      ignorados++;
+      continue;
+    }
+    const rating = calcularRating(r);
+    await db.update(activeRestaurants).set({
+      ratingScore: String(rating.score),
+      ratingTier: rating.tier,
+      ratingMultiplier: String(rating.multiplicador),
+      ratingUpdatedAt: new Date(),
+    }).where(eq(activeRestaurants.id, r.id));
+    atualizados++;
+  }
+
+  return { total: all.length, atualizados, ignorados };
+}
+
+const RATING_FIELDS = [
+  'monthlyCustomers', 'tableCount', 'ticketMedio', 'avgStayMinutes',
+  'locationRating', 'venueType', 'digitalPresence'
+];
+
 export async function createActiveRestaurant(data: InsertActiveRestaurant) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const result = await db.insert(activeRestaurants).values(data).returning();
-  return result[0];
+  const restaurant = result[0];
+
+  if (temCamposRatingCompletos(restaurant)) {
+    const rating = calcularRating(restaurant);
+    const updated = await db.update(activeRestaurants).set({
+      ratingScore: String(rating.score),
+      ratingTier: rating.tier,
+      ratingMultiplier: String(rating.multiplicador),
+      ratingUpdatedAt: new Date(),
+    }).where(eq(activeRestaurants.id, restaurant.id)).returning();
+    return updated[0];
+  }
+
+  return restaurant;
 }
 
 export async function updateActiveRestaurant(id: number, data: Partial<InsertActiveRestaurant>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const result = await db.update(activeRestaurants).set({ ...data, updatedAt: new Date() }).where(eq(activeRestaurants.id, id)).returning();
-  return result[0];
+  const restaurant = result[0];
+
+  const alterouRating = RATING_FIELDS.some(campo => campo in data);
+  if (alterouRating) {
+    if (temCamposRatingCompletos(restaurant)) {
+      const rating = calcularRating(restaurant);
+      const updated = await db.update(activeRestaurants).set({
+        ratingScore: String(rating.score),
+        ratingTier: rating.tier,
+        ratingMultiplier: String(rating.multiplicador),
+        ratingUpdatedAt: new Date(),
+      }).where(eq(activeRestaurants.id, id)).returning();
+      return updated[0];
+    } else {
+      const updated = await db.update(activeRestaurants).set({
+        ratingScore: null,
+        ratingTier: null,
+        ratingMultiplier: null,
+        ratingUpdatedAt: null,
+      }).where(eq(activeRestaurants.id, id)).returning();
+      return updated[0];
+    }
+  }
+
+  return restaurant;
 }
 
 export async function deleteActiveRestaurant(id: number) {

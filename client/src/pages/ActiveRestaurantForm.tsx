@@ -36,7 +36,19 @@ import {
   Globe,
   Calendar,
   MessageCircle,
+  Target,
+  Star,
 } from "lucide-react";
+import { calcularRating, temCamposRatingCompletos } from "@shared/rating";
+import {
+  RATING_CONFIG,
+  LOCATION_RATING_LABELS,
+  VENUE_TYPE_LABELS,
+  DIGITAL_PRESENCE_LABELS,
+  PRIMARY_DRINK_LABELS,
+  RATING_DIMENSION_LABELS,
+  TIER_LABELS,
+} from "@shared/rating-config";
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
@@ -122,6 +134,12 @@ interface FormData {
   dataAbertura: string;
   situacaoCadastral: string;
   socios: string;
+  ticketMedio: number;
+  avgStayMinutes: number;
+  locationRating: number;
+  venueType: number;
+  digitalPresence: number;
+  primaryDrink: string;
 }
 
 const emptyForm: FormData = {
@@ -162,6 +180,12 @@ const emptyForm: FormData = {
   dataAbertura: "",
   situacaoCadastral: "",
   socios: "",
+  ticketMedio: 0,
+  avgStayMinutes: 0,
+  locationRating: 1,
+  venueType: 1,
+  digitalPresence: 1,
+  primaryDrink: "",
 };
 
 interface Socio {
@@ -233,6 +257,12 @@ export default function ActiveRestaurantForm() {
         dataAbertura: existingRestaurant.dataAbertura || "",
         situacaoCadastral: existingRestaurant.situacaoCadastral || "",
         socios: existingRestaurant.socios || "",
+        ticketMedio: existingRestaurant.ticketMedio ? parseFloat(String(existingRestaurant.ticketMedio)) : 0,
+        avgStayMinutes: existingRestaurant.avgStayMinutes || 0,
+        locationRating: existingRestaurant.locationRating || 1,
+        venueType: existingRestaurant.venueType || 1,
+        digitalPresence: existingRestaurant.digitalPresence || 1,
+        primaryDrink: existingRestaurant.primaryDrink || "",
         notes: existingRestaurant.notes || "",
         status: existingRestaurant.status,
       });
@@ -369,6 +399,12 @@ export default function ActiveRestaurantForm() {
       dataAbertura: form.dataAbertura || undefined,
       situacaoCadastral: form.situacaoCadastral || undefined,
       socios: form.socios || undefined,
+      ticketMedio: String(form.ticketMedio || 0),
+      avgStayMinutes: form.avgStayMinutes || 0,
+      locationRating: form.locationRating || 1,
+      venueType: form.venueType || 1,
+      digitalPresence: form.digitalPresence || 1,
+      primaryDrink: form.primaryDrink || undefined,
       notes: form.notes || undefined,
       status: form.status as "active" | "inactive",
     };
@@ -544,6 +580,87 @@ export default function ActiveRestaurantForm() {
                     <Field label="Horários de Maior Movimento" value={form.busyHours} onChange={(v) => setForm(p => ({ ...p, busyHours: v }))} placeholder="Ex: 18h–22h" />
                   </Section>
 
+                  <Section icon={<Target className="w-4 h-4" />} title="Perfil Publicitário">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Ticket Médio (R$)</Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+                          <Input
+                            type="number"
+                            min={5}
+                            step={0.01}
+                            value={form.ticketMedio || ""}
+                            onChange={(e) => setForm(p => ({ ...p, ticketMedio: parseFloat(e.target.value) || 0 }))}
+                            placeholder="0,00"
+                            className="bg-background border-border/30 h-9 text-sm pl-9"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Permanência Média (minutos)</Label>
+                        <Input
+                          type="number"
+                          min={10}
+                          max={300}
+                          value={form.avgStayMinutes || ""}
+                          onChange={(e) => setForm(p => ({ ...p, avgStayMinutes: parseInt(e.target.value) || 0 }))}
+                          placeholder="Ex: 60"
+                          className="bg-background border-border/30 h-9 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Localização</Label>
+                        <Select value={String(form.locationRating)} onValueChange={(v) => setForm(p => ({ ...p, locationRating: parseInt(v) }))}>
+                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(LOCATION_RATING_LABELS).map(([val, label]) => (
+                              <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Tipo de Estabelecimento</Label>
+                        <Select value={String(form.venueType)} onValueChange={(v) => setForm(p => ({ ...p, venueType: parseInt(v) }))}>
+                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(VENUE_TYPE_LABELS).map(([val, label]) => (
+                              <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Presença Digital</Label>
+                        <Select value={String(form.digitalPresence)} onValueChange={(v) => setForm(p => ({ ...p, digitalPresence: parseInt(v) }))}>
+                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(DIGITAL_PRESENCE_LABELS).map(([val, label]) => (
+                              <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Bebida Predominante</Label>
+                        <Select value={form.primaryDrink || "_none"} onValueChange={(v) => setForm(p => ({ ...p, primaryDrink: v === "_none" ? "" : v }))}>
+                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue placeholder="Selecione (opcional)" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="_none">Não informado</SelectItem>
+                            {Object.entries(PRIMARY_DRINK_LABELS).map(([val, label]) => (
+                              <SelectItem key={val} value={val}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <RatingPreviewCard form={form} />
+                  </Section>
+
                   <Section icon={<ShieldAlert className="w-4 h-4" />} title="Restrições">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">Categorias que NÃO deseja anunciar *</Label>
@@ -709,6 +826,79 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
     <div>
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="text-xs mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function RatingPreviewCard({ form }: { form: FormData }) {
+  const ratingInput = {
+    monthlyCustomers: form.monthlyCustomers,
+    tableCount: form.tableCount,
+    ticketMedio: form.ticketMedio,
+    avgStayMinutes: form.avgStayMinutes,
+    locationRating: form.locationRating,
+    venueType: form.venueType,
+    digitalPresence: form.digitalPresence,
+  };
+
+  const isComplete = temCamposRatingCompletos(ratingInput);
+
+  if (!isComplete) {
+    return (
+      <div className="mt-3 p-4 rounded-lg border border-border/20 bg-muted/10">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Star className="w-4 h-4" />
+          <span className="text-xs">Preencha todos os campos acima e os dados de operação (mesas, clientes/mês) para ver a classificação ao vivo.</span>
+        </div>
+      </div>
+    );
+  }
+
+  const rating = calcularRating(ratingInput);
+  const tierLabel = TIER_LABELS[rating.tier] || rating.tier;
+  const scorePercent = Math.min((rating.score / 5) * 100, 100);
+
+  return (
+    <div className="mt-3 p-4 rounded-lg border border-border/20 bg-muted/10 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Star className="w-4 h-4" style={{ color: rating.cor }} />
+          <span className="text-sm font-semibold">Classificação</span>
+        </div>
+        <Badge className="text-xs font-bold px-2 py-0.5" style={{ backgroundColor: rating.cor, color: rating.tier === "prata" || rating.tier === "ouro" ? "#1a1a1a" : "#fff" }}>
+          {tierLabel.toUpperCase()} {rating.score.toFixed(2)}
+        </Badge>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Score</span>
+          <span className="font-mono font-semibold">{rating.score.toFixed(2)} / 5.00</span>
+        </div>
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${scorePercent}%`, backgroundColor: rating.cor }} />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">Multiplicador</span>
+        <span className="font-mono font-semibold">{rating.multiplicador.toFixed(2)}x</span>
+      </div>
+
+      <div className="space-y-1.5 pt-1 border-t border-border/20">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Detalhamento</p>
+        {(Object.entries(rating.detalhamento) as [string, { valor: number; pontos: number; peso: number }][]).map(([key, detail]) => (
+          <div key={key} className="space-y-0.5">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-muted-foreground">{RATING_DIMENSION_LABELS[key] || key}</span>
+              <span className="font-mono text-[10px]">{detail.pontos}/5 (peso {(detail.peso * 100).toFixed(0)}%)</span>
+            </div>
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${(detail.pontos / 5) * 100}%`, backgroundColor: rating.cor }} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

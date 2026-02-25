@@ -1,4 +1,4 @@
-import { useState, Fragment } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useLocation } from "wouter";
 
 import { trpc } from "@/lib/trpc";
@@ -40,7 +40,16 @@ import {
   Search,
   Pencil,
   Trash2,
+  ArrowUpDown,
 } from "lucide-react";
+import {
+  TIER_COLORS,
+  TIER_LABELS,
+  LOCATION_RATING_LABELS,
+  VENUE_TYPE_LABELS,
+  DIGITAL_PRESENCE_LABELS,
+  PRIMARY_DRINK_LABELS,
+} from "@shared/rating-config";
 
 const CONTACT_TYPE_LABELS: Record<string, string> = {
   proprietario: "Proprietário",
@@ -111,6 +120,16 @@ const EXCLUDED_CATEGORIES = [
   "Conteúdo adulto/sexual",
 ];
 
+const TIER_FILTER_OPTIONS = [
+  { value: "bronze", label: "Bronze" },
+  { value: "prata", label: "Prata" },
+  { value: "ouro", label: "Ouro" },
+  { value: "diamante", label: "Diamante" },
+  { value: "sem_rating", label: "Sem rating" },
+];
+
+type SortOption = "name" | "ratingScore";
+
 interface FormData {
   name: string;
   address: string;
@@ -135,6 +154,12 @@ interface FormData {
   pixKey: string;
   notes: string;
   status: string;
+  ticketMedio: number;
+  avgStayMinutes: number;
+  locationRating: number;
+  venueType: number;
+  digitalPresence: number;
+  primaryDrink: string;
 }
 
 const emptyForm: FormData = {
@@ -161,6 +186,12 @@ const emptyForm: FormData = {
   pixKey: "",
   notes: "",
   status: "active",
+  ticketMedio: 0,
+  avgStayMinutes: 0,
+  locationRating: 1,
+  venueType: 1,
+  digitalPresence: 1,
+  primaryDrink: "",
 };
 
 export default function ActiveRestaurantsPage() {
@@ -170,6 +201,8 @@ export default function ActiveRestaurantsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState<FormData>(emptyForm);
   const [search, setSearch] = useState("");
+  const [tierFilter, setTierFilter] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<SortOption>("name");
 
   const utils = trpc.useUtils();
   const { data: restaurants = [] } = trpc.activeRestaurant.list.useQuery();
@@ -233,6 +266,12 @@ export default function ActiveRestaurantsPage() {
       pixKey: r.pixKey || "",
       notes: r.notes || "",
       status: r.status,
+      ticketMedio: r.ticketMedio ? parseFloat(String(r.ticketMedio)) : 0,
+      avgStayMinutes: r.avgStayMinutes || 0,
+      locationRating: r.locationRating || 1,
+      venueType: r.venueType || 1,
+      digitalPresence: r.digitalPresence || 1,
+      primaryDrink: r.primaryDrink || "",
     });
     setIsDialogOpen(true);
   };
@@ -261,6 +300,12 @@ export default function ActiveRestaurantsPage() {
       photoAuthorization: form.photoAuthorization,
       pixKey: form.pixKey || undefined,
       notes: form.notes || undefined,
+      ticketMedio: form.ticketMedio ? String(form.ticketMedio) : undefined,
+      avgStayMinutes: form.avgStayMinutes || undefined,
+      locationRating: form.locationRating,
+      venueType: form.venueType,
+      digitalPresence: form.digitalPresence,
+      primaryDrink: form.primaryDrink || undefined,
     };
 
     if (editingId) {
@@ -270,11 +315,41 @@ export default function ActiveRestaurantsPage() {
     }
   };
 
-  const filtered = restaurants.filter((r) => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    return r.name.toLowerCase().includes(s) || r.neighborhood.toLowerCase().includes(s) || (r.whatsapp && r.whatsapp.includes(s));
-  });
+  const toggleTierFilter = (tier: string) => {
+    setTierFilter(prev =>
+      prev.includes(tier) ? prev.filter(t => t !== tier) : [...prev, tier]
+    );
+  };
+
+  const filtered = useMemo(() => {
+    let list = restaurants.filter((r) => {
+      if (search) {
+        const s = search.toLowerCase();
+        if (!r.name.toLowerCase().includes(s) && !r.neighborhood.toLowerCase().includes(s) && !(r.whatsapp && r.whatsapp.includes(s))) return false;
+      }
+      if (tierFilter.length > 0) {
+        const tier = (r as any).ratingTier;
+        if (!tier) {
+          if (!tierFilter.includes("sem_rating")) return false;
+        } else {
+          if (!tierFilter.includes(tier)) return false;
+        }
+      }
+      return true;
+    });
+
+    if (sortBy === "ratingScore") {
+      list = [...list].sort((a, b) => {
+        const sa = (a as any).ratingScore != null ? parseFloat(String((a as any).ratingScore)) : -1;
+        const sb = (b as any).ratingScore != null ? parseFloat(String((b as any).ratingScore)) : -1;
+        return sb - sa;
+      });
+    } else {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return list;
+  }, [restaurants, search, tierFilter, sortBy]);
 
   const activeCount = restaurants.filter((r) => r.status === "active").length;
   const totalTables = restaurants.reduce((s, r) => s + (r.tableCount || 0), 0);
@@ -319,9 +394,40 @@ export default function ActiveRestaurantsPage() {
           <StatCard label="Total Assentos" value={totalSeats} />
         </div>
 
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Buscar restaurante..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card border-border/30" />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative max-w-md flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input placeholder="Buscar restaurante..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card border-border/30" />
+          </div>
+          <Button
+            variant={sortBy === "ratingScore" ? "default" : "outline"}
+            size="sm"
+            className="gap-1.5 h-9"
+            onClick={() => setSortBy(prev => prev === "name" ? "ratingScore" : "name")}
+          >
+            <ArrowUpDown className="w-3.5 h-3.5" />
+            {sortBy === "ratingScore" ? "Rating" : "Nome"}
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium">Filtrar por tier:</span>
+          {TIER_FILTER_OPTIONS.map((opt) => (
+            <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
+              <Checkbox
+                checked={tierFilter.includes(opt.value)}
+                onCheckedChange={() => toggleTierFilter(opt.value)}
+              />
+              <span className="text-xs" style={opt.value !== "sem_rating" ? { color: TIER_COLORS[opt.value] } : undefined}>
+                {opt.label}
+              </span>
+            </label>
+          ))}
+          {tierFilter.length > 0 && (
+            <Button variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={() => setTierFilter([])}>
+              Limpar
+            </Button>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -345,6 +451,24 @@ export default function ActiveRestaurantsPage() {
                             <Badge variant="outline" className={r.status === "active" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]" : "bg-gray-500/20 text-gray-400 border-gray-500/30 text-[10px]"}>
                               {r.status === "active" ? "Ativo" : "Inativo"}
                             </Badge>
+                            {(r as any).ratingTier ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] font-bold border"
+                                style={{
+                                  color: TIER_COLORS[(r as any).ratingTier] || "#888",
+                                  borderColor: TIER_COLORS[(r as any).ratingTier] || "#888",
+                                  backgroundColor: `${TIER_COLORS[(r as any).ratingTier] || "#888"}20`,
+                                }}
+                              >
+                                {TIER_LABELS[(r as any).ratingTier]?.toUpperCase() || (r as any).ratingTier.toUpperCase()}{" "}
+                                {parseFloat(String((r as any).ratingScore)).toFixed(2)}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] text-muted-foreground border-border/30">
+                                —
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5 truncate">
                             {r.neighborhood} · {formatSocialClass(r.socialClass)}
@@ -398,10 +522,11 @@ export default function ActiveRestaurantsPage() {
             </DialogHeader>
 
             <Tabs defaultValue="local" className="space-y-4">
-              <TabsList className="grid grid-cols-5 w-full">
+              <TabsList className="grid grid-cols-6 w-full">
                 <TabsTrigger value="local" className="text-xs">Local</TabsTrigger>
                 <TabsTrigger value="contato" className="text-xs">Contato</TabsTrigger>
                 <TabsTrigger value="operacao" className="text-xs">Operação</TabsTrigger>
+                <TabsTrigger value="perfil" className="text-xs">Perfil Pub.</TabsTrigger>
                 <TabsTrigger value="restricoes" className="text-xs">Restrições</TabsTrigger>
                 <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
               </TabsList>
@@ -522,6 +647,80 @@ export default function ActiveRestaurantsPage() {
                 <div className="space-y-2">
                   <Label className="text-xs">Horários de Maior Movimento</Label>
                   <Input value={form.busyHours} onChange={(e) => setForm(p => ({ ...p, busyHours: e.target.value }))} placeholder="Ex: 18h–22h" className="bg-background border-border/30" />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="perfil" className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Ticket Médio (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="5"
+                      value={form.ticketMedio || ""}
+                      onChange={(e) => setForm(p => ({ ...p, ticketMedio: parseFloat(e.target.value) || 0 }))}
+                      placeholder="Ex: 45.00"
+                      className="bg-background border-border/30"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Permanência Média (min)</Label>
+                    <Input
+                      type="number"
+                      min="10"
+                      max="300"
+                      value={form.avgStayMinutes || ""}
+                      onChange={(e) => setForm(p => ({ ...p, avgStayMinutes: parseInt(e.target.value) || 0 }))}
+                      placeholder="Ex: 60"
+                      className="bg-background border-border/30"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Localização</Label>
+                  <Select value={String(form.locationRating)} onValueChange={(v) => setForm(p => ({ ...p, locationRating: parseInt(v) }))}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(LOCATION_RATING_LABELS).map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Tipo de Estabelecimento</Label>
+                  <Select value={String(form.venueType)} onValueChange={(v) => setForm(p => ({ ...p, venueType: parseInt(v) }))}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(VENUE_TYPE_LABELS).map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Presença Digital</Label>
+                  <Select value={String(form.digitalPresence)} onValueChange={(v) => setForm(p => ({ ...p, digitalPresence: parseInt(v) }))}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(DIGITAL_PRESENCE_LABELS).map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Bebida Predominante</Label>
+                  <Select value={form.primaryDrink || "_none"} onValueChange={(v) => setForm(p => ({ ...p, primaryDrink: v === "_none" ? "" : v }))}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">Nenhuma / Não informado</SelectItem>
+                      {Object.entries(PRIMARY_DRINK_LABELS).map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </TabsContent>
 
