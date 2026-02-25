@@ -100,6 +100,20 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - Rating badge shown in ActiveRestaurants.tsx list with tier filter and score sort
 - Rating badge shown in CampaignDetail.tsx Distribuição tab
 
+## Simulator Restaurant Allocation
+
+- Restaurant selection panel in simulator overview tab (between Budget Selector and KPI Cards)
+- Multi-select dropdown with search to add restaurants from the active restaurant database
+- Per-restaurant coaster allocation with slider + numeric input
+- Validation: sum of allocated coasters must equal total campaign coasters (coastersPerRestaurant × activeRestaurants)
+- Weighted multiplier: calculated as weighted average of each restaurant's ratingMultiplier, weighted by coasters allocated
+- Weighted score: calculated as weighted average of each restaurant's ratingScore, weighted by coasters allocated
+- "Distribute evenly" button to split coasters equally across selected restaurants
+- State persisted to localStorage (`mesa-ads-restaurant-allocations`)
+- Hook: `client/src/hooks/useRestaurantAllocation.ts`
+- Component: `client/src/components/RestaurantAllocationPanel.tsx`
+- Expandable/collapsible panel with summary badge showing allocation status
+
 ## Theme & Visual Identity
 
 - Brand colors: Black (#0d0d0d) + Orange (hsl 22 100% 50%) — consistent across landing page and app

@@ -7,6 +7,7 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useSimulator, type BudgetOption, loadSavedBudgetId, saveBudgetId } from "@/hooks/useSimulator";
+import { useRestaurantAllocation } from "@/hooks/useRestaurantAllocation";
 import { trpc } from "@/lib/trpc";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,6 +26,7 @@ import DiscountTable from "@/components/DiscountTable";
 import ScenarioComparison from "@/components/ScenarioComparison";
 import DashboardCharts from "@/components/DashboardCharts";
 import UnitEconomicsPanel from "@/components/UnitEconomicsPanel";
+import RestaurantAllocationPanel from "@/components/RestaurantAllocationPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -74,9 +76,24 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("overview");
   const [, navigate] = useLocation();
 
+  const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
+  const restaurantsForAllocation = useMemo(
+    () => restaurantsList.map(r => ({
+      id: r.id,
+      name: r.name,
+      neighborhood: r.neighborhood,
+      ratingScore: r.ratingScore,
+      ratingMultiplier: r.ratingMultiplier,
+      status: r.status,
+    })),
+    [restaurantsList]
+  );
+
   // Total coasters for budget interpolation info
   const totalCoasters =
     simulator.inputs.coastersPerRestaurant * simulator.inputs.activeRestaurants;
+
+  const allocation = useRestaurantAllocation(restaurantsForAllocation, totalCoasters);
 
   return (
     <div className="h-full flex overflow-hidden">
@@ -304,6 +321,24 @@ export default function Home() {
                     </div>
                   )}
                 </div>
+
+                {/* Restaurant Allocation */}
+                <RestaurantAllocationPanel
+                  restaurants={restaurantsForAllocation}
+                  allocations={allocation.allocations}
+                  selectedIds={allocation.selectedIds}
+                  totalCoasters={totalCoasters}
+                  allocatedTotal={allocation.allocatedTotal}
+                  remaining={allocation.remaining}
+                  isValid={allocation.isValid}
+                  hasAllocations={allocation.hasAllocations}
+                  weightedMultiplier={allocation.weightedMultiplier}
+                  weightedScore={allocation.weightedScore}
+                  onAddRestaurant={allocation.addRestaurant}
+                  onRemoveRestaurant={allocation.removeRestaurant}
+                  onUpdateCoasters={allocation.updateCoasters}
+                  onDistributeEvenly={allocation.distributeEvenly}
+                />
 
                 {/* KPI Cards */}
                 <KPICards
