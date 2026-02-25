@@ -4,7 +4,7 @@
  * Fundo dark slate, acentos emerald, tipografia DM Sans + JetBrains Mono
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useSimulator, type BudgetOption, loadSavedBudgetId, saveBudgetId } from "@/hooks/useSimulator";
 import { useRestaurantAllocation } from "@/hooks/useRestaurantAllocation";
@@ -72,7 +72,6 @@ export default function Home() {
     };
   }, [selectedBudgetId, budgetsList]);
 
-  const simulator = useSimulator(selectedBudget);
   const [activeTab, setActiveTab] = useState("overview");
   const [, navigate] = useLocation();
 
@@ -90,11 +89,20 @@ export default function Home() {
     [restaurantsList]
   );
 
-  // Total coasters for budget interpolation info
+  const [allocMultiplier, setAllocMultiplier] = useState<number | undefined>();
+  const [allocCommission, setAllocCommission] = useState<number | undefined>();
+
+  const simulator = useSimulator(selectedBudget, allocCommission, allocMultiplier);
+
   const totalCoasters =
     simulator.inputs.coastersPerRestaurant * simulator.inputs.activeRestaurants;
 
   const allocation = useRestaurantAllocation(restaurantsForAllocation, totalCoasters);
+
+  useEffect(() => {
+    setAllocMultiplier(allocation.hasAllocations ? allocation.weightedMultiplier : undefined);
+    setAllocCommission(allocation.hasAllocations ? allocation.weightedCommission : undefined);
+  }, [allocation.hasAllocations, allocation.weightedMultiplier, allocation.weightedCommission]);
 
   return (
     <div className="h-full flex overflow-hidden">

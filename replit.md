@@ -108,11 +108,26 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - Validation: sum of allocated coasters must equal total campaign coasters (coastersPerRestaurant × activeRestaurants)
 - Weighted multiplier: calculated as weighted average of each restaurant's ratingMultiplier, weighted by coasters allocated
 - Weighted score: calculated as weighted average of each restaurant's ratingScore, weighted by coasters allocated
+- Weighted commission: calculated as weighted average of each restaurant's commissionPercent, weighted by coasters allocated (default 20%)
+- Multiplier applies to selling price: `adjustedSellingPrice = baseSellingPrice × weightedMultiplier`
+- All percentage-based costs (restaurant commission, agency commission, seller commission, taxes) recalculate on the adjusted price
+- Restaurant commission in DRE reflects the multiplier-adjusted price
 - "Distribute evenly" button to split coasters equally across selected restaurants
 - State persisted to localStorage (`mesa-ads-restaurant-allocations`)
 - Hook: `client/src/hooks/useRestaurantAllocation.ts`
 - Component: `client/src/components/RestaurantAllocationPanel.tsx`
 - Expandable/collapsible panel with summary badge showing allocation status
+
+## Pricing Engine (calcPricing)
+
+- Located in `client/src/hooks/useSimulator.ts`
+- Grossup formula: CustoBruto = CustoPD / (1 - totalVarRate), then SellingPrice = CustoBruto × (1 + markup%)
+- Multiplier applied post-grossup: `sellingPrice = baseSellingPrice × multiplier`
+- Two commission types in DRE:
+  - **Comissão Restaurante**: weighted avg of restaurant DB `commissionPercent`, applied as % of adjusted selling price
+  - **Comissão Agência/Parceiro**: from simulator input (variable % or fixed per coaster)
+- Parameters passed via `CalcPricingOptions`: `{ markupOverride, restaurantCommissionRate, multiplier }`
+- All tables (markup, discount, scenarios, sensitivity) use the same multiplier and commission rate
 
 ## Theme & Visual Identity
 

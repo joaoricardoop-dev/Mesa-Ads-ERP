@@ -114,7 +114,7 @@ const DEFAULT_INPUTS: SimulatorInputs = {
   contractDuration: 6,
 };
 
-function loadInputs(): SimulatorInputs {
+export function loadInputs(): SimulatorInputs {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -199,15 +199,21 @@ interface PricingResult {
   grossMargin: number;
 }
 
+interface CalcPricingOptions {
+  markupOverride?: number;
+  restaurantCommissionRate?: number;
+  multiplier?: number;
+}
+
 function calcPricing(
   productionCost: number,
   inputs: SimulatorInputs,
-  markupOverride?: number,
-  restaurantCommissionRate?: number
+  opts: CalcPricingOptions = {}
 ): PricingResult {
   const coasters = inputs.coastersPerRestaurant;
-  const markupPct = markupOverride !== undefined ? markupOverride : inputs.markupPercent;
-  const restDbRate = (restaurantCommissionRate ?? 20) / 100;
+  const markupPct = opts.markupOverride !== undefined ? opts.markupOverride : inputs.markupPercent;
+  const restDbRate = (opts.restaurantCommissionRate ?? 20) / 100;
+  const mult = opts.multiplier ?? 1.0;
 
   const agencyFixed =
     inputs.commissionType === "fixed"
@@ -228,12 +234,14 @@ function calcPricing(
   const denominator = 1 - totalVarRate;
   const custoBruto = denominator > 0 ? custoPD / denominator : custoPD;
 
-  let sellingPrice: number;
+  let baseSellingPrice: number;
   if (inputs.pricingType === "fixed") {
-    sellingPrice = custoBruto + inputs.fixedPrice;
+    baseSellingPrice = custoBruto + inputs.fixedPrice;
   } else {
-    sellingPrice = custoBruto * (1 + markupPct / 100);
+    baseSellingPrice = custoBruto * (1 + markupPct / 100);
   }
+
+  const sellingPrice = baseSellingPrice * mult;
 
   const actualAgencyComm =
     inputs.commissionType === "fixed"
@@ -265,7 +273,11 @@ function calcPricing(
   };
 }
 
-export function useSimulator(selectedBudget?: BudgetOption | null, restaurantCommissionRate?: number) {
+export function useSimulator(
+  selectedBudget?: BudgetOption | null,
+  restaurantCommissionRate?: number,
+  weightedMultiplier?: number
+) {
   const [inputs, setInputs] = useState<SimulatorInputs>(loadInputs);
 
   useEffect(() => {
@@ -300,14 +312,17 @@ export function useSimulator(selectedBudget?: BudgetOption | null, restaurantCom
     const unitProductionCost = effectiveUnitCost;
     const productionCost = inputs.coastersPerRestaurant * unitProductionCost;
 
-    const pricing = calcPricing(productionCost, inputs, undefined, restaurantCommissionRate);
+    const pricing = calcPricing(productionCost, inputs, {
+      restaurantCommissionRate,
+      multiplier: weightedMultiplier,
+    });
 
     return {
       impressions,
       unitProductionCost,
       ...pricing,
     };
-  }, [inputs, effectiveUnitCost, restaurantCommissionRate]);
+  }, [inputs, effectiveUnitCost, restaurantCommissionRate, weightedMultiplier]);
 
   const markupTable = useMemo<MarkupTableRow[]>(() => {
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
@@ -315,7 +330,11 @@ export function useSimulator(selectedBudget?: BudgetOption | null, restaurantCom
 
     const markups = [50, 75, 100, 125, 150, 175, 200, 250, 300];
     for (const markup of markups) {
-      const p = calcPricing(production, inputs, markup, restaurantCommissionRate);
+      const p = calcPricing(production, inputs, {
+        markupOverride: markup,
+        restaurantCommissionRate,
+        multiplier: weightedMultiplier,
+      });
       rows.push({
         markup,
         revenue: p.sellingPrice,
@@ -326,13 +345,13 @@ export function useSimulator(selectedBudget?: BudgetOption | null, restaurantCom
       });
     }
     return rows;
-  }, [inputs, effectiveUnitCost, restaurantCommissionRate]);
+  }, [inputs, effectiveUnitCost, restaurantCommissionRate, weightedMultiplier]);
 
   const discountTable = useMemo<DiscountTableRow[]>(() => {
     const rows: DiscountTableRow[] = [];
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
     const restDbRate = (restaurantCommissionRate ?? 20) / 100;
-    const baseResult = calcPricing(production, inputs, undefined, restaurantCommissionRate);
+    const baseResult = calcPricing(production, inputs, { restaurantCommissionRate, multiplier: weightedMultiplier });
     const basePrice = baseResult.sellingPrice;
 
     const tiers = [1, 2, 3, 5, 8, 10, 15, 20, 25, 30, 40, 50];
@@ -409,7 +428,7 @@ export function useSimulator(selectedBudget?: BudgetOption | null, restaurantCom
       });
     }
     return rows;
-  }, [inputs, effectiveUnitCost, restaurantCommissionRate]);
+  }, [inputs, effectiveUnitCost, restaurantCommissionRate, weightedMultiplier]);
 
   const unitEconomics = useMemo<UnitEconomics>(() => {
     const monthlyRevenue = perRestaurant.sellingPrice * inputs.activeRestaurants;
@@ -442,7 +461,11 @@ export function useSimulator(selectedBudget?: BudgetOption | null, restaurantCom
     ];
 
     return scenarioConfigs.map((s) => {
-      const p = calcPricing(production, inputs, s.markup);
+      const p = calcPricing(production, inputs, {
+        markupOverride: s.markup,
+        restaurantCommissionRate,
+        multiplier: weightedMultiplier,
+      });
       const monthlyTotal = p.grossProfit * inputs.activeRestaurants;
       const annualTotal = monthlyTotal * 12;
 
@@ -456,7 +479,7 @@ export function useSimulator(selectedBudget?: BudgetOption | null, restaurantCom
         annualTotal,
       };
     });
-  }, [inputs, effectiveUnitCost]);
+  }, [inputs, effectiveUnitCost, restaurantCommissionRate, weightedMultiplier]);
 
   const revenueVsRestaurants = useMemo(() => {
     const data = [];
@@ -474,11 +497,15 @@ export function useSimulator(selectedBudget?: BudgetOption | null, restaurantCom
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
     const data = [];
     for (let markup = 0; markup <= 100; markup += 5) {
-      const p = calcPricing(production, inputs, markup);
+      const p = calcPricing(production, inputs, {
+        markupOverride: markup,
+        restaurantCommissionRate,
+        multiplier: weightedMultiplier,
+      });
       data.push({ markup, margin: p.grossMargin, profit: p.grossProfit });
     }
     return data;
-  }, [inputs, effectiveUnitCost]);
+  }, [inputs, effectiveUnitCost, restaurantCommissionRate, weightedMultiplier]);
 
   const cumulativeProfit = useMemo(() => {
     const monthlyProfit =
@@ -496,18 +523,20 @@ export function useSimulator(selectedBudget?: BudgetOption | null, restaurantCom
 
   const discountSensitivity = useMemo(() => {
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
-    const baseResult = calcPricing(production, inputs);
+    const restDbRate = (restaurantCommissionRate ?? 20) / 100;
+    const baseResult = calcPricing(production, inputs, { restaurantCommissionRate, multiplier: weightedMultiplier });
     const basePrice = baseResult.sellingPrice;
     const data = [];
     for (let d = 0; d <= 40; d += 2) {
       const discountedPrice = basePrice * (1 - d / 100);
-      const restComm =
+      const agencyComm =
         inputs.commissionType === "fixed"
           ? inputs.fixedCommission * inputs.coastersPerRestaurant
           : discountedPrice * (inputs.restaurantCommission / 100);
+      const restComm = discountedPrice * restDbRate;
       const sellerComm = discountedPrice * (inputs.sellerCommission / 100);
       const tax = discountedPrice * (inputs.taxRate / 100);
-      const profit = discountedPrice - production - restComm - sellerComm - tax;
+      const profit = discountedPrice - production - agencyComm - restComm - sellerComm - tax;
       const margin =
         discountedPrice > 0 ? (profit / discountedPrice) * 100 : 0;
       data.push({
@@ -518,7 +547,7 @@ export function useSimulator(selectedBudget?: BudgetOption | null, restaurantCom
       });
     }
     return data;
-  }, [inputs, effectiveUnitCost]);
+  }, [inputs, effectiveUnitCost, restaurantCommissionRate, weightedMultiplier]);
 
   return {
     inputs,

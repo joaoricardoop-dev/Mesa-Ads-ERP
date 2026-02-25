@@ -88,6 +88,7 @@ export default function SimulatorDRE({
 
   const totalProduction = pr.productionCost * n;
   const totalRestComm = pr.restaurantCommission * n;
+  const totalAgencyComm = pr.agencyCommission * n;
   const totalSellerComm = pr.sellerCommissionValue * n;
   const totalTax = pr.taxValue * n;
   const totalCosts = pr.totalCosts * n;
@@ -157,6 +158,14 @@ export default function SimulatorDRE({
               total={formatCurrency(totalRestComm)}
               contract={formatCurrency(totalRestComm * d)}
               pct={pctOf(totalRestComm)}
+              sub
+            />
+            <DRERow
+              label="(-) Comissão Agência/Parceiro"
+              perRest={formatCurrency(pr.agencyCommission)}
+              total={formatCurrency(totalAgencyComm)}
+              contract={formatCurrency(totalAgencyComm * d)}
+              pct={pctOf(totalAgencyComm)}
               sub
             />
             <DRERow
@@ -234,9 +243,10 @@ export default function SimulatorDRE({
         <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 font-medium">
           Custos do Contrato ({d} meses × {n} restaurantes)
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
           <CostCard label="Produção" value={formatCurrency(totalProduction * d)} monthly={formatCurrency(totalProduction)} />
           <CostCard label="Com. Restaurante" value={formatCurrency(totalRestComm * d)} monthly={formatCurrency(totalRestComm)} />
+          <CostCard label="Com. Agência" value={formatCurrency(totalAgencyComm * d)} monthly={formatCurrency(totalAgencyComm)} />
           <CostCard label="Com. Vendedor" value={formatCurrency(totalSellerComm * d)} monthly={formatCurrency(totalSellerComm)} />
           <CostCard label="Impostos" value={formatCurrency(totalTax * d)} monthly={formatCurrency(totalTax)} />
         </div>
