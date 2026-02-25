@@ -31,9 +31,11 @@ interface RestaurantAllocationPanelProps {
   hasAllocations: boolean;
   weightedMultiplier: number;
   weightedScore: number;
+  weightedCommission: number;
   onAddRestaurant: (id: number) => void;
   onRemoveRestaurant: (id: number) => void;
   onUpdateCoasters: (id: number, coasters: number) => void;
+  onUpdateCommission: (id: number, commission: number) => void;
   onDistributeEvenly: () => void;
 }
 
@@ -67,9 +69,11 @@ export default function RestaurantAllocationPanel({
   hasAllocations,
   weightedMultiplier,
   weightedScore,
+  weightedCommission,
   onAddRestaurant,
   onRemoveRestaurant,
   onUpdateCoasters,
+  onUpdateCommission,
   onDistributeEvenly,
 }: RestaurantAllocationPanelProps) {
   const [search, setSearch] = useState("");
@@ -95,8 +99,8 @@ export default function RestaurantAllocationPanel({
   const selectedRestaurants = useMemo(() => {
     return allocations.map(a => {
       const r = restaurants.find(res => res.id === a.restaurantId);
-      return r ? { ...r, coasters: a.coasters } : null;
-    }).filter(Boolean) as (RestaurantForAllocation & { coasters: number })[];
+      return r ? { ...r, coasters: a.coasters, allocCommission: a.commissionPercent ?? 10 } : null;
+    }).filter(Boolean) as (RestaurantForAllocation & { coasters: number; allocCommission: number })[];
   }, [allocations, restaurants]);
 
   const percentAllocated = totalCoasters > 0 ? (allocatedTotal / totalCoasters) * 100 : 0;
@@ -237,6 +241,7 @@ export default function RestaurantAllocationPanel({
                     <th className="text-center py-2 px-2 font-medium w-16">Rating</th>
                     <th className="text-right py-2 px-2 font-medium w-24">Coasters</th>
                     <th className="text-right py-2 px-2 font-medium w-14">%</th>
+                    <th className="text-center py-2 px-2 font-medium w-20">Com. %</th>
                     <th className="py-2 px-3 w-8"></th>
                   </tr>
                 </thead>
@@ -284,6 +289,17 @@ export default function RestaurantAllocationPanel({
                         <td className="py-2.5 px-2 text-right">
                           <span className="font-mono text-xs text-muted-foreground">{pct.toFixed(0)}%</span>
                         </td>
+                        <td className="py-2.5 px-2 text-center">
+                          <Input
+                            type="number"
+                            value={r.allocCommission}
+                            onChange={(e) => onUpdateCommission(r.id, parseFloat(e.target.value) || 8)}
+                            className="w-full font-mono text-xs bg-background/50 border-border/40 h-8 tabular-nums text-center"
+                            min={8}
+                            max={15}
+                            step={0.5}
+                          />
+                        </td>
                         <td className="py-2.5 px-3 text-center">
                           <button
                             type="button"
@@ -329,7 +345,7 @@ export default function RestaurantAllocationPanel({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="bg-muted/30 rounded-lg p-4 text-center border border-border/10">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2 font-medium">Rating Ponderado</p>
                   <div className="flex items-center justify-center gap-1.5">
@@ -339,8 +355,12 @@ export default function RestaurantAllocationPanel({
                   </div>
                 </div>
                 <div className="bg-primary/10 rounded-lg p-4 text-center border border-primary/20">
-                  <p className="text-xs text-primary/70 uppercase tracking-wider mb-2 font-medium">Multiplicador Final</p>
+                  <p className="text-xs text-primary/70 uppercase tracking-wider mb-2 font-medium">Multiplicador</p>
                   <span className="font-mono text-xl font-bold text-primary">{weightedMultiplier.toFixed(2)}x</span>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-4 text-center border border-border/10">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2 font-medium">Com. Ponderada</p>
+                  <span className="font-mono text-xl font-bold">{weightedCommission.toFixed(1)}%</span>
                 </div>
               </div>
             </div>

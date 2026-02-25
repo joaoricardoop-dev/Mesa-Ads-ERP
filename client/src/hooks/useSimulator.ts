@@ -212,7 +212,7 @@ function calcPricing(
 ): PricingResult {
   const coasters = inputs.coastersPerRestaurant;
   const markupPct = opts.markupOverride !== undefined ? opts.markupOverride : inputs.markupPercent;
-  const restDbRate = (opts.restaurantCommissionRate ?? 20) / 100;
+  const restDbRate = (opts.restaurantCommissionRate ?? 10) / 100;
   const mult = opts.multiplier ?? 1.0;
 
   const agencyFixed =
@@ -350,7 +350,7 @@ export function useSimulator(
   const discountTable = useMemo<DiscountTableRow[]>(() => {
     const rows: DiscountTableRow[] = [];
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
-    const restDbRate = (restaurantCommissionRate ?? 20) / 100;
+    const restDbRate = (restaurantCommissionRate ?? 10) / 100;
     const baseResult = calcPricing(production, inputs, { restaurantCommissionRate, multiplier: weightedMultiplier });
     const basePrice = baseResult.sellingPrice;
 
@@ -523,7 +523,7 @@ export function useSimulator(
 
   const discountSensitivity = useMemo(() => {
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
-    const restDbRate = (restaurantCommissionRate ?? 20) / 100;
+    const restDbRate = (restaurantCommissionRate ?? 10) / 100;
     const baseResult = calcPricing(production, inputs, { restaurantCommissionRate, multiplier: weightedMultiplier });
     const basePrice = baseResult.sellingPrice;
     const data = [];

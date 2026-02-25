@@ -13,6 +13,7 @@ export interface RestaurantForAllocation {
 export interface AllocationEntry {
   restaurantId: number;
   coasters: number;
+  commissionPercent: number;
 }
 
 const STORAGE_KEY = "mesa-ads-restaurant-allocations";
@@ -20,7 +21,13 @@ const STORAGE_KEY = "mesa-ads-restaurant-allocations";
 function loadAllocations(): AllocationEntry[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return parsed.map((a: any) => ({
+        ...a,
+        commissionPercent: a.commissionPercent ?? 10,
+      }));
+    }
   } catch {}
   return [];
 }
@@ -65,7 +72,7 @@ export function useRestaurantAllocation(
   const addRestaurant = useCallback((id: number) => {
     setAllocations(prev => {
       if (prev.find(a => a.restaurantId === id)) return prev;
-      return [...prev, { restaurantId: id, coasters: 0 }];
+      return [...prev, { restaurantId: id, coasters: 0, commissionPercent: 10 }];
     });
   }, []);
 
@@ -78,6 +85,16 @@ export function useRestaurantAllocation(
       prev.map(a =>
         a.restaurantId === id
           ? { ...a, coasters: Math.max(0, coasters) }
+          : a
+      )
+    );
+  }, []);
+
+  const updateCommission = useCallback((id: number, commission: number) => {
+    setAllocations(prev =>
+      prev.map(a =>
+        a.restaurantId === id
+          ? { ...a, commissionPercent: Math.min(15, Math.max(8, commission)) }
           : a
       )
     );
@@ -136,25 +153,22 @@ export function useRestaurantAllocation(
   }, [allocations, restaurants, allocatedTotal]);
 
   const weightedCommission = useMemo(() => {
-    if (allocatedTotal === 0 || allocations.length === 0) return 20;
+    if (allocatedTotal === 0 || allocations.length === 0) return 10;
 
     let weightedSum = 0;
     let totalWeight = 0;
 
     for (const alloc of allocations) {
       if (alloc.coasters <= 0) continue;
-      const restaurant = restaurants.find(r => r.id === alloc.restaurantId);
-      if (!restaurant) continue;
-
-      const commission = safeParseFloat(restaurant.commissionPercent, 20);
+      const commission = alloc.commissionPercent ?? 10;
       weightedSum += commission * alloc.coasters;
       totalWeight += alloc.coasters;
     }
 
     return totalWeight > 0
       ? Math.round((weightedSum / totalWeight) * 100) / 100
-      : 20;
-  }, [allocations, restaurants, allocatedTotal]);
+      : 10;
+  }, [allocations, allocatedTotal]);
 
   const distributeEvenly = useCallback(() => {
     if (allocations.length === 0 || totalCoasters <= 0) return;
@@ -174,6 +188,7 @@ export function useRestaurantAllocation(
     addRestaurant,
     removeRestaurant,
     updateCoasters,
+    updateCommission,
     allocatedTotal,
     remaining,
     isValid,

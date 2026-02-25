@@ -343,9 +343,11 @@ export default function Home() {
                   hasAllocations={allocation.hasAllocations}
                   weightedMultiplier={allocation.weightedMultiplier}
                   weightedScore={allocation.weightedScore}
+                  weightedCommission={allocation.weightedCommission}
                   onAddRestaurant={allocation.addRestaurant}
                   onRemoveRestaurant={allocation.removeRestaurant}
                   onUpdateCoasters={allocation.updateCoasters}
+                  onUpdateCommission={allocation.updateCommission}
                   onDistributeEvenly={allocation.distributeEvenly}
                 />
 

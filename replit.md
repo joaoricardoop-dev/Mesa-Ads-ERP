@@ -108,7 +108,7 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - Validation: sum of allocated coasters must equal total campaign coasters (coastersPerRestaurant × activeRestaurants)
 - Weighted multiplier: calculated as weighted average of each restaurant's ratingMultiplier, weighted by coasters allocated
 - Weighted score: calculated as weighted average of each restaurant's ratingScore, weighted by coasters allocated
-- Weighted commission: calculated as weighted average of each restaurant's commissionPercent, weighted by coasters allocated (default 20%)
+- Weighted commission: calculated as weighted average of per-restaurant commissionPercent (editable 8–15%, default 10%), weighted by coasters allocated
 - Multiplier applies to selling price: `adjustedSellingPrice = baseSellingPrice × weightedMultiplier`
 - All percentage-based costs (restaurant commission, agency commission, seller commission, taxes) recalculate on the adjusted price
 - Restaurant commission in DRE reflects the multiplier-adjusted price
