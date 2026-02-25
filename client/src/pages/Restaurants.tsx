@@ -100,7 +100,7 @@ const emptyForm: RestaurantForm = {
   whatsapp: "",
   instagram: "",
   coastersAllocated: 500,
-  commissionPercent: "20.00",
+  commissionPercent: "10.00",
   status: "active",
 };
 
@@ -829,6 +829,24 @@ export default function Restaurants() {
                   placeholder="@usuario"
                   className="bg-background border-border/30"
                 />
+              </div>
+            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Comercial</p>
+            <div className="grid grid-cols-1 gap-4">
+              <div className="grid gap-2">
+                <Label>Comissão do Restaurante (%)</Label>
+                <Input
+                  type="number"
+                  value={form.commissionPercent}
+                  onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })}
+                  min={8}
+                  max={15}
+                  step={0.5}
+                  placeholder="10.00"
+                  className="bg-background border-border/30 font-mono"
+                />
+                <p className="text-[10px] text-muted-foreground">Faixa: 8% a 15%</p>
               </div>
             </div>
 

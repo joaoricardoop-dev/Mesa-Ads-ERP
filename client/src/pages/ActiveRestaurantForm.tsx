@@ -118,6 +118,7 @@ interface FormData {
   excludedCategories: string[];
   excludedOther: string;
   photoAuthorization: string;
+  commissionPercent: string;
   pixKey: string;
   notes: string;
   status: string;
@@ -163,6 +164,7 @@ const emptyForm: FormData = {
   excludedCategories: [],
   excludedOther: "",
   photoAuthorization: "sim",
+  commissionPercent: "10.00",
   pixKey: "",
   notes: "",
   status: "active",
@@ -257,6 +259,7 @@ export default function ActiveRestaurantForm() {
         })(),
         excludedOther: existingRestaurant.excludedOther || "",
         photoAuthorization: existingRestaurant.photoAuthorization || "sim",
+        commissionPercent: existingRestaurant.commissionPercent ? String(existingRestaurant.commissionPercent) : "10.00",
         pixKey: existingRestaurant.pixKey || "",
         cnpj: existingRestaurant.cnpj || "",
         razaoSocial: existingRestaurant.razaoSocial || "",
