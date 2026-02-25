@@ -205,7 +205,7 @@ interface CalcPricingOptions {
   multiplier?: number;
 }
 
-function calcPricing(
+export function calcPricing(
   productionCost: number,
   inputs: SimulatorInputs,
   opts: CalcPricingOptions = {}

@@ -7,8 +7,11 @@ export interface RestaurantForAllocation {
   ratingScore: string | null;
   ratingMultiplier: string | null;
   commissionPercent: string;
+  monthlyDrinksSold: number | null;
   status: string;
 }
+
+export const COASTER_CAPACITY_FACTOR = 0.6;
 
 export interface AllocationEntry {
   restaurantId: number;

@@ -104,8 +104,11 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 
 - Restaurant selection panel in simulator overview tab (between Budget Selector and KPI Cards)
 - Multi-select dropdown with search to add restaurants from the active restaurant database
-- Per-restaurant coaster allocation with slider + numeric input
+- Per-restaurant coaster allocation with numeric input
+- "Capacidade Mensal" column: calculated as `monthlyDrinksSold × 0.6` with tooltip explaining the formula
 - Validation: sum of allocated coasters must equal total campaign coasters (coastersPerRestaurant × activeRestaurants)
+- Per-restaurant pricing view: toggle "Ver Preços" shows individual selling price, profit, and margin per restaurant using their specific multiplier and commission rate
+- Detailed pricing breakdown per restaurant: receita, produção, comissão restaurante, impostos, comissão agência, comissão vendedor, lucro bruto, margem
 - Weighted multiplier: calculated as weighted average of each restaurant's ratingMultiplier, weighted by coasters allocated
 - Weighted score: calculated as weighted average of each restaurant's ratingScore, weighted by coasters allocated
 - Weighted commission: calculated as weighted average of per-restaurant commissionPercent (editable 8–15%, default 10%), weighted by coasters allocated

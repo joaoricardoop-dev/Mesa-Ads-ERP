@@ -84,6 +84,7 @@ export default function Home() {
       ratingScore: r.ratingScore,
       ratingMultiplier: r.ratingMultiplier,
       commissionPercent: r.commissionPercent,
+      monthlyDrinksSold: r.monthlyDrinksSold,
       status: r.status,
     })),
     [restaurantsList]
@@ -349,6 +350,8 @@ export default function Home() {
                   onUpdateCoasters={allocation.updateCoasters}
                   onUpdateCommission={allocation.updateCommission}
                   onDistributeEvenly={allocation.distributeEvenly}
+                  simulatorInputs={simulator.inputs}
+                  effectiveUnitCost={simulator.effectiveUnitCost}
                 />
 
                 {/* KPI Cards */}
