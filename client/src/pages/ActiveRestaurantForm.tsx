@@ -235,9 +235,19 @@ export default function ActiveRestaurantForm() {
         seatCount: existingRestaurant.seatCount || 0,
         monthlyCustomers: existingRestaurant.monthlyCustomers || 0,
         monthlyDrinksSold: existingRestaurant.monthlyDrinksSold || 0,
-        busyDays: existingRestaurant.busyDays ? JSON.parse(existingRestaurant.busyDays) : [],
+        busyDays: (() => {
+          const bd = existingRestaurant.busyDays;
+          if (!bd) return [];
+          try { const parsed = JSON.parse(bd); if (Array.isArray(parsed)) return parsed; } catch {}
+          return bd.split(",").map((s: string) => s.trim()).filter(Boolean);
+        })(),
         busyHours: existingRestaurant.busyHours || "",
-        excludedCategories: existingRestaurant.excludedCategories ? JSON.parse(existingRestaurant.excludedCategories) : [],
+        excludedCategories: (() => {
+          const ec = existingRestaurant.excludedCategories;
+          if (!ec) return [];
+          try { const parsed = JSON.parse(ec); if (Array.isArray(parsed)) return parsed; } catch {}
+          return ec.split(",").map((s: string) => s.trim()).filter(Boolean);
+        })(),
         excludedOther: existingRestaurant.excludedOther || "",
         photoAuthorization: existingRestaurant.photoAuthorization || "sim",
         pixKey: existingRestaurant.pixKey || "",
