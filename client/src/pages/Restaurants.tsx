@@ -43,6 +43,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
+  LOCATION_RATING_LABELS,
+  VENUE_TYPE_LABELS,
+  DIGITAL_PRESENCE_LABELS,
+  PRIMARY_DRINK_LABELS,
+} from "@shared/rating-config";
+import {
   Plus,
   Pencil,
   Trash2,
@@ -114,13 +120,19 @@ interface ConvertForm {
   tableCount: number;
   seatCount: number;
   monthlyCustomers: number;
+  monthlyDrinksSold: number;
   busyDays: string[];
-  busyHours: string;
+  busyHours: string[];
   excludedCategories: string[];
   excludedOther: string;
   photoAuthorization: string;
   pixKey: string;
   notes: string;
+  ticketMedio: number;
+  locationRating: number;
+  venueType: number;
+  digitalPresence: number;
+  primaryDrink: string;
 }
 
 const emptyConvertForm: ConvertForm = {
@@ -139,16 +151,23 @@ const emptyConvertForm: ConvertForm = {
   tableCount: 0,
   seatCount: 0,
   monthlyCustomers: 0,
+  monthlyDrinksSold: 0,
   busyDays: [],
-  busyHours: "",
+  busyHours: [],
   excludedCategories: [],
   excludedOther: "",
   photoAuthorization: "sim",
   pixKey: "",
   notes: "",
+  ticketMedio: 0,
+  locationRating: 0,
+  venueType: 0,
+  digitalPresence: 0,
+  primaryDrink: "",
 };
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const BUSY_HOURS_OPTIONS = ["06h–09h", "09h–12h", "12h–15h", "15h–18h", "18h–21h", "21h–00h", "00h–03h", "03h–06h"];
 
 const EXCLUDED_CATEGORIES = [
   "Concorrentes diretos",
@@ -326,6 +345,10 @@ export default function Restaurants() {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
+    if (!convertForm.monthlyDrinksSold || !convertForm.tableCount || !convertForm.ticketMedio || !convertForm.locationRating || !convertForm.venueType || !convertForm.digitalPresence) {
+      toast.error("Preencha todos os campos de rating (Bebidas/mês, Mesas, Ticket Médio, Localização, Tipo, Presença Digital)");
+      return;
+    }
     createActiveMutation.mutate({
       name: convertForm.name,
       address: convertForm.address,
@@ -342,13 +365,19 @@ export default function Restaurants() {
       tableCount: convertForm.tableCount,
       seatCount: convertForm.seatCount,
       monthlyCustomers: convertForm.monthlyCustomers,
-      busyDays: convertForm.busyDays.length > 0 ? convertForm.busyDays.join(",") : undefined,
-      busyHours: convertForm.busyHours || undefined,
-      excludedCategories: convertForm.excludedCategories.length > 0 ? convertForm.excludedCategories.join("||") : undefined,
+      monthlyDrinksSold: convertForm.monthlyDrinksSold,
+      busyDays: JSON.stringify(convertForm.busyDays),
+      busyHours: JSON.stringify(convertForm.busyHours),
+      excludedCategories: JSON.stringify(convertForm.excludedCategories),
       excludedOther: convertForm.excludedOther || undefined,
       photoAuthorization: convertForm.photoAuthorization,
       pixKey: convertForm.pixKey || undefined,
       notes: convertForm.notes || undefined,
+      ticketMedio: String(convertForm.ticketMedio),
+      locationRating: convertForm.locationRating,
+      venueType: convertForm.venueType,
+      digitalPresence: convertForm.digitalPresence,
+      primaryDrink: convertForm.primaryDrink || undefined,
     });
   };
 
@@ -356,6 +385,13 @@ export default function Restaurants() {
     setConvertForm(prev => ({
       ...prev,
       busyDays: prev.busyDays.includes(day) ? prev.busyDays.filter(d => d !== day) : [...prev.busyDays, day],
+    }));
+  };
+
+  const toggleBusyHour = (slot: string) => {
+    setConvertForm(prev => ({
+      ...prev,
+      busyHours: prev.busyHours.includes(slot) ? prev.busyHours.filter(s => s !== slot) : [...prev.busyHours, slot],
     }));
   };
 
@@ -970,7 +1006,71 @@ export default function Restaurants() {
               </div>
               <div className="space-y-2">
                 <Label className="text-xs">Horários de Maior Movimento</Label>
-                <Input value={convertForm.busyHours} onChange={(e) => setConvertForm(p => ({ ...p, busyHours: e.target.value }))} placeholder="Ex: 18h–22h" className="bg-background border-border/30" />
+                <div className="flex flex-wrap gap-2">
+                  {BUSY_HOURS_OPTIONS.map((slot) => (
+                    <Button key={slot} type="button" size="sm" variant={convertForm.busyHours.includes(slot) ? "default" : "outline"} className="text-xs h-7 px-3" onClick={() => toggleBusyHour(slot)}>
+                      {slot}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t border-border/20 pt-3 space-y-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rating Interno *</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Bebidas Vendidas/Mês *</Label>
+                    <Input type="number" value={convertForm.monthlyDrinksSold || ""} onChange={(e) => setConvertForm(p => ({ ...p, monthlyDrinksSold: parseInt(e.target.value) || 0 }))} placeholder="Ex: 5000" className="bg-background border-border/30" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Ticket Médio (R$) *</Label>
+                    <Input type="number" min={5} step={0.01} value={convertForm.ticketMedio || ""} onChange={(e) => setConvertForm(p => ({ ...p, ticketMedio: parseFloat(e.target.value) || 0 }))} placeholder="0,00" className="bg-background border-border/30" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Localização *</Label>
+                  <Select value={convertForm.locationRating ? String(convertForm.locationRating) : ""} onValueChange={(v) => setConvertForm(p => ({ ...p, locationRating: parseInt(v) }))}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(LOCATION_RATING_LABELS).map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Tipo de Estabelecimento *</Label>
+                  <Select value={convertForm.venueType ? String(convertForm.venueType) : ""} onValueChange={(v) => setConvertForm(p => ({ ...p, venueType: parseInt(v) }))}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(VENUE_TYPE_LABELS).map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Presença Digital *</Label>
+                  <Select value={convertForm.digitalPresence ? String(convertForm.digitalPresence) : ""} onValueChange={(v) => setConvertForm(p => ({ ...p, digitalPresence: parseInt(v) }))}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(DIGITAL_PRESENCE_LABELS).map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{val} — {label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Bebida Predominante</Label>
+                  <Select value={convertForm.primaryDrink} onValueChange={(v) => setConvertForm(p => ({ ...p, primaryDrink: v }))}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PRIMARY_DRINK_LABELS).map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </TabsContent>
 
@@ -1019,7 +1119,7 @@ export default function Restaurants() {
             <Button variant="outline" onClick={() => setIsConvertOpen(false)}>Cancelar</Button>
             <Button
               onClick={handleSubmitConvert}
-              disabled={createActiveMutation.isPending || !convertForm.name || !convertForm.address || !convertForm.neighborhood || !convertForm.contactName || !convertForm.contactRole || !convertForm.whatsapp}
+              disabled={createActiveMutation.isPending || !convertForm.name || !convertForm.address || !convertForm.neighborhood || !convertForm.contactName || !convertForm.contactRole || !convertForm.whatsapp || !convertForm.monthlyDrinksSold || !convertForm.tableCount || !convertForm.ticketMedio || !convertForm.locationRating || !convertForm.venueType || !convertForm.digitalPresence}
               className="gap-2 bg-emerald-600 hover:bg-emerald-700"
             >
               <UtensilsCrossed className="w-4 h-4" />

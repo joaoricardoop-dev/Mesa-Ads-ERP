@@ -50,6 +50,7 @@ import {
 } from "@shared/rating-config";
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const BUSY_HOURS_OPTIONS = ["06h–09h", "09h–12h", "12h–15h", "15h–18h", "18h–21h", "21h–00h", "00h–03h", "03h–06h"];
 
 const EXCLUDED_CATEGORIES = [
   "Concorrentes diretos",
@@ -113,7 +114,7 @@ interface FormData {
   monthlyCustomers: number;
   monthlyDrinksSold: number;
   busyDays: string[];
-  busyHours: string;
+  busyHours: string[];
   excludedCategories: string[];
   excludedOther: string;
   photoAuthorization: string;
@@ -158,7 +159,7 @@ const emptyForm: FormData = {
   monthlyCustomers: 0,
   monthlyDrinksSold: 0,
   busyDays: [],
-  busyHours: "",
+  busyHours: [],
   excludedCategories: [],
   excludedOther: "",
   photoAuthorization: "sim",
@@ -241,11 +242,17 @@ export default function ActiveRestaurantForm() {
           try { const parsed = JSON.parse(bd); if (Array.isArray(parsed)) return parsed; } catch {}
           return bd.split(",").map((s: string) => s.trim()).filter(Boolean);
         })(),
-        busyHours: existingRestaurant.busyHours || "",
+        busyHours: (() => {
+          const bh = existingRestaurant.busyHours;
+          if (!bh) return [];
+          try { const parsed = JSON.parse(bh); if (Array.isArray(parsed)) return parsed; } catch {}
+          return bh.split(",").map((s: string) => s.trim()).filter(Boolean);
+        })(),
         excludedCategories: (() => {
           const ec = existingRestaurant.excludedCategories;
           if (!ec) return [];
           try { const parsed = JSON.parse(ec); if (Array.isArray(parsed)) return parsed; } catch {}
+          if (ec.includes("||")) return ec.split("||").map((s: string) => s.trim()).filter(Boolean);
           return ec.split(",").map((s: string) => s.trim()).filter(Boolean);
         })(),
         excludedOther: existingRestaurant.excludedOther || "",
@@ -334,6 +341,15 @@ export default function ActiveRestaurantForm() {
     }));
   };
 
+  const toggleBusyHour = (slot: string) => {
+    setForm(prev => ({
+      ...prev,
+      busyHours: prev.busyHours.includes(slot)
+        ? prev.busyHours.filter(s => s !== slot)
+        : [...prev.busyHours, slot],
+    }));
+  };
+
   const toggleCategory = (cat: string) => {
     setForm(prev => ({
       ...prev,
@@ -387,7 +403,7 @@ export default function ActiveRestaurantForm() {
       monthlyCustomers: form.monthlyCustomers,
       monthlyDrinksSold: form.monthlyDrinksSold || null,
       busyDays: JSON.stringify(form.busyDays),
-      busyHours: form.busyHours || undefined,
+      busyHours: JSON.stringify(form.busyHours),
       excludedCategories: JSON.stringify(form.excludedCategories),
       excludedOther: form.excludedOther || undefined,
       photoAuthorization: form.photoAuthorization,
@@ -582,7 +598,16 @@ export default function ActiveRestaurantForm() {
                         ))}
                       </div>
                     </div>
-                    <Field label="Horários de Maior Movimento" value={form.busyHours} onChange={(v) => setForm(p => ({ ...p, busyHours: v }))} placeholder="Ex: 18h–22h" />
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Horários de Maior Movimento</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {BUSY_HOURS_OPTIONS.map((slot) => (
+                          <Button key={slot} type="button" size="sm" variant={form.busyHours.includes(slot) ? "default" : "outline"} className="text-xs h-7 px-3" onClick={() => toggleBusyHour(slot)}>
+                            {slot}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="border-t border-border/20 pt-3 space-y-3">
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rating Interno</p>
                       <div className="grid grid-cols-2 gap-3">

@@ -335,7 +335,20 @@ export default function ActiveRestaurantProfile() {
                       </div>
                     </div>
                   )}
-                  {restaurant.busyHours && <MiniStat label="Horário Pico" value={restaurant.busyHours} />}
+                  {restaurant.busyHours && (() => {
+                    let hours: string[] = [];
+                    try { const parsed = JSON.parse(restaurant.busyHours); if (Array.isArray(parsed)) hours = parsed; } catch { hours = [restaurant.busyHours]; }
+                    return hours.length > 0 ? (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Horários Pico</p>
+                        <div className="flex flex-wrap gap-1">
+                          {hours.map((h: string) => (
+                            <Badge key={h} variant="outline" className="text-[10px]">{h}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
                 </Card>
 
                 <Card title="Financeiro">
@@ -527,7 +540,11 @@ export default function ActiveRestaurantProfile() {
                     <InfoRow label="Clientes/Mês" value={restaurant.monthlyCustomers.toLocaleString("pt-BR")} />
                     <InfoRow label="Bebidas Vendidas/Mês" value={restaurant.monthlyDrinksSold ? restaurant.monthlyDrinksSold.toLocaleString("pt-BR") : undefined} />
                     <InfoRow label="Dias Movimentados" value={busyDays.join(", ") || undefined} />
-                    <InfoRow label="Horário Pico" value={restaurant.busyHours || undefined} />
+                    <InfoRow label="Horário Pico" value={(() => {
+                      if (!restaurant.busyHours) return undefined;
+                      try { const parsed = JSON.parse(restaurant.busyHours); if (Array.isArray(parsed)) return parsed.join(", "); } catch {}
+                      return restaurant.busyHours;
+                    })()} />
                     <InfoRow label="Autoriza Fotos" value={restaurant.photoAuthorization === "sim" ? "Sim" : "Não"} />
                   </div>
                 </Card>

@@ -68,6 +68,7 @@ function formatSocialClass(value: string): string {
 }
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const BUSY_HOURS_OPTIONS = ["06h–09h", "09h–12h", "12h–15h", "15h–18h", "18h–21h", "21h–00h", "00h–03h", "03h–06h"];
 
 const EXCLUDED_CATEGORIES = [
   "Concorrentes diretos",
@@ -138,7 +139,7 @@ interface FormData {
   seatCount: number;
   monthlyCustomers: number;
   busyDays: string[];
-  busyHours: string;
+  busyHours: string[];
   excludedCategories: string[];
   excludedOther: string;
   photoAuthorization: string;
@@ -169,7 +170,7 @@ const emptyForm: FormData = {
   seatCount: 0,
   monthlyCustomers: 0,
   busyDays: [],
-  busyHours: "",
+  busyHours: [],
   excludedCategories: [],
   excludedOther: "",
   photoAuthorization: "sim",
@@ -246,9 +247,9 @@ export default function ActiveRestaurantsPage() {
       tableCount: r.tableCount,
       seatCount: r.seatCount,
       monthlyCustomers: r.monthlyCustomers,
-      busyDays: r.busyDays ? r.busyDays.split(",") : [],
-      busyHours: r.busyHours || "",
-      excludedCategories: r.excludedCategories ? r.excludedCategories.split("||") : [],
+      busyDays: (() => { const bd = r.busyDays; if (!bd) return []; try { const p = JSON.parse(bd); if (Array.isArray(p)) return p; } catch {} return bd.split(",").map((s: string) => s.trim()).filter(Boolean); })(),
+      busyHours: (() => { const bh = r.busyHours; if (!bh) return []; try { const p = JSON.parse(bh); if (Array.isArray(p)) return p; } catch {} return bh.split(",").map((s: string) => s.trim()).filter(Boolean); })(),
+      excludedCategories: (() => { const ec = r.excludedCategories; if (!ec) return []; try { const p = JSON.parse(ec); if (Array.isArray(p)) return p; } catch {} if (ec.includes("||")) return ec.split("||").map((s: string) => s.trim()).filter(Boolean); return ec.split(",").map((s: string) => s.trim()).filter(Boolean); })(),
       excludedOther: r.excludedOther || "",
       photoAuthorization: r.photoAuthorization || "sim",
       pixKey: r.pixKey || "",
@@ -280,9 +281,9 @@ export default function ActiveRestaurantsPage() {
       tableCount: form.tableCount,
       seatCount: form.seatCount,
       monthlyCustomers: form.monthlyCustomers,
-      busyDays: form.busyDays.length > 0 ? form.busyDays.join(",") : undefined,
-      busyHours: form.busyHours || undefined,
-      excludedCategories: form.excludedCategories.length > 0 ? form.excludedCategories.join("||") : undefined,
+      busyDays: JSON.stringify(form.busyDays),
+      busyHours: JSON.stringify(form.busyHours),
+      excludedCategories: JSON.stringify(form.excludedCategories),
       excludedOther: form.excludedOther || undefined,
       photoAuthorization: form.photoAuthorization,
       pixKey: form.pixKey || undefined,
@@ -331,6 +332,13 @@ export default function ActiveRestaurantsPage() {
     setForm(prev => ({
       ...prev,
       busyDays: prev.busyDays.includes(day) ? prev.busyDays.filter(d => d !== day) : [...prev.busyDays, day],
+    }));
+  };
+
+  const toggleBusyHour = (slot: string) => {
+    setForm(prev => ({
+      ...prev,
+      busyHours: prev.busyHours.includes(slot) ? prev.busyHours.filter(s => s !== slot) : [...prev.busyHours, slot],
     }));
   };
 
@@ -588,7 +596,13 @@ export default function ActiveRestaurantsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs">Horários de Maior Movimento</Label>
-                  <Input value={form.busyHours} onChange={(e) => setForm(p => ({ ...p, busyHours: e.target.value }))} placeholder="Ex: 18h–22h" className="bg-background border-border/30" />
+                  <div className="flex flex-wrap gap-2">
+                    {BUSY_HOURS_OPTIONS.map((slot) => (
+                      <Button key={slot} type="button" size="sm" variant={form.busyHours.includes(slot) ? "default" : "outline"} className="text-xs h-7 px-3" onClick={() => toggleBusyHour(slot)}>
+                        {slot}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
                 <div className="border-t border-border/20 pt-3 space-y-3">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rating Interno</p>
