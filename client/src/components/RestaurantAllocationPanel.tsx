@@ -102,7 +102,7 @@ export default function RestaurantAllocationPanel({
   const percentAllocated = totalCoasters > 0 ? (allocatedTotal / totalCoasters) * 100 : 0;
 
   return (
-    <div className="bg-card border border-border/30 rounded-xl overflow-hidden">
+    <div className="bg-card border border-border/30 rounded-xl">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -149,9 +149,9 @@ export default function RestaurantAllocationPanel({
       </button>
 
       {expanded && (
-        <div className="border-t border-border/20">
-          <div className="px-5 py-4 space-y-4">
-            <div className="relative">
+        <div className="border-t border-border/20 overflow-visible">
+          <div className="px-5 py-4 pb-6 space-y-4 overflow-visible">
+            <div className="relative" style={{ zIndex: 30, minHeight: dropdownOpen ? "280px" : "auto" }}>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
                 placeholder="Buscar restaurante por nome ou bairro..."
@@ -173,7 +173,7 @@ export default function RestaurantAllocationPanel({
                     className="fixed inset-0 z-10"
                     onClick={() => setDropdownOpen(false)}
                   />
-                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-xl max-h-72 overflow-y-auto">
                     {filteredRestaurants.length === 0 ? (
                       <div className="px-4 py-6 text-sm text-muted-foreground text-center">
                         {activeRestaurants.length === selectedIds.length
