@@ -357,6 +357,9 @@ export default function Home() {
                   activeRestaurants={simulator.inputs.activeRestaurants}
                   contractDuration={simulator.inputs.contractDuration}
                   minMargin={simulator.inputs.minMargin}
+                  weightedMultiplier={allocation.hasAllocations ? allocation.weightedMultiplier : undefined}
+                  weightedScore={allocation.hasAllocations ? allocation.weightedScore : undefined}
+                  allocationValid={allocation.isValid}
                 />
 
                 {/* Management Charts */}
