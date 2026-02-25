@@ -132,7 +132,7 @@ export type CampaignHistory = typeof campaignHistory.$inferSelect;
 export type InsertCampaignHistory = typeof campaignHistory.$inferInsert;
 
 export const contactTypeEnum = pgEnum("contact_type", ["proprietario", "gerente", "marketing", "outro"]);
-export const socialClassEnum = pgEnum("social_class", ["A", "B", "C", "misto_ab", "misto_bc", "nao_sei"]);
+export const socialClassEnum = pgEnum("social_class", ["A", "B", "C", "misto_ab", "misto_bc", "nao_sei", "AA", "D", "E"]);
 
 export const activeRestaurants = pgTable("active_restaurants", {
   id: serial("id").primaryKey(),
@@ -147,7 +147,7 @@ export const activeRestaurants = pgTable("active_restaurants", {
   whatsapp: varchar("whatsapp", { length: 50 }).notNull(),
   email: varchar("email", { length: 320 }),
   financialEmail: varchar("financialEmail", { length: 320 }),
-  socialClass: socialClassEnum("socialClass").default("misto_ab").notNull(),
+  socialClass: text("socialClass").default("[]").notNull(),
   tableCount: integer("tableCount").notNull(),
   seatCount: integer("seatCount").notNull(),
   monthlyCustomers: integer("monthlyCustomers").notNull(),

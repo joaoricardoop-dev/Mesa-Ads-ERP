@@ -50,13 +50,15 @@ const CONTACT_TYPE_LABELS: Record<string, string> = {
 };
 
 const SOCIAL_CLASS_LABELS: Record<string, string> = {
-  A: "Classe A",
-  B: "Classe B",
-  C: "Classe C",
-  misto_ab: "Misto (A/B)",
-  misto_bc: "Misto (B/C)",
-  nao_sei: "Não sei",
+  AA: "Classe AA", A: "Classe A", B: "Classe B", C: "Classe C", D: "Classe D", E: "Classe E",
+  misto_ab: "Misto (A/B)", misto_bc: "Misto (B/C)", nao_sei: "Não sei",
 };
+
+function formatSocialClass(value: string): string {
+  if (!value) return "—";
+  try { const parsed = JSON.parse(value); if (Array.isArray(parsed)) return parsed.map((c: string) => SOCIAL_CLASS_LABELS[c] || c).join(", "); } catch {}
+  return SOCIAL_CLASS_LABELS[value] || value;
+}
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
@@ -121,7 +123,7 @@ interface FormData {
   whatsapp: string;
   email: string;
   financialEmail: string;
-  socialClass: string;
+  socialClass: string[];
   tableCount: number;
   seatCount: number;
   monthlyCustomers: number;
@@ -147,7 +149,7 @@ const emptyForm: FormData = {
   whatsapp: "",
   email: "",
   financialEmail: "",
-  socialClass: "misto_ab",
+  socialClass: [],
   tableCount: 0,
   seatCount: 0,
   monthlyCustomers: 0,
@@ -219,7 +221,7 @@ export default function ActiveRestaurantsPage() {
       whatsapp: r.whatsapp,
       email: r.email || "",
       financialEmail: r.financialEmail || "",
-      socialClass: r.socialClass || "misto_ab",
+      socialClass: (() => { const sc = r.socialClass; if (!sc) return []; try { const p = JSON.parse(sc); if (Array.isArray(p)) return p; } catch {} return [sc]; })(),
       tableCount: r.tableCount,
       seatCount: r.seatCount,
       monthlyCustomers: r.monthlyCustomers,
@@ -248,7 +250,7 @@ export default function ActiveRestaurantsPage() {
       whatsapp: form.whatsapp,
       email: form.email || undefined,
       financialEmail: form.financialEmail || undefined,
-      socialClass: form.socialClass as any,
+      socialClass: JSON.stringify(form.socialClass),
       tableCount: form.tableCount,
       seatCount: form.seatCount,
       monthlyCustomers: form.monthlyCustomers,
@@ -345,7 +347,7 @@ export default function ActiveRestaurantsPage() {
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                            {r.neighborhood} · {SOCIAL_CLASS_LABELS[r.socialClass] || r.socialClass}
+                            {r.neighborhood} · {formatSocialClass(r.socialClass)}
                             {r.contactName ? ` · ${r.contactName}` : ""}
                           </p>
                         </div>
@@ -471,20 +473,26 @@ export default function ActiveRestaurantsPage() {
               </TabsContent>
 
               <TabsContent value="operacao" className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Classe Social Predominante *</Label>
-                    <Select value={form.socialClass} onValueChange={(v) => setForm(p => ({ ...p, socialClass: v }))}>
-                      <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="A">Classe A</SelectItem>
-                        <SelectItem value="B">Classe B</SelectItem>
-                        <SelectItem value="C">Classe C</SelectItem>
-                        <SelectItem value="misto_ab">Misto (A/B)</SelectItem>
-                        <SelectItem value="misto_bc">Misto (B/C)</SelectItem>
-                        <SelectItem value="nao_sei">Não sei</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <div className="space-y-2">
+                  <Label className="text-xs">Classe Social Predominante *</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {["AA", "A", "B", "C", "D", "E"].map((cls) => (
+                      <Button
+                        key={cls}
+                        type="button"
+                        size="sm"
+                        variant={form.socialClass.includes(cls) ? "default" : "outline"}
+                        className="text-xs h-7 px-3"
+                        onClick={() => setForm(p => ({
+                          ...p,
+                          socialClass: p.socialClass.includes(cls)
+                            ? p.socialClass.filter(c => c !== cls)
+                            : [...p.socialClass, cls],
+                        }))}
+                      >
+                        Classe {cls}
+                      </Button>
+                    ))}
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3">

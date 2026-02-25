@@ -110,7 +110,7 @@ interface ConvertForm {
   whatsapp: string;
   email: string;
   financialEmail: string;
-  socialClass: string;
+  socialClass: string[];
   tableCount: number;
   seatCount: number;
   monthlyCustomers: number;
@@ -135,7 +135,7 @@ const emptyConvertForm: ConvertForm = {
   whatsapp: "",
   email: "",
   financialEmail: "",
-  socialClass: "misto_ab",
+  socialClass: [],
   tableCount: 0,
   seatCount: 0,
   monthlyCustomers: 0,
@@ -338,7 +338,7 @@ export default function Restaurants() {
       whatsapp: convertForm.whatsapp,
       email: convertForm.email || undefined,
       financialEmail: convertForm.financialEmail || undefined,
-      socialClass: convertForm.socialClass as any,
+      socialClass: JSON.stringify(convertForm.socialClass),
       tableCount: convertForm.tableCount,
       seatCount: convertForm.seatCount,
       monthlyCustomers: convertForm.monthlyCustomers,
@@ -923,17 +923,25 @@ export default function Restaurants() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label className="text-xs">Classe Social Predominante *</Label>
-                  <Select value={convertForm.socialClass} onValueChange={(v) => setConvertForm(p => ({ ...p, socialClass: v }))}>
-                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="A">Classe A</SelectItem>
-                      <SelectItem value="B">Classe B</SelectItem>
-                      <SelectItem value="C">Classe C</SelectItem>
-                      <SelectItem value="misto_ab">Misto (A/B)</SelectItem>
-                      <SelectItem value="misto_bc">Misto (B/C)</SelectItem>
-                      <SelectItem value="nao_sei">Não sei</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex flex-wrap gap-2">
+                    {["AA", "A", "B", "C", "D", "E"].map((cls) => (
+                      <Button
+                        key={cls}
+                        type="button"
+                        size="sm"
+                        variant={convertForm.socialClass.includes(cls) ? "default" : "outline"}
+                        className="text-xs h-7 px-3"
+                        onClick={() => setConvertForm(p => ({
+                          ...p,
+                          socialClass: p.socialClass.includes(cls)
+                            ? p.socialClass.filter(c => c !== cls)
+                            : [...p.socialClass, cls],
+                        }))}
+                      >
+                        Classe {cls}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">

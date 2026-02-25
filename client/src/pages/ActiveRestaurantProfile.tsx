@@ -87,9 +87,21 @@ const PAYMENT_STATUS_COLORS: Record<string, string> = {
 };
 
 const SOCIAL_CLASS_LABELS: Record<string, string> = {
-  A: "Classe A", B: "Classe B", C: "Classe C",
+  AA: "Classe AA", A: "Classe A", B: "Classe B", C: "Classe C", D: "Classe D", E: "Classe E",
   misto_ab: "Misto (A/B)", misto_bc: "Misto (B/C)", nao_sei: "Não sei",
 };
+
+function parseSocialClass(value: string): string[] {
+  if (!value) return [];
+  try { const parsed = JSON.parse(value); if (Array.isArray(parsed)) return parsed; } catch {}
+  return [value];
+}
+
+function formatSocialClass(value: string): string {
+  const classes = parseSocialClass(value);
+  if (classes.length === 0) return "—";
+  return classes.map(c => SOCIAL_CLASS_LABELS[c] || c).join(", ");
+}
 
 const CONTACT_TYPE_LABELS: Record<string, string> = {
   proprietario: "Proprietário", gerente: "Gerente", marketing: "Marketing", outro: "Outro",
@@ -301,7 +313,7 @@ export default function ActiveRestaurantProfile() {
                     <MiniStat label="Assentos" value={String(restaurant.seatCount)} />
                     <MiniStat label="Clientes/Mês" value={restaurant.monthlyCustomers.toLocaleString("pt-BR")} />
                     {restaurant.monthlyDrinksSold && <MiniStat label="Bebidas/Mês" value={restaurant.monthlyDrinksSold.toLocaleString("pt-BR")} />}
-                    <MiniStat label="Classe" value={SOCIAL_CLASS_LABELS[restaurant.socialClass] || restaurant.socialClass} />
+                    <MiniStat label="Classe" value={formatSocialClass(restaurant.socialClass)} />
                   </div>
                   {busyDays.length > 0 && (
                     <div className="pt-2">
@@ -452,7 +464,7 @@ export default function ActiveRestaurantProfile() {
 
                 <Card title="Operação" icon={<BarChart3 className="w-4 h-4" />}>
                   <div className="space-y-2">
-                    <InfoRow label="Classe Social" value={SOCIAL_CLASS_LABELS[restaurant.socialClass] || restaurant.socialClass} />
+                    <InfoRow label="Classe Social" value={formatSocialClass(restaurant.socialClass)} />
                     <InfoRow label="Mesas" value={String(restaurant.tableCount)} />
                     <InfoRow label="Assentos" value={String(restaurant.seatCount)} />
                     <InfoRow label="Clientes/Mês" value={restaurant.monthlyCustomers.toLocaleString("pt-BR")} />

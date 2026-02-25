@@ -96,7 +96,7 @@ interface FormData {
   whatsapp: string;
   email: string;
   financialEmail: string;
-  socialClass: string;
+  socialClass: string[];
   tableCount: number;
   seatCount: number;
   monthlyCustomers: number;
@@ -136,7 +136,7 @@ const emptyForm: FormData = {
   whatsapp: "",
   email: "",
   financialEmail: "",
-  socialClass: "misto_ab",
+  socialClass: [],
   tableCount: 0,
   seatCount: 0,
   monthlyCustomers: 0,
@@ -204,7 +204,12 @@ export default function ActiveRestaurantForm() {
         whatsapp: existingRestaurant.whatsapp || "",
         email: existingRestaurant.email || "",
         financialEmail: existingRestaurant.financialEmail || "",
-        socialClass: existingRestaurant.socialClass || "misto_ab",
+        socialClass: (() => {
+          const sc = existingRestaurant.socialClass;
+          if (!sc) return [];
+          try { const parsed = JSON.parse(sc); if (Array.isArray(parsed)) return parsed; } catch {}
+          return [sc];
+        })(),
         tableCount: existingRestaurant.tableCount || 0,
         seatCount: existingRestaurant.seatCount || 0,
         monthlyCustomers: existingRestaurant.monthlyCustomers || 0,
@@ -340,7 +345,7 @@ export default function ActiveRestaurantForm() {
       whatsapp: form.whatsapp,
       email: form.email || undefined,
       financialEmail: form.financialEmail || undefined,
-      socialClass: form.socialClass as any,
+      socialClass: JSON.stringify(form.socialClass),
       tableCount: form.tableCount,
       seatCount: form.seatCount,
       monthlyCustomers: form.monthlyCustomers,
@@ -500,17 +505,25 @@ export default function ActiveRestaurantForm() {
                   <Section icon={<BarChart3 className="w-4 h-4" />} title="Operação">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">Classe Social Predominante *</Label>
-                      <Select value={form.socialClass} onValueChange={(v) => setForm(p => ({ ...p, socialClass: v }))}>
-                        <SelectTrigger className="bg-background border-border/30 h-9 text-sm w-48"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="A">Classe A</SelectItem>
-                          <SelectItem value="B">Classe B</SelectItem>
-                          <SelectItem value="C">Classe C</SelectItem>
-                          <SelectItem value="misto_ab">Misto (A/B)</SelectItem>
-                          <SelectItem value="misto_bc">Misto (B/C)</SelectItem>
-                          <SelectItem value="nao_sei">Não sei</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex flex-wrap gap-2">
+                        {["AA", "A", "B", "C", "D", "E"].map((cls) => (
+                          <Button
+                            key={cls}
+                            type="button"
+                            size="sm"
+                            variant={form.socialClass.includes(cls) ? "default" : "outline"}
+                            className="text-xs h-7 px-3"
+                            onClick={() => setForm(p => ({
+                              ...p,
+                              socialClass: p.socialClass.includes(cls)
+                                ? p.socialClass.filter(c => c !== cls)
+                                : [...p.socialClass, cls],
+                            }))}
+                          >
+                            Classe {cls}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                       <NumberField label="Quantidade de Mesas *" value={form.tableCount} onChange={(v) => setForm(p => ({ ...p, tableCount: v }))} />
