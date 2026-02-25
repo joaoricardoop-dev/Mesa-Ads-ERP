@@ -151,6 +151,7 @@ export const activeRestaurants = pgTable("active_restaurants", {
   tableCount: integer("tableCount").notNull(),
   seatCount: integer("seatCount").notNull(),
   monthlyCustomers: integer("monthlyCustomers").notNull(),
+  monthlyDrinksSold: integer("monthlyDrinksSold"),
   busyDays: text("busyDays"),
   busyHours: varchar("busyHours", { length: 100 }),
   excludedCategories: text("excludedCategories"),

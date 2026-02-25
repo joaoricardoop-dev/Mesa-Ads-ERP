@@ -44,7 +44,7 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - `users` — Auth users with role (admin/manager/user/viewer), isActive, lastLoginAt
 - `sessions` — Auth sessions (Replit Auth)
 - `restaurants` — Prospecting/leads for partner restaurants
-- `active_restaurants` — Onboarded active restaurants with full operational data (tables, seats, customers, excluded ad categories, Pix, etc.)
+- `active_restaurants` — Onboarded active restaurants with full operational data (tables, seats, customers, monthlyDrinksSold, excluded ad categories, Pix, etc.)
 - `clients` — Advertisers (47 imported with full address/contact/CNPJ data)
 - `campaigns` — Ad campaigns with full financial parameters (grossup pricing, commissions, taxes, markup)
 - `campaign_restaurants` — N:N campaign-restaurant relationship with coasters/usage allocation

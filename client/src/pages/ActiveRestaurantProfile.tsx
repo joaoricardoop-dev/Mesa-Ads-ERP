@@ -300,6 +300,7 @@ export default function ActiveRestaurantProfile() {
                     <MiniStat label="Mesas" value={String(restaurant.tableCount)} />
                     <MiniStat label="Assentos" value={String(restaurant.seatCount)} />
                     <MiniStat label="Clientes/Mês" value={restaurant.monthlyCustomers.toLocaleString("pt-BR")} />
+                    {restaurant.monthlyDrinksSold && <MiniStat label="Bebidas/Mês" value={restaurant.monthlyDrinksSold.toLocaleString("pt-BR")} />}
                     <MiniStat label="Classe" value={SOCIAL_CLASS_LABELS[restaurant.socialClass] || restaurant.socialClass} />
                   </div>
                   {busyDays.length > 0 && (
@@ -455,6 +456,7 @@ export default function ActiveRestaurantProfile() {
                     <InfoRow label="Mesas" value={String(restaurant.tableCount)} />
                     <InfoRow label="Assentos" value={String(restaurant.seatCount)} />
                     <InfoRow label="Clientes/Mês" value={restaurant.monthlyCustomers.toLocaleString("pt-BR")} />
+                    <InfoRow label="Bebidas Vendidas/Mês" value={restaurant.monthlyDrinksSold ? restaurant.monthlyDrinksSold.toLocaleString("pt-BR") : undefined} />
                     <InfoRow label="Dias Movimentados" value={busyDays.join(", ") || undefined} />
                     <InfoRow label="Horário Pico" value={restaurant.busyHours || undefined} />
                     <InfoRow label="Autoriza Fotos" value={restaurant.photoAuthorization === "sim" ? "Sim" : "Não"} />

@@ -100,6 +100,7 @@ interface FormData {
   tableCount: number;
   seatCount: number;
   monthlyCustomers: number;
+  monthlyDrinksSold: number;
   busyDays: string[];
   busyHours: string;
   excludedCategories: string[];
@@ -139,6 +140,7 @@ const emptyForm: FormData = {
   tableCount: 0,
   seatCount: 0,
   monthlyCustomers: 0,
+  monthlyDrinksSold: 0,
   busyDays: [],
   busyHours: "",
   excludedCategories: [],
@@ -206,6 +208,7 @@ export default function ActiveRestaurantForm() {
         tableCount: existingRestaurant.tableCount || 0,
         seatCount: existingRestaurant.seatCount || 0,
         monthlyCustomers: existingRestaurant.monthlyCustomers || 0,
+        monthlyDrinksSold: existingRestaurant.monthlyDrinksSold || 0,
         busyDays: existingRestaurant.busyDays ? JSON.parse(existingRestaurant.busyDays) : [],
         busyHours: existingRestaurant.busyHours || "",
         excludedCategories: existingRestaurant.excludedCategories ? JSON.parse(existingRestaurant.excludedCategories) : [],
@@ -341,6 +344,7 @@ export default function ActiveRestaurantForm() {
       tableCount: form.tableCount,
       seatCount: form.seatCount,
       monthlyCustomers: form.monthlyCustomers,
+      monthlyDrinksSold: form.monthlyDrinksSold || null,
       busyDays: JSON.stringify(form.busyDays),
       busyHours: form.busyHours || undefined,
       excludedCategories: JSON.stringify(form.excludedCategories),
@@ -512,6 +516,7 @@ export default function ActiveRestaurantForm() {
                       <NumberField label="Quantidade de Mesas *" value={form.tableCount} onChange={(v) => setForm(p => ({ ...p, tableCount: v }))} />
                       <NumberField label="Quantidade de Assentos *" value={form.seatCount} onChange={(v) => setForm(p => ({ ...p, seatCount: v }))} />
                       <NumberField label="Clientes por Mês *" value={form.monthlyCustomers} onChange={(v) => setForm(p => ({ ...p, monthlyCustomers: v }))} />
+                      <NumberField label="Qtd. de Bebidas Vendidas/Mês" value={form.monthlyDrinksSold} onChange={(v) => setForm(p => ({ ...p, monthlyDrinksSold: v }))} />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">Dias de Maior Movimento</Label>
@@ -612,6 +617,7 @@ export default function ActiveRestaurantForm() {
                       <InfoRow label="Mesas" value={form.tableCount > 0 ? String(form.tableCount) : undefined} />
                       <InfoRow label="Assentos" value={form.seatCount > 0 ? String(form.seatCount) : undefined} />
                       <InfoRow label="Clientes/Mês" value={form.monthlyCustomers > 0 ? form.monthlyCustomers.toLocaleString("pt-BR") : undefined} />
+                      <InfoRow label="Bebidas Vendidas/Mês" value={form.monthlyDrinksSold > 0 ? form.monthlyDrinksSold.toLocaleString("pt-BR") : undefined} />
                     </div>
                   </div>
                 </div>
