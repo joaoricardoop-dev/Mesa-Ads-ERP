@@ -1,4 +1,5 @@
 import { useState, Fragment, useCallback } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
 import { Button } from "@/components/ui/button";
@@ -179,6 +180,7 @@ type SortKey = "quotationNumber" | "clientName" | "totalValue" | "status" | "cre
 type SortDir = "asc" | "desc";
 
 export default function Quotations() {
+  const [, navigate] = useLocation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<QuotationForm>(emptyForm);
@@ -206,16 +208,6 @@ export default function Quotations() {
     { quotationId: signOsDialogId! },
     { enabled: !!signOsDialogId }
   );
-
-  const createMutation = trpc.quotation.create.useMutation({
-    onSuccess: () => {
-      utils.quotation.list.invalidate();
-      setIsDialogOpen(false);
-      setForm(emptyForm);
-      toast.success("Cotação criada com sucesso!");
-    },
-    onError: (err) => toast.error(`Erro: ${err.message}`),
-  });
 
   const updateMutation = trpc.quotation.update.useMutation({
     onSuccess: () => {
@@ -307,8 +299,6 @@ export default function Quotations() {
 
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...payload });
-    } else {
-      createMutation.mutate(payload);
     }
   };
 
@@ -330,11 +320,6 @@ export default function Quotations() {
     setIsDialogOpen(true);
   };
 
-  const handleNew = () => {
-    setEditingId(null);
-    setForm(emptyForm);
-    setIsDialogOpen(true);
-  };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -403,7 +388,7 @@ export default function Quotations() {
       title="Cotações"
       description="Gestão de cotações comerciais"
       actions={
-        <Button onClick={handleNew} className="gap-2">
+        <Button onClick={() => navigate("/comercial/simulador")} className="gap-2">
           <Plus className="w-4 h-4" />
           Nova Cotação
         </Button>
@@ -476,7 +461,7 @@ export default function Quotations() {
                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {search || statusFilter !== "all"
                     ? "Nenhuma cotação encontrada"
-                    : 'Nenhuma cotação cadastrada. Clique em "Nova Cotação" para começar.'}
+                    : 'Nenhuma cotação cadastrada. Use o Simulador para criar uma nova cotação.'}
                 </TableCell>
               </TableRow>
             ) : (
@@ -609,7 +594,7 @@ export default function Quotations() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-2xl bg-card border-border/30 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Editar Cotação" : "Nova Cotação"}</DialogTitle>
+            <DialogTitle>Editar Cotação</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Cliente</p>
@@ -752,13 +737,9 @@ export default function Quotations() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={updateMutation.isPending}
             >
-              {createMutation.isPending || updateMutation.isPending
-                ? "Salvando..."
-                : editingId
-                  ? "Atualizar"
-                  : "Criar Cotação"}
+              {updateMutation.isPending ? "Salvando..." : "Atualizar"}
             </Button>
           </DialogFooter>
         </DialogContent>
