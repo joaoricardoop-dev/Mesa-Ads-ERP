@@ -1,7 +1,7 @@
 import { internalProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { serviceOrders, campaigns, clients } from "../drizzle/schema";
+import { serviceOrders, campaigns, clients, quotations, campaignHistory } from "../drizzle/schema";
 import { eq, and, desc, sql, inArray, ilike } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -154,6 +154,64 @@ export const serviceOrderRouter = router({
         .where(eq(serviceOrders.id, input.id))
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "OS não encontrada" });
+
+      if (input.status === "assinada" && updated.quotationId) {
+        const quotation = await db.select().from(quotations).where(eq(quotations.id, updated.quotationId)).limit(1);
+        if (quotation[0] && quotation[0].status === "os_gerada") {
+          const year = new Date().getFullYear();
+          const countResult = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(campaigns)
+            .where(sql`"campaignNumber" LIKE ${'CMP-' + year + '-%'}`);
+          const seqNum = Number(countResult[0]?.count || 0) + 1;
+          const campaignNumber = `CMP-${year}-${String(seqNum).padStart(4, "0")}`;
+
+          const q = quotation[0];
+          const clientRows = await db.select().from(clients).where(eq(clients.id, q.clientId)).limit(1);
+          const clientName = clientRows[0]?.name || clientRows[0]?.company || "Cliente";
+
+          const [campaign] = await db.insert(campaigns).values({
+            campaignNumber,
+            clientId: q.clientId,
+            name: `${clientName} - ${q.campaignType || "Campanha"}`,
+            startDate: updated.periodStart || new Date().toISOString().split("T")[0],
+            endDate: updated.periodEnd || new Date().toISOString().split("T")[0],
+            status: "producao",
+            quotationId: q.id,
+            campaignType: q.campaignType,
+            coastersPerRestaurant: 500,
+            usagePerDay: 3,
+            daysPerMonth: 26,
+            activeRestaurants: 10,
+            pricingType: "variable",
+            markupPercent: "30.00",
+            fixedPrice: "0.00",
+            commissionType: "variable",
+            restaurantCommission: "20.00",
+            fixedCommission: "0.0500",
+            sellerCommission: "10.00",
+            taxRate: "15.00",
+            contractDuration: q.cycles || 6,
+            batchSize: q.coasterVolume,
+            batchCost: "1200.00",
+            notes: q.notes,
+          }).returning();
+
+          await db.insert(campaignHistory).values({
+            campaignId: campaign.id,
+            action: "created_from_quotation",
+            details: `Campanha criada após assinatura da OS ${updated.orderNumber} (cotação ${q.quotationNumber})`,
+          });
+
+          await db
+            .update(quotations)
+            .set({ status: "win", updatedAt: new Date() })
+            .where(eq(quotations.id, q.id));
+
+          return { ...updated, campaignCreated: true, campaignId: campaign.id, campaignNumber };
+        }
+      }
+
       return updated;
     }),
 });

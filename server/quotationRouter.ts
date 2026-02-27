@@ -1,7 +1,7 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory } from "../drizzle/schema";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders } from "../drizzle/schema";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -31,10 +31,21 @@ async function generateCampaignNumber(db: any) {
   return `CMP-${year}-${String(seqNum).padStart(4, "0")}`;
 }
 
+async function generateOSNumber(db: any) {
+  const year = new Date().getFullYear();
+  const pattern = `OS-ANT-${year}-%`;
+  const countResult = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(serviceOrders)
+    .where(sql`${serviceOrders.orderNumber} LIKE ${pattern}`);
+  const seqNum = Number(countResult[0]?.count || 0) + 1;
+  return `OS-ANT-${year}-${String(seqNum).padStart(4, "0")}`;
+}
+
 export const quotationRouter = router({
   list: protectedProcedure
     .input(z.object({
-      status: z.enum(["rascunho", "enviada", "ativa", "win", "perdida", "expirada"]).optional(),
+      status: z.enum(["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]).optional(),
       clientId: z.number().optional(),
     }).optional())
     .query(async ({ input }) => {
@@ -165,7 +176,7 @@ export const quotationRouter = router({
       includesProduction: z.boolean().optional(),
       notes: z.string().optional(),
       validUntil: z.string().optional(),
-      status: z.enum(["rascunho", "enviada", "ativa", "win", "perdida", "expirada"]).optional(),
+      status: z.enum(["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]).optional(),
       lossReason: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
@@ -289,5 +300,59 @@ export const quotationRouter = router({
       }).returning();
 
       return created;
+    }),
+
+  generateOS: comercialProcedure
+    .input(z.object({
+      id: z.number(),
+      description: z.string().optional(),
+      periodStart: z.string().optional(),
+      periodEnd: z.string().optional(),
+      paymentTerms: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+
+      const quotation = await db.select().from(quotations).where(eq(quotations.id, input.id)).limit(1);
+      if (!quotation[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
+      if (quotation[0].status !== "ativa") throw new TRPCError({ code: "BAD_REQUEST", message: "Cotação precisa estar ativa para gerar OS" });
+
+      const existingOS = await db.select().from(serviceOrders).where(eq(serviceOrders.quotationId, input.id)).limit(1);
+      if (existingOS[0]) throw new TRPCError({ code: "BAD_REQUEST", message: "OS já foi gerada para esta cotação" });
+
+      const orderNumber = await generateOSNumber(db);
+
+      const [os] = await db.insert(serviceOrders).values({
+        orderNumber,
+        type: "anunciante" as const,
+        quotationId: quotation[0].id,
+        clientId: quotation[0].clientId,
+        description: input.description || `OS referente à cotação ${quotation[0].quotationNumber}`,
+        coasterVolume: quotation[0].coasterVolume,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        totalValue: quotation[0].totalValue,
+        paymentTerms: input.paymentTerms,
+        status: "rascunho" as const,
+      }).returning();
+
+      await db
+        .update(quotations)
+        .set({ status: "os_gerada", updatedAt: new Date() })
+        .where(eq(quotations.id, input.id));
+
+      return { quotationId: input.id, serviceOrderId: os.id, orderNumber };
+    }),
+
+  getOS: protectedProcedure
+    .input(z.object({ quotationId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const result = await db
+        .select()
+        .from(serviceOrders)
+        .where(eq(serviceOrders.quotationId, input.quotationId))
+        .limit(1);
+      return result[0] || null;
     }),
 });

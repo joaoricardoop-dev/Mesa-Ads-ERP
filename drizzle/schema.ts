@@ -16,7 +16,7 @@ export const statusEnum = pgEnum("status", ["active", "inactive"]);
 export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa"]);
 export const budgetStatusEnum = pgEnum("budget_status", ["active", "expired", "rejected"]);
 export const invoiceStatusEnum = pgEnum("invoice_status", ["emitida", "paga", "vencida", "cancelada"]);
-export const quotationStatusEnum = pgEnum("quotation_status", ["rascunho", "enviada", "ativa", "win", "perdida", "expirada"]);
+export const quotationStatusEnum = pgEnum("quotation_status", ["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]);
 export const leadTypeEnum = pgEnum("lead_type", ["anunciante", "restaurante"]);
 export const serviceOrderTypeEnum = pgEnum("service_order_type", ["anunciante", "producao"]);
 export const serviceOrderStatusEnum = pgEnum("service_order_status", ["rascunho", "enviada", "assinada", "execucao", "concluida"]);
@@ -353,6 +353,7 @@ export const serviceOrders = pgTable("service_orders", {
   type: serviceOrderTypeEnum("type").notNull(),
   campaignId: integer("campaignId"),
   clientId: integer("clientId"),
+  quotationId: integer("quotationId"),
   description: text("description"),
   coasterVolume: integer("coasterVolume"),
   networkAllocation: text("networkAllocation"),

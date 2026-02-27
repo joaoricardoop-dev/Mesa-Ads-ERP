@@ -45,7 +45,6 @@ import {
   Pencil,
   Trash2,
   Search,
-  Trophy,
   XCircle,
   Copy,
   ChevronDown,
@@ -53,9 +52,45 @@ import {
   ArrowUpDown,
   FileText,
   Calendar,
+  CheckCircle2,
 } from "lucide-react";
 
-type QuotationStatus = "rascunho" | "enviada" | "ativa" | "win" | "perdida" | "expirada";
+function OSActionButton({ quotationId, onSign }: { quotationId: number; onSign: (osId: number) => void }) {
+  const { data: os } = trpc.quotation.getOS.useQuery({ quotationId });
+  if (!os) return <span className="text-xs text-muted-foreground px-2">Carregando OS...</span>;
+
+  const osStatusLabels: Record<string, string> = {
+    rascunho: "OS Rascunho",
+    enviada: "OS Enviada",
+    assinada: "OS Assinada",
+    execucao: "OS Execução",
+    concluida: "OS Concluída",
+  };
+
+  if (os.status === "assinada" || os.status === "execucao" || os.status === "concluida") {
+    return (
+      <Badge variant="outline" className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">
+        <CheckCircle2 className="w-3 h-3 mr-1" />
+        {osStatusLabels[os.status] || os.status}
+      </Badge>
+    );
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-7 text-xs text-emerald-400 hover:text-emerald-300 gap-1"
+      onClick={() => onSign(os.id)}
+      title="Assinar OS e criar campanha"
+    >
+      <CheckCircle2 className="w-3.5 h-3.5" />
+      Assinar OS
+    </Button>
+  );
+}
+
+type QuotationStatus = "rascunho" | "enviada" | "ativa" | "os_gerada" | "win" | "perdida" | "expirada";
 
 interface QuotationForm {
   clientId: number | "";
@@ -85,22 +120,11 @@ const emptyForm: QuotationForm = {
   validUntil: "",
 };
 
-interface WinForm {
-  campaignName: string;
-  startDate: string;
-  endDate: string;
-}
-
-const emptyWinForm: WinForm = {
-  campaignName: "",
-  startDate: "",
-  endDate: "",
-};
-
 const STATUS_CONFIG: Record<QuotationStatus, { label: string; className: string }> = {
   rascunho: { label: "Rascunho", className: "bg-muted text-muted-foreground" },
   enviada: { label: "Enviada", className: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
   ativa: { label: "Ativa", className: "bg-primary/20 text-primary border-primary/30" },
+  os_gerada: { label: "OS Gerada", className: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
   win: { label: "WIN", className: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
   perdida: { label: "Perdida", className: "bg-destructive/20 text-destructive border-destructive/30" },
   expirada: { label: "Expirada", className: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
@@ -119,11 +143,12 @@ export default function Quotations() {
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  const [winDialogId, setWinDialogId] = useState<number | null>(null);
-  const [winForm, setWinForm] = useState<WinForm>(emptyWinForm);
 
   const [lossDialogId, setLossDialogId] = useState<number | null>(null);
   const [lossReason, setLossReason] = useState("");
+  const [osDialogId, setOsDialogId] = useState<number | null>(null);
+  const [osForm, setOsForm] = useState({ description: "", periodStart: "", periodEnd: "", paymentTerms: "" });
+  const [signOsDialogId, setSignOsDialogId] = useState<{ quotationId: number; osId: number } | null>(null);
 
   const utils = trpc.useUtils();
   const { data: quotationsList = [], isLoading } = trpc.quotation.list.useQuery();
@@ -159,16 +184,6 @@ export default function Quotations() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
-  const winMutation = trpc.quotation.markWin.useMutation({
-    onSuccess: (data) => {
-      utils.quotation.list.invalidate();
-      setWinDialogId(null);
-      setWinForm(emptyWinForm);
-      toast.success(`Campanha ${data.campaignNumber} criada com sucesso!`);
-    },
-    onError: (err) => toast.error(`Erro: ${err.message}`),
-  });
-
   const lossMutation = trpc.quotation.markLost.useMutation({
     onSuccess: () => {
       utils.quotation.list.invalidate();
@@ -183,6 +198,27 @@ export default function Quotations() {
     onSuccess: () => {
       utils.quotation.list.invalidate();
       toast.success("Cotação duplicada!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const generateOSMutation = trpc.quotation.generateOS.useMutation({
+    onSuccess: (data) => {
+      utils.quotation.list.invalidate();
+      setOsDialogId(null);
+      toast.success(`OS ${data.orderNumber} gerada com sucesso!`);
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const signOSMutation = trpc.serviceOrder.updateStatus.useMutation({
+    onSuccess: (data: any) => {
+      utils.quotation.list.invalidate();
+      if (data.campaignCreated) {
+        toast.success(`OS assinada! Campanha ${data.campaignNumber} criada.`);
+      } else {
+        toast.success("OS assinada com sucesso!");
+      }
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
@@ -240,33 +276,6 @@ export default function Quotations() {
     setEditingId(null);
     setForm(emptyForm);
     setIsDialogOpen(true);
-  };
-
-  const handleWin = (q: (typeof quotationsList)[0]) => {
-    setWinDialogId(q.id);
-    setWinForm({
-      campaignName: `Campanha ${q.clientName || ""}`.trim(),
-      startDate: "",
-      endDate: "",
-    });
-  };
-
-  const handleSubmitWin = () => {
-    if (!winDialogId) return;
-    if (!winForm.campaignName.trim()) {
-      toast.error("Nome da campanha é obrigatório");
-      return;
-    }
-    if (!winForm.startDate || !winForm.endDate) {
-      toast.error("Datas de início e fim são obrigatórias");
-      return;
-    }
-    winMutation.mutate({
-      id: winDialogId,
-      campaignName: winForm.campaignName,
-      startDate: winForm.startDate,
-      endDate: winForm.endDate,
-    });
   };
 
   const handleSort = (key: SortKey) => {
@@ -375,6 +384,7 @@ export default function Quotations() {
             <SelectItem value="rascunho">Rascunho</SelectItem>
             <SelectItem value="enviada">Enviada</SelectItem>
             <SelectItem value="ativa">Ativa</SelectItem>
+            <SelectItem value="os_gerada">OS Gerada</SelectItem>
             <SelectItem value="win">WIN</SelectItem>
             <SelectItem value="perdida">Perdida</SelectItem>
             <SelectItem value="expirada">Expirada</SelectItem>
@@ -450,18 +460,24 @@ export default function Quotations() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {q.status !== "win" && q.status !== "perdida" && (
+                      {q.status === "ativa" && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-emerald-400 hover:text-emerald-300"
-                          onClick={() => handleWin(q)}
-                          title="Marcar WIN"
+                          className="h-8 w-8 text-amber-400 hover:text-amber-300"
+                          onClick={() => {
+                            setOsDialogId(q.id);
+                            setOsForm({ description: "", periodStart: "", periodEnd: "", paymentTerms: "" });
+                          }}
+                          title="Gerar OS"
                         >
-                          <Trophy className="w-3.5 h-3.5" />
+                          <FileText className="w-3.5 h-3.5" />
                         </Button>
                       )}
-                      {q.status !== "win" && q.status !== "perdida" && (
+                      {q.status === "os_gerada" && (
+                        <OSActionButton quotationId={q.id} onSign={(osId) => setSignOsDialogId({ quotationId: q.id, osId })} />
+                      )}
+                      {q.status !== "win" && q.status !== "perdida" && q.status !== "os_gerada" && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -669,62 +685,109 @@ export default function Quotations() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={winDialogId !== null} onOpenChange={() => setWinDialogId(null)}>
+      <Dialog open={osDialogId !== null} onOpenChange={() => setOsDialogId(null)}>
         <DialogContent className="sm:max-w-md bg-card border-border/30">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-emerald-400" />
-              Marcar como WIN
+              <FileText className="w-5 h-5 text-amber-400" />
+              Gerar OS para Anunciante
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <p className="text-sm text-muted-foreground">
-              A cotação será convertida em uma nova campanha com número CMP-YYYY-NNNN.
+              Uma Ordem de Serviço será criada com os dados da cotação. Quando assinada, a campanha será automaticamente criada.
             </p>
             <div className="grid gap-2">
-              <Label>Nome da Campanha *</Label>
-              <Input
-                value={winForm.campaignName}
-                onChange={(e) => setWinForm({ ...winForm, campaignName: e.target.value })}
-                placeholder="Nome da campanha"
+              <Label>Descrição</Label>
+              <Textarea
+                value={osForm.description}
+                onChange={(e) => setOsForm({ ...osForm, description: e.target.value })}
+                placeholder="Descrição da OS (opcional)"
                 className="bg-background border-border/30"
+                rows={2}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Data Início *</Label>
+                <Label>Período Início</Label>
                 <Input
                   type="date"
-                  value={winForm.startDate}
-                  onChange={(e) => setWinForm({ ...winForm, startDate: e.target.value })}
+                  value={osForm.periodStart}
+                  onChange={(e) => setOsForm({ ...osForm, periodStart: e.target.value })}
                   className="bg-background border-border/30"
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Data Fim *</Label>
+                <Label>Período Fim</Label>
                 <Input
                   type="date"
-                  value={winForm.endDate}
-                  onChange={(e) => setWinForm({ ...winForm, endDate: e.target.value })}
+                  value={osForm.periodEnd}
+                  onChange={(e) => setOsForm({ ...osForm, periodEnd: e.target.value })}
                   className="bg-background border-border/30"
                 />
               </div>
             </div>
+            <div className="grid gap-2">
+              <Label>Condições de Pagamento</Label>
+              <Input
+                value={osForm.paymentTerms}
+                onChange={(e) => setOsForm({ ...osForm, paymentTerms: e.target.value })}
+                placeholder="Ex: 30/60/90 dias"
+                className="bg-background border-border/30"
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setWinDialogId(null)}>
+            <Button variant="outline" onClick={() => setOsDialogId(null)}>
               Cancelar
             </Button>
             <Button
-              onClick={handleSubmitWin}
-              disabled={winMutation.isPending}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => {
+                if (!osDialogId) return;
+                generateOSMutation.mutate({
+                  id: osDialogId,
+                  description: osForm.description || undefined,
+                  periodStart: osForm.periodStart || undefined,
+                  periodEnd: osForm.periodEnd || undefined,
+                  paymentTerms: osForm.paymentTerms || undefined,
+                });
+              }}
+              disabled={generateOSMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700"
             >
-              {winMutation.isPending ? "Convertendo..." : "Converter em Campanha"}
+              {generateOSMutation.isPending ? "Gerando..." : "Gerar OS"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={signOsDialogId !== null} onOpenChange={() => setSignOsDialogId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              Assinar OS e Criar Campanha
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Ao assinar a OS, a cotação será automaticamente convertida em WIN e uma nova campanha (CMP-YYYY-NNNN) será criada no status de Produção.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (signOsDialogId) {
+                  signOSMutation.mutate({ id: signOsDialogId.osId, status: "assinada" });
+                  setSignOsDialogId(null);
+                }
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              Assinar OS
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={lossDialogId !== null} onOpenChange={() => setLossDialogId(null)}>
         <AlertDialogContent>

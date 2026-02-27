@@ -22,7 +22,6 @@ import Production from "./pages/Production";
 import Members from "./pages/Members";
 import LandingPage from "./pages/LandingPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
-import ServiceOrders from "./pages/ServiceOrders";
 import Library from "./pages/Library";
 import Quotations from "./pages/Quotations";
 import Leads from "./pages/Leads";
@@ -39,7 +38,6 @@ function Router() {
       <Route path="/comercial/simulador" component={Home} />
       <Route path="/comercial/cotacoes" component={Quotations} />
       <Route path="/comercial/leads" component={Leads} />
-      <Route path="/comercial/os" component={ServiceOrders} />
       <Route path="/prospeccao/novo" component={ProspectForm} />
       <Route path="/prospeccao/:id" component={ProspectForm} />
       <Route path="/prospeccao" component={Prospecting} />

@@ -35,7 +35,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - **No top navigation bar** — all navigation is in the sidebar
 - **Module-based sidebar** with collapsible groups:
   - Dashboard (`/`) — operational overview with status cards, pipeline, activity
-  - Comercial (group): Cotações (`/comercial/cotacoes`), Simulador (`/comercial/simulador`), Leads (`/comercial/leads`), OS Anunciantes (`/comercial/os`)
+  - Comercial (group): Cotações (`/comercial/cotacoes`), Simulador (`/comercial/simulador`), Leads (`/comercial/leads`)
   - Anunciantes (`/clientes`) — top-level item
   - Campanhas (`/campanhas`)
   - Financeiro (group, admin only): Dashboard (`/financeiro`), Faturamento (`/financeiro/faturamento`), Pagamentos (`/financeiro/pagamentos`), Custos (`/financeiro/custos`), Relatórios (`/financeiro/relatorios`)
@@ -103,8 +103,10 @@ Statuses: `producao` → `transito` → `executar` → `veiculacao` → `inativa
 
 ## Quotation Workflow
 
-Statuses: `rascunho` → `enviada` → `ativa` → `win` / `perdida` / `expirada`
-- WIN conversion auto-creates campaign with CMP-YYYY-NNNN number
+Statuses: `rascunho` → `enviada` → `ativa` → `os_gerada` → `win` / `perdida` / `expirada`
+- Cotação ativa → "Gerar OS" creates OS-ANT service order linked to quotation
+- OS signed (assinada) → auto-converts quotation to WIN + creates campaign CMP-YYYY-NNNN
+- OS Anunciantes is NOT a separate menu item — managed within Cotações flow
 - Supports duplicate, mark lost with reason
 
 ## Pricing Engine (calcPricing)

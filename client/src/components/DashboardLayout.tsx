@@ -90,7 +90,6 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: ClipboardList, label: "Cotações", path: "/comercial/cotacoes" },
       { icon: BarChart3, label: "Simulador", path: "/comercial/simulador" },
       { icon: Users, label: "Leads", path: "/comercial/leads" },
-      { icon: FileText, label: "OS Anunciantes", path: "/comercial/os" },
     ],
   },
   { icon: Building2, label: "Anunciantes", path: "/clientes" },
