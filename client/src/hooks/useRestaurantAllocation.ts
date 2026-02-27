@@ -185,6 +185,10 @@ export function useRestaurantAllocation(
     );
   }, [allocations.length, totalCoasters]);
 
+  const clearAllocations = useCallback(() => {
+    setAllocations([]);
+  }, []);
+
   return {
     allocations,
     selectedIds,
@@ -200,5 +204,6 @@ export function useRestaurantAllocation(
     weightedScore,
     weightedCommission,
     distributeEvenly,
+    clearAllocations,
   };
 }

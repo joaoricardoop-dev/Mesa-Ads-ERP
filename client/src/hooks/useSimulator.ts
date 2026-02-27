@@ -549,10 +549,15 @@ export function useSimulator(
     return data;
   }, [inputs, effectiveUnitCost, restaurantCommissionRate, weightedMultiplier]);
 
+  const resetInputs = useCallback(() => {
+    setInputs(DEFAULT_INPUTS);
+  }, []);
+
   return {
     inputs,
     updateInput,
     setInputs,
+    resetInputs,
     effectiveUnitCost,
     perRestaurant,
     markupTable,

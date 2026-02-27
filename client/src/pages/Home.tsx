@@ -41,6 +41,7 @@ import {
   SlidersHorizontal,
   Rocket,
   FileText,
+  RotateCcw,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -104,6 +105,18 @@ export default function Home() {
     setAllocMultiplier(allocation.hasAllocations ? allocation.weightedMultiplier : undefined);
     setAllocCommission(allocation.hasAllocations ? allocation.weightedCommission : undefined);
   }, [allocation.hasAllocations, allocation.weightedMultiplier, allocation.weightedCommission]);
+
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const handleResetQuotation = () => {
+    simulator.resetInputs();
+    allocation.clearAllocations();
+    setSelectedBudgetId("manual");
+    saveBudgetId(null);
+    setAllocMultiplier(undefined);
+    setAllocCommission(undefined);
+    setShowResetConfirm(false);
+  };
 
   return (
     <div className="h-full flex overflow-hidden">
@@ -209,14 +222,47 @@ export default function Home() {
                         Faturamento e lucro da Mesa Ads. Restaurantes parceiros
                         recebem comissão sobre a mídia veiculada nos coasters.
                       </p>
-                      <Button
-                        onClick={() => navigate("/cotacao/preview")}
-                        className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
-                        size="sm"
-                      >
-                        <Rocket className="w-4 h-4" />
-                        Criar Cotação com estes valores
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => navigate("/cotacao/preview")}
+                          className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
+                          size="sm"
+                        >
+                          <Rocket className="w-4 h-4" />
+                          Criar Cotação com estes valores
+                        </Button>
+                        {showResetConfirm ? (
+                          <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-destructive/40">
+                            <span className="text-xs text-white/80">Resetar tudo?</span>
+                            <Button
+                              onClick={handleResetQuotation}
+                              variant="destructive"
+                              size="sm"
+                              className="h-7 text-xs px-2"
+                            >
+                              Confirmar
+                            </Button>
+                            <Button
+                              onClick={() => setShowResetConfirm(false)}
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs px-2 text-white/60 hover:text-white hover:bg-white/10"
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            onClick={() => setShowResetConfirm(true)}
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 border-white/20 text-white/70 hover:text-white hover:bg-white/10 hover:border-white/40"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            Resetar
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
