@@ -194,7 +194,7 @@ export default function Quotations() {
   const [osDialogId, setOsDialogId] = useState<number | null>(null);
   const [osForm, setOsForm] = useState({ description: "", periodStart: "", periodEnd: "", paymentTerms: "" });
   const [signOsDialogId, setSignOsDialogId] = useState<number | null>(null);
-  const [signForm, setSignForm] = useState({ campaignName: "", startDate: "", endDate: "", signatureUrl: "" });
+  const [signForm, setSignForm] = useState({ startDate: "", endDate: "", signatureUrl: "" });
   const [restaurantAllocations, setRestaurantAllocations] = useState<Array<{ restaurantId: number; coasterQuantity: number }>>([]);
   const [addRestaurantId, setAddRestaurantId] = useState<string>("");
 
@@ -549,7 +549,6 @@ export default function Quotations() {
                           onSign={() => {
                           setSignOsDialogId(q.id);
                           setSignForm({
-                            campaignName: q.quotationName || `${q.clientName || "Cliente"} - ${q.coasterVolume.toLocaleString("pt-BR")}`,
                             startDate: "",
                             endDate: "",
                             signatureUrl: "",
@@ -971,12 +970,14 @@ export default function Quotations() {
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-4">Dados da Campanha</p>
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label>Nome da Campanha *</Label>
-                <Input
-                  value={signForm.campaignName}
-                  onChange={(e) => setSignForm({ ...signForm, campaignName: e.target.value })}
-                  className="bg-background border-border/30"
-                />
+                <Label>Nome da Campanha</Label>
+                <div className="h-10 px-3 flex items-center rounded-lg bg-muted/50 border border-border/20 text-sm text-muted-foreground">
+                  {(() => {
+                    const q = quotationsList.find((x) => x.id === signOsDialogId);
+                    return q?.quotationName || q?.quotationNumber || "—";
+                  })()}
+                </div>
+                <p className="text-[11px] text-muted-foreground">Gerado automaticamente a partir da cotação.</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
@@ -1036,10 +1037,6 @@ export default function Quotations() {
                   toast.error("Informe a URL da assinatura");
                   return;
                 }
-                if (!signForm.campaignName.trim()) {
-                  toast.error("Informe o nome da campanha");
-                  return;
-                }
                 if (!signForm.startDate || !signForm.endDate) {
                   toast.error("Informe as datas de início e fim");
                   return;
@@ -1047,7 +1044,6 @@ export default function Quotations() {
                 signOSMutation.mutate({
                   quotationId: signOsDialogId,
                   signatureUrl: signForm.signatureUrl.trim(),
-                  campaignName: signForm.campaignName.trim(),
                   startDate: signForm.startDate,
                   endDate: signForm.endDate,
                 });

@@ -7,10 +7,12 @@ import { TRPCError } from "@trpc/server";
 
 const MONTH_NAMES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-function generateQuotationName(clientName: string, coasterVolume: number): string {
-  const month = MONTH_NAMES_PT[new Date().getMonth()];
+function generateQuotationName(clientName: string, coasterVolume: number, date?: Date): string {
+  const d = date || new Date();
+  const month = MONTH_NAMES_PT[d.getMonth()];
+  const year = d.getFullYear();
   const formattedVolume = coasterVolume.toLocaleString("pt-BR");
-  return `${month} | ${clientName} | ${formattedVolume}`;
+  return `${month} ${year} | ${clientName} | ${formattedVolume}`;
 }
 
 async function getDatabase() {
@@ -227,7 +229,6 @@ export const quotationRouter = router({
   markWin: comercialProcedure
     .input(z.object({
       id: z.number(),
-      campaignName: z.string().min(1),
       startDate: z.string(),
       endDate: z.string(),
     }))
@@ -239,11 +240,12 @@ export const quotationRouter = router({
       if (quotation[0].status === "win") throw new TRPCError({ code: "BAD_REQUEST", message: "Cotação já foi convertida" });
 
       const campaignNumber = await generateCampaignNumber(db);
+      const campaignName = quotation[0].quotationName || quotation[0].quotationNumber;
 
       const [campaign] = await db.insert(campaigns).values({
         campaignNumber,
         clientId: quotation[0].clientId,
-        name: input.campaignName,
+        name: campaignName,
         startDate: input.startDate,
         endDate: input.endDate,
         status: "active",
@@ -440,7 +442,6 @@ export const quotationRouter = router({
     .input(z.object({
       quotationId: z.number(),
       signatureUrl: z.string().min(1),
-      campaignName: z.string().min(1),
       startDate: z.string(),
       endDate: z.string(),
     }))
@@ -477,11 +478,12 @@ export const quotationRouter = router({
       const avgCommission = totalCoasters > 0 ? (weightedCommissionSum / totalCoasters).toFixed(2) : "20.00";
 
       const campaignNumber = await generateCampaignNumber(db);
+      const campaignName = quotation[0].quotationName || quotation[0].quotationNumber;
 
       const [campaign] = await db.insert(campaigns).values({
         campaignNumber,
         clientId: quotation[0].clientId,
-        name: input.campaignName,
+        name: campaignName,
         startDate: input.startDate,
         endDate: input.endDate,
         status: "producao",

@@ -113,7 +113,8 @@ Statuses: `producao` → `transito` → `executar` → `veiculacao` → `inativa
 ## Quotation Workflow
 
 Statuses: `rascunho` → `enviada` → `ativa` → `os_gerada` → `win` / `perdida` / `expirada`
-- Quotation naming standard: auto-generated as `{Mês} | {Nome Anunciante} | {Volume}`
+- Quotation naming standard: auto-generated as `{Mês} {Ano} | {Nome Anunciante} | {Volume}` — NOT editable, recalculated on update/duplicate
+- quotationName carries over as campaign name on WIN conversion (no separate campaignName input)
 - Cotação ativa → "Gerar OS" creates OS-ANT service order linked to quotation
 - OS gerada → Allocate restaurants (quotation_restaurants table) → Upload signature URL → Sign OS → auto-converts to WIN + creates campaign CMP-YYYY-NNNN with status `producao`
 - Conversion gate: requires (1) restaurants allocated with coaster volumes, (2) OS signed with signature URL
