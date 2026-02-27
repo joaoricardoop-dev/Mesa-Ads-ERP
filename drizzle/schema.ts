@@ -381,6 +381,7 @@ export const quotationRestaurants = pgTable("quotation_restaurants", {
   quotationId: integer("quotationId").notNull(),
   restaurantId: integer("restaurantId").notNull(),
   coasterQuantity: integer("coasterQuantity").notNull(),
+  commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("20.00"),
 });
 
 export type QuotationRestaurant = typeof quotationRestaurants.$inferSelect;

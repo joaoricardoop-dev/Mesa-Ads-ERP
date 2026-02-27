@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 
 import { trpc } from "@/lib/trpc";
@@ -156,6 +156,8 @@ export default function ActiveRestaurantProfile() {
   const [photoForm, setPhotoForm] = useState({ url: "", caption: "", photoType: "veiculacao" });
   const [termForm, setTermForm] = useState({ conditions: "", remunerationRule: "", allowedCategories: "", blockedCategories: "", restaurantObligations: "", mesaObligations: "", validFrom: "", validUntil: "" });
   const [selectedBranch, setSelectedBranch] = useState("");
+  const [editingCommission, setEditingCommission] = useState(false);
+  const [commissionValue, setCommissionValue] = useState("");
 
   const utils = trpc.useUtils();
   const { data: restaurant, isLoading } = trpc.activeRestaurant.get.useQuery({ id: restaurantId }, { enabled: restaurantId > 0 });
@@ -179,6 +181,16 @@ export default function ActiveRestaurantProfile() {
     allRestaurants.filter(r => r.id !== restaurantId && !r.parentRestaurantId && !branches.find(b => b.id === r.id)),
     [allRestaurants, restaurantId, branches]
   );
+
+  const updateCommissionMutation = trpc.activeRestaurant.update.useMutation({
+    onSuccess: () => {
+      utils.activeRestaurant.get.invalidate({ id: restaurantId });
+      utils.activeRestaurant.list.invalidate();
+      setEditingCommission(false);
+      toast.success("Comissão atualizada!");
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   const addPaymentMutation = trpc.activeRestaurant.addPayment.useMutation({
     onSuccess: () => { utils.activeRestaurant.getPayments.invalidate(); setIsPaymentDialogOpen(false); toast.success("Pagamento registrado!"); },
@@ -379,7 +391,57 @@ export default function ActiveRestaurantProfile() {
                     <MiniStat label="Comissão Paga" value={formatCurrency(stats.totalPaid)} accent />
                     <MiniStat label="Pendente" value={formatCurrency(stats.totalPending)} warn={stats.totalPending > 0} />
                     <MiniStat label="Coasters Alocados" value={String(restaurant.coastersAllocated)} />
-                    <MiniStat label="Comissão %" value={`${restaurant.commissionPercent}%`} />
+                    <div className="p-2 bg-background/50 rounded-md">
+                      <p className="text-[10px] text-muted-foreground mb-1">Comissão Padrão</p>
+                      {editingCommission ? (
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={commissionValue}
+                            onChange={(e) => setCommissionValue(e.target.value)}
+                            className="h-7 w-20 text-xs bg-background border-border/30"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                updateCommissionMutation.mutate({ id: restaurantId, commissionPercent: commissionValue });
+                              }
+                              if (e.key === "Escape") setEditingCommission(false);
+                            }}
+                          />
+                          <span className="text-xs text-muted-foreground">%</span>
+                          <Button
+                            size="sm"
+                            className="h-6 text-[10px] px-2"
+                            onClick={() => updateCommissionMutation.mutate({ id: restaurantId, commissionPercent: commissionValue })}
+                            disabled={updateCommissionMutation.isPending}
+                          >
+                            Salvar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 text-[10px] px-2"
+                            onClick={() => setEditingCommission(false)}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          className="text-sm font-semibold font-mono text-primary hover:underline cursor-pointer"
+                          onClick={() => {
+                            setCommissionValue(String(restaurant.commissionPercent || "20.00"));
+                            setEditingCommission(true);
+                          }}
+                          title="Clique para editar"
+                        >
+                          {restaurant.commissionPercent}%
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {restaurant.pixKey && <MiniStat label="Chave Pix" value={restaurant.pixKey} />}
                 </Card>

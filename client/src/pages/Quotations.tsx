@@ -861,6 +861,7 @@ export default function Quotations() {
                   <TableHeader>
                     <TableRow className="border-border/30 hover:bg-transparent">
                       <TableHead className="text-xs">Restaurante</TableHead>
+                      <TableHead className="text-xs text-center">Comissão</TableHead>
                       <TableHead className="text-xs text-right">Bolachas</TableHead>
                       <TableHead className="text-xs w-[60px]"></TableHead>
                     </TableRow>
@@ -873,6 +874,9 @@ export default function Quotations() {
                             <Store className="w-3.5 h-3.5 text-muted-foreground" />
                             {r.restaurantName || `Restaurante #${r.restaurantId}`}
                           </div>
+                        </TableCell>
+                        <TableCell className="text-center text-xs text-muted-foreground font-mono">
+                          {r.commissionPercent ? `${r.commissionPercent}%` : "20%"}
                         </TableCell>
                         <TableCell className="text-right">
                           <Input

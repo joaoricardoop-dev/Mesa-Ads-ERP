@@ -381,6 +381,7 @@ export const quotationRouter = router({
           coasterQuantity: quotationRestaurants.coasterQuantity,
           restaurantName: activeRestaurants.name,
           restaurantAddress: activeRestaurants.address,
+          commissionPercent: quotationRestaurants.commissionPercent,
         })
         .from(quotationRestaurants)
         .leftJoin(activeRestaurants, eq(quotationRestaurants.restaurantId, activeRestaurants.id))
@@ -400,11 +401,19 @@ export const quotationRouter = router({
       const db = await getDatabase();
       await db.delete(quotationRestaurants).where(eq(quotationRestaurants.quotationId, input.quotationId));
       if (input.restaurants.length > 0) {
+        const restaurantIds = input.restaurants.map(r => r.restaurantId);
+        const restaurantRecords = await db
+          .select({ id: activeRestaurants.id, commissionPercent: activeRestaurants.commissionPercent })
+          .from(activeRestaurants)
+          .where(inArray(activeRestaurants.id, restaurantIds));
+        const commMap = new Map(restaurantRecords.map(r => [r.id, r.commissionPercent || "20.00"]));
+
         await db.insert(quotationRestaurants).values(
           input.restaurants.map(r => ({
             quotationId: input.quotationId,
             restaurantId: r.restaurantId,
             coasterQuantity: r.coasterQuantity,
+            commissionPercent: String(commMap.get(r.restaurantId) || "20.00"),
           }))
         );
       }
@@ -442,6 +451,15 @@ export const quotationRouter = router({
         .set({ status: "assinada", signatureUrl: input.signatureUrl, updatedAt: new Date() })
         .where(eq(serviceOrders.id, os[0].id));
 
+      let totalCoasters = 0;
+      let weightedCommissionSum = 0;
+      for (const alloc of allocatedRestaurants) {
+        const comm = parseFloat(String(alloc.commissionPercent || "20"));
+        totalCoasters += alloc.coasterQuantity;
+        weightedCommissionSum += comm * alloc.coasterQuantity;
+      }
+      const avgCommission = totalCoasters > 0 ? (weightedCommissionSum / totalCoasters).toFixed(2) : "20.00";
+
       const campaignNumber = await generateCampaignNumber(db);
 
       const [campaign] = await db.insert(campaigns).values({
@@ -461,7 +479,7 @@ export const quotationRouter = router({
         markupPercent: "30.00",
         fixedPrice: "0.00",
         commissionType: "variable",
-        restaurantCommission: "20.00",
+        restaurantCommission: avgCommission,
         fixedCommission: "0.0500",
         sellerCommission: "10.00",
         taxRate: "15.00",

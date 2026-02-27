@@ -410,6 +410,7 @@ export default function ActiveRestaurantForm() {
       excludedCategories: JSON.stringify(form.excludedCategories),
       excludedOther: form.excludedOther || undefined,
       photoAuthorization: form.photoAuthorization,
+      commissionPercent: form.commissionPercent || "20.00",
       pixKey: form.pixKey || undefined,
       cnpj: form.cnpj || undefined,
       razaoSocial: form.razaoSocial || undefined,
@@ -712,6 +713,20 @@ export default function ActiveRestaurantForm() {
 
                   <Section icon={<CreditCard className="w-4 h-4" />} title="Financeiro">
                     <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Comissão Padrão (%)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={form.commissionPercent}
+                          onChange={(e) => setForm(p => ({ ...p, commissionPercent: e.target.value }))}
+                          placeholder="20.00"
+                          className="bg-background border-border/30 h-9 text-sm"
+                        />
+                        <p className="text-[10px] text-muted-foreground">Percentual aplicado sobre o valor de venda por bolacha. Reflete em cotações e campanhas.</p>
+                      </div>
                       <Field label="Chave Pix" value={form.pixKey} onChange={(v) => setForm(p => ({ ...p, pixKey: v }))} placeholder="CPF, CNPJ, email ou telefone" />
                       {isEditing && (
                         <div className="space-y-1.5">

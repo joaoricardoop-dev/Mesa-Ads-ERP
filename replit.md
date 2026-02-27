@@ -79,7 +79,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - `campaign_history` — Audit trail for campaign status changes
 - `campaign_proofs` — Weekly proof photos per restaurant per campaign
 - `quotations` — Commercial quotations (QOT-YYYY-NNNN numbering, 6 statuses, quotationName auto-generated)
-- `quotation_restaurants` — N:N quotation-restaurant allocation with coaster quantities
+- `quotation_restaurants` — N:N quotation-restaurant allocation with coaster quantities + frozen commissionPercent
 - `leads` — CRM leads (anunciante/restaurante types, kanban stages)
 - `lead_interactions` — Interaction history per lead
 - `service_orders` — OS for anunciantes and production (OS-ANT/OS-PROD numbering)
