@@ -7,6 +7,7 @@ import { leadRouter } from "./leadRouter";
 import { serviceOrderRouter } from "./serviceOrderRouter";
 import { termRouter } from "./termRouter";
 import { libraryRouter } from "./libraryRouter";
+import { batchRouter } from "./batchRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -70,6 +71,7 @@ export const appRouter = router({
   serviceOrder: serviceOrderRouter,
   term: termRouter,
   library: libraryRouter,
+  batch: batchRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

@@ -26,6 +26,7 @@ import Library from "./pages/Library";
 import Quotations from "./pages/Quotations";
 import Leads from "./pages/Leads";
 import ServiceOrders from "./pages/ServiceOrders";
+import BatchManagement from "./pages/BatchManagement";
 import DevRoleSwitcher from "./components/DevRoleSwitcher";
 import ForcePasswordChange from "./components/ForcePasswordChange";
 import FinancialDashboard from "./pages/financial/FinancialDashboard";
@@ -60,6 +61,7 @@ function Router() {
       <Route path="/ordens-servico" component={ServiceOrders} />
       <Route path="/economics" component={Economics} />
       <Route path="/producao" component={Production} />
+      <Route path="/configuracoes/batches" component={BatchManagement} />
       <Route path="/membros" component={Members} />
       <Route path="/configuracoes/usuarios" component={Members} />
       <Route path="/biblioteca" component={Library} />

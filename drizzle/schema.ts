@@ -471,4 +471,28 @@ export const budgetItems = pgTable("budget_items", {
 export type BudgetItem = typeof budgetItems.$inferSelect;
 export type InsertBudgetItem = typeof budgetItems.$inferInsert;
 
+export const campaignBatches = pgTable("campaign_batches", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull(),
+  batchNumber: integer("batchNumber").notNull(),
+  label: varchar("label", { length: 100 }).notNull(),
+  startDate: date("startDate").notNull(),
+  endDate: date("endDate").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type CampaignBatch = typeof campaignBatches.$inferSelect;
+export type InsertCampaignBatch = typeof campaignBatches.$inferInsert;
+
+export const campaignBatchAssignments = pgTable("campaign_batch_assignments", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaignId").notNull(),
+  batchId: integer("batchId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CampaignBatchAssignment = typeof campaignBatchAssignments.$inferSelect;
+
 export * from "../shared/models/auth";

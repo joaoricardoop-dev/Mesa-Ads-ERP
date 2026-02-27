@@ -98,6 +98,16 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - `restaurant_payments` — Payments to restaurant partners
 - `suppliers` — Production suppliers
 - `budgets` / `budget_items` — Production budgets
+- `campaign_batches` — 4-week veiculação periods (13 per year, auto-generated from first Monday)
+- `campaign_batch_assignments` — N:N campaign-to-batch mapping (campaigns can span multiple batches)
+
+## Campaign Batches
+
+- Year divided into 13 batches of 4 weeks (28 days), starting from the first Monday of the year
+- Auto-generated on first access for a given year; admin can edit dates/labels/status
+- Campaigns can span 1 or more consecutive batches (multi-batch = 8+ weeks)
+- Batch management page: `/configuracoes/batches` (admin only)
+- `server/batchRouter.ts` — CRUD + auto-generation + campaign assignment
 
 ## Campaign Workflow (6-Step Automated Flow)
 

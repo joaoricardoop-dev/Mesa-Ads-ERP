@@ -53,6 +53,7 @@ import {
   Users,
   Wallet,
   ClipboardList,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -121,6 +122,7 @@ const NAV_ENTRIES: NavEntry[] = [
     items: [
       { icon: DollarSign, label: "Economics", path: "/economics" },
       { icon: Factory, label: "Produção", path: "/producao" },
+      { icon: Layers, label: "Batches", path: "/configuracoes/batches", adminOnly: true },
       { icon: Users, label: "Gestão de Usuários", path: "/configuracoes/usuarios", adminOnly: true },
     ],
   },

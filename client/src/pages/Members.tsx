@@ -20,6 +20,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import {
@@ -34,6 +43,11 @@ import {
   Mail,
   Clock,
   CalendarDays,
+  UserPlus,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Copy,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -81,6 +95,13 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof S
   },
 };
 
+function generateTempPassword() {
+  const chars = "abcdefghijkmnpqrstuvwxyz23456789";
+  let result = "";
+  for (let i = 0; i < 8; i++) result += chars[Math.floor(Math.random() * chars.length)];
+  return result;
+}
+
 export default function Members() {
   const [search, setSearch] = useState("");
   const [confirmAction, setConfirmAction] = useState<{
@@ -88,6 +109,24 @@ export default function Members() {
     action: "activate" | "deactivate";
     userName: string;
   } | null>(null);
+
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    email: "",
+    firstName: "",
+    lastName: "",
+    role: "user",
+    tempPassword: generateTempPassword(),
+  });
+  const [showTempPassword, setShowTempPassword] = useState(false);
+
+  const [resetDialogTarget, setResetDialogTarget] = useState<{
+    userId: string;
+    userName: string;
+    email: string;
+  } | null>(null);
+  const [resetPassword, setResetPassword] = useState(generateTempPassword());
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const utils = trpc.useUtils();
   const { data: membersList = [], isLoading } = trpc.members.list.useQuery();
@@ -109,6 +148,25 @@ export default function Members() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
+  const createUserMutation = trpc.members.createUser.useMutation({
+    onSuccess: () => {
+      utils.members.list.invalidate();
+      setCreateDialogOpen(false);
+      setCreateForm({ email: "", firstName: "", lastName: "", role: "user", tempPassword: generateTempPassword() });
+      toast.success("Usuário cadastrado com sucesso! A senha temporária foi definida.");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const resetPasswordMutation = trpc.members.resetPassword.useMutation({
+    onSuccess: () => {
+      utils.members.list.invalidate();
+      toast.success("Senha resetada! O usuário precisará definir uma nova senha no próximo login.");
+      setResetDialogTarget(null);
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
   const filtered = membersList.filter(
     (m) =>
       (m.firstName || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -122,8 +180,18 @@ export default function Members() {
 
   return (
     <PageContainer
-      title="Membros"
-      description="Gestão de usuários e permissões"
+      title="Gestão de Usuários"
+      description="Cadastrar, gerenciar papéis e permissões dos usuários da plataforma"
+      actions={
+        <Button onClick={() => {
+          setCreateForm({ email: "", firstName: "", lastName: "", role: "user", tempPassword: generateTempPassword() });
+          setShowTempPassword(false);
+          setCreateDialogOpen(true);
+        }}>
+          <UserPlus className="w-4 h-4 mr-2" />
+          Cadastrar Usuário
+        </Button>
+      }
     >
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -264,7 +332,25 @@ export default function Members() {
                     </p>
                   </div>
 
-                  <div className="flex justify-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10"
+                      title="Resetar senha"
+                      onClick={() => {
+                        const pw = generateTempPassword();
+                        setResetPassword(pw);
+                        setShowResetPassword(false);
+                        setResetDialogTarget({
+                          userId: member.id,
+                          userName: `${member.firstName || ""} ${member.lastName || ""}`.trim() || "Usuário",
+                          email: member.email || "",
+                        });
+                      }}
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -450,6 +536,205 @@ export default function Members() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="bg-card border-border/30 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-primary" />
+              Cadastrar Novo Usuário
+            </DialogTitle>
+            <DialogDescription>
+              O usuário receberá uma senha temporária e precisará definir sua própria senha no primeiro login.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Nome *</Label>
+              <Input
+                value={createForm.firstName}
+                onChange={(e) => setCreateForm({ ...createForm, firstName: e.target.value })}
+                placeholder="Nome"
+                className="bg-background border-border/30"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Sobrenome</Label>
+              <Input
+                value={createForm.lastName}
+                onChange={(e) => setCreateForm({ ...createForm, lastName: e.target.value })}
+                placeholder="Sobrenome"
+                className="bg-background border-border/30"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>E-mail *</Label>
+              <Input
+                type="email"
+                value={createForm.email}
+                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                placeholder="usuario@empresa.com"
+                className="bg-background border-border/30"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Papel</Label>
+              <Select
+                value={createForm.role}
+                onValueChange={(role) => setCreateForm({ ...createForm, role })}
+              >
+                <SelectTrigger className="bg-background border-border/30">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(ROLE_CONFIG).map(([value, config]) => (
+                    <SelectItem key={value} value={value}>
+                      <span className="flex items-center gap-1.5">
+                        <config.icon className={`w-3 h-3 ${config.color.split(" ")[1]}`} />
+                        {config.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Senha Temporária</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showTempPassword ? "text" : "password"}
+                    value={createForm.tempPassword}
+                    onChange={(e) => setCreateForm({ ...createForm, tempPassword: e.target.value })}
+                    className="bg-background border-border/30 pr-10 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTempPassword(!showTempPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showTempPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="border-border/30 flex-shrink-0"
+                  title="Copiar senha"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createForm.tempPassword);
+                    toast.success("Senha copiada!");
+                  }}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Copie e envie esta senha ao usuário. Ele terá que trocá-la no primeiro acesso.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (!createForm.email.trim() || !createForm.firstName.trim()) {
+                  toast.error("Nome e e-mail são obrigatórios.");
+                  return;
+                }
+                if (createForm.tempPassword.length < 6) {
+                  toast.error("A senha deve ter pelo menos 6 caracteres.");
+                  return;
+                }
+                createUserMutation.mutate(createForm);
+              }}
+              disabled={createUserMutation.isPending}
+            >
+              {createUserMutation.isPending ? "Cadastrando..." : "Cadastrar Usuário"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!resetDialogTarget} onOpenChange={(open) => !open && setResetDialogTarget(null)}>
+        <DialogContent className="bg-card border-border/30 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-amber-400" />
+              Resetar Senha
+            </DialogTitle>
+            <DialogDescription>
+              Definir uma nova senha temporária para <strong>{resetDialogTarget?.userName}</strong> ({resetDialogTarget?.email}).
+              O usuário precisará definir uma nova senha no próximo login.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Nova Senha Temporária</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showResetPassword ? "text" : "password"}
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                    className="bg-background border-border/30 pr-10 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(!showResetPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="border-border/30 flex-shrink-0"
+                  title="Copiar senha"
+                  onClick={() => {
+                    navigator.clipboard.writeText(resetPassword);
+                    toast.success("Senha copiada!");
+                  }}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Copie e envie esta senha ao usuário.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetDialogTarget(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!resetDialogTarget) return;
+                if (resetPassword.length < 6) {
+                  toast.error("A senha deve ter pelo menos 6 caracteres.");
+                  return;
+                }
+                resetPasswordMutation.mutate({
+                  userId: resetDialogTarget.userId,
+                  newPassword: resetPassword,
+                });
+              }}
+              disabled={resetPasswordMutation.isPending}
+            >
+              {resetPasswordMutation.isPending ? "Resetando..." : "Resetar Senha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }
