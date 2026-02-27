@@ -1,6 +1,6 @@
-# Mesa Ads Simulator
+# Mesa Ads ERP
 
-Financial simulation and management SaaS for a Brazilian offline media company specializing in advertising on coasters (bolachas de chopp).
+Financial simulation and management SaaS (ERP) for a Brazilian offline media company specializing in advertising on coasters (bolachas de chopp).
 
 ## Tech Stack
 
@@ -23,11 +23,29 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - `shared/rating.ts` — Rating calculator functions (calcularRating, temCamposRatingCompletos)
 - `drizzle/` — Database schema and migrations
 
+## Layout & Navigation
+
+- **Sidebar layout** via `DashboardLayout.tsx` (shadcn Sidebar, collapsible, resizable)
+- **No top navigation bar** — all navigation is in the sidebar
+- **Module-based sidebar** with collapsible groups:
+  - Dashboard (`/`) — operational overview
+  - Comercial (group): Cotações, Simulador (`/comercial/simulador`), Leads, Anunciantes (`/clientes`), OS Anunciantes, Termos Restaurantes
+  - Campanhas (`/campanhas`)
+  - Parceiros (group): Prospecção (`/prospeccao`), Restaurantes (`/restaurantes`)
+  - Biblioteca (`/biblioteca`)
+  - Configurações (group): Economics (`/economics`), Produção (`/producao`), Membros (`/membros`, admin only)
+- **Reusable layout components**:
+  - `PageContainer` (`client/src/components/PageContainer.tsx`) — page wrapper with title, description, actions, consistent padding/scroll
+  - `Section` (`client/src/components/Section.tsx`) — card section with icon, title, description
+- **Topbar** (inside SidebarInset): breadcrumb label + theme toggle
+- **Landing page** (`LandingPage.tsx`) — shown when not authenticated, outside DashboardLayout
+- **Placeholder pages** (`PlaceholderPage.tsx`) — "Em desenvolvimento" for unbuilt modules
+
 ## Authentication
 
 - Replit Auth via OpenID Connect (supports Google, GitHub, Apple, email)
 - Landing page shown when not logged in (`client/src/pages/LandingPage.tsx`)
-- AppNav shows user avatar, name, and logout button when logged in
+- Sidebar footer shows user avatar, name, role, and logout button when logged in
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
 - Session stored in PostgreSQL `sessions` table
 - Auth hook: `client/src/hooks/use-auth.ts`
@@ -38,8 +56,7 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - **Gerente** (manager): Approve quotations, CRUD campaigns/restaurants/clients, simulator, economics — no member management or deletion
 - **Usuário** (user): Create quotations, view campaigns/restaurants/clients — no approval or deletion
 - **Visualizador** (viewer): Read-only access to campaigns/restaurants/clients — no creation or editing
-- Admin-only pages: `/membros` (Members management)
-- Admin nav items highlighted in amber in AppNav
+- Admin-only pages: `/membros` (Members management, visible in sidebar only for admins)
 
 ## Database Tables
 
@@ -67,6 +84,17 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - Server: `server/_core/index.ts`
 - Client: `client/src/main.tsx`
 
+## Simulator (Comercial > Simulador)
+
+- Route: `/comercial/simulador`
+- Page: `client/src/pages/Home.tsx`
+- Layout: sidebar inputs (InputPanel) + 3 tabs:
+  - **Simulação**: Budget selector, restaurant allocation, KPIs, DRE
+  - **Análise**: Charts, scenarios, unit economics
+  - **Tabelas**: Markup and discount tables
+- Actions in PageContainer header: "Criar Cotação" + "Resetar"
+- No hero banner — clean dashboard layout
+
 ## Campaign Workflow
 
 - Statuses: draft → quotation → active (approved) / archived
@@ -91,35 +119,18 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - Score calculated from 1.00 to 5.00 using `calcularRating()` from `shared/rating.ts`
 - Multiplier helper: `calcularMultiplicador(score)` exported from `shared/rating-config.ts`
 - Configuration centralized in `shared/rating-config.ts` (RATING_CONFIG object)
-- Input fields in active_restaurants: ticketMedio, locationRating (1-5), venueType (1-5), digitalPresence (1-5), primaryDrink
-- Calculated fields: ratingScore, ratingTier, ratingMultiplier, ratingUpdatedAt
-- Auto-triggers: rating recalculates on create/update of any of the 6 rating fields in server/db.ts
-- Admin bulk recalculation: `activeRestaurant.recalculateRatings` route (adminProcedure)
-- Form section "Rating Interno" (merged into Operação section) with live preview in ActiveRestaurantForm.tsx
-- Rating card displayed in ActiveRestaurantProfile.tsx Painel tab
-- Rating badge shown in ActiveRestaurants.tsx list with tier filter and score sort
-- Rating badge shown in CampaignDetail.tsx Distribuição tab
 
 ## Simulator Restaurant Allocation
 
-- Restaurant selection panel in simulator overview tab (between Budget Selector and KPI Cards)
+- Restaurant selection panel in simulator Simulação tab (between Budget Selector and KPI Cards)
 - Multi-select dropdown with search to add restaurants from the active restaurant database
 - Per-restaurant coaster allocation with numeric input
 - "Capacidade Mensal" column: calculated as `monthlyDrinksSold × 0.6` with tooltip explaining the formula
 - Validation: sum of allocated coasters must equal total campaign coasters (coastersPerRestaurant × activeRestaurants)
-- Per-restaurant pricing view: toggle "Ver Preços" shows individual selling price, profit, and margin per restaurant using their specific multiplier and commission rate
-- Detailed pricing breakdown per restaurant: receita, produção, comissão restaurante, impostos, comissão agência, comissão vendedor, lucro bruto, margem
-- Weighted multiplier: calculated as weighted average of each restaurant's ratingMultiplier, weighted by coasters allocated
-- Weighted score: calculated as weighted average of each restaurant's ratingScore, weighted by coasters allocated
-- Weighted commission: calculated as weighted average of per-restaurant commissionPercent (editable 8–15%, default 10%), weighted by coasters allocated
-- Multiplier applies to selling price: `adjustedSellingPrice = baseSellingPrice × weightedMultiplier`
-- All percentage-based costs (restaurant commission, agency commission, seller commission, taxes) recalculate on the adjusted price
-- Restaurant commission in DRE reflects the multiplier-adjusted price
-- "Distribute evenly" button to split coasters equally across selected restaurants
-- State persisted to localStorage (`mesa-ads-restaurant-allocations`)
+- Per-restaurant pricing view: toggle "Ver Preços" shows individual selling price, profit, and margin per restaurant
+- Weighted multiplier/score/commission: calculated as weighted average, weighted by coasters allocated
 - Hook: `client/src/hooks/useRestaurantAllocation.ts`
 - Component: `client/src/components/RestaurantAllocationPanel.tsx`
-- Expandable/collapsible panel with summary badge showing allocation status
 
 ## Pricing Engine (calcPricing)
 
@@ -129,13 +140,11 @@ Financial simulation and management SaaS for a Brazilian offline media company s
 - Two commission types in DRE:
   - **Comissão Restaurante**: weighted avg of restaurant DB `commissionPercent`, applied as % of adjusted selling price
   - **Comissão Agência/Parceiro**: from simulator input (variable % or fixed per coaster)
-- Parameters passed via `CalcPricingOptions`: `{ markupOverride, restaurantCommissionRate, multiplier }`
-- All tables (markup, discount, scenarios, sensitivity) use the same multiplier and commission rate
 
 ## Theme & Visual Identity
 
 - Brand colors: Black (#0d0d0d) + Orange (hsl 22 100% 50%) — consistent across landing page and app
-- Light/dark mode with toggle in navigation bar, defaults to dark
+- Light/dark mode with toggle in sidebar topbar, defaults to dark
 - Landing page: Separate dark-only marketing design with Outfit font, framer-motion animations
 - App: DM Sans + JetBrains Mono fonts, orange primary color, deep black backgrounds in dark mode
 - CSS variables in `client/src/index.css` (`:root` for light, `.dark` for dark)

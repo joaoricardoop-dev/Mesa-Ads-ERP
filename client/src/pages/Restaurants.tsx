@@ -2,6 +2,7 @@ import { useState, Fragment } from "react";
 import { useLocation } from "wouter";
 
 import { trpc } from "@/lib/trpc";
+import PageContainer from "@/components/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -453,23 +454,16 @@ export default function Restaurants() {
   );
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <Store className="w-5 h-5 text-primary" />
-            Prospecção de Restaurantes
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Leads e prospecção de novos restaurantes parceiros
-          </p>
-        </div>
+    <PageContainer
+      title="Prospecção"
+      description="Pipeline de prospecção de restaurantes"
+      actions={
         <Button onClick={() => navigate("/prospeccao/novo")} className="gap-2">
           <Plus className="w-4 h-4" />
           Novo Restaurante
         </Button>
-      </div>
+      }
+    >
 
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-card border border-border/30 rounded-lg p-4">
@@ -1167,7 +1161,6 @@ export default function Restaurants() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      </div>
-    </div>
+    </PageContainer>
   );
 }

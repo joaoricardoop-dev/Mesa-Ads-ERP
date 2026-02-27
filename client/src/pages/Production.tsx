@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PageContainer from "@/components/PageContainer";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -412,31 +413,21 @@ export default function Production() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-background text-foreground">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <Factory className="w-6 h-6 text-primary" />
-              Custos de Produção
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Gerencie fornecedores e orçamentos de produção dos coasters
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar..."
-                className="pl-9 w-64 bg-card border-border/30"
-              />
-            </div>
-          </div>
+    <PageContainer
+      title="Produção"
+      description="Gestão de fornecedores e orçamentos de produção"
+      actions={
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar..."
+            className="pl-9 w-64 bg-card border-border/30"
+          />
         </div>
+      }
+    >
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -1326,7 +1317,6 @@ export default function Production() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
-    </div>
+    </PageContainer>
   );
 }

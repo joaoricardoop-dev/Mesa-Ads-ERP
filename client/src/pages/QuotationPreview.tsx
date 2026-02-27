@@ -208,7 +208,7 @@ export default function QuotationPreview() {
         <div className="border-b border-border/20 bg-card/30 px-4 lg:px-6 py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/")}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/comercial/simulador")}>
                 <ArrowLeft className="w-4 h-4" />
               </Button>
               <div>
@@ -222,7 +222,7 @@ export default function QuotationPreview() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => navigate("/")}>Voltar ao Simulador</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate("/comercial/simulador")}>Voltar ao Simulador</Button>
               <Button
                 size="sm"
                 className="gap-1.5 bg-primary hover:bg-primary/90"
@@ -403,7 +403,7 @@ export default function QuotationPreview() {
           </div>
 
           <div className="flex justify-end gap-3 pb-6">
-            <Button variant="outline" onClick={() => navigate("/")}>Voltar ao Simulador</Button>
+            <Button variant="outline" onClick={() => navigate("/comercial/simulador")}>Voltar ao Simulador</Button>
             <Button
               className="gap-2 bg-primary hover:bg-primary/90 px-6"
               onClick={handleCreate}

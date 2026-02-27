@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 
 import { trpc } from "@/lib/trpc";
+import PageContainer from "@/components/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -390,23 +391,16 @@ export default function Campaigns() {
   }, [campaignsList]);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-              <Megaphone className="w-5 h-5 text-primary" />
-              Campanhas
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Gerencie campanhas com todos os parâmetros financeiros do simulador
-            </p>
-          </div>
-          <Button onClick={handleNew} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nova Campanha
-          </Button>
-        </div>
+    <PageContainer
+      title="Campanhas"
+      description="Gestão de campanhas de mídia"
+      actions={
+        <Button onClick={handleNew} className="gap-2">
+          <Plus className="w-4 h-4" />
+          Nova Campanha
+        </Button>
+      }
+    >
 
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <div className="bg-card border border-border/30 rounded-lg p-4">
@@ -725,8 +719,7 @@ export default function Campaigns() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
-    </div>
+    </PageContainer>
   );
 }
 

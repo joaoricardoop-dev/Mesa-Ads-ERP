@@ -23,6 +23,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import PageContainer from "@/components/PageContainer";
 import { formatCurrency, formatCompact, formatPercent } from "@/lib/format";
 import {
   TrendingUp,
@@ -93,21 +94,10 @@ export default function Economics() {
   const campaigns = data?.campaigns || [];
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-primary" />
-            Economics Mensal
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Visão consolidada do faturamento e lucro da Mesa Ads no mês
-          </p>
-        </div>
-
-        {/* Month/Year Selector */}
+    <PageContainer
+      title="Economics"
+      description="Visão financeira e indicadores da operação"
+      actions={
         <div className="flex items-center gap-2">
           <Select
             value={String(month)}
@@ -140,7 +130,8 @@ export default function Economics() {
             </SelectContent>
           </Select>
         </div>
-      </div>
+      }
+    >
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
@@ -487,7 +478,6 @@ export default function Economics() {
           </div>
         </div>
       )}
-      </div>
-    </div>
+    </PageContainer>
   );
 }

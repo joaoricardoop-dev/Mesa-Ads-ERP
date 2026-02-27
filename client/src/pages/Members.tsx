@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PageContainer from "@/components/PageContainer";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -100,19 +101,10 @@ export default function Members() {
   const inactiveCount = membersList.filter((m) => m.isActive === false).length;
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-              <UserCog className="w-5 h-5 text-primary" />
-              Área de Membros
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Gerencie usuários, papéis e permissões da plataforma
-            </p>
-          </div>
-        </div>
+    <PageContainer
+      title="Membros"
+      description="Gestão de usuários e permissões"
+    >
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-card border border-border/30 rounded-lg p-4">
@@ -373,7 +365,6 @@ export default function Members() {
             </div>
           </div>
         </div>
-      </div>
 
       <AlertDialog
         open={!!confirmAction}
@@ -414,6 +405,6 @@ export default function Members() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageContainer>
   );
 }

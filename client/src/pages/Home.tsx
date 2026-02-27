@@ -1,9 +1,3 @@
-/*
- * Design: Bloomberg Terminal Reimaginado
- * Layout: Sidebar fixa à esquerda (inputs) + Área principal com grid de dados
- * Fundo dark slate, acentos emerald, tipografia DM Sans + JetBrains Mono
- */
-
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useSimulator, type BudgetOption, loadSavedBudgetId, saveBudgetId } from "@/hooks/useSimulator";
@@ -18,6 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/format";
+import PageContainer from "@/components/PageContainer";
+import Section from "@/components/Section";
 import InputPanel from "@/components/InputPanel";
 import KPICards from "@/components/KPICards";
 import SimulatorDRE from "@/components/SimulatorDRE";
@@ -31,24 +27,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-
 import {
   BarChart3,
   Table2,
-  Layers,
-  Zap,
   LineChart,
   SlidersHorizontal,
   Rocket,
   FileText,
   RotateCcw,
 } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
-
 
 export default function Home() {
-  // ─── Budget selection state ────────────────────────────────────────
-  const { theme, toggleTheme } = useTheme();
   const { data: budgetsList = [] } = trpc.budget.listActiveWithItems.useQuery();
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>(() => {
     const savedId = loadSavedBudgetId();
@@ -73,7 +62,7 @@ export default function Home() {
     };
   }, [selectedBudgetId, budgetsList]);
 
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("simulation");
   const [, navigate] = useLocation();
 
   const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
@@ -118,9 +107,42 @@ export default function Home() {
     setShowResetConfirm(false);
   };
 
+  const actions = (
+    <>
+      <Button
+        onClick={() => navigate("/cotacao/preview")}
+        className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+        size="sm"
+      >
+        <Rocket className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Criar Cotação</span>
+      </Button>
+      {showResetConfirm ? (
+        <div className="flex items-center gap-1.5 bg-destructive/10 rounded-lg px-2 py-1 border border-destructive/30">
+          <span className="text-xs text-muted-foreground">Resetar?</span>
+          <Button onClick={handleResetQuotation} variant="destructive" size="sm" className="h-6 text-xs px-2">
+            Sim
+          </Button>
+          <Button onClick={() => setShowResetConfirm(false)} variant="ghost" size="sm" className="h-6 text-xs px-2">
+            Não
+          </Button>
+        </div>
+      ) : (
+        <Button
+          onClick={() => setShowResetConfirm(true)}
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Resetar</span>
+        </Button>
+      )}
+    </>
+  );
+
   return (
     <div className="h-full flex overflow-hidden">
-      {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-[300px] xl:w-[320px] flex-shrink-0 border-r border-border/30 bg-sidebar flex-col">
         <ScrollArea className="h-full">
           <InputPanel
@@ -131,18 +153,11 @@ export default function Home() {
         </ScrollArea>
       </aside>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-
-        {/* Mobile sidebar trigger */}
         <div className="lg:hidden border-b border-border/30 bg-card/30 px-4 py-2">
           <Sheet>
             <SheetTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 border-border/40"
-              >
+              <Button variant="outline" size="sm" className="gap-2 border-border/40">
                 <SlidersHorizontal className="w-4 h-4" />
                 Parâmetros
               </Button>
@@ -159,319 +174,206 @@ export default function Home() {
           </Sheet>
         </div>
 
-        {/* Tabs Navigation - Fixed */}
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="flex-1 flex flex-col min-h-0"
+        <PageContainer
+          title="Simulador Financeiro"
+          description="Monte cenários de campanha e gere cotações"
+          actions={actions}
+          noPadding
         >
-          <div className="border-b border-border/30 bg-card/30 flex-shrink-0 px-4 lg:px-6">
-            <TabsList className="bg-transparent h-10 p-0 gap-0">
-              <TabsTrigger
-                value="overview"
-                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 text-xs gap-1.5"
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Visão Geral</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="tables"
-                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 text-xs gap-1.5"
-              >
-                <Table2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Tabelas</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="scenarios"
-                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 text-xs gap-1.5"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Cenários</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="unit-economics"
-                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 text-xs gap-1.5"
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Unit Economics</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="charts"
-                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 text-xs gap-1.5"
-              >
-                <LineChart className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Dashboard</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+            <div className="border-b border-border/30 bg-card/30 flex-shrink-0 px-4 lg:px-6">
+              <TabsList className="bg-transparent h-10 p-0 gap-0">
+                <TabsTrigger
+                  value="simulation"
+                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 text-xs gap-1.5"
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Simulação</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="analysis"
+                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 text-xs gap-1.5"
+                >
+                  <LineChart className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Análise</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="tables"
+                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 text-xs gap-1.5"
+                >
+                  <Table2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Tabelas</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-          {/* Scrollable Content Area */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4 lg:p-6">
-              <TabsContent value="overview" className="mt-0 space-y-6">
-                {/* Hero Banner */}
-                <div className="relative rounded-xl overflow-hidden h-32 md:h-36 border border-border/30">
-                  <img src="/images/hero-bar.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/30" />
-                  <div className="absolute inset-0 flex items-center p-6 md:p-8">
-                    <div className="flex-1 relative z-10">
-                      <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-1 text-white">
-                        Simulador Financeiro
-                      </h2>
-                      <p className="text-sm text-white/60 max-w-md mb-3">
-                        Faturamento e lucro da Mesa Ads. Restaurantes parceiros
-                        recebem comissão sobre a mídia veiculada nos coasters.
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => navigate("/cotacao/preview")}
-                          className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
-                          size="sm"
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 lg:p-6">
+                <TabsContent value="simulation" className="mt-0 space-y-6">
+                  <Section title="Custo de Produção" icon={FileText} description="Selecione um orçamento cadastrado ou use valores manuais">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1.5 block">
+                          Orçamento de Produção
+                        </Label>
+                        <Select
+                          value={selectedBudgetId}
+                          onValueChange={(v) => {
+                            setSelectedBudgetId(v);
+                            saveBudgetId(v === "manual" ? null : parseInt(v));
+                          }}
                         >
-                          <Rocket className="w-4 h-4" />
-                          Criar Cotação com estes valores
-                        </Button>
-                        {showResetConfirm ? (
-                          <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-destructive/40">
-                            <span className="text-xs text-white/80">Resetar tudo?</span>
-                            <Button
-                              onClick={handleResetQuotation}
-                              variant="destructive"
-                              size="sm"
-                              className="h-7 text-xs px-2"
-                            >
-                              Confirmar
-                            </Button>
-                            <Button
-                              onClick={() => setShowResetConfirm(false)}
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs px-2 text-white/60 hover:text-white hover:bg-white/10"
-                            >
-                              Cancelar
-                            </Button>
+                          <SelectTrigger className="bg-background/50 border-border/50 h-9 text-sm">
+                            <SelectValue placeholder="Selecione um orçamento" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="manual">Manual (Batch Size / Custo)</SelectItem>
+                            {budgetsList.map((b) => (
+                              <SelectItem key={b.id} value={String(b.id)}>
+                                {b.supplierName} — {b.code || b.description}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex items-end gap-4">
+                        <div className="flex-1">
+                          <Label className="text-xs text-muted-foreground mb-1.5 block">
+                            Custo Unitário Efetivo
+                          </Label>
+                          <div className="bg-background/50 border border-border/50 rounded-md h-9 flex items-center px-3">
+                            <span className="font-mono text-sm font-semibold text-primary">
+                              R$ {simulator.effectiveUnitCost.toFixed(3)}
+                            </span>
+                            <span className="text-xs text-muted-foreground ml-2">/ coaster</span>
                           </div>
-                        ) : (
-                          <Button
-                            onClick={() => setShowResetConfirm(true)}
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 border-white/20 text-white/70 hover:text-white hover:bg-white/10 hover:border-white/40"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            Resetar
-                          </Button>
+                        </div>
+                        {selectedBudget && (
+                          <div className="flex-1">
+                            <Label className="text-xs text-muted-foreground mb-1.5 block">
+                              Qtd. Total Estimada
+                            </Label>
+                            <div className="bg-background/50 border border-border/50 rounded-md h-9 flex items-center px-3">
+                              <span className="font-mono text-sm">
+                                {totalCoasters.toLocaleString("pt-BR")} un
+                              </span>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Budget Selector Card */}
-                <div className="bg-card/50 border border-border/30 rounded-xl p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                      <FileText className="w-4 h-4 text-amber-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold">
-                        Custo de Produção
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        Selecione um orçamento cadastrado ou use valores manuais
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-xs text-muted-foreground mb-1.5 block">
-                        Orçamento de Produção
-                      </Label>
-                      <Select
-                        value={selectedBudgetId}
-                        onValueChange={(v) => {
-                          setSelectedBudgetId(v);
-                          saveBudgetId(v === "manual" ? null : parseInt(v));
-                        }}
-                      >
-                        <SelectTrigger className="bg-background/50 border-border/50 h-9 text-sm">
-                          <SelectValue placeholder="Selecione um orçamento" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="manual">
-                            Manual (Batch Size / Custo)
-                          </SelectItem>
-                          {budgetsList.map((b) => (
-                            <SelectItem key={b.id} value={String(b.id)}>
-                              {b.supplierName} — {b.code || b.description}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex items-end gap-4">
-                      <div className="flex-1">
-                        <Label className="text-xs text-muted-foreground mb-1.5 block">
-                          Custo Unitário Efetivo
-                        </Label>
-                        <div className="bg-background/50 border border-border/50 rounded-md h-9 flex items-center px-3">
-                          <span className="font-mono text-sm font-semibold text-primary">
-                            R$ {simulator.effectiveUnitCost.toFixed(3)}
-                          </span>
-                          <span className="text-xs text-muted-foreground ml-2">
-                            / coaster
-                          </span>
+                    {selectedBudget && selectedBudget.items.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-border/20">
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Tabela de preços do orçamento{" "}
+                          <span className="text-foreground font-medium">{selectedBudget.code}</span>{" "}
+                          ({selectedBudget.supplierName}):
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedBudget.items.map((item, i) => {
+                            const isActive =
+                              totalCoasters >= item.quantity &&
+                              (i === selectedBudget.items.length - 1 ||
+                                totalCoasters < selectedBudget.items[i + 1].quantity);
+                            return (
+                              <div
+                                key={i}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
+                                  isActive
+                                    ? "bg-primary/20 border-primary/40 text-primary"
+                                    : "bg-background/30 border-border/20 text-muted-foreground"
+                                }`}
+                              >
+                                <span className="font-semibold">{item.quantity.toLocaleString("pt-BR")}</span>
+                                <span className="mx-1">→</span>
+                                <span>R$ {parseFloat(item.unitPrice).toFixed(3)}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                      {selectedBudget && (
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground mb-1.5 block">
-                            Qtd. Total Estimada
-                          </Label>
-                          <div className="bg-background/50 border border-border/50 rounded-md h-9 flex items-center px-3">
-                            <span className="font-mono text-sm">
-                              {totalCoasters.toLocaleString("pt-BR")} un
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    )}
+                  </Section>
 
-                  {selectedBudget && selectedBudget.items.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-border/20">
-                      <p className="text-xs text-muted-foreground mb-2">
-                        Tabela de preços do orçamento{" "}
-                        <span className="text-foreground font-medium">
-                          {selectedBudget.code}
-                        </span>{" "}
-                        ({selectedBudget.supplierName}):
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedBudget.items.map((item, i) => {
-                          const isActive =
-                            totalCoasters >= item.quantity &&
-                            (i === selectedBudget.items.length - 1 ||
-                              totalCoasters <
-                                selectedBudget.items[i + 1].quantity);
-                          return (
-                            <div
-                              key={i}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
-                                isActive
-                                  ? "bg-primary/20 border-primary/40 text-primary"
-                                  : "bg-background/30 border-border/20 text-muted-foreground"
-                              }`}
-                            >
-                              <span className="font-semibold">
-                                {item.quantity.toLocaleString("pt-BR")}
-                              </span>
-                              <span className="mx-1">→</span>
-                              <span>R$ {parseFloat(item.unitPrice).toFixed(3)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  <RestaurantAllocationPanel
+                    restaurants={restaurantsForAllocation}
+                    allocations={allocation.allocations}
+                    selectedIds={allocation.selectedIds}
+                    totalCoasters={totalCoasters}
+                    allocatedTotal={allocation.allocatedTotal}
+                    remaining={allocation.remaining}
+                    isValid={allocation.isValid}
+                    hasAllocations={allocation.hasAllocations}
+                    weightedMultiplier={allocation.weightedMultiplier}
+                    weightedScore={allocation.weightedScore}
+                    weightedCommission={allocation.weightedCommission}
+                    onAddRestaurant={allocation.addRestaurant}
+                    onRemoveRestaurant={allocation.removeRestaurant}
+                    onUpdateCoasters={allocation.updateCoasters}
+                    onUpdateCommission={allocation.updateCommission}
+                    onDistributeEvenly={allocation.distributeEvenly}
+                    simulatorInputs={simulator.inputs}
+                    effectiveUnitCost={simulator.effectiveUnitCost}
+                  />
 
-                {/* Restaurant Allocation */}
-                <RestaurantAllocationPanel
-                  restaurants={restaurantsForAllocation}
-                  allocations={allocation.allocations}
-                  selectedIds={allocation.selectedIds}
-                  totalCoasters={totalCoasters}
-                  allocatedTotal={allocation.allocatedTotal}
-                  remaining={allocation.remaining}
-                  isValid={allocation.isValid}
-                  hasAllocations={allocation.hasAllocations}
-                  weightedMultiplier={allocation.weightedMultiplier}
-                  weightedScore={allocation.weightedScore}
-                  weightedCommission={allocation.weightedCommission}
-                  onAddRestaurant={allocation.addRestaurant}
-                  onRemoveRestaurant={allocation.removeRestaurant}
-                  onUpdateCoasters={allocation.updateCoasters}
-                  onUpdateCommission={allocation.updateCommission}
-                  onDistributeEvenly={allocation.distributeEvenly}
-                  simulatorInputs={simulator.inputs}
-                  effectiveUnitCost={simulator.effectiveUnitCost}
-                />
+                  <KPICards
+                    perRestaurant={simulator.perRestaurant}
+                    unitEconomics={simulator.unitEconomics}
+                    activeRestaurants={simulator.inputs.activeRestaurants}
+                    contractDuration={simulator.inputs.contractDuration}
+                    coastersPerRestaurant={simulator.inputs.coastersPerRestaurant}
+                    minMargin={simulator.inputs.minMargin}
+                  />
 
-                {/* KPI Cards */}
-                <KPICards
-                  perRestaurant={simulator.perRestaurant}
-                  unitEconomics={simulator.unitEconomics}
-                  activeRestaurants={simulator.inputs.activeRestaurants}
-                  contractDuration={simulator.inputs.contractDuration}
-                  coastersPerRestaurant={simulator.inputs.coastersPerRestaurant}
-                  minMargin={simulator.inputs.minMargin}
-                />
+                  <SimulatorDRE
+                    perRestaurant={simulator.perRestaurant}
+                    unitEconomics={simulator.unitEconomics}
+                    activeRestaurants={simulator.inputs.activeRestaurants}
+                    contractDuration={simulator.inputs.contractDuration}
+                    minMargin={simulator.inputs.minMargin}
+                    weightedMultiplier={allocation.hasAllocations ? allocation.weightedMultiplier : undefined}
+                    weightedScore={allocation.hasAllocations ? allocation.weightedScore : undefined}
+                    allocationValid={allocation.isValid}
+                  />
+                </TabsContent>
 
-                {/* DRE - Income Statement */}
-                <SimulatorDRE
-                  perRestaurant={simulator.perRestaurant}
-                  unitEconomics={simulator.unitEconomics}
-                  activeRestaurants={simulator.inputs.activeRestaurants}
-                  contractDuration={simulator.inputs.contractDuration}
-                  minMargin={simulator.inputs.minMargin}
-                  weightedMultiplier={allocation.hasAllocations ? allocation.weightedMultiplier : undefined}
-                  weightedScore={allocation.hasAllocations ? allocation.weightedScore : undefined}
-                  allocationValid={allocation.isValid}
-                />
+                <TabsContent value="analysis" className="mt-0 space-y-6">
+                  <DashboardCharts
+                    perRestaurant={simulator.perRestaurant}
+                    unitEconomics={simulator.unitEconomics}
+                    activeRestaurants={simulator.inputs.activeRestaurants}
+                    cumulativeProfit={simulator.cumulativeProfit}
+                    revenueVsRestaurants={simulator.revenueVsRestaurants}
+                    minMargin={simulator.inputs.minMargin}
+                  />
 
-                {/* Management Charts */}
-                <DashboardCharts
-                  perRestaurant={simulator.perRestaurant}
-                  unitEconomics={simulator.unitEconomics}
-                  activeRestaurants={simulator.inputs.activeRestaurants}
-                  cumulativeProfit={simulator.cumulativeProfit}
-                  revenueVsRestaurants={simulator.revenueVsRestaurants}
-                  minMargin={simulator.inputs.minMargin}
-                />
-              </TabsContent>
+                  <ScenarioComparison scenarios={simulator.scenarios} />
 
-              <TabsContent value="tables" className="mt-0 space-y-6">
-                <MarkupTable
-                  data={simulator.markupTable}
-                  currentMarkup={simulator.inputs.markupPercent}
-                  minMargin={simulator.inputs.minMargin}
-                />
-                <DiscountTable
-                  data={simulator.discountTable}
-                  minMargin={simulator.inputs.minMargin}
-                />
-              </TabsContent>
+                  <UnitEconomicsPanel
+                    data={simulator.unitEconomics}
+                    sellerCommission={simulator.inputs.sellerCommission}
+                    contractDuration={simulator.inputs.contractDuration}
+                  />
+                </TabsContent>
 
-              <TabsContent value="scenarios" className="mt-0 space-y-6">
-                <ScenarioComparison scenarios={simulator.scenarios} />
-              </TabsContent>
-
-              <TabsContent value="unit-economics" className="mt-0 space-y-6">
-                <UnitEconomicsPanel
-                  data={simulator.unitEconomics}
-                  sellerCommission={simulator.inputs.sellerCommission}
-                  contractDuration={simulator.inputs.contractDuration}
-                />
-              </TabsContent>
-
-              <TabsContent value="charts" className="mt-0 space-y-6">
-                <DashboardCharts
-                  perRestaurant={simulator.perRestaurant}
-                  unitEconomics={simulator.unitEconomics}
-                  activeRestaurants={simulator.inputs.activeRestaurants}
-                  cumulativeProfit={simulator.cumulativeProfit}
-                  revenueVsRestaurants={simulator.revenueVsRestaurants}
-                  minMargin={simulator.inputs.minMargin}
-                />
-              </TabsContent>
+                <TabsContent value="tables" className="mt-0 space-y-6">
+                  <MarkupTable
+                    data={simulator.markupTable}
+                    currentMarkup={simulator.inputs.markupPercent}
+                    minMargin={simulator.inputs.minMargin}
+                  />
+                  <DiscountTable
+                    data={simulator.discountTable}
+                    minMargin={simulator.inputs.minMargin}
+                  />
+                </TabsContent>
+              </div>
             </div>
-          </div>
-        </Tabs>
+          </Tabs>
+        </PageContainer>
       </div>
-
     </div>
   );
 }

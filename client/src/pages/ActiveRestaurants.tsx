@@ -2,6 +2,7 @@ import { useState, useMemo, Fragment } from "react";
 import { useLocation } from "wouter";
 
 import { trpc } from "@/lib/trpc";
+import PageContainer from "@/components/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -350,22 +351,15 @@ export default function ActiveRestaurantsPage() {
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-              <UtensilsCrossed className="w-5 h-5 text-primary" />
-              Restaurantes Ativos
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Restaurantes parceiros ativos da Mesa Ads
-            </p>
-          </div>
-          <Button onClick={() => navigate("/restaurantes/novo")} className="gap-2">
-            <Plus className="w-4 h-4" /> Novo Restaurante
-          </Button>
-        </div>
+    <PageContainer
+      title="Restaurantes Ativos"
+      description="Rede de parceiros ativa da Mesa Ads"
+      actions={
+        <Button onClick={() => navigate("/restaurantes/novo")} className="gap-2">
+          <Plus className="w-4 h-4" /> Novo Restaurante
+        </Button>
+      }
+    >
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard label="Total" value={restaurants.length} />
@@ -744,8 +738,7 @@ export default function ActiveRestaurantsPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
-    </div>
+    </PageContainer>
   );
 }
 

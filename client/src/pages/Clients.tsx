@@ -37,6 +37,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import PageContainer from "@/components/PageContainer";
 import { toast } from "sonner";
 import {
   Plus,
@@ -248,24 +249,16 @@ export default function Clients() {
   );
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-primary" />
-            Clientes (Anunciantes)
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Base de dados dos anunciantes da Mesa Ads
-          </p>
-        </div>
+    <PageContainer
+      title="Anunciantes"
+      description="Base de dados dos anunciantes da Mesa Ads"
+      actions={
         <Button onClick={handleNew} className="gap-2">
           <Plus className="w-4 h-4" />
           Novo Cliente
         </Button>
-      </div>
+      }
+    >
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
@@ -698,7 +691,6 @@ export default function Clients() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      </div>
-    </div>
+    </PageContainer>
   );
 }

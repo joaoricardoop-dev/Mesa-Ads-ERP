@@ -4,8 +4,9 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import AppNav from "./components/AppNav";
+import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./hooks/use-auth";
+import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
 import Prospecting from "./pages/Restaurants";
 import ProspectForm from "./pages/ProspectForm";
@@ -20,26 +21,43 @@ import Economics from "./pages/Economics";
 import Production from "./pages/Production";
 import Members from "./pages/Members";
 import LandingPage from "./pages/LandingPage";
+import PlaceholderPage from "./pages/PlaceholderPage";
 
 function Router() {
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/prospeccao/novo"} component={ProspectForm} />
-      <Route path={"/prospeccao/:id"} component={ProspectForm} />
-      <Route path={"/prospeccao"} component={Prospecting} />
-      <Route path={"/restaurantes/perfil/:id"} component={ActiveRestaurantProfile} />
-      <Route path={"/restaurantes/novo"} component={ActiveRestaurantForm} />
-      <Route path={"/restaurantes/:id"} component={ActiveRestaurantForm} />
-      <Route path={"/restaurantes"} component={ActiveRestaurantsPage} />
-      <Route path={"/clientes"} component={Clients} />
-      <Route path={"/cotacao/preview"} component={QuotationPreview} />
-      <Route path={"/campanhas/:id"} component={CampaignDetail} />
-      <Route path={"/campanhas"} component={Campaigns} />
-      <Route path={"/economics"} component={Economics} />
-      <Route path={"/producao"} component={Production} />
-      <Route path={"/membros"} component={Members} />
-      <Route path={"/404"} component={NotFound} />
+      <Route path="/" component={Dashboard} />
+      <Route path="/comercial/simulador" component={Home} />
+      <Route path="/comercial/cotacoes">
+        <PlaceholderPage title="Cotações" description="Gestão de cotações comerciais" />
+      </Route>
+      <Route path="/comercial/leads">
+        <PlaceholderPage title="Leads" description="CRM e pipeline de vendas" />
+      </Route>
+      <Route path="/comercial/os">
+        <PlaceholderPage title="OS para Anunciantes" description="Ordens de serviço para anunciantes" />
+      </Route>
+      <Route path="/comercial/termos">
+        <PlaceholderPage title="Termos para Restaurantes" description="Termos de parceria e adesão" />
+      </Route>
+      <Route path="/prospeccao/novo" component={ProspectForm} />
+      <Route path="/prospeccao/:id" component={ProspectForm} />
+      <Route path="/prospeccao" component={Prospecting} />
+      <Route path="/restaurantes/perfil/:id" component={ActiveRestaurantProfile} />
+      <Route path="/restaurantes/novo" component={ActiveRestaurantForm} />
+      <Route path="/restaurantes/:id" component={ActiveRestaurantForm} />
+      <Route path="/restaurantes" component={ActiveRestaurantsPage} />
+      <Route path="/clientes" component={Clients} />
+      <Route path="/cotacao/preview" component={QuotationPreview} />
+      <Route path="/campanhas/:id" component={CampaignDetail} />
+      <Route path="/campanhas" component={Campaigns} />
+      <Route path="/economics" component={Economics} />
+      <Route path="/producao" component={Production} />
+      <Route path="/membros" component={Members} />
+      <Route path="/biblioteca">
+        <PlaceholderPage title="Biblioteca" description="Repositório de artes e coasters" />
+      </Route>
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -64,11 +82,10 @@ function AuthenticatedApp() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <AppNav user={user} />
-      <div className="flex-1 overflow-hidden">
+    <div className="h-screen flex overflow-hidden">
+      <DashboardLayout user={user}>
         <Router />
-      </div>
+      </DashboardLayout>
     </div>
   );
 }
