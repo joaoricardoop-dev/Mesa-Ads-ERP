@@ -35,7 +35,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - **No top navigation bar** — all navigation is in the sidebar
 - **Module-based sidebar** with collapsible groups:
   - Dashboard (`/`) — operational overview with status cards, pipeline, activity
-  - Comercial (group): Cotações (`/comercial/cotacoes`), Simulador (`/comercial/simulador`), Leads (`/comercial/leads`)
+  - Comercial (group): Cotações (`/comercial/cotacoes`, detail: `/comercial/cotacoes/:id`), Simulador (`/comercial/simulador`), Leads (`/comercial/leads`)
   - Anunciantes (`/clientes`) — top-level item
   - Campanhas (`/campanhas`)
   - Financeiro (group, admin only): Dashboard (`/financeiro`), Faturamento (`/financeiro/faturamento`), Pagamentos (`/financeiro/pagamentos`), Custos (`/financeiro/custos`), Relatórios (`/financeiro/relatorios`)

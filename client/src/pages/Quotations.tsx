@@ -59,6 +59,7 @@ import {
   Upload,
   Download,
   Store,
+  ExternalLink,
 } from "lucide-react";
 
 function OSActionButton({ quotationId, quotationNumber, clientName, clientCompany, coasterVolume, totalValue, onSign }: {
@@ -468,15 +469,18 @@ export default function Quotations() {
               sorted.map((q) => (
                 <TableRow key={q.id} className="border-border/20 hover:bg-card/80">
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-muted-foreground" />
+                    <button
+                      className="flex items-center gap-2 text-left hover:text-primary transition-colors group"
+                      onClick={() => navigate(`/comercial/cotacoes/${q.id}`)}
+                    >
+                      <FileText className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
                       <div>
-                        <p>{q.quotationNumber}</p>
+                        <p className="group-hover:underline">{q.quotationNumber}</p>
                         {q.quotationName && (
                           <p className="text-[11px] text-muted-foreground font-normal">{q.quotationName}</p>
                         )}
                       </div>
-                    </div>
+                    </button>
                   </TableCell>
                   <TableCell>
                     <div>
@@ -509,6 +513,15 @@ export default function Quotations() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-primary hover:text-primary"
+                        onClick={() => navigate(`/comercial/cotacoes/${q.id}`)}
+                        title="Abrir"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Button>
                       {q.status === "ativa" && (
                         <Button
                           variant="ghost"

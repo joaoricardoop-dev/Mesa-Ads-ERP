@@ -25,6 +25,7 @@ import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import Library from "./pages/Library";
 import Quotations from "./pages/Quotations";
+import QuotationDetail from "./pages/QuotationDetail";
 import Leads from "./pages/Leads";
 import ServiceOrders from "./pages/ServiceOrders";
 import BatchManagement from "./pages/BatchManagement";
@@ -41,6 +42,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/comercial/simulador" component={Home} />
+      <Route path="/comercial/cotacoes/:id" component={QuotationDetail} />
       <Route path="/comercial/cotacoes" component={Quotations} />
       <Route path="/comercial/leads" component={Leads} />
       <Route path="/prospeccao/novo" component={ProspectForm} />
