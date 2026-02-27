@@ -7,7 +7,7 @@ import { leadRouter } from "./leadRouter";
 import { serviceOrderRouter } from "./serviceOrderRouter";
 import { termRouter } from "./termRouter";
 import { libraryRouter } from "./libraryRouter";
-import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { authStorage } from "./replit_integrations/auth";
 import {
@@ -596,7 +596,7 @@ export const appRouter = router({
         await addCampaignHistory(input.id, "archived", "Cotação arquivada");
       }),
 
-    uploadArt: protectedProcedure
+    uploadArt: operacoesProcedure
       .input(z.object({
         id: z.number(),
         artPdfUrl: z.string().optional(),
@@ -608,7 +608,7 @@ export const appRouter = router({
         await addCampaignHistory(id, "art_uploaded", "Arte enviada — campanha em produção");
       }),
 
-    completeProduction: protectedProcedure
+    completeProduction: operacoesProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const campaign = await getCampaign(input.id);
@@ -641,14 +641,14 @@ export const appRouter = router({
         }
       }),
 
-    confirmMaterial: protectedProcedure
+    confirmMaterial: operacoesProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await updateCampaign(input.id, { status: "executar", materialReceivedDate: new Date().toISOString().split("T")[0] } as any);
         await addCampaignHistory(input.id, "material_received", "Material recebido — pronto para execução");
       }),
 
-    startVeiculacao: protectedProcedure
+    startVeiculacao: operacoesProcedure
       .input(z.object({
         id: z.number(),
         veiculacaoStartDate: z.string(),
@@ -663,7 +663,7 @@ export const appRouter = router({
         await addCampaignHistory(input.id, "veiculacao_started", `Veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`);
       }),
 
-    finalizeCampaign: protectedProcedure
+    finalizeCampaign: operacoesProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const campaign = await getCampaign(input.id);
@@ -687,7 +687,7 @@ export const appRouter = router({
         }
       }),
 
-    addProof: protectedProcedure
+    addProof: operacoesProcedure
       .input(z.object({
         campaignId: z.number(),
         restaurantId: z.number(),

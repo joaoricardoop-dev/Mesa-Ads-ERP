@@ -66,6 +66,10 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - **Anunciante**: Portal — view own campaigns, request new campaigns, edit own profile
 - **Manager/User/Viewer**: Legacy roles (backward compatibility)
 - Admin-only pages: Gestão de Usuários, Financeiro module
+- **Backend role procedures**: `comercialProcedure`, `operacoesProcedure`, `financeiroProcedure`, `internalProcedure` (admin always allowed)
+- Campaign workflow endpoints (uploadArt, completeProduction, confirmMaterial, startVeiculacao, finalizeCampaign, addProof) use `operacoesProcedure`
+- Quotation endpoints use `comercialProcedure`
+- Financial endpoints use `financeiroProcedure`
 
 ## Database Tables
 

@@ -25,6 +25,7 @@ import PlaceholderPage from "./pages/PlaceholderPage";
 import Library from "./pages/Library";
 import Quotations from "./pages/Quotations";
 import Leads from "./pages/Leads";
+import ServiceOrders from "./pages/ServiceOrders";
 import FinancialDashboard from "./pages/financial/FinancialDashboard";
 import Invoicing from "./pages/financial/Invoicing";
 import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
@@ -54,6 +55,7 @@ function Router() {
       <Route path="/financeiro/relatorios" component={FinancialReport} />
       <Route path="/campanhas/:id" component={CampaignDetail} />
       <Route path="/campanhas" component={Campaigns} />
+      <Route path="/ordens-servico" component={ServiceOrders} />
       <Route path="/economics" component={Economics} />
       <Route path="/producao" component={Production} />
       <Route path="/membros" component={Members} />

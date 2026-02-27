@@ -195,12 +195,24 @@ export const quotationRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDatabase();
       const { id, ...data } = input;
+
+      const existing = await db.select().from(quotations).where(eq(quotations.id, id)).limit(1);
+      if (!existing[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
+
+      const clientId = data.clientId ?? existing[0].clientId;
+      const coasterVolume = data.coasterVolume ?? existing[0].coasterVolume;
+
+      if (data.clientId !== undefined || data.coasterVolume !== undefined) {
+        const client = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
+        const clientName = client[0]?.name || client[0]?.company || "Cliente";
+        (data as any).quotationName = generateQuotationName(clientName, coasterVolume);
+      }
+
       const [updated] = await db
         .update(quotations)
         .set({ ...data, updatedAt: new Date() })
         .where(eq(quotations.id, id))
         .returning();
-      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
       return updated;
     }),
 
@@ -294,9 +306,13 @@ export const quotationRouter = router({
       if (!original[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
 
       const quotationNumber = await generateQuotationNumber(db);
+      const client = await db.select().from(clients).where(eq(clients.id, original[0].clientId)).limit(1);
+      const clientName = client[0]?.name || client[0]?.company || "Cliente";
+      const quotationName = generateQuotationName(clientName, original[0].coasterVolume);
 
       const [created] = await db.insert(quotations).values({
         quotationNumber,
+        quotationName,
         clientId: original[0].clientId,
         campaignType: original[0].campaignType,
         coasterVolume: original[0].coasterVolume,
