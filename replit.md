@@ -53,7 +53,8 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 
 - **Replit Auth** via OpenID Connect (supports Google, GitHub, Apple, email)
 - **Email/password auth**: Admin creates users with temp password → user logs in → ForcePasswordChange modal on first access → user sets own password
-- Landing page shown when not logged in, with email login modal (direct fetch, no hooks)
+- Login page shown when not logged in (`LoginPage.tsx`) — direct email/password form + social login option
+- Original landing page (`LandingPage.tsx`) commented out but preserved
 - Sidebar footer shows user avatar, name, role, and logout button
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`, `/api/auth/email-login`, `/api/auth/change-password`, `/api/auth/test-login` (dev only)
 - Test login (dev only): `POST /api/auth/test-login` with `{"userId": <id>}` — bypasses password, sets session with `expires_at`

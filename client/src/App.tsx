@@ -20,7 +20,8 @@ import QuotationPreview from "./pages/QuotationPreview";
 import Economics from "./pages/Economics";
 import Production from "./pages/Production";
 import Members from "./pages/Members";
-import LandingPage from "./pages/LandingPage";
+// import LandingPage from "./pages/LandingPage";
+import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import Library from "./pages/Library";
 import Quotations from "./pages/Quotations";
@@ -86,7 +87,7 @@ function AuthenticatedApp() {
   }
 
   if (!isAuthenticated) {
-    return <LandingPage />;
+    return <LoginPage />;
   }
 
   return (
