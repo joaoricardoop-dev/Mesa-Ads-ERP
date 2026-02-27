@@ -8,6 +8,7 @@ import { serviceOrderRouter } from "./serviceOrderRouter";
 import { termRouter } from "./termRouter";
 import { libraryRouter } from "./libraryRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { authStorage } from "./replit_integrations/auth";
 import {
@@ -93,15 +94,87 @@ export const appRouter = router({
 
   // ─── Members (Admin) ────────────────────────────────────────────────────
   members: router({
-    list: adminProcedure.query(() => authStorage.listUsers()),
+    list: adminProcedure.query(async () => {
+        const allUsers = await authStorage.listUsers();
+        return allUsers.map(({ passwordHash: _, ...u }) => u);
+      }),
 
     updateRole: adminProcedure
       .input(z.object({ userId: z.string(), role: z.string() }))
-      .mutation(({ input }) => authStorage.updateUserRole(input.userId, input.role)),
+      .mutation(async ({ input }) => {
+        const user = await authStorage.updateUserRole(input.userId, input.role);
+        if (!user) return undefined;
+        const { passwordHash: _, ...safe } = user;
+        return safe;
+      }),
 
     toggleActive: adminProcedure
       .input(z.object({ userId: z.string(), isActive: z.boolean() }))
-      .mutation(({ input }) => authStorage.updateUserActive(input.userId, input.isActive)),
+      .mutation(async ({ input }) => {
+        const user = await authStorage.updateUserActive(input.userId, input.isActive);
+        if (!user) return undefined;
+        const { passwordHash: _, ...safe } = user;
+        return safe;
+      }),
+
+    createUser: adminProcedure
+      .input(z.object({
+        email: z.string().email(),
+        firstName: z.string().min(1),
+        lastName: z.string().optional(),
+        role: z.string().default("user"),
+        tempPassword: z.string().min(6),
+      }))
+      .mutation(async ({ input }) => {
+        const bcrypt = await import("bcryptjs");
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const { users: usersTable } = await import("../shared/models/auth");
+        const { eq } = await import("drizzle-orm");
+        const existing = await db.select().from(usersTable).where(eq(usersTable.email, input.email.toLowerCase().trim()));
+        if (existing.length > 0) {
+          throw new TRPCError({ code: "CONFLICT", message: "Já existe um usuário com este e-mail." });
+        }
+
+        const hash = await bcrypt.hash(input.tempPassword, 10);
+        const [user] = await db.insert(usersTable).values({
+          email: input.email.toLowerCase().trim(),
+          firstName: input.firstName,
+          lastName: input.lastName || null,
+          role: input.role,
+          isActive: true,
+          passwordHash: hash,
+          mustChangePassword: true,
+        }).returning();
+        const { passwordHash: _ph, ...safeUser } = user;
+        return safeUser;
+      }),
+
+    resetPassword: adminProcedure
+      .input(z.object({
+        userId: z.string(),
+        newPassword: z.string().min(6),
+      }))
+      .mutation(async ({ input }) => {
+        const bcrypt = await import("bcryptjs");
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const { users: usersTable } = await import("../shared/models/auth");
+        const { eq } = await import("drizzle-orm");
+        const hash = await bcrypt.hash(input.newPassword, 10);
+        const [updated] = await db.update(usersTable).set({
+          passwordHash: hash,
+          mustChangePassword: true,
+          updatedAt: new Date(),
+        }).where(eq(usersTable.id, input.userId)).returning();
+
+        if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado." });
+        return { success: true };
+      }),
   }),
 
   // ─── CNPJ Lookup ────────────────────────────────────────────────────────

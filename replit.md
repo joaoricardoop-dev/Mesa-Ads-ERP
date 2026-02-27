@@ -51,11 +51,15 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 
 ## Authentication
 
-- Replit Auth via OpenID Connect (supports Google, GitHub, Apple, email)
-- Landing page shown when not logged in
+- **Replit Auth** via OpenID Connect (supports Google, GitHub, Apple, email)
+- **Email/password auth**: Admin creates users with temp password → user logs in → ForcePasswordChange modal on first access → user sets own password
+- Landing page shown when not logged in, with email login modal (direct fetch, no hooks)
 - Sidebar footer shows user avatar, name, role, and logout button
-- Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
+- Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`, `/api/auth/email-login`, `/api/auth/change-password`
+- Admin mutations: `members.createUser` (with temp password), `members.resetPassword` (sets mustChangePassword)
+- All user-returning endpoints sanitize `passwordHash` before sending to client
 - Session stored in PostgreSQL `sessions` table
+- `ForcePasswordChange` component (`client/src/components/ForcePasswordChange.tsx`) — modal overlay when `mustChangePassword` is true
 
 ## Roles & Permissions
 
