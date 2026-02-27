@@ -33,7 +33,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
-  Plus,
   Pencil,
   Trash2,
   Megaphone,
@@ -225,16 +224,6 @@ export default function Campaigns() {
     { enabled: managingCampaignId !== null }
   );
 
-  const createMutation = trpc.campaign.create.useMutation({
-    onSuccess: () => {
-      utils.campaign.list.invalidate();
-      setIsDialogOpen(false);
-      setForm(emptyForm);
-      toast.success("Campanha criada com sucesso!");
-    },
-    onError: (err: any) => toast.error(`Erro: ${err.message}`),
-  });
-
   const updateMutation = trpc.campaign.update.useMutation({
     onSuccess: () => {
       utils.campaign.list.invalidate();
@@ -296,8 +285,6 @@ export default function Campaigns() {
 
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...payload });
-    } else {
-      createMutation.mutate(payload);
     }
   };
 
@@ -329,11 +316,7 @@ export default function Campaigns() {
     setIsDialogOpen(true);
   };
 
-  const handleNew = () => {
-    setEditingId(null);
-    setForm(emptyForm);
-    setIsDialogOpen(true);
-  };
+
 
   const handleManageRestaurants = (campaignId: number) => {
     setManagingCampaignId(campaignId);
@@ -385,8 +368,6 @@ export default function Campaigns() {
   );
 
   const activeCount = campaignsList.filter((c) => ["active", "producao", "transito", "executar", "veiculacao"].includes(c.status)).length;
-  const quotationCount = campaignsList.filter((c) => c.status === "quotation").length;
-
   const totals = useMemo(() => {
     let totalContract = 0;
     let totalProfit = 0;
@@ -404,12 +385,7 @@ export default function Campaigns() {
     <PageContainer
       title="Campanhas"
       description="Gestão de campanhas de mídia"
-      actions={
-        <Button onClick={handleNew} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Nova Campanha
-        </Button>
-      }
+      actions={null}
     >
 
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
@@ -418,8 +394,8 @@ export default function Campaigns() {
             <p className="text-2xl font-bold font-mono">{campaignsList.length}</p>
           </div>
           <div className="bg-card border border-border/30 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Cotações</p>
-            <p className="text-2xl font-bold font-mono text-orange-400">{quotationCount}</p>
+            <p className="text-xs text-muted-foreground">Em Produção</p>
+            <p className="text-2xl font-bold font-mono text-orange-400">{campaignsList.filter((c) => c.status === "producao").length}</p>
           </div>
           <div className="bg-card border border-border/30 rounded-lg p-4">
             <p className="text-xs text-muted-foreground">Ativas</p>
@@ -458,7 +434,7 @@ export default function Campaigns() {
             <div className="bg-card border border-border/30 rounded-lg p-8 text-center text-muted-foreground">
               {search
                 ? "Nenhuma campanha encontrada"
-                : 'Nenhuma campanha cadastrada. Clique em "Nova Campanha" ou crie pelo Simulador.'}
+                : 'Nenhuma campanha cadastrada. Campanhas são criadas automaticamente a partir de cotações aprovadas (WIN).'}
             </div>
           ) : (
             filtered.map((c) => {
@@ -531,7 +507,7 @@ export default function Campaigns() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-2xl bg-card border-border/30 max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editingId ? "Editar Campanha" : "Nova Campanha"}</DialogTitle>
+              <DialogTitle>Editar Campanha</DialogTitle>
             </DialogHeader>
             <div className="space-y-5 py-2">
               <div className="space-y-3">
@@ -676,8 +652,8 @@ export default function Campaigns() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-              <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending}>
-                {editingId ? "Salvar" : "Criar"}
+              <Button onClick={handleSubmit} disabled={updateMutation.isPending}>
+                Salvar
               </Button>
             </DialogFooter>
           </DialogContent>
