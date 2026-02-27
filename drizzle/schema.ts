@@ -87,7 +87,7 @@ export type InsertClient = typeof clients.$inferInsert;
 
 export const campaigns = pgTable("campaigns", {
   id: serial("id").primaryKey(),
-  campaignNumber: varchar("campaignNumber", { length: 20 }),
+  campaignNumber: varchar("campaignNumber", { length: 20 }).unique(),
   clientId: integer("clientId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   startDate: date("startDate").notNull(),
@@ -291,7 +291,8 @@ export type InsertOperationalCost = typeof operationalCosts.$inferInsert;
 
 export const quotations = pgTable("quotations", {
   id: serial("id").primaryKey(),
-  quotationNumber: varchar("quotationNumber", { length: 20 }).notNull(),
+  quotationNumber: varchar("quotationNumber", { length: 20 }).notNull().unique(),
+  quotationName: varchar("quotationName", { length: 255 }),
   clientId: integer("clientId").notNull(),
   campaignType: varchar("campaignType", { length: 50 }).default("padrao"),
   coasterVolume: integer("coasterVolume").notNull(),
@@ -349,7 +350,7 @@ export type InsertLeadInteraction = typeof leadInteractions.$inferInsert;
 
 export const serviceOrders = pgTable("service_orders", {
   id: serial("id").primaryKey(),
-  orderNumber: varchar("orderNumber", { length: 30 }).notNull(),
+  orderNumber: varchar("orderNumber", { length: 30 }).notNull().unique(),
   type: serviceOrderTypeEnum("type").notNull(),
   campaignId: integer("campaignId"),
   clientId: integer("clientId"),
@@ -367,12 +368,23 @@ export const serviceOrders = pgTable("service_orders", {
   estimatedDeadline: date("estimatedDeadline"),
   artPdfUrl: text("artPdfUrl"),
   artImageUrls: text("artImageUrls"),
+  signatureUrl: text("signatureUrl"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type ServiceOrder = typeof serviceOrders.$inferSelect;
 export type InsertServiceOrder = typeof serviceOrders.$inferInsert;
+
+export const quotationRestaurants = pgTable("quotation_restaurants", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotationId").notNull(),
+  restaurantId: integer("restaurantId").notNull(),
+  coasterQuantity: integer("coasterQuantity").notNull(),
+});
+
+export type QuotationRestaurant = typeof quotationRestaurants.$inferSelect;
+export type InsertQuotationRestaurant = typeof quotationRestaurants.$inferInsert;
 
 export const restaurantTerms = pgTable("restaurant_terms", {
   id: serial("id").primaryKey(),

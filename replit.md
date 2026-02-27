@@ -78,7 +78,8 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - `campaign_restaurants` — N:N campaign-restaurant relationship
 - `campaign_history` — Audit trail for campaign status changes
 - `campaign_proofs` — Weekly proof photos per restaurant per campaign
-- `quotations` — Commercial quotations (QOT-YYYY-NNNN numbering, 6 statuses)
+- `quotations` — Commercial quotations (QOT-YYYY-NNNN numbering, 6 statuses, quotationName auto-generated)
+- `quotation_restaurants` — N:N quotation-restaurant allocation with coaster quantities
 - `leads` — CRM leads (anunciante/restaurante types, kanban stages)
 - `lead_interactions` — Interaction history per lead
 - `service_orders` — OS for anunciantes and production (OS-ANT/OS-PROD numbering)
@@ -104,9 +105,12 @@ Statuses: `producao` → `transito` → `executar` → `veiculacao` → `inativa
 ## Quotation Workflow
 
 Statuses: `rascunho` → `enviada` → `ativa` → `os_gerada` → `win` / `perdida` / `expirada`
+- Quotation naming standard: auto-generated as `{Mês} | {Nome Anunciante} | {Volume}`
 - Cotação ativa → "Gerar OS" creates OS-ANT service order linked to quotation
-- OS signed (assinada) → auto-converts quotation to WIN + creates campaign CMP-YYYY-NNNN
+- OS gerada → Allocate restaurants (quotation_restaurants table) → Upload signature URL → Sign OS → auto-converts to WIN + creates campaign CMP-YYYY-NNNN with status `producao`
+- Conversion gate: requires (1) restaurants allocated with coaster volumes, (2) OS signed with signature URL
 - OS Anunciantes is NOT a separate menu item — managed within Cotações flow
+- OS PDF generation: jsPDF + jspdf-autotable (client-side, `client/src/lib/generate-os-pdf.ts`)
 - Supports duplicate, mark lost with reason
 
 ## Pricing Engine (calcPricing)

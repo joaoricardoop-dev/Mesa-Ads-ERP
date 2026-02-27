@@ -1,9 +1,17 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory, serviceOrders } from "../drizzle/schema";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants } from "../drizzle/schema";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+
+const MONTH_NAMES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+function generateQuotationName(clientName: string, coasterVolume: number): string {
+  const month = MONTH_NAMES_PT[new Date().getMonth()];
+  const formattedVolume = coasterVolume.toLocaleString("pt-BR");
+  return `${month} | ${clientName} | ${formattedVolume}`;
+}
 
 async function getDatabase() {
   const d = await getDb();
@@ -58,6 +66,7 @@ export const quotationRouter = router({
         .select({
           id: quotations.id,
           quotationNumber: quotations.quotationNumber,
+          quotationName: quotations.quotationName,
           clientId: quotations.clientId,
           campaignType: quotations.campaignType,
           coasterVolume: quotations.coasterVolume,
@@ -93,6 +102,7 @@ export const quotationRouter = router({
         .select({
           id: quotations.id,
           quotationNumber: quotations.quotationNumber,
+          quotationName: quotations.quotationName,
           clientId: quotations.clientId,
           campaignType: quotations.campaignType,
           coasterVolume: quotations.coasterVolume,
@@ -142,9 +152,12 @@ export const quotationRouter = router({
       if (!client[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado" });
 
       const quotationNumber = await generateQuotationNumber(db);
+      const clientName = client[0].name || client[0].company || "Cliente";
+      const quotationName = generateQuotationName(clientName, input.coasterVolume);
 
       const [created] = await db.insert(quotations).values({
         quotationNumber,
+        quotationName,
         clientId: input.clientId,
         campaignType: input.campaignType,
         coasterVolume: input.coasterVolume,
@@ -354,5 +367,131 @@ export const quotationRouter = router({
         .where(eq(serviceOrders.quotationId, input.quotationId))
         .limit(1);
       return result[0] || null;
+    }),
+
+  getRestaurants: protectedProcedure
+    .input(z.object({ quotationId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const rows = await db
+        .select({
+          id: quotationRestaurants.id,
+          quotationId: quotationRestaurants.quotationId,
+          restaurantId: quotationRestaurants.restaurantId,
+          coasterQuantity: quotationRestaurants.coasterQuantity,
+          restaurantName: activeRestaurants.name,
+          restaurantAddress: activeRestaurants.address,
+        })
+        .from(quotationRestaurants)
+        .leftJoin(activeRestaurants, eq(quotationRestaurants.restaurantId, activeRestaurants.id))
+        .where(eq(quotationRestaurants.quotationId, input.quotationId));
+      return rows;
+    }),
+
+  setRestaurants: comercialProcedure
+    .input(z.object({
+      quotationId: z.number(),
+      restaurants: z.array(z.object({
+        restaurantId: z.number(),
+        coasterQuantity: z.number().int().min(1),
+      })),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      await db.delete(quotationRestaurants).where(eq(quotationRestaurants.quotationId, input.quotationId));
+      if (input.restaurants.length > 0) {
+        await db.insert(quotationRestaurants).values(
+          input.restaurants.map(r => ({
+            quotationId: input.quotationId,
+            restaurantId: r.restaurantId,
+            coasterQuantity: r.coasterQuantity,
+          }))
+        );
+      }
+      return { success: true, count: input.restaurants.length };
+    }),
+
+  signOS: comercialProcedure
+    .input(z.object({
+      quotationId: z.number(),
+      signatureUrl: z.string().min(1),
+      campaignName: z.string().min(1),
+      startDate: z.string(),
+      endDate: z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+
+      const quotation = await db.select().from(quotations).where(eq(quotations.id, input.quotationId)).limit(1);
+      if (!quotation[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
+      if (quotation[0].status !== "os_gerada") throw new TRPCError({ code: "BAD_REQUEST", message: "Cotação precisa estar com OS gerada" });
+
+      const allocatedRestaurants = await db
+        .select()
+        .from(quotationRestaurants)
+        .where(eq(quotationRestaurants.quotationId, input.quotationId));
+      if (allocatedRestaurants.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "É necessário alocar restaurantes antes de assinar a OS" });
+      }
+
+      const os = await db.select().from(serviceOrders).where(eq(serviceOrders.quotationId, input.quotationId)).limit(1);
+      if (!os[0]) throw new TRPCError({ code: "NOT_FOUND", message: "OS não encontrada" });
+
+      await db
+        .update(serviceOrders)
+        .set({ status: "assinada", signatureUrl: input.signatureUrl, updatedAt: new Date() })
+        .where(eq(serviceOrders.id, os[0].id));
+
+      const campaignNumber = await generateCampaignNumber(db);
+
+      const [campaign] = await db.insert(campaigns).values({
+        campaignNumber,
+        clientId: quotation[0].clientId,
+        name: input.campaignName,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        status: "producao",
+        quotationId: quotation[0].id,
+        campaignType: quotation[0].campaignType,
+        coastersPerRestaurant: 500,
+        usagePerDay: 3,
+        daysPerMonth: 26,
+        activeRestaurants: allocatedRestaurants.length,
+        pricingType: "variable",
+        markupPercent: "30.00",
+        fixedPrice: "0.00",
+        commissionType: "variable",
+        restaurantCommission: "20.00",
+        fixedCommission: "0.0500",
+        sellerCommission: "10.00",
+        taxRate: "15.00",
+        contractDuration: quotation[0].cycles || 6,
+        batchSize: quotation[0].coasterVolume,
+        batchCost: "1200.00",
+        notes: quotation[0].notes,
+      }).returning();
+
+      await db.insert(campaignHistory).values({
+        campaignId: campaign.id,
+        action: "created_from_quotation",
+        details: `Campanha criada a partir da cotação ${quotation[0].quotationNumber} (OS assinada)`,
+      });
+
+      if (allocatedRestaurants.length > 0) {
+        await db.insert(campaignRestaurants).values(
+          allocatedRestaurants.map(r => ({
+            campaignId: campaign.id,
+            restaurantId: r.restaurantId,
+            coastersCount: r.coasterQuantity,
+          }))
+        );
+      }
+
+      await db
+        .update(quotations)
+        .set({ status: "win", updatedAt: new Date() })
+        .where(eq(quotations.id, input.quotationId));
+
+      return { quotationId: input.quotationId, campaignId: campaign.id, campaignNumber };
     }),
 });

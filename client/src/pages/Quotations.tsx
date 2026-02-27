@@ -1,5 +1,6 @@
-import { useState, Fragment } from "react";
+import { useState, Fragment, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
+import { generateOSPdf } from "@/lib/generate-os-pdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,10 +54,23 @@ import {
   FileText,
   Calendar,
   CheckCircle2,
+  MapPin,
+  Upload,
+  Download,
+  Store,
 } from "lucide-react";
 
-function OSActionButton({ quotationId, onSign }: { quotationId: number; onSign: (osId: number) => void }) {
+function OSActionButton({ quotationId, quotationNumber, clientName, clientCompany, coasterVolume, totalValue, onSign }: {
+  quotationId: number;
+  quotationNumber: string;
+  clientName: string;
+  clientCompany?: string;
+  coasterVolume: number;
+  totalValue?: string;
+  onSign: () => void;
+}) {
   const { data: os } = trpc.quotation.getOS.useQuery({ quotationId });
+  const { data: restaurants = [] } = trpc.quotation.getRestaurants.useQuery({ quotationId });
   if (!os) return <span className="text-xs text-muted-foreground px-2">Carregando OS...</span>;
 
   const osStatusLabels: Record<string, string> = {
@@ -77,16 +91,47 @@ function OSActionButton({ quotationId, onSign }: { quotationId: number; onSign: 
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="h-7 text-xs text-emerald-400 hover:text-emerald-300 gap-1"
-      onClick={() => onSign(os.id)}
-      title="Assinar OS e criar campanha"
-    >
-      <CheckCircle2 className="w-3.5 h-3.5" />
-      Assinar OS
-    </Button>
+    <div className="flex items-center gap-1">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 text-xs text-amber-400 hover:text-amber-300 gap-1"
+        onClick={() => {
+          if (os) {
+            generateOSPdf({
+              orderNumber: os.orderNumber,
+              quotationNumber,
+              clientName,
+              clientCompany,
+              coasterVolume,
+              totalValue: totalValue || os.totalValue || undefined,
+              paymentTerms: os.paymentTerms || undefined,
+              periodStart: os.periodStart || undefined,
+              periodEnd: os.periodEnd || undefined,
+              description: os.description || undefined,
+              restaurants: restaurants.map((r: any) => ({
+                name: r.restaurantName || `Restaurante #${r.restaurantId}`,
+                coasterQuantity: r.coasterQuantity,
+              })),
+            });
+          }
+        }}
+        title="Baixar OS em PDF"
+      >
+        <Download className="w-3.5 h-3.5" />
+        PDF
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 text-xs text-emerald-400 hover:text-emerald-300 gap-1"
+        onClick={onSign}
+        title="Assinar OS e criar campanha"
+      >
+        <CheckCircle2 className="w-3.5 h-3.5" />
+        Assinar OS
+      </Button>
+    </div>
   );
 }
 
@@ -148,11 +193,19 @@ export default function Quotations() {
   const [lossReason, setLossReason] = useState("");
   const [osDialogId, setOsDialogId] = useState<number | null>(null);
   const [osForm, setOsForm] = useState({ description: "", periodStart: "", periodEnd: "", paymentTerms: "" });
-  const [signOsDialogId, setSignOsDialogId] = useState<{ quotationId: number; osId: number } | null>(null);
+  const [signOsDialogId, setSignOsDialogId] = useState<number | null>(null);
+  const [signForm, setSignForm] = useState({ campaignName: "", startDate: "", endDate: "", signatureUrl: "" });
+  const [restaurantAllocations, setRestaurantAllocations] = useState<Array<{ restaurantId: number; coasterQuantity: number }>>([]);
+  const [addRestaurantId, setAddRestaurantId] = useState<string>("");
 
   const utils = trpc.useUtils();
   const { data: quotationsList = [], isLoading } = trpc.quotation.list.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: activeRestaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
+  const { data: allocatedRestaurants = [] } = trpc.quotation.getRestaurants.useQuery(
+    { quotationId: signOsDialogId! },
+    { enabled: !!signOsDialogId }
+  );
 
   const createMutation = trpc.quotation.create.useMutation({
     onSuccess: () => {
@@ -211,14 +264,19 @@ export default function Quotations() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
-  const signOSMutation = trpc.serviceOrder.updateStatus.useMutation({
-    onSuccess: (data: any) => {
+  const setRestaurantsMutation = trpc.quotation.setRestaurants.useMutation({
+    onSuccess: () => {
+      utils.quotation.getRestaurants.invalidate({ quotationId: signOsDialogId! });
+      toast.success("Restaurantes atualizados!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const signOSMutation = trpc.quotation.signOS.useMutation({
+    onSuccess: (data) => {
       utils.quotation.list.invalidate();
-      if (data.campaignCreated) {
-        toast.success(`OS assinada! Campanha ${data.campaignNumber} criada.`);
-      } else {
-        toast.success("OS assinada com sucesso!");
-      }
+      setSignOsDialogId(null);
+      toast.success(`OS assinada! Campanha ${data.campaignNumber} criada.`);
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
@@ -290,6 +348,7 @@ export default function Quotations() {
   const filtered = quotationsList.filter((q) => {
     const matchesSearch =
       (q.quotationNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+      (q.quotationName || "").toLowerCase().includes(search.toLowerCase()) ||
       (q.clientName || "").toLowerCase().includes(search.toLowerCase()) ||
       (q.clientCompany || "").toLowerCase().includes(search.toLowerCase()) ||
       (q.notes || "").toLowerCase().includes(search.toLowerCase());
@@ -426,7 +485,12 @@ export default function Quotations() {
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4 text-muted-foreground" />
-                      {q.quotationNumber}
+                      <div>
+                        <p>{q.quotationNumber}</p>
+                        {q.quotationName && (
+                          <p className="text-[11px] text-muted-foreground font-normal">{q.quotationName}</p>
+                        )}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -475,7 +539,23 @@ export default function Quotations() {
                         </Button>
                       )}
                       {q.status === "os_gerada" && (
-                        <OSActionButton quotationId={q.id} onSign={(osId) => setSignOsDialogId({ quotationId: q.id, osId })} />
+                        <OSActionButton
+                          quotationId={q.id}
+                          quotationNumber={q.quotationNumber}
+                          clientName={q.clientName || "Anunciante"}
+                          clientCompany={q.clientCompany || undefined}
+                          coasterVolume={q.coasterVolume}
+                          totalValue={q.totalValue || undefined}
+                          onSign={() => {
+                          setSignOsDialogId(q.id);
+                          setSignForm({
+                            campaignName: q.quotationName || `${q.clientName || "Cliente"} - ${q.coasterVolume.toLocaleString("pt-BR")}`,
+                            startDate: "",
+                            endDate: "",
+                            signatureUrl: "",
+                          });
+                          setRestaurantAllocations([]);
+                        }} />
                       )}
                       {q.status !== "win" && q.status !== "perdida" && q.status !== "os_gerada" && (
                         <Button
@@ -761,33 +841,221 @@ export default function Quotations() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={signOsDialogId !== null} onOpenChange={() => setSignOsDialogId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
+      <Dialog open={signOsDialogId !== null} onOpenChange={() => setSignOsDialogId(null)}>
+        <DialogContent className="sm:max-w-2xl bg-card border-border/30 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-emerald-400" />
               Assinar OS e Criar Campanha
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Ao assinar a OS, a cotação será automaticamente convertida em WIN e uma nova campanha (CMP-YYYY-NNNN) será criada no status de Produção.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Ao assinar a OS, a cotação será automaticamente convertida em WIN e uma nova campanha (CMP-YYYY-NNNN) será criada no status de Produção.
+          </p>
+
+          <div className="space-y-4">
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Alocação de Restaurantes</p>
+            {allocatedRestaurants.length > 0 && (
+              <div className="border border-border/30 rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border/30 hover:bg-transparent">
+                      <TableHead className="text-xs">Restaurante</TableHead>
+                      <TableHead className="text-xs text-right">Bolachas</TableHead>
+                      <TableHead className="text-xs w-[60px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allocatedRestaurants.map((r) => (
+                      <TableRow key={r.id} className="border-border/20">
+                        <TableCell className="text-sm">
+                          <div className="flex items-center gap-2">
+                            <Store className="w-3.5 h-3.5 text-muted-foreground" />
+                            {r.restaurantName || `Restaurante #${r.restaurantId}`}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            className="w-24 h-7 text-xs text-right font-mono bg-background border-border/30 ml-auto"
+                            defaultValue={r.coasterQuantity}
+                            min={1}
+                            onBlur={(e) => {
+                              const newQty = Number(e.target.value);
+                              if (newQty < 1 || newQty === r.coasterQuantity) return;
+                              const updated = allocatedRestaurants.map((ar) =>
+                                ar.restaurantId === r.restaurantId
+                                  ? { restaurantId: ar.restaurantId, coasterQuantity: newQty }
+                                  : { restaurantId: ar.restaurantId, coasterQuantity: ar.coasterQuantity }
+                              );
+                              setRestaurantsMutation.mutate({ quotationId: signOsDialogId!, restaurants: updated });
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive"
+                            onClick={() => {
+                              const updated = allocatedRestaurants
+                                .filter((ar) => ar.restaurantId !== r.restaurantId)
+                                .map((ar) => ({ restaurantId: ar.restaurantId, coasterQuantity: ar.coasterQuantity }));
+                              setRestaurantsMutation.mutate({ quotationId: signOsDialogId!, restaurants: updated });
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="px-3 py-2 bg-muted/30 border-t border-border/30 flex justify-between text-xs">
+                  <span className="text-muted-foreground">Total</span>
+                  <span className="font-mono font-medium">
+                    {allocatedRestaurants.reduce((sum, r) => sum + r.coasterQuantity, 0).toLocaleString("pt-BR")} bolachas
+                  </span>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Select value={addRestaurantId} onValueChange={setAddRestaurantId}>
+                <SelectTrigger className="flex-1 bg-background border-border/30">
+                  <SelectValue placeholder="Selecione um restaurante" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeRestaurantsList
+                    .filter((r: any) => !allocatedRestaurants.some((ar) => ar.restaurantId === r.id))
+                    .map((r: any) => (
+                      <SelectItem key={r.id} value={String(r.id)}>
+                        {r.name} {r.address ? `— ${r.address}` : ""}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!addRestaurantId) return;
+                  const existing = allocatedRestaurants.map((ar) => ({
+                    restaurantId: ar.restaurantId,
+                    coasterQuantity: ar.coasterQuantity,
+                  }));
+                  existing.push({ restaurantId: Number(addRestaurantId), coasterQuantity: 500 });
+                  setRestaurantsMutation.mutate({ quotationId: signOsDialogId!, restaurants: existing });
+                  setAddRestaurantId("");
+                }}
+                disabled={!addRestaurantId}
+              >
+                <Plus className="w-4 h-4 mr-1" /> Adicionar
+              </Button>
+            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-4">Assinatura da OS</p>
+            <div className="grid gap-2">
+              <Label>URL da Assinatura *</Label>
+              <Input
+                value={signForm.signatureUrl}
+                onChange={(e) => setSignForm({ ...signForm, signatureUrl: e.target.value })}
+                placeholder="https://... (link do documento assinado)"
+                className="bg-background border-border/30"
+              />
+              <p className="text-[11px] text-muted-foreground">Cole a URL do documento ou comprovante de assinatura.</p>
+            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-4">Dados da Campanha</p>
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label>Nome da Campanha *</Label>
+                <Input
+                  value={signForm.campaignName}
+                  onChange={(e) => setSignForm({ ...signForm, campaignName: e.target.value })}
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Data Início *</Label>
+                  <Input
+                    type="date"
+                    value={signForm.startDate}
+                    onChange={(e) => setSignForm({ ...signForm, startDate: e.target.value })}
+                    className="bg-background border-border/30"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Data Fim *</Label>
+                  <Input
+                    type="date"
+                    value={signForm.endDate}
+                    onChange={(e) => setSignForm({ ...signForm, endDate: e.target.value })}
+                    className="bg-background border-border/30"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-wrap gap-2">
+            <Button
+              variant="outline"
+              className="mr-auto"
               onClick={() => {
-                if (signOsDialogId) {
-                  signOSMutation.mutate({ id: signOsDialogId.osId, status: "assinada" });
-                  setSignOsDialogId(null);
-                }
+                if (!signOsDialogId) return;
+                const q = quotationsList.find((x) => x.id === signOsDialogId);
+                generateOSPdf({
+                  orderNumber: `OS-${signOsDialogId}`,
+                  quotationNumber: q?.quotationNumber || "",
+                  clientName: q?.clientName || "Anunciante",
+                  clientCompany: q?.clientCompany || undefined,
+                  coasterVolume: q?.coasterVolume || 0,
+                  totalValue: q?.totalValue || undefined,
+                  description: "",
+                  restaurants: allocatedRestaurants.map((r) => ({
+                    name: r.restaurantName || `Restaurante #${r.restaurantId}`,
+                    coasterQuantity: r.coasterQuantity,
+                  })),
+                });
               }}
+              disabled={allocatedRestaurants.length === 0}
+            >
+              <Download className="w-4 h-4 mr-1" /> Baixar PDF
+            </Button>
+            <Button variant="outline" onClick={() => setSignOsDialogId(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (!signOsDialogId) return;
+                if (!signForm.signatureUrl.trim()) {
+                  toast.error("Informe a URL da assinatura");
+                  return;
+                }
+                if (!signForm.campaignName.trim()) {
+                  toast.error("Informe o nome da campanha");
+                  return;
+                }
+                if (!signForm.startDate || !signForm.endDate) {
+                  toast.error("Informe as datas de início e fim");
+                  return;
+                }
+                signOSMutation.mutate({
+                  quotationId: signOsDialogId,
+                  signatureUrl: signForm.signatureUrl.trim(),
+                  campaignName: signForm.campaignName.trim(),
+                  startDate: signForm.startDate,
+                  endDate: signForm.endDate,
+                });
+              }}
+              disabled={signOSMutation.isPending || allocatedRestaurants.length === 0}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
-              Assinar OS
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              {signOSMutation.isPending ? "Assinando..." : "Assinar OS e Criar Campanha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={lossDialogId !== null} onOpenChange={() => setLossDialogId(null)}>
         <AlertDialogContent>
