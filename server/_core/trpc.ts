@@ -43,3 +43,35 @@ export const adminProcedure = t.procedure.use(
     });
   }),
 );
+
+function createRoleProcedure(allowedRoles: string[]) {
+  return t.procedure.use(
+    t.middleware(async opts => {
+      const { ctx, next } = opts;
+
+      if (!ctx.user) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+      }
+
+      const userRole = ctx.user.role || "user";
+      if (userRole !== "admin" && !allowedRoles.includes(userRole)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Você não tem permissão para acessar este recurso.",
+        });
+      }
+
+      return next({
+        ctx: {
+          ...ctx,
+          user: ctx.user,
+        },
+      });
+    }),
+  );
+}
+
+export const comercialProcedure = createRoleProcedure(["comercial", "manager"]);
+export const operacoesProcedure = createRoleProcedure(["operacoes", "manager"]);
+export const financeiroProcedure = createRoleProcedure(["financeiro", "manager"]);
+export const internalProcedure = createRoleProcedure(["comercial", "operacoes", "financeiro", "manager"]);

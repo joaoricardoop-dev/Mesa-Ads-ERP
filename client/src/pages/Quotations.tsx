@@ -1,0 +1,781 @@
+import { useState, Fragment } from "react";
+import { trpc } from "@/lib/trpc";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import PageContainer from "@/components/PageContainer";
+import { toast } from "sonner";
+import { formatCurrency } from "@/lib/format";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  Trophy,
+  XCircle,
+  Copy,
+  ChevronDown,
+  ChevronUp,
+  ArrowUpDown,
+  FileText,
+  Calendar,
+} from "lucide-react";
+
+type QuotationStatus = "rascunho" | "enviada" | "ativa" | "win" | "perdida" | "expirada";
+
+interface QuotationForm {
+  clientId: number | "";
+  campaignType: string;
+  coasterVolume: number;
+  networkProfile: string;
+  regions: string;
+  cycles: number;
+  unitPrice: string;
+  totalValue: string;
+  includesProduction: boolean;
+  notes: string;
+  validUntil: string;
+}
+
+const emptyForm: QuotationForm = {
+  clientId: "",
+  campaignType: "padrao",
+  coasterVolume: 10000,
+  networkProfile: "",
+  regions: "",
+  cycles: 1,
+  unitPrice: "",
+  totalValue: "",
+  includesProduction: true,
+  notes: "",
+  validUntil: "",
+};
+
+interface WinForm {
+  campaignName: string;
+  startDate: string;
+  endDate: string;
+}
+
+const emptyWinForm: WinForm = {
+  campaignName: "",
+  startDate: "",
+  endDate: "",
+};
+
+const STATUS_CONFIG: Record<QuotationStatus, { label: string; className: string }> = {
+  rascunho: { label: "Rascunho", className: "bg-muted text-muted-foreground" },
+  enviada: { label: "Enviada", className: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  ativa: { label: "Ativa", className: "bg-primary/20 text-primary border-primary/30" },
+  win: { label: "WIN", className: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
+  perdida: { label: "Perdida", className: "bg-destructive/20 text-destructive border-destructive/30" },
+  expirada: { label: "Expirada", className: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
+};
+
+type SortKey = "quotationNumber" | "clientName" | "totalValue" | "status" | "createdAt";
+type SortDir = "asc" | "desc";
+
+export default function Quotations() {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<QuotationForm>(emptyForm);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("createdAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const [winDialogId, setWinDialogId] = useState<number | null>(null);
+  const [winForm, setWinForm] = useState<WinForm>(emptyWinForm);
+
+  const [lossDialogId, setLossDialogId] = useState<number | null>(null);
+  const [lossReason, setLossReason] = useState("");
+
+  const utils = trpc.useUtils();
+  const { data: quotationsList = [], isLoading } = trpc.quotation.list.useQuery();
+  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+
+  const createMutation = trpc.quotation.create.useMutation({
+    onSuccess: () => {
+      utils.quotation.list.invalidate();
+      setIsDialogOpen(false);
+      setForm(emptyForm);
+      toast.success("Cotação criada com sucesso!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const updateMutation = trpc.quotation.update.useMutation({
+    onSuccess: () => {
+      utils.quotation.list.invalidate();
+      setIsDialogOpen(false);
+      setEditingId(null);
+      setForm(emptyForm);
+      toast.success("Cotação atualizada!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const deleteMutation = trpc.quotation.delete.useMutation({
+    onSuccess: () => {
+      utils.quotation.list.invalidate();
+      setDeleteId(null);
+      toast.success("Cotação removida!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const winMutation = trpc.quotation.markWin.useMutation({
+    onSuccess: (data) => {
+      utils.quotation.list.invalidate();
+      setWinDialogId(null);
+      setWinForm(emptyWinForm);
+      toast.success(`Campanha ${data.campaignNumber} criada com sucesso!`);
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const lossMutation = trpc.quotation.markLost.useMutation({
+    onSuccess: () => {
+      utils.quotation.list.invalidate();
+      setLossDialogId(null);
+      setLossReason("");
+      toast.success("Cotação marcada como perdida.");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const duplicateMutation = trpc.quotation.duplicate.useMutation({
+    onSuccess: () => {
+      utils.quotation.list.invalidate();
+      toast.success("Cotação duplicada!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const handleSubmit = () => {
+    if (!form.clientId) {
+      toast.error("Selecione um cliente");
+      return;
+    }
+    if (form.coasterVolume < 1) {
+      toast.error("Volume de bolachas deve ser pelo menos 1");
+      return;
+    }
+
+    const payload = {
+      clientId: form.clientId as number,
+      campaignType: form.campaignType || undefined,
+      coasterVolume: form.coasterVolume,
+      networkProfile: form.networkProfile || undefined,
+      regions: form.regions || undefined,
+      cycles: form.cycles || undefined,
+      unitPrice: form.unitPrice || undefined,
+      totalValue: form.totalValue || undefined,
+      includesProduction: form.includesProduction,
+      notes: form.notes || undefined,
+      validUntil: form.validUntil || undefined,
+    };
+
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, ...payload });
+    } else {
+      createMutation.mutate(payload);
+    }
+  };
+
+  const handleEdit = (q: (typeof quotationsList)[0]) => {
+    setEditingId(q.id);
+    setForm({
+      clientId: q.clientId,
+      campaignType: q.campaignType || "padrao",
+      coasterVolume: q.coasterVolume,
+      networkProfile: q.networkProfile || "",
+      regions: q.regions || "",
+      cycles: q.cycles || 1,
+      unitPrice: q.unitPrice || "",
+      totalValue: q.totalValue || "",
+      includesProduction: q.includesProduction ?? true,
+      notes: q.notes || "",
+      validUntil: q.validUntil || "",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleNew = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setIsDialogOpen(true);
+  };
+
+  const handleWin = (q: (typeof quotationsList)[0]) => {
+    setWinDialogId(q.id);
+    setWinForm({
+      campaignName: `Campanha ${q.clientName || ""}`.trim(),
+      startDate: "",
+      endDate: "",
+    });
+  };
+
+  const handleSubmitWin = () => {
+    if (!winDialogId) return;
+    if (!winForm.campaignName.trim()) {
+      toast.error("Nome da campanha é obrigatório");
+      return;
+    }
+    if (!winForm.startDate || !winForm.endDate) {
+      toast.error("Datas de início e fim são obrigatórias");
+      return;
+    }
+    winMutation.mutate({
+      id: winDialogId,
+      campaignName: winForm.campaignName,
+      startDate: winForm.startDate,
+      endDate: winForm.endDate,
+    });
+  };
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const filtered = quotationsList.filter((q) => {
+    const matchesSearch =
+      (q.quotationNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+      (q.clientName || "").toLowerCase().includes(search.toLowerCase()) ||
+      (q.clientCompany || "").toLowerCase().includes(search.toLowerCase()) ||
+      (q.notes || "").toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === "all" || q.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    switch (sortKey) {
+      case "quotationNumber":
+        return (a.quotationNumber || "").localeCompare(b.quotationNumber || "") * dir;
+      case "clientName":
+        return (a.clientName || "").localeCompare(b.clientName || "") * dir;
+      case "totalValue":
+        return (Number(a.totalValue || 0) - Number(b.totalValue || 0)) * dir;
+      case "status":
+        return (a.status || "").localeCompare(b.status || "") * dir;
+      case "createdAt":
+        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
+      default:
+        return 0;
+    }
+  });
+
+  const statusCounts = quotationsList.reduce(
+    (acc, q) => {
+      acc[q.status] = (acc[q.status] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+
+  const SortHeader = ({ label, col, className = "" }: { label: string; col: SortKey; className?: string }) => (
+    <TableHead
+      className={`text-xs text-muted-foreground font-medium cursor-pointer select-none hover:text-foreground transition-colors ${className}`}
+      onClick={() => handleSort(col)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {sortKey === col ? (
+          sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+        ) : (
+          <ArrowUpDown className="w-3 h-3 opacity-40" />
+        )}
+      </div>
+    </TableHead>
+  );
+
+  return (
+    <PageContainer
+      title="Cotações"
+      description="Gestão de cotações comerciais"
+      actions={
+        <Button onClick={handleNew} className="gap-2">
+          <Plus className="w-4 h-4" />
+          Nova Cotação
+        </Button>
+      }
+    >
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+        {(["rascunho", "enviada", "ativa", "win", "perdida", "expirada"] as QuotationStatus[]).map((s) => (
+          <button
+            key={s}
+            onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
+            className={`bg-card border rounded-lg p-3 text-left transition-all ${
+              statusFilter === s ? "border-primary ring-1 ring-primary" : "border-border/30 hover:border-border/60"
+            }`}
+          >
+            <p className="text-xs text-muted-foreground">{STATUS_CONFIG[s].label}</p>
+            <p className="text-xl font-bold font-mono">{statusCounts[s] || 0}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar cotação..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-card border-border/30"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[160px] bg-card border-border/30">
+            <SelectValue placeholder="Todos Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos Status</SelectItem>
+            <SelectItem value="rascunho">Rascunho</SelectItem>
+            <SelectItem value="enviada">Enviada</SelectItem>
+            <SelectItem value="ativa">Ativa</SelectItem>
+            <SelectItem value="win">WIN</SelectItem>
+            <SelectItem value="perdida">Perdida</SelectItem>
+            <SelectItem value="expirada">Expirada</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-border/30 hover:bg-transparent">
+              <SortHeader label="COTAÇÃO" col="quotationNumber" />
+              <SortHeader label="CLIENTE" col="clientName" />
+              <TableHead className="text-xs text-muted-foreground font-medium hidden md:table-cell">VOLUME</TableHead>
+              <SortHeader label="VALOR" col="totalValue" className="hidden lg:table-cell" />
+              <TableHead className="text-xs text-muted-foreground font-medium hidden lg:table-cell">VALIDADE</TableHead>
+              <SortHeader label="STATUS" col="status" className="text-center" />
+              <TableHead className="text-xs text-muted-foreground font-medium text-right">AÇÕES</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  Carregando...
+                </TableCell>
+              </TableRow>
+            ) : sorted.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  {search || statusFilter !== "all"
+                    ? "Nenhuma cotação encontrada"
+                    : 'Nenhuma cotação cadastrada. Clique em "Nova Cotação" para começar.'}
+                </TableCell>
+              </TableRow>
+            ) : (
+              sorted.map((q) => (
+                <TableRow key={q.id} className="border-border/20 hover:bg-card/80">
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-muted-foreground" />
+                      {q.quotationNumber}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{q.clientName || "—"}</p>
+                      {q.clientCompany && (
+                        <p className="text-xs text-muted-foreground">{q.clientCompany}</p>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                    {q.coasterVolume.toLocaleString("pt-BR")} un.
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    {q.totalValue ? formatCurrency(Number(q.totalValue)) : "—"}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+                    {q.validUntil ? (
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(q.validUntil + "T00:00:00").toLocaleDateString("pt-BR")}
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="outline" className={STATUS_CONFIG[q.status as QuotationStatus]?.className || ""}>
+                      {STATUS_CONFIG[q.status as QuotationStatus]?.label || q.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {q.status !== "win" && q.status !== "perdida" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-emerald-400 hover:text-emerald-300"
+                          onClick={() => handleWin(q)}
+                          title="Marcar WIN"
+                        >
+                          <Trophy className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      {q.status !== "win" && q.status !== "perdida" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => {
+                            setLossDialogId(q.id);
+                            setLossReason("");
+                          }}
+                          title="Marcar Perdida"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleEdit(q)}
+                        title="Editar"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => duplicateMutation.mutate({ id: q.id })}
+                        title="Duplicar"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => setDeleteId(q.id)}
+                        title="Excluir"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-2xl bg-card border-border/30 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Editar Cotação" : "Nova Cotação"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Cliente</p>
+            <div className="grid gap-2">
+              <Label>Cliente *</Label>
+              <Select
+                value={form.clientId ? String(form.clientId) : ""}
+                onValueChange={(v) => setForm({ ...form, clientId: Number(v) })}
+              >
+                <SelectTrigger className="bg-background border-border/30">
+                  <SelectValue placeholder="Selecione um cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientsList.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name} {c.company ? `(${c.company})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Detalhes</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Tipo de Campanha</Label>
+                <Select
+                  value={form.campaignType}
+                  onValueChange={(v) => setForm({ ...form, campaignType: v })}
+                >
+                  <SelectTrigger className="bg-background border-border/30">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="padrao">Padrão</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                    <SelectItem value="exclusivo">Exclusivo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Perfil de Rede</Label>
+                <Input
+                  value={form.networkProfile}
+                  onChange={(e) => setForm({ ...form, networkProfile: e.target.value })}
+                  placeholder="Ex: Top 50"
+                  className="bg-background border-border/30"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label>Volume de Bolachas *</Label>
+                <Input
+                  type="number"
+                  value={form.coasterVolume}
+                  onChange={(e) => setForm({ ...form, coasterVolume: Number(e.target.value) })}
+                  min={1}
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Ciclos</Label>
+                <Input
+                  type="number"
+                  value={form.cycles}
+                  onChange={(e) => setForm({ ...form, cycles: Number(e.target.value) })}
+                  min={1}
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Regiões</Label>
+                <Input
+                  value={form.regions}
+                  onChange={(e) => setForm({ ...form, regions: e.target.value })}
+                  placeholder="Ex: Zona Sul, Centro"
+                  className="bg-background border-border/30"
+                />
+              </div>
+            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Valores</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Preço Unitário (R$)</Label>
+                <Input
+                  value={form.unitPrice}
+                  onChange={(e) => setForm({ ...form, unitPrice: e.target.value })}
+                  placeholder="0.0000"
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Valor Total (R$)</Label>
+                <Input
+                  value={form.totalValue}
+                  onChange={(e) => setForm({ ...form, totalValue: e.target.value })}
+                  placeholder="0.00"
+                  className="bg-background border-border/30"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Validade</Label>
+                <Input
+                  type="date"
+                  value={form.validUntil}
+                  onChange={(e) => setForm({ ...form, validUntil: e.target.value })}
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="flex items-end gap-2 pb-1">
+                <input
+                  type="checkbox"
+                  id="includesProduction"
+                  checked={form.includesProduction}
+                  onChange={(e) => setForm({ ...form, includesProduction: e.target.checked })}
+                  className="rounded border-border"
+                />
+                <Label htmlFor="includesProduction" className="cursor-pointer">
+                  Inclui Produção
+                </Label>
+              </div>
+            </div>
+
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Observações</p>
+            <Textarea
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Notas e observações..."
+              className="bg-background border-border/30"
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              {createMutation.isPending || updateMutation.isPending
+                ? "Salvando..."
+                : editingId
+                  ? "Atualizar"
+                  : "Criar Cotação"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={winDialogId !== null} onOpenChange={() => setWinDialogId(null)}>
+        <DialogContent className="sm:max-w-md bg-card border-border/30">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-emerald-400" />
+              Marcar como WIN
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              A cotação será convertida em uma nova campanha com número CMP-YYYY-NNNN.
+            </p>
+            <div className="grid gap-2">
+              <Label>Nome da Campanha *</Label>
+              <Input
+                value={winForm.campaignName}
+                onChange={(e) => setWinForm({ ...winForm, campaignName: e.target.value })}
+                placeholder="Nome da campanha"
+                className="bg-background border-border/30"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Data Início *</Label>
+                <Input
+                  type="date"
+                  value={winForm.startDate}
+                  onChange={(e) => setWinForm({ ...winForm, startDate: e.target.value })}
+                  className="bg-background border-border/30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Data Fim *</Label>
+                <Input
+                  type="date"
+                  value={winForm.endDate}
+                  onChange={(e) => setWinForm({ ...winForm, endDate: e.target.value })}
+                  className="bg-background border-border/30"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWinDialogId(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSubmitWin}
+              disabled={winMutation.isPending}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {winMutation.isPending ? "Convertendo..." : "Converter em Campanha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={lossDialogId !== null} onOpenChange={() => setLossDialogId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Marcar como Perdida</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja marcar esta cotação como perdida? Opcionalmente, informe o motivo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            value={lossReason}
+            onChange={(e) => setLossReason(e.target.value)}
+            placeholder="Motivo da perda (opcional)"
+            className="bg-background border-border/30"
+            rows={3}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (lossDialogId) {
+                  lossMutation.mutate({ id: lossDialogId, lossReason: lossReason || undefined });
+                }
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Marcar Perdida
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Cotação</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta cotação? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteId && deleteMutation.mutate({ id: deleteId })}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </PageContainer>
+  );
+}

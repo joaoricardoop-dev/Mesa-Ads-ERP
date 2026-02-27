@@ -52,7 +52,7 @@ interface CampaignForm {
   name: string;
   startDate: string;
   endDate: string;
-  status: "draft" | "active" | "paused" | "completed" | "quotation" | "archived";
+  status: "draft" | "active" | "paused" | "completed" | "quotation" | "archived" | "producao" | "transito" | "executar" | "veiculacao" | "inativa";
   notes: string;
   coastersPerRestaurant: number;
   usagePerDay: number;
@@ -110,6 +110,11 @@ const STATUS_LABELS: Record<string, string> = {
   completed: "Concluída",
   quotation: "Cotação",
   archived: "Arquivada",
+  producao: "Produção",
+  transito: "Trânsito",
+  executar: "Executar",
+  veiculacao: "Veiculação",
+  inativa: "Inativa",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -119,6 +124,11 @@ const STATUS_COLORS: Record<string, string> = {
   completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   quotation: "bg-orange-500/20 text-orange-400 border-orange-500/30",
   archived: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  producao: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  transito: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+  executar: "bg-violet-500/20 text-violet-400 border-violet-500/30",
+  veiculacao: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  inativa: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
 function calcCampaignPricing(c: {
@@ -374,7 +384,7 @@ export default function Campaigns() {
       (c.clientName || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const activeCount = campaignsList.filter((c) => c.status === "active").length;
+  const activeCount = campaignsList.filter((c) => ["active", "producao", "transito", "executar", "veiculacao"].includes(c.status)).length;
   const quotationCount = campaignsList.filter((c) => c.status === "quotation").length;
 
   const totals = useMemo(() => {
@@ -463,7 +473,12 @@ export default function Campaigns() {
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="min-w-0">
-                          <h3 className="font-semibold text-sm truncate">{c.name}</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-sm truncate">{c.name}</h3>
+                            {(c as any).campaignNumber && (
+                              <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{(c as any).campaignNumber}</span>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground truncate">
                             {c.clientName || "—"}
                             {c.clientCompany ? ` · ${c.clientCompany}` : ""}
@@ -549,9 +564,14 @@ export default function Campaigns() {
                           <SelectItem value="draft">Rascunho</SelectItem>
                           <SelectItem value="quotation">Cotação</SelectItem>
                           <SelectItem value="active">Ativa</SelectItem>
+                          <SelectItem value="producao">Produção</SelectItem>
+                          <SelectItem value="transito">Trânsito</SelectItem>
+                          <SelectItem value="executar">Executar</SelectItem>
+                          <SelectItem value="veiculacao">Veiculação</SelectItem>
                           <SelectItem value="paused">Pausada</SelectItem>
                           <SelectItem value="completed">Concluída</SelectItem>
                           <SelectItem value="archived">Arquivada</SelectItem>
+                          <SelectItem value="inativa">Inativa</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

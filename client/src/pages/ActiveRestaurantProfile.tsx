@@ -150,8 +150,11 @@ export default function ActiveRestaurantProfile() {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
   const [isBranchDialogOpen, setIsBranchDialogOpen] = useState(false);
+  const [isTermDialogOpen, setIsTermDialogOpen] = useState(false);
+  const [editingTermId, setEditingTermId] = useState<number | null>(null);
   const [paymentForm, setPaymentForm] = useState({ campaignId: "", amount: "", referenceMonth: "", paymentDate: "", status: "pending", notes: "" });
   const [photoForm, setPhotoForm] = useState({ url: "", caption: "", photoType: "veiculacao" });
+  const [termForm, setTermForm] = useState({ conditions: "", remunerationRule: "", allowedCategories: "", blockedCategories: "", restaurantObligations: "", mesaObligations: "", validFrom: "", validUntil: "" });
   const [selectedBranch, setSelectedBranch] = useState("");
 
   const utils = trpc.useUtils();
@@ -160,6 +163,7 @@ export default function ActiveRestaurantProfile() {
   const { data: photos = [] } = trpc.activeRestaurant.getPhotos.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
   const { data: payments = [] } = trpc.activeRestaurant.getPayments.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
   const { data: allRestaurants = [] } = trpc.activeRestaurant.list.useQuery();
+  const { data: terms = [] } = trpc.term.list.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
 
   const branches = useMemo(() =>
     allRestaurants.filter(r => r.parentRestaurantId === restaurantId),
@@ -204,6 +208,24 @@ export default function ActiveRestaurantProfile() {
 
   const unlinkBranchMutation = trpc.activeRestaurant.unlinkBranch.useMutation({
     onSuccess: () => { utils.activeRestaurant.list.invalidate(); toast.success("Filial desvinculada!"); },
+  });
+
+  const createTermMutation = trpc.term.create.useMutation({
+    onSuccess: () => { utils.term.list.invalidate(); setIsTermDialogOpen(false); toast.success("Termo criado!"); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateTermMutation = trpc.term.update.useMutation({
+    onSuccess: () => { utils.term.list.invalidate(); setIsTermDialogOpen(false); setEditingTermId(null); toast.success("Termo atualizado!"); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const deleteTermMutation = trpc.term.delete.useMutation({
+    onSuccess: () => { utils.term.list.invalidate(); toast.success("Termo removido!"); },
+  });
+
+  const updateTermStatusMutation = trpc.term.updateStatus.useMutation({
+    onSuccess: () => { utils.term.list.invalidate(); toast.success("Status atualizado!"); },
   });
 
   const stats = useMemo(() => {
@@ -305,6 +327,7 @@ export default function ActiveRestaurantProfile() {
               <TabsTrigger value="financeiro" className="gap-1.5 text-xs"><DollarSign className="w-3.5 h-3.5" /> Financeiro</TabsTrigger>
               <TabsTrigger value="fotos" className="gap-1.5 text-xs"><Camera className="w-3.5 h-3.5" /> Fotos</TabsTrigger>
               <TabsTrigger value="filiais" className="gap-1.5 text-xs"><Link2 className="w-3.5 h-3.5" /> Filiais</TabsTrigger>
+              <TabsTrigger value="termos" className="gap-1.5 text-xs"><FileText className="w-3.5 h-3.5" /> Termos</TabsTrigger>
             </TabsList>
 
             {/* ─── PAINEL ─── */}
@@ -760,6 +783,131 @@ export default function ActiveRestaurantProfile() {
               )}
             </TabsContent>
 
+            {/* ─── TERMOS ─── */}
+            <TabsContent value="termos" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold">Termos para Restaurante</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Contratos e termos de parceria</p>
+                </div>
+                <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => {
+                  setEditingTermId(null);
+                  setTermForm({ conditions: "", remunerationRule: "", allowedCategories: "", blockedCategories: "", restaurantObligations: "", mesaObligations: "", validFrom: "", validUntil: "" });
+                  setIsTermDialogOpen(true);
+                }}>
+                  <Plus className="w-3.5 h-3.5" /> Novo Termo
+                </Button>
+              </div>
+
+              {terms.length === 0 ? (
+                <div className="bg-card border border-border/30 rounded-lg p-8 text-center text-muted-foreground text-sm">
+                  <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p>Nenhum termo cadastrado</p>
+                  <p className="text-xs mt-1">Crie termos de parceria para este restaurante</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {terms.map((term) => (
+                    <div key={term.id} className="bg-card border border-border/30 rounded-lg p-4">
+                      <div className="flex items-center justify-between gap-4 mb-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-semibold font-mono">{term.termNumber}</h4>
+                            <Badge variant="outline" className={
+                              term.status === "vigente" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" :
+                              term.status === "assinado" ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
+                              term.status === "enviado" ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
+                              term.status === "encerrado" ? "bg-gray-500/20 text-gray-400 border-gray-500/30" :
+                              "bg-muted text-muted-foreground"
+                            }>
+                              {term.status === "rascunho" ? "Rascunho" : term.status === "enviado" ? "Enviado" : term.status === "assinado" ? "Assinado" : term.status === "vigente" ? "Vigente" : "Encerrado"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {term.validFrom && term.validUntil ? `${new Date(term.validFrom).toLocaleDateString("pt-BR")} → ${new Date(term.validUntil).toLocaleDateString("pt-BR")}` : term.validFrom ? `A partir de ${new Date(term.validFrom).toLocaleDateString("pt-BR")}` : "Sem período definido"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Select value={term.status} onValueChange={(v) => updateTermStatusMutation.mutate({ id: term.id, status: v as any })}>
+                            <SelectTrigger className="h-7 text-[10px] w-[110px] bg-background border-border/30">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="rascunho">Rascunho</SelectItem>
+                              <SelectItem value="enviado">Enviado</SelectItem>
+                              <SelectItem value="assinado">Assinado</SelectItem>
+                              <SelectItem value="vigente">Vigente</SelectItem>
+                              <SelectItem value="encerrado">Encerrado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                            setEditingTermId(term.id);
+                            setTermForm({
+                              conditions: term.conditions || "",
+                              remunerationRule: term.remunerationRule || "",
+                              allowedCategories: term.allowedCategories || "",
+                              blockedCategories: term.blockedCategories || "",
+                              restaurantObligations: term.restaurantObligations || "",
+                              mesaObligations: term.mesaObligations || "",
+                              validFrom: term.validFrom || "",
+                              validUntil: term.validUntil || "",
+                            });
+                            setIsTermDialogOpen(true);
+                          }}>
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteTermMutation.mutate({ id: term.id })}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        {term.conditions && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Condições</p>
+                            <p className="text-muted-foreground whitespace-pre-wrap">{term.conditions}</p>
+                          </div>
+                        )}
+                        {term.remunerationRule && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Remuneração</p>
+                            <p className="text-muted-foreground whitespace-pre-wrap">{term.remunerationRule}</p>
+                          </div>
+                        )}
+                        {term.allowedCategories && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Categorias Permitidas</p>
+                            <p className="text-muted-foreground">{term.allowedCategories}</p>
+                          </div>
+                        )}
+                        {term.blockedCategories && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Categorias Bloqueadas</p>
+                            <p className="text-muted-foreground">{term.blockedCategories}</p>
+                          </div>
+                        )}
+                        {term.restaurantObligations && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Obrigações do Restaurante</p>
+                            <p className="text-muted-foreground whitespace-pre-wrap">{term.restaurantObligations}</p>
+                          </div>
+                        )}
+                        {term.mesaObligations && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Obrigações da Mesa Ads</p>
+                            <p className="text-muted-foreground whitespace-pre-wrap">{term.mesaObligations}</p>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-2">
+                        Criado em {new Date(term.createdAt).toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
             {/* ─── FILIAIS ─── */}
             <TabsContent value="filiais" className="space-y-4">
               <div className="flex items-center justify-between">
@@ -960,6 +1108,73 @@ export default function ActiveRestaurantProfile() {
             <Button disabled={!selectedBranch} onClick={() => {
               linkBranchMutation.mutate({ parentId: restaurantId, branchId: parseInt(selectedBranch) });
             }}>Vincular</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Term Dialog */}
+      <Dialog open={isTermDialogOpen} onOpenChange={(open) => { setIsTermDialogOpen(open); if (!open) setEditingTermId(null); }}>
+        <DialogContent className="sm:max-w-lg bg-card border-border/30 max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-primary" /> {editingTermId ? "Editar Termo" : "Novo Termo"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Válido De</Label>
+                <Input type="date" value={termForm.validFrom} onChange={(e) => setTermForm(p => ({ ...p, validFrom: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Válido Até</Label>
+                <Input type="date" value={termForm.validUntil} onChange={(e) => setTermForm(p => ({ ...p, validUntil: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Condições Gerais</Label>
+              <textarea value={termForm.conditions} onChange={(e) => setTermForm(p => ({ ...p, conditions: e.target.value }))} rows={3} className="w-full rounded-md border border-border/30 bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Regra de Remuneração</Label>
+              <textarea value={termForm.remunerationRule} onChange={(e) => setTermForm(p => ({ ...p, remunerationRule: e.target.value }))} rows={2} className="w-full rounded-md border border-border/30 bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Categorias Permitidas</Label>
+                <Input value={termForm.allowedCategories} onChange={(e) => setTermForm(p => ({ ...p, allowedCategories: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Categorias Bloqueadas</Label>
+                <Input value={termForm.blockedCategories} onChange={(e) => setTermForm(p => ({ ...p, blockedCategories: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Obrigações do Restaurante</Label>
+              <textarea value={termForm.restaurantObligations} onChange={(e) => setTermForm(p => ({ ...p, restaurantObligations: e.target.value }))} rows={2} className="w-full rounded-md border border-border/30 bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Obrigações da Mesa Ads</Label>
+              <textarea value={termForm.mesaObligations} onChange={(e) => setTermForm(p => ({ ...p, mesaObligations: e.target.value }))} rows={2} className="w-full rounded-md border border-border/30 bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsTermDialogOpen(false); setEditingTermId(null); }}>Cancelar</Button>
+            <Button onClick={() => {
+              const data = {
+                conditions: termForm.conditions || undefined,
+                remunerationRule: termForm.remunerationRule || undefined,
+                allowedCategories: termForm.allowedCategories || undefined,
+                blockedCategories: termForm.blockedCategories || undefined,
+                restaurantObligations: termForm.restaurantObligations || undefined,
+                mesaObligations: termForm.mesaObligations || undefined,
+                validFrom: termForm.validFrom || undefined,
+                validUntil: termForm.validUntil || undefined,
+              };
+              if (editingTermId) {
+                updateTermMutation.mutate({ id: editingTermId, ...data });
+              } else {
+                createTermMutation.mutate({ restaurantId, ...data });
+              }
+            }}>{editingTermId ? "Salvar" : "Criar Termo"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

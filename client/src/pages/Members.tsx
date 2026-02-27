@@ -44,9 +44,24 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof S
     color: "bg-amber-500/20 text-amber-400 border-amber-500/30",
     icon: Crown,
   },
+  comercial: {
+    label: "Comercial",
+    color: "bg-green-500/20 text-green-400 border-green-500/30",
+    icon: ShieldCheck,
+  },
+  operacoes: {
+    label: "Operações",
+    color: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    icon: ShieldCheck,
+  },
+  financeiro: {
+    label: "Financeiro",
+    color: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+    icon: ShieldCheck,
+  },
   manager: {
     label: "Gerente",
-    color: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
     icon: ShieldCheck,
   },
   user: {
@@ -57,6 +72,11 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof S
   viewer: {
     label: "Visualizador",
     color: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    icon: Shield,
+  },
+  anunciante: {
+    label: "Anunciante",
+    color: "bg-orange-500/20 text-orange-400 border-orange-500/30",
     icon: Shield,
   },
 };
@@ -220,30 +240,14 @@ export default function Members() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin">
-                          <span className="flex items-center gap-1.5">
-                            <Crown className="w-3 h-3 text-amber-400" />
-                            Administrador
-                          </span>
-                        </SelectItem>
-                        <SelectItem value="manager">
-                          <span className="flex items-center gap-1.5">
-                            <ShieldCheck className="w-3 h-3 text-blue-400" />
-                            Gerente
-                          </span>
-                        </SelectItem>
-                        <SelectItem value="user">
-                          <span className="flex items-center gap-1.5">
-                            <Shield className="w-3 h-3 text-gray-400" />
-                            Usuário
-                          </span>
-                        </SelectItem>
-                        <SelectItem value="viewer">
-                          <span className="flex items-center gap-1.5">
-                            <Shield className="w-3 h-3 text-purple-400" />
-                            Visualizador
-                          </span>
-                        </SelectItem>
+                        {Object.entries(ROLE_CONFIG).map(([value, config]) => (
+                          <SelectItem key={value} value={value}>
+                            <span className="flex items-center gap-1.5">
+                              <config.icon className={`w-3 h-3 ${config.color.split(" ")[1]}`} />
+                              {config.label}
+                            </span>
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -306,31 +310,63 @@ export default function Members() {
                 <h4 className="text-sm font-semibold text-amber-400">Administrador</h4>
               </div>
               <ul className="text-xs text-muted-foreground space-y-1.5">
-                <li className="flex items-center gap-1.5">✓ Gerenciar membros e papéis</li>
-                <li className="flex items-center gap-1.5">✓ Ativar/desativar usuários</li>
-                <li className="flex items-center gap-1.5">✓ Aprovar/arquivar cotações</li>
-                <li className="flex items-center gap-1.5">✓ Criar e editar campanhas</li>
-                <li className="flex items-center gap-1.5">✓ Gerenciar restaurantes</li>
-                <li className="flex items-center gap-1.5">✓ Gerenciar clientes</li>
-                <li className="flex items-center gap-1.5">✓ Acesso ao simulador</li>
-                <li className="flex items-center gap-1.5">✓ Ver economics e produção</li>
-                <li className="flex items-center gap-1.5">✓ Excluir registros</li>
+                <li>✓ Acesso total a todos os módulos</li>
+                <li>✓ Gestão de usuários e permissões</li>
+                <li>✓ Dashboard completo</li>
+                <li>✓ Configurações do sistema</li>
+              </ul>
+            </div>
+            <div className="bg-background/50 border border-green-500/20 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <ShieldCheck className="w-4 h-4 text-green-400" />
+                <h4 className="text-sm font-semibold text-green-400">Comercial</h4>
+              </div>
+              <ul className="text-xs text-muted-foreground space-y-1.5">
+                <li>✓ Cotações (criar, marcar WIN)</li>
+                <li>✓ Simulador</li>
+                <li>✓ Leads / CRM</li>
+                <li>✓ Cadastro de anunciantes</li>
+                <li>✓ OS para anunciantes</li>
+                <li>✓ Biblioteca</li>
               </ul>
             </div>
             <div className="bg-background/50 border border-blue-500/20 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
                 <ShieldCheck className="w-4 h-4 text-blue-400" />
-                <h4 className="text-sm font-semibold text-blue-400">Gerente</h4>
+                <h4 className="text-sm font-semibold text-blue-400">Operações</h4>
               </div>
               <ul className="text-xs text-muted-foreground space-y-1.5">
-                <li className="flex items-center gap-1.5">✓ Aprovar/arquivar cotações</li>
-                <li className="flex items-center gap-1.5">✓ Criar e editar campanhas</li>
-                <li className="flex items-center gap-1.5">✓ Gerenciar restaurantes</li>
-                <li className="flex items-center gap-1.5">✓ Gerenciar clientes</li>
-                <li className="flex items-center gap-1.5">✓ Acesso ao simulador</li>
-                <li className="flex items-center gap-1.5">✓ Ver economics e produção</li>
-                <li className="flex items-center gap-1.5 text-red-400/60">✗ Gerenciar membros</li>
-                <li className="flex items-center gap-1.5 text-red-400/60">✗ Excluir registros</li>
+                <li>✓ Campanhas (todas as etapas)</li>
+                <li>✓ OS de produção gráfica</li>
+                <li>✓ Biblioteca</li>
+                <li>✓ Provas de execução</li>
+                <li>✓ Dashboard operacional</li>
+              </ul>
+            </div>
+            <div className="bg-background/50 border border-cyan-500/20 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                <h4 className="text-sm font-semibold text-cyan-400">Financeiro</h4>
+              </div>
+              <ul className="text-xs text-muted-foreground space-y-1.5">
+                <li>✓ Dashboard financeiro</li>
+                <li>✓ Faturamento</li>
+                <li>✓ Pagamentos</li>
+                <li>✓ Custos operacionais</li>
+                <li>✓ Relatórios</li>
+              </ul>
+            </div>
+            <div className="bg-background/50 border border-indigo-500/20 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                <h4 className="text-sm font-semibold text-indigo-400">Gerente</h4>
+              </div>
+              <ul className="text-xs text-muted-foreground space-y-1.5">
+                <li>✓ Acesso a Comercial + Operações</li>
+                <li>✓ Cotações e campanhas</li>
+                <li>✓ Leads e OS</li>
+                <li>✓ Dashboard financeiro</li>
+                <li className="text-red-400/60">✗ Gestão de usuários</li>
               </ul>
             </div>
             <div className="bg-background/50 border border-gray-500/20 rounded-lg p-4">
@@ -339,13 +375,11 @@ export default function Members() {
                 <h4 className="text-sm font-semibold text-gray-400">Usuário</h4>
               </div>
               <ul className="text-xs text-muted-foreground space-y-1.5">
-                <li className="flex items-center gap-1.5">✓ Criar cotações no simulador</li>
-                <li className="flex items-center gap-1.5">✓ Ver campanhas</li>
-                <li className="flex items-center gap-1.5">✓ Ver restaurantes</li>
-                <li className="flex items-center gap-1.5">✓ Ver clientes</li>
-                <li className="flex items-center gap-1.5 text-red-400/60">✗ Aprovar cotações</li>
-                <li className="flex items-center gap-1.5 text-red-400/60">✗ Gerenciar membros</li>
-                <li className="flex items-center gap-1.5 text-red-400/60">✗ Excluir registros</li>
+                <li>✓ Visualizar dashboard</li>
+                <li>✓ Simulador de preços</li>
+                <li>✓ Visualizar campanhas</li>
+                <li className="text-red-400/60">✗ Criar/editar registros</li>
+                <li className="text-red-400/60">✗ Módulos financeiros</li>
               </ul>
             </div>
             <div className="bg-background/50 border border-purple-500/20 rounded-lg p-4">
@@ -354,13 +388,24 @@ export default function Members() {
                 <h4 className="text-sm font-semibold text-purple-400">Visualizador</h4>
               </div>
               <ul className="text-xs text-muted-foreground space-y-1.5">
-                <li className="flex items-center gap-1.5">✓ Ver campanhas</li>
-                <li className="flex items-center gap-1.5">✓ Ver restaurantes</li>
-                <li className="flex items-center gap-1.5">✓ Ver clientes</li>
-                <li className="flex items-center gap-1.5 text-red-400/60">✗ Criar ou editar</li>
-                <li className="flex items-center gap-1.5 text-red-400/60">✗ Acesso ao simulador</li>
-                <li className="flex items-center gap-1.5 text-red-400/60">✗ Gerenciar membros</li>
-                <li className="flex items-center gap-1.5 text-red-400/60">✗ Excluir registros</li>
+                <li>✓ Visualizar campanhas</li>
+                <li>✓ Visualizar restaurantes</li>
+                <li>✓ Visualizar clientes</li>
+                <li className="text-red-400/60">✗ Criar ou editar</li>
+                <li className="text-red-400/60">✗ Módulos financeiros</li>
+              </ul>
+            </div>
+            <div className="bg-background/50 border border-orange-500/20 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Shield className="w-4 h-4 text-orange-400" />
+                <h4 className="text-sm font-semibold text-orange-400">Anunciante</h4>
+              </div>
+              <ul className="text-xs text-muted-foreground space-y-1.5">
+                <li>✓ Portal do anunciante</li>
+                <li>✓ Ver próprias campanhas</li>
+                <li>✓ Solicitar novas campanhas</li>
+                <li>✓ Editar perfil próprio</li>
+                <li className="text-red-400/60">✗ Acesso interno</li>
               </ul>
             </div>
           </div>

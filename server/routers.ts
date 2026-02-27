@@ -2,6 +2,11 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { financialRouter } from "./financialRouter";
+import { quotationRouter } from "./quotationRouter";
+import { leadRouter } from "./leadRouter";
+import { serviceOrderRouter } from "./serviceOrderRouter";
+import { termRouter } from "./termRouter";
+import { libraryRouter } from "./libraryRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { authStorage } from "./replit_integrations/auth";
@@ -59,6 +64,11 @@ import {
 export const appRouter = router({
   system: systemRouter,
   financial: financialRouter,
+  quotation: quotationRouter,
+  lead: leadRouter,
+  serviceOrder: serviceOrderRouter,
+  term: termRouter,
+  library: libraryRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -138,13 +148,13 @@ export const appRouter = router({
 
   // ─── Restaurants ────────────────────────────────────────────────────────
   restaurant: router({
-    list: publicProcedure.query(() => listRestaurants()),
+    list: protectedProcedure.query(() => listRestaurants()),
 
-    get: publicProcedure
+    get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(({ input }) => getRestaurant(input.id)),
 
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -178,7 +188,7 @@ export const appRouter = router({
       )
       .mutation(({ input }) => createRestaurant(input)),
 
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -216,20 +226,20 @@ export const appRouter = router({
         return updateRestaurant(id, data);
       }),
 
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteRestaurant(input.id)),
   }),
 
   // ─── Active Restaurants (Restaurantes Ativos) ────────────────────────
   activeRestaurant: router({
-    list: publicProcedure.query(() => listActiveRestaurants()),
+    list: protectedProcedure.query(() => listActiveRestaurants()),
 
-    get: publicProcedure
+    get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(({ input }) => getActiveRestaurant(input.id)),
 
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -281,7 +291,7 @@ export const appRouter = router({
       )
       .mutation(({ input }) => createActiveRestaurant(input)),
 
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -338,43 +348,43 @@ export const appRouter = router({
         return updateActiveRestaurant(id, data);
       }),
 
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteActiveRestaurant(input.id)),
 
-    getCampaigns: publicProcedure
+    getCampaigns: protectedProcedure
       .input(z.object({ restaurantId: z.number() }))
       .query(({ input }) => getRestaurantCampaigns(input.restaurantId)),
 
-    getBranches: publicProcedure
+    getBranches: protectedProcedure
       .input(z.object({ restaurantId: z.number() }))
       .query(({ input }) => getRestaurantBranches(input.restaurantId)),
 
-    linkBranch: publicProcedure
+    linkBranch: protectedProcedure
       .input(z.object({ parentId: z.number(), branchId: z.number() }))
       .mutation(({ input }) => linkBranch(input.parentId, input.branchId)),
 
-    unlinkBranch: publicProcedure
+    unlinkBranch: protectedProcedure
       .input(z.object({ branchId: z.number() }))
       .mutation(({ input }) => unlinkBranch(input.branchId)),
 
-    getPhotos: publicProcedure
+    getPhotos: protectedProcedure
       .input(z.object({ restaurantId: z.number() }))
       .query(({ input }) => listRestaurantPhotos(input.restaurantId)),
 
-    addPhoto: publicProcedure
+    addPhoto: protectedProcedure
       .input(z.object({ restaurantId: z.number(), url: z.string(), caption: z.string().optional(), photoType: z.string().optional() }))
       .mutation(({ input }) => addRestaurantPhoto(input)),
 
-    deletePhoto: publicProcedure
+    deletePhoto: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteRestaurantPhoto(input.id)),
 
-    getPayments: publicProcedure
+    getPayments: protectedProcedure
       .input(z.object({ restaurantId: z.number() }))
       .query(({ input }) => listRestaurantPayments(input.restaurantId)),
 
-    addPayment: publicProcedure
+    addPayment: protectedProcedure
       .input(z.object({
         restaurantId: z.number(),
         campaignId: z.number().optional(),
@@ -387,7 +397,7 @@ export const appRouter = router({
       }))
       .mutation(({ input }) => addRestaurantPayment(input)),
 
-    updatePayment: publicProcedure
+    updatePayment: protectedProcedure
       .input(z.object({
         id: z.number(),
         amount: z.string().optional(),
@@ -400,7 +410,7 @@ export const appRouter = router({
         return updateRestaurantPayment(id, data);
       }),
 
-    deletePayment: publicProcedure
+    deletePayment: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteRestaurantPayment(input.id)),
 
@@ -410,13 +420,13 @@ export const appRouter = router({
 
   // ─── Clients (Anunciantes) ────────────────────────────────────────────
   advertiser: router({
-    list: publicProcedure.query(() => listClients()),
+    list: protectedProcedure.query(() => listClients()),
 
-    get: publicProcedure
+    get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(({ input }) => getClient(input.id)),
 
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -438,7 +448,7 @@ export const appRouter = router({
       )
       .mutation(({ input }) => createClient(input)),
 
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -464,27 +474,27 @@ export const appRouter = router({
         return updateClient(id, data);
       }),
 
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteClient(input.id)),
   }),
 
   // ─── Campaigns ────────────────────────────────────────────────────────
   campaign: router({
-    list: publicProcedure.query(() => listCampaigns()),
+    list: protectedProcedure.query(() => listCampaigns()),
 
-    get: publicProcedure
+    get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(({ input }) => getCampaign(input.id)),
 
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           clientId: z.number(),
           name: z.string().min(1),
           startDate: z.string(),
           endDate: z.string(),
-          status: z.enum(["draft", "active", "paused", "completed", "quotation", "archived"]).default("quotation"),
+          status: z.enum(["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa"]).default("quotation"),
           notes: z.string().optional(),
           coastersPerRestaurant: z.number().int().default(500),
           usagePerDay: z.number().int().default(3),
@@ -506,7 +516,7 @@ export const appRouter = router({
       )
       .mutation(({ input }) => createCampaign(input)),
 
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -514,7 +524,7 @@ export const appRouter = router({
           name: z.string().min(1).optional(),
           startDate: z.string().optional(),
           endDate: z.string().optional(),
-          status: z.enum(["draft", "active", "paused", "completed", "quotation", "archived"]).optional(),
+          status: z.enum(["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa"]).optional(),
           notes: z.string().optional(),
           coastersPerRestaurant: z.number().int().optional(),
           usagePerDay: z.number().int().optional(),
@@ -539,15 +549,15 @@ export const appRouter = router({
         return updateCampaign(id, rest);
       }),
 
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteCampaign(input.id)),
 
-    getRestaurants: publicProcedure
+    getRestaurants: protectedProcedure
       .input(z.object({ campaignId: z.number() }))
       .query(({ input }) => getCampaignRestaurants(input.campaignId)),
 
-    setRestaurants: publicProcedure
+    setRestaurants: protectedProcedure
       .input(
         z.object({
           campaignId: z.number(),
@@ -564,39 +574,159 @@ export const appRouter = router({
         setCampaignRestaurants(input.campaignId, input.restaurants)
       ),
 
-    getHistory: publicProcedure
+    getHistory: protectedProcedure
       .input(z.object({ campaignId: z.number() }))
       .query(({ input }) => getCampaignHistory(input.campaignId)),
 
-    addHistory: publicProcedure
+    addHistory: protectedProcedure
       .input(z.object({ campaignId: z.number(), action: z.string(), details: z.string().optional() }))
       .mutation(({ input }) => addCampaignHistory(input.campaignId, input.action, input.details)),
 
-    approve: publicProcedure
+    approve: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await updateCampaign(input.id, { status: "active" });
         await addCampaignHistory(input.id, "approved", "Cotação aprovada — campanha ativada");
       }),
 
-    archive: publicProcedure
+    archive: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await updateCampaign(input.id, { status: "archived" });
         await addCampaignHistory(input.id, "archived", "Cotação arquivada");
       }),
+
+    uploadArt: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        artPdfUrl: z.string().optional(),
+        artImageUrls: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...artData } = input;
+        await updateCampaign(id, { ...artData, status: "producao" } as any);
+        await addCampaignHistory(id, "art_uploaded", "Arte enviada — campanha em produção");
+      }),
+
+    completeProduction: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const campaign = await getCampaign(input.id);
+        if (!campaign) throw new Error("Campanha não encontrada");
+        await updateCampaign(input.id, { status: "transito" } as any);
+        await addCampaignHistory(input.id, "production_complete", "Produção concluída — material em trânsito");
+
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (db) {
+          const { serviceOrders: soTable } = await import("../drizzle/schema");
+          const { sql: sqlFn } = await import("drizzle-orm");
+          const year = new Date().getFullYear();
+          const pattern = `OS-PROD-${year}-%`;
+          const countResult = await db
+            .select({ count: sqlFn<number>`COUNT(*)` })
+            .from(soTable)
+            .where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
+          const seqNum = Number(countResult[0]?.count || 0) + 1;
+          const orderNumber = `OS-PROD-${year}-${String(seqNum).padStart(4, "0")}`;
+          await db.insert(soTable).values({
+            orderNumber,
+            type: "producao" as const,
+            campaignId: input.id,
+            clientId: campaign.clientId,
+            description: `OS de produção para campanha ${campaign.name}`,
+            coasterVolume: campaign.coastersPerRestaurant * campaign.activeRestaurants,
+            status: "execucao" as const,
+          });
+        }
+      }),
+
+    confirmMaterial: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await updateCampaign(input.id, { status: "executar", materialReceivedDate: new Date().toISOString().split("T")[0] } as any);
+        await addCampaignHistory(input.id, "material_received", "Material recebido — pronto para execução");
+      }),
+
+    startVeiculacao: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        veiculacaoStartDate: z.string(),
+        veiculacaoEndDate: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        await updateCampaign(input.id, {
+          status: "veiculacao",
+          veiculacaoStartDate: input.veiculacaoStartDate,
+          veiculacaoEndDate: input.veiculacaoEndDate,
+        } as any);
+        await addCampaignHistory(input.id, "veiculacao_started", `Veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`);
+      }),
+
+    finalizeCampaign: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const campaign = await getCampaign(input.id);
+        if (!campaign) throw new Error("Campanha não encontrada");
+        await updateCampaign(input.id, { status: "inativa" } as any);
+        await addCampaignHistory(input.id, "finalized", "Campanha finalizada e arquivada");
+
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (db) {
+          const { libraryItems } = await import("../drizzle/schema");
+          await db.insert(libraryItems).values({
+            campaignId: input.id,
+            clientId: campaign.clientId,
+            title: campaign.name,
+            artPdfUrl: campaign.artPdfUrl,
+            artImageUrls: campaign.artImageUrls,
+            status: "arquivado",
+            archivedAt: new Date(),
+          });
+        }
+      }),
+
+    addProof: protectedProcedure
+      .input(z.object({
+        campaignId: z.number(),
+        restaurantId: z.number(),
+        week: z.number().min(1).max(4),
+        photoUrl: z.string(),
+        uploadedBy: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new Error("Database not available");
+        const { campaignProofs } = await import("../drizzle/schema");
+        const [created] = await db.insert(campaignProofs).values(input).returning();
+        await addCampaignHistory(input.campaignId, "proof_added", `Comprovante semana ${input.week} adicionado`);
+        return created;
+      }),
+
+    getProofs: protectedProcedure
+      .input(z.object({ campaignId: z.number() }))
+      .query(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { campaignProofs } = await import("../drizzle/schema");
+        const { eq: eqFn, desc: descFn } = await import("drizzle-orm");
+        return db.select().from(campaignProofs).where(eqFn(campaignProofs.campaignId, input.campaignId)).orderBy(descFn(campaignProofs.createdAt));
+      }),
   }),
 
   // ─── Client History ─────────────────────────────────────────────────
   clientHistory: router({
-    get: publicProcedure
+    get: protectedProcedure
       .input(z.object({ clientId: z.number() }))
       .query(({ input }) => getClientHistory(input.clientId)),
   }),
 
   // ─── Economics ────────────────────────────────────────────────────────
   economics: router({
-    monthly: publicProcedure
+    monthly: protectedProcedure
       .input(
         z.object({
           year: z.number(),
@@ -608,9 +738,9 @@ export const appRouter = router({
 
   // ─── Suppliers (Fornecedores) ─────────────────────────────────────────
   supplier: router({
-    list: publicProcedure.query(() => listSuppliers()),
+    list: protectedProcedure.query(() => listSuppliers()),
 
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -626,7 +756,7 @@ export const appRouter = router({
       )
       .mutation(({ input }) => createSupplier(input)),
 
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -646,22 +776,22 @@ export const appRouter = router({
         return updateSupplier(id, data);
       }),
 
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteSupplier(input.id)),
   }),
 
   // ─── Budgets (Orçamentos de Produção) ─────────────────────────────────
   budget: router({
-    list: publicProcedure.query(() => listBudgets()),
+    list: protectedProcedure.query(() => listBudgets()),
 
-    listActiveWithItems: publicProcedure.query(() => listActiveBudgetsWithItems()),
+    listActiveWithItems: protectedProcedure.query(() => listActiveBudgetsWithItems()),
 
-    getItems: publicProcedure
+    getItems: protectedProcedure
       .input(z.object({ budgetId: z.number() }))
       .query(({ input }) => getBudgetItems(input.budgetId)),
 
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           supplierId: z.number(),
@@ -688,7 +818,7 @@ export const appRouter = router({
         );
       }),
 
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -717,7 +847,7 @@ export const appRouter = router({
         return updateBudget(id, data, items);
       }),
 
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteBudget(input.id)),
   }),

@@ -1,0 +1,159 @@
+import { internalProcedure, protectedProcedure, router } from "./_core/trpc";
+import { z } from "zod";
+import { getDb } from "./db";
+import { serviceOrders, campaigns, clients } from "../drizzle/schema";
+import { eq, and, desc, sql, inArray, ilike } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+
+async function getDatabase() {
+  const d = await getDb();
+  if (!d) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+  return d;
+}
+
+async function generateOrderNumber(db: any, type: "anunciante" | "producao") {
+  const prefix = type === "anunciante" ? "OS-ANT" : "OS-PROD";
+  const year = new Date().getFullYear();
+  const pattern = `${prefix}-${year}-%`;
+  const countResult = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(serviceOrders)
+    .where(sql`${serviceOrders.orderNumber} LIKE ${pattern}`);
+  const seqNum = Number(countResult[0]?.count || 0) + 1;
+  return `${prefix}-${year}-${String(seqNum).padStart(4, "0")}`;
+}
+
+export const serviceOrderRouter = router({
+  list: protectedProcedure
+    .input(z.object({
+      type: z.enum(["anunciante", "producao"]).optional(),
+      status: z.enum(["rascunho", "enviada", "assinada", "execucao", "concluida"]).optional(),
+      campaignId: z.number().optional(),
+      clientId: z.number().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const conditions = [];
+      if (input?.type) conditions.push(eq(serviceOrders.type, input.type));
+      if (input?.status) conditions.push(eq(serviceOrders.status, input.status));
+      if (input?.campaignId) conditions.push(eq(serviceOrders.campaignId, input.campaignId));
+      if (input?.clientId) conditions.push(eq(serviceOrders.clientId, input.clientId));
+
+      const rows = await db
+        .select()
+        .from(serviceOrders)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(serviceOrders.createdAt));
+
+      const campaignIds = Array.from(new Set(rows.map(r => r.campaignId).filter((v): v is number => v != null)));
+      const clientIds = Array.from(new Set(rows.map(r => r.clientId).filter((v): v is number => v != null)));
+
+      const campaignMap: Record<number, string> = {};
+      const clientMap: Record<number, string> = {};
+
+      if (campaignIds.length > 0) {
+        const campRows = await db.select({ id: campaigns.id, name: campaigns.name }).from(campaigns).where(inArray(campaigns.id, campaignIds));
+        for (const c of campRows) campaignMap[c.id] = c.name;
+      }
+      if (clientIds.length > 0) {
+        const cliRows = await db.select({ id: clients.id, name: clients.name }).from(clients).where(inArray(clients.id, clientIds));
+        for (const c of cliRows) clientMap[c.id] = c.name;
+      }
+
+      return rows.map(r => ({
+        ...r,
+        campaignName: r.campaignId ? (campaignMap[r.campaignId] || "—") : "—",
+        clientName: r.clientId ? (clientMap[r.clientId] || "—") : "—",
+      }));
+    }),
+
+  get: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const result = await db.select().from(serviceOrders).where(eq(serviceOrders.id, input.id)).limit(1);
+      if (!result[0]) throw new TRPCError({ code: "NOT_FOUND", message: "OS não encontrada" });
+      return result[0];
+    }),
+
+  create: internalProcedure
+    .input(z.object({
+      type: z.enum(["anunciante", "producao"]),
+      campaignId: z.number().optional(),
+      clientId: z.number().optional(),
+      description: z.string().optional(),
+      coasterVolume: z.number().optional(),
+      networkAllocation: z.string().optional(),
+      periodStart: z.string().optional(),
+      periodEnd: z.string().optional(),
+      totalValue: z.string().optional(),
+      paymentTerms: z.string().optional(),
+      specs: z.string().optional(),
+      supplierName: z.string().optional(),
+      estimatedDeadline: z.string().optional(),
+      artPdfUrl: z.string().optional(),
+      artImageUrls: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const orderNumber = await generateOrderNumber(db, input.type);
+      const [created] = await db.insert(serviceOrders).values({
+        ...input,
+        orderNumber,
+      }).returning();
+      return created;
+    }),
+
+  update: internalProcedure
+    .input(z.object({
+      id: z.number(),
+      description: z.string().optional(),
+      coasterVolume: z.number().optional(),
+      networkAllocation: z.string().optional(),
+      periodStart: z.string().optional(),
+      periodEnd: z.string().optional(),
+      totalValue: z.string().optional(),
+      paymentTerms: z.string().optional(),
+      status: z.enum(["rascunho", "enviada", "assinada", "execucao", "concluida"]).optional(),
+      specs: z.string().optional(),
+      supplierName: z.string().optional(),
+      estimatedDeadline: z.string().optional(),
+      artPdfUrl: z.string().optional(),
+      artImageUrls: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const { id, ...data } = input;
+      const [updated] = await db
+        .update(serviceOrders)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(serviceOrders.id, id))
+        .returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "OS não encontrada" });
+      return updated;
+    }),
+
+  delete: internalProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      await db.delete(serviceOrders).where(eq(serviceOrders.id, input.id));
+      return { success: true };
+    }),
+
+  updateStatus: internalProcedure
+    .input(z.object({
+      id: z.number(),
+      status: z.enum(["rascunho", "enviada", "assinada", "execucao", "concluida"]),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const [updated] = await db
+        .update(serviceOrders)
+        .set({ status: input.status, updatedAt: new Date() })
+        .where(eq(serviceOrders.id, input.id))
+        .returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "OS não encontrada" });
+      return updated;
+    }),
+});

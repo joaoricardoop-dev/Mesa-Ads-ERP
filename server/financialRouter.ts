@@ -1,4 +1,4 @@
-import { protectedProcedure, router } from "./_core/trpc";
+import { financeiroProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import {
@@ -13,7 +13,7 @@ import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 function requireFinancialAccess(role: string) {
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "financeiro" && role !== "manager") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito ao módulo financeiro" });
   }
 }

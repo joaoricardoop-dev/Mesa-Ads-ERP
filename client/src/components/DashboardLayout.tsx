@@ -53,7 +53,6 @@ import {
   Users,
   Wallet,
   ClipboardList,
-  Handshake,
   type LucideIcon,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -65,6 +64,7 @@ interface NavItem {
   label: string;
   path: string;
   adminOnly?: boolean;
+  allowedRoles?: string[];
 }
 
 interface NavGroup {
@@ -72,6 +72,7 @@ interface NavGroup {
   label: string;
   items: NavItem[];
   adminOnly?: boolean;
+  allowedRoles?: string[];
 }
 
 type NavEntry = NavItem | NavGroup;
@@ -89,16 +90,15 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: ClipboardList, label: "Cotações", path: "/comercial/cotacoes" },
       { icon: BarChart3, label: "Simulador", path: "/comercial/simulador" },
       { icon: Users, label: "Leads", path: "/comercial/leads" },
-      { icon: Building2, label: "Anunciantes", path: "/clientes" },
       { icon: FileText, label: "OS Anunciantes", path: "/comercial/os" },
-      { icon: Handshake, label: "Termos Rest.", path: "/comercial/termos" },
     ],
   },
+  { icon: Building2, label: "Anunciantes", path: "/clientes" },
   { icon: Megaphone, label: "Campanhas", path: "/campanhas" },
   {
     icon: Wallet,
     label: "Financeiro",
-    adminOnly: true,
+    allowedRoles: ["admin", "financeiro", "manager"],
     items: [
       { icon: BarChart3, label: "Dashboard", path: "/financeiro" },
       { icon: Receipt, label: "Faturamento", path: "/financeiro/faturamento" },
@@ -122,7 +122,7 @@ const NAV_ENTRIES: NavEntry[] = [
     items: [
       { icon: DollarSign, label: "Economics", path: "/economics" },
       { icon: Factory, label: "Produção", path: "/producao" },
-      { icon: UserCog, label: "Membros", path: "/membros", adminOnly: true },
+      { icon: Users, label: "Gestão de Usuários", path: "/configuracoes/usuarios", adminOnly: true },
     ],
   },
 ];
@@ -235,11 +235,16 @@ function DashboardLayoutContent({
           <SidebarContent className="gap-0 px-2 py-2">
             <SidebarMenu>
               {NAV_ENTRIES.map((entry) => {
+                const userRole = user.role || "user";
+                const canSee = (item: { adminOnly?: boolean; allowedRoles?: string[] }) => {
+                  if (item.adminOnly && userRole !== "admin") return false;
+                  if (item.allowedRoles && !item.allowedRoles.includes(userRole)) return false;
+                  return true;
+                };
+
                 if (isGroup(entry)) {
-                  if (entry.adminOnly && user.role !== "admin") return null;
-                  const visibleItems = entry.items.filter(
-                    (i) => !i.adminOnly || user.role === "admin"
-                  );
+                  if (!canSee(entry)) return null;
+                  const visibleItems = entry.items.filter(canSee);
                   if (visibleItems.length === 0) return null;
                   const groupActive = visibleItems.some((i) => location === i.path || location.startsWith(i.path + "/"));
 
@@ -254,7 +259,7 @@ function DashboardLayoutContent({
                   );
                 }
 
-                if (entry.adminOnly && user.role !== "admin") return null;
+                if (!canSee(entry)) return null;
                 const isActive = location === entry.path;
                 return (
                   <SidebarMenuItem key={entry.path}>
@@ -296,7 +301,7 @@ function DashboardLayoutContent({
                       {user.firstName || user.email || "-"}
                     </p>
                     <p className="text-[10px] text-muted-foreground truncate mt-1">
-                      {user.role === "admin" ? "Administrador" : user.role === "manager" ? "Gerente" : user.role === "viewer" ? "Visualizador" : "Usuário"}
+                      {{admin: "Administrador", comercial: "Comercial", operacoes: "Operações", financeiro: "Financeiro", manager: "Gerente", viewer: "Visualizador", anunciante: "Anunciante", user: "Usuário"}[user.role || "user"] || "Usuário"}
                     </p>
                   </div>
                 </button>

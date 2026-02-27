@@ -57,7 +57,14 @@ import {
   ShieldCheck,
   CircleDollarSign,
   TrendingUp,
+  Upload,
+  Truck,
+  CheckSquare,
+  Camera,
+  Image,
+  ArrowRight,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
@@ -66,6 +73,11 @@ const STATUS_LABELS: Record<string, string> = {
   paused: "Pausada",
   completed: "Concluída",
   archived: "Arquivada",
+  producao: "Produção",
+  transito: "Trânsito",
+  executar: "Executar",
+  veiculacao: "Veiculação",
+  inativa: "Inativa",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -75,7 +87,21 @@ const STATUS_COLORS: Record<string, string> = {
   paused: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   archived: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  producao: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  transito: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+  executar: "bg-violet-500/20 text-violet-400 border-violet-500/30",
+  veiculacao: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  inativa: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
+
+const WORKFLOW_STEPS = [
+  { key: "active", label: "Ativa", step: 1 },
+  { key: "producao", label: "Produção", step: 2 },
+  { key: "transito", label: "Trânsito", step: 3 },
+  { key: "executar", label: "Executar", step: 4 },
+  { key: "veiculacao", label: "Veiculação", step: 5 },
+  { key: "inativa", label: "Inativa", step: 6 },
+];
 
 const HISTORY_LABELS: Record<string, string> = {
   created: "Cotação criada",
@@ -87,6 +113,12 @@ const HISTORY_LABELS: Record<string, string> = {
   reactivated: "Campanha reativada",
   updated: "Campanha atualizada",
   restaurants_updated: "Restaurantes atualizados",
+  art_uploaded: "Arte enviada",
+  production_complete: "Produção concluída",
+  material_received: "Material recebido",
+  veiculacao_started: "Veiculação iniciada",
+  finalized: "Campanha finalizada",
+  proof_added: "Comprovante adicionado",
 };
 
 const PIE_COLORS = ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
@@ -202,6 +234,13 @@ export default function CampaignDetail() {
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [editStart, setEditStart] = useState("");
   const [editEnd, setEditEnd] = useState("");
+  const [artPdfUrl, setArtPdfUrl] = useState("");
+  const [artImageUrls, setArtImageUrls] = useState("");
+  const [veiculacaoStart, setVeiculacaoStart] = useState("");
+  const [veiculacaoEnd, setVeiculacaoEnd] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
+  const [proofWeek, setProofWeek] = useState(1);
+  const [proofRestaurantId, setProofRestaurantId] = useState<number | null>(null);
 
   const utils = trpc.useUtils();
   const { data: campaign, isLoading } = trpc.campaign.get.useQuery({ id: campaignId }, { enabled: campaignId > 0 });
@@ -209,6 +248,76 @@ export default function CampaignDetail() {
   const { data: historyList = [] } = trpc.campaign.getHistory.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
   const { data: restaurantsList = [] } = trpc.restaurant.list.useQuery();
+  const { data: proofsList = [] } = trpc.campaign.getProofs.useQuery({ campaignId }, { enabled: campaignId > 0 });
+
+  const uploadArtMutation = trpc.campaign.uploadArt.useMutation({
+    onSuccess: () => {
+      utils.campaign.get.invalidate();
+      utils.campaign.getHistory.invalidate();
+      utils.campaign.list.invalidate();
+      setArtPdfUrl("");
+      setArtImageUrls("");
+      toast.success("Arte enviada! Campanha em produção.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const completeProductionMutation = trpc.campaign.completeProduction.useMutation({
+    onSuccess: () => {
+      utils.campaign.get.invalidate();
+      utils.campaign.getHistory.invalidate();
+      utils.campaign.list.invalidate();
+      setConfirmAction(null);
+      toast.success("Produção concluída! Material em trânsito.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const confirmMaterialMutation = trpc.campaign.confirmMaterial.useMutation({
+    onSuccess: () => {
+      utils.campaign.get.invalidate();
+      utils.campaign.getHistory.invalidate();
+      utils.campaign.list.invalidate();
+      setConfirmAction(null);
+      toast.success("Material recebido! Pronto para execução.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const startVeiculacaoMutation = trpc.campaign.startVeiculacao.useMutation({
+    onSuccess: () => {
+      utils.campaign.get.invalidate();
+      utils.campaign.getHistory.invalidate();
+      utils.campaign.list.invalidate();
+      setVeiculacaoStart("");
+      setVeiculacaoEnd("");
+      toast.success("Veiculação iniciada!");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const finalizeCampaignMutation = trpc.campaign.finalizeCampaign.useMutation({
+    onSuccess: () => {
+      utils.campaign.get.invalidate();
+      utils.campaign.getHistory.invalidate();
+      utils.campaign.list.invalidate();
+      setConfirmAction(null);
+      toast.success("Campanha finalizada e arquivada na biblioteca.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const addProofMutation = trpc.campaign.addProof.useMutation({
+    onSuccess: () => {
+      utils.campaign.getProofs.invalidate();
+      utils.campaign.getHistory.invalidate();
+      setProofUrl("");
+      setProofWeek(1);
+      setProofRestaurantId(null);
+      toast.success("Comprovante adicionado!");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
 
   const approveMutation = trpc.campaign.approve.useMutation({
     onSuccess: () => {
@@ -277,6 +386,12 @@ export default function CampaignDetail() {
       updateMutation.mutate({ id: campaignId, status: "active" });
       addHistoryMutation.mutate({ campaignId, action: "reactivated", details: "Campanha reativada" });
       toast.success("Campanha reativada.");
+    } else if (action === "completeProduction") {
+      completeProductionMutation.mutate({ id: campaignId });
+    } else if (action === "confirmMaterial") {
+      confirmMaterialMutation.mutate({ id: campaignId });
+    } else if (action === "finalize") {
+      finalizeCampaignMutation.mutate({ id: campaignId });
     }
     setConfirmAction(null);
   };
@@ -421,6 +536,9 @@ export default function CampaignDetail() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg font-bold tracking-tight">{campaign.name}</h1>
+                  {(campaign as any).campaignNumber && (
+                    <Badge variant="outline" className="font-mono text-[10px]">{(campaign as any).campaignNumber}</Badge>
+                  )}
                   <Badge variant="outline" className={STATUS_COLORS[campaign.status] || ""}>
                     {STATUS_LABELS[campaign.status] || campaign.status}
                   </Badge>
@@ -456,7 +574,22 @@ export default function CampaignDetail() {
                   <Play className="w-3.5 h-3.5" /> Retomar
                 </Button>
               )}
-              {(campaign.status === "archived" || campaign.status === "completed") && (
+              {campaign.status === "producao" && (
+                <Button size="sm" className="gap-1.5 bg-cyan-600 hover:bg-cyan-700 text-xs h-8" onClick={() => setConfirmAction("completeProduction")}>
+                  <Truck className="w-3.5 h-3.5" /> Concluir Produção
+                </Button>
+              )}
+              {campaign.status === "transito" && (
+                <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-xs h-8" onClick={() => setConfirmAction("confirmMaterial")}>
+                  <CheckSquare className="w-3.5 h-3.5" /> Confirmar Recebimento
+                </Button>
+              )}
+              {campaign.status === "veiculacao" && (
+                <Button size="sm" className="gap-1.5 text-xs h-8" variant="outline" onClick={() => setConfirmAction("finalize")}>
+                  <Archive className="w-3.5 h-3.5" /> Finalizar Campanha
+                </Button>
+              )}
+              {(campaign.status === "archived" || campaign.status === "completed" || campaign.status === "inativa") && (
                 <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => setConfirmAction("reactivate")}>
                   <Play className="w-3.5 h-3.5" /> Reativar
                 </Button>
@@ -466,6 +599,244 @@ export default function CampaignDetail() {
         </div>
 
         <div className="p-4 lg:p-6 space-y-5">
+          {WORKFLOW_STEPS.some(s => s.key === campaign.status) && (
+            <div className="bg-card border border-border/30 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fluxo da Campanha</h3>
+                <span className="text-[10px] text-muted-foreground">
+                  Etapa {WORKFLOW_STEPS.find(s => s.key === campaign.status)?.step || 0} de {WORKFLOW_STEPS.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {WORKFLOW_STEPS.map((step, i) => {
+                  const currentStep = WORKFLOW_STEPS.find(s => s.key === campaign.status)?.step || 0;
+                  const isCompleted = step.step < currentStep;
+                  const isCurrent = step.key === campaign.status;
+                  return (
+                    <div key={step.key} className="flex items-center flex-1 last:flex-none">
+                      <div className="flex flex-col items-center flex-1 last:flex-none">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-all ${
+                          isCompleted ? "bg-emerald-500 border-emerald-500 text-white" :
+                          isCurrent ? "bg-primary border-primary text-primary-foreground" :
+                          "bg-muted border-border/30 text-muted-foreground"
+                        }`}>
+                          {isCompleted ? <CheckCircle2 className="w-3.5 h-3.5" /> : step.step}
+                        </div>
+                        <span className={`text-[9px] mt-1 text-center ${isCurrent ? "font-semibold text-primary" : "text-muted-foreground"}`}>
+                          {step.label}
+                        </span>
+                      </div>
+                      {i < WORKFLOW_STEPS.length - 1 && (
+                        <div className={`h-0.5 flex-1 mx-1 mb-4 ${step.step < currentStep ? "bg-emerald-500" : "bg-border/30"}`} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {campaign.status === "active" && (
+            <div className="bg-card border border-border/30 rounded-lg p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 text-primary" />
+                <h3 className="text-sm font-semibold">Enviar Arte para Produção</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Envie o PDF e/ou imagens da arte aprovada para iniciar a produção dos porta-copos.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">URL do PDF da Arte</Label>
+                  <Input
+                    value={artPdfUrl}
+                    onChange={(e) => setArtPdfUrl(e.target.value)}
+                    placeholder="https://..."
+                    className="bg-background border-border/30 h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">URLs das Imagens (separadas por vírgula)</Label>
+                  <Input
+                    value={artImageUrls}
+                    onChange={(e) => setArtImageUrls(e.target.value)}
+                    placeholder="https://img1.jpg, https://img2.jpg"
+                    className="bg-background border-border/30 h-9 text-sm"
+                  />
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="gap-1.5 text-xs"
+                disabled={(!artPdfUrl && !artImageUrls) || uploadArtMutation.isPending}
+                onClick={() => uploadArtMutation.mutate({ id: campaignId, artPdfUrl: artPdfUrl || undefined, artImageUrls: artImageUrls || undefined })}
+              >
+                <Upload className="w-3.5 h-3.5" /> Enviar Arte e Iniciar Produção
+              </Button>
+            </div>
+          )}
+
+          {campaign.status === "producao" && (
+            <div className="bg-card border border-amber-500/30 rounded-lg p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-amber-400" />
+                <h3 className="text-sm font-semibold text-amber-400">Produção em Andamento</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Os porta-copos estão sendo produzidos. Quando a produção estiver concluída, clique em "Concluir Produção" para gerar automaticamente a OS de Produção e mover para trânsito.
+              </p>
+              {(campaign as any).artPdfUrl && (
+                <div className="flex items-center gap-2 text-xs">
+                  <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                  <a href={(campaign as any).artPdfUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Ver PDF da Arte</a>
+                </div>
+              )}
+              <div className="text-xs text-muted-foreground">
+                Volume: <strong className="text-foreground">{(campaign.coastersPerRestaurant * campaign.activeRestaurants).toLocaleString("pt-BR")}</strong> coasters
+              </div>
+            </div>
+          )}
+
+          {campaign.status === "transito" && (
+            <div className="bg-card border border-cyan-500/30 rounded-lg p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Truck className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-sm font-semibold text-cyan-400">Material em Trânsito</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                O material produzido está sendo transportado. Ao receber o material, confirme o recebimento para avançar.
+              </p>
+            </div>
+          )}
+
+          {campaign.status === "executar" && (
+            <div className="bg-card border border-violet-500/30 rounded-lg p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <CheckSquare className="w-5 h-5 text-violet-400" />
+                <h3 className="text-sm font-semibold text-violet-400">Pronto para Execução</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Material recebido em {(campaign as any).materialReceivedDate ? new Date((campaign as any).materialReceivedDate).toLocaleDateString("pt-BR") : "—"}.
+                Configure os restaurantes na aba Distribuição e defina o período de veiculação para iniciar.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Início da Veiculação</Label>
+                  <Input type="date" value={veiculacaoStart} onChange={(e) => setVeiculacaoStart(e.target.value)} className="bg-background border-border/30 h-9 text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Fim da Veiculação</Label>
+                  <Input type="date" value={veiculacaoEnd} onChange={(e) => setVeiculacaoEnd(e.target.value)} className="bg-background border-border/30 h-9 text-sm" />
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="gap-1.5 text-xs bg-violet-600 hover:bg-violet-700"
+                disabled={!veiculacaoStart || !veiculacaoEnd || startVeiculacaoMutation.isPending}
+                onClick={() => startVeiculacaoMutation.mutate({ id: campaignId, veiculacaoStartDate: veiculacaoStart, veiculacaoEndDate: veiculacaoEnd })}
+              >
+                <Play className="w-3.5 h-3.5" /> Iniciar Veiculação
+              </Button>
+            </div>
+          )}
+
+          {campaign.status === "veiculacao" && (
+            <div className="bg-card border border-emerald-500/30 rounded-lg p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <Eye className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-sm font-semibold text-emerald-400">Veiculação em Andamento</h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <MiniStat label="Início" value={(campaign as any).veiculacaoStartDate ? new Date((campaign as any).veiculacaoStartDate).toLocaleDateString("pt-BR") : "—"} />
+                <MiniStat label="Fim" value={(campaign as any).veiculacaoEndDate ? new Date((campaign as any).veiculacaoEndDate).toLocaleDateString("pt-BR") : "—"} />
+                <MiniStat label="Restaurantes" value={`${restaurantsConfigured}`} />
+                <MiniStat label="Comprovantes" value={`${proofsList.length}`} />
+              </div>
+
+              <div className="border-t border-border/20 pt-4 space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Adicionar Comprovante</h4>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Semana</Label>
+                    <select
+                      value={proofWeek}
+                      onChange={(e) => setProofWeek(Number(e.target.value))}
+                      className="w-full h-9 rounded-md border border-border/30 bg-background px-3 text-sm"
+                    >
+                      {[1, 2, 3, 4].map(w => <option key={w} value={w}>Semana {w}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Restaurante</Label>
+                    <select
+                      value={proofRestaurantId || ""}
+                      onChange={(e) => setProofRestaurantId(Number(e.target.value) || null)}
+                      className="w-full h-9 rounded-md border border-border/30 bg-background px-3 text-sm"
+                    >
+                      <option value="">Selecione...</option>
+                      {campaignRestaurants.map(r => (
+                        <option key={r.restaurantId} value={r.restaurantId}>{r.restaurantName || `Rest. #${r.restaurantId}`}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">URL da Foto</Label>
+                    <Input
+                      value={proofUrl}
+                      onChange={(e) => setProofUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="bg-background border-border/30 h-9 text-sm"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      size="sm"
+                      className="gap-1.5 text-xs w-full"
+                      disabled={!proofUrl || !proofRestaurantId || addProofMutation.isPending}
+                      onClick={() => addProofMutation.mutate({ campaignId, restaurantId: proofRestaurantId!, week: proofWeek, photoUrl: proofUrl })}
+                    >
+                      <Camera className="w-3.5 h-3.5" /> Adicionar
+                    </Button>
+                  </div>
+                </div>
+
+                {proofsList.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+                    {proofsList.map((proof: any) => (
+                      <div key={proof.id} className="bg-muted/20 border border-border/20 rounded-lg p-2 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline" className="text-[9px]">Sem. {proof.week}</Badge>
+                          <span className="text-muted-foreground text-[9px]">{new Date(proof.createdAt).toLocaleDateString("pt-BR")}</span>
+                        </div>
+                        <a href={proof.photoUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                          <Image className="w-3 h-3" /> Ver foto
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {campaign.status === "inativa" && (
+            <div className="bg-card border border-gray-500/30 rounded-lg p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Archive className="w-5 h-5 text-gray-400" />
+                <h3 className="text-sm font-semibold text-gray-400">Campanha Finalizada</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Esta campanha foi finalizada e arquivada na Biblioteca. Os dados abaixo são somente leitura.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <MiniStat label="Comprovantes" value={`${proofsList.length}`} />
+                <MiniStat label="Restaurantes" value={`${restaurantsConfigured}`} />
+                <MiniStat label="Receita Total" value={formatCurrency(p.contractRevenue)} />
+                <MiniStat label="Lucro Total" value={formatCurrency(p.contractProfit)} />
+              </div>
+            </div>
+          )}
+
           <Tabs defaultValue="resumo" className="space-y-4">
             <TabsList className="bg-card border border-border/30">
               <TabsTrigger value="resumo" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>
@@ -938,6 +1309,9 @@ export default function CampaignDetail() {
                 {confirmAction === "resume" && "Retomar Campanha?"}
                 {confirmAction === "complete" && "Concluir Campanha?"}
                 {confirmAction === "reactivate" && "Reativar Campanha?"}
+                {confirmAction === "completeProduction" && "Concluir Produção?"}
+                {confirmAction === "confirmMaterial" && "Confirmar Recebimento?"}
+                {confirmAction === "finalize" && "Finalizar Campanha?"}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {confirmAction === "approve" && "A cotação será aprovada e a campanha será ativada."}
@@ -946,6 +1320,9 @@ export default function CampaignDetail() {
                 {confirmAction === "resume" && "A campanha será retomada."}
                 {confirmAction === "complete" && "A campanha será marcada como concluída."}
                 {confirmAction === "reactivate" && "A campanha será reativada."}
+                {confirmAction === "completeProduction" && "A produção será concluída, uma OS de Produção será gerada automaticamente e o material passará para trânsito."}
+                {confirmAction === "confirmMaterial" && "O recebimento será confirmado e a campanha ficará pronta para execução."}
+                {confirmAction === "finalize" && "A campanha será finalizada e arquivada na Biblioteca."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

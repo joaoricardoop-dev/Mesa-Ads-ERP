@@ -22,6 +22,10 @@ import Production from "./pages/Production";
 import Members from "./pages/Members";
 import LandingPage from "./pages/LandingPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import ServiceOrders from "./pages/ServiceOrders";
+import Library from "./pages/Library";
+import Quotations from "./pages/Quotations";
+import Leads from "./pages/Leads";
 import FinancialDashboard from "./pages/financial/FinancialDashboard";
 import Invoicing from "./pages/financial/Invoicing";
 import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
@@ -33,18 +37,9 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/comercial/simulador" component={Home} />
-      <Route path="/comercial/cotacoes">
-        <PlaceholderPage title="Cotações" description="Gestão de cotações comerciais" />
-      </Route>
-      <Route path="/comercial/leads">
-        <PlaceholderPage title="Leads" description="CRM e pipeline de vendas" />
-      </Route>
-      <Route path="/comercial/os">
-        <PlaceholderPage title="OS para Anunciantes" description="Ordens de serviço para anunciantes" />
-      </Route>
-      <Route path="/comercial/termos">
-        <PlaceholderPage title="Termos para Restaurantes" description="Termos de parceria e adesão" />
-      </Route>
+      <Route path="/comercial/cotacoes" component={Quotations} />
+      <Route path="/comercial/leads" component={Leads} />
+      <Route path="/comercial/os" component={ServiceOrders} />
       <Route path="/prospeccao/novo" component={ProspectForm} />
       <Route path="/prospeccao/:id" component={ProspectForm} />
       <Route path="/prospeccao" component={Prospecting} />
@@ -64,9 +59,8 @@ function Router() {
       <Route path="/economics" component={Economics} />
       <Route path="/producao" component={Production} />
       <Route path="/membros" component={Members} />
-      <Route path="/biblioteca">
-        <PlaceholderPage title="Biblioteca" description="Repositório de artes e coasters" />
-      </Route>
+      <Route path="/configuracoes/usuarios" component={Members} />
+      <Route path="/biblioteca" component={Library} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

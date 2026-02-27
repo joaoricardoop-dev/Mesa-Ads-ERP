@@ -17,10 +17,16 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - `server/_core/` — Server entry point, OAuth, Vite config
 - `server/replit_integrations/auth/` — Auth module (Replit Auth OIDC)
 - `server/db.ts` — Database connection and query functions
+- `server/financialRouter.ts` — Financial module tRPC router
+- `server/quotationRouter.ts` — Quotations tRPC router
+- `server/leadRouter.ts` — Leads/CRM tRPC router
+- `server/serviceOrderRouter.ts` — Service Orders tRPC router
+- `server/termRouter.ts` — Restaurant Terms tRPC router
+- `server/libraryRouter.ts` — Library tRPC router
 - `shared/` — Shared types/constants
 - `shared/models/auth.ts` — Auth schema (users, sessions tables)
-- `shared/rating-config.ts` — Rating system configuration (weights, score ranges, tier definitions, label maps)
-- `shared/rating.ts` — Rating calculator functions (calcularRating, temCamposRatingCompletos)
+- `shared/rating-config.ts` — Rating system configuration
+- `shared/rating.ts` — Rating calculator functions
 - `drizzle/` — Database schema and migrations
 
 ## Layout & Navigation
@@ -28,53 +34,97 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - **Sidebar layout** via `DashboardLayout.tsx` (shadcn Sidebar, collapsible, resizable)
 - **No top navigation bar** — all navigation is in the sidebar
 - **Module-based sidebar** with collapsible groups:
-  - Dashboard (`/`) — operational overview
-  - Comercial (group): Cotações, Simulador (`/comercial/simulador`), Leads, Anunciantes (`/clientes`), OS Anunciantes, Termos Restaurantes
+  - Dashboard (`/`) — operational overview with status cards, pipeline, activity
+  - Comercial (group): Cotações (`/comercial/cotacoes`), Simulador (`/comercial/simulador`), Leads (`/comercial/leads`), OS Anunciantes (`/comercial/os`)
+  - Anunciantes (`/clientes`) — top-level item
   - Campanhas (`/campanhas`)
   - Financeiro (group, admin only): Dashboard (`/financeiro`), Faturamento (`/financeiro/faturamento`), Pagamentos (`/financeiro/pagamentos`), Custos (`/financeiro/custos`), Relatórios (`/financeiro/relatorios`)
   - Parceiros (group): Prospecção (`/prospeccao`), Restaurantes (`/restaurantes`)
   - Biblioteca (`/biblioteca`)
-  - Configurações (group): Economics (`/economics`), Produção (`/producao`), Membros (`/membros`, admin only)
+  - Configurações (group): Economics (`/economics`), Produção (`/producao`), Gestão de Usuários (`/configuracoes/usuarios`, admin only)
 - **Reusable layout components**:
-  - `PageContainer` (`client/src/components/PageContainer.tsx`) — page wrapper with title, description, actions, consistent padding/scroll
-  - `Section` (`client/src/components/Section.tsx`) — card section with icon, title, description
+  - `PageContainer` — page wrapper with title, description, actions
+  - `Section` — card section with icon, title, description
 - **Topbar** (inside SidebarInset): breadcrumb label + theme toggle
-- **Landing page** (`LandingPage.tsx`) — shown when not authenticated, outside DashboardLayout
-- **Placeholder pages** (`PlaceholderPage.tsx`) — "Em desenvolvimento" for unbuilt modules
+- **Landing page** (`LandingPage.tsx`) — shown when not authenticated
+- **Restaurant Terms**: accessed from restaurant profile page (Termos tab), not a separate menu item
 
 ## Authentication
 
 - Replit Auth via OpenID Connect (supports Google, GitHub, Apple, email)
-- Landing page shown when not logged in (`client/src/pages/LandingPage.tsx`)
-- Sidebar footer shows user avatar, name, role, and logout button when logged in
+- Landing page shown when not logged in
+- Sidebar footer shows user avatar, name, role, and logout button
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
 - Session stored in PostgreSQL `sessions` table
-- Auth hook: `client/src/hooks/use-auth.ts`
 
 ## Roles & Permissions
 
-- **Administrador** (admin): Full access — manage members, approve quotations, CRUD all entities, delete records
-- **Gerente** (manager): Approve quotations, CRUD campaigns/restaurants/clients, simulator, economics — no member management or deletion
-- **Usuário** (user): Create quotations, view campaigns/restaurants/clients — no approval or deletion
-- **Visualizador** (viewer): Read-only access to campaigns/restaurants/clients — no creation or editing
-- Admin-only pages: `/membros` (Members management, visible in sidebar only for admins)
+- **Admin**: Full access — all modules, user management, configurations
+- **Comercial**: Cotações (create, WIN), Simulador, Leads/CRM, Cadastro Anunciantes, OS Anunciantes, Biblioteca
+- **Operações**: Campanhas (all workflow steps), OS Produção, Biblioteca, Provas de execução
+- **Financeiro**: Dashboard financeiro, Faturamento, Pagamentos, Custos, Relatórios
+- **Anunciante**: Portal — view own campaigns, request new campaigns, edit own profile
+- **Manager/User/Viewer**: Legacy roles (backward compatibility)
+- Admin-only pages: Gestão de Usuários, Financeiro module
 
 ## Database Tables
 
-- `users` — Auth users with role (admin/manager/user/viewer), isActive, lastLoginAt
+- `users` — Auth users with role, isActive, lastLoginAt
 - `sessions` — Auth sessions (Replit Auth)
 - `restaurants` — Prospecting/leads for partner restaurants
-- `active_restaurants` — Onboarded active restaurants with full operational data (tables, seats, customers, monthlyDrinksSold, excluded ad categories, Pix, rating system fields, etc.)
+- `active_restaurants` — Onboarded active restaurants with full operational data
 - `clients` — Advertisers (47 imported with full address/contact/CNPJ data)
-- `campaigns` — Ad campaigns with full financial parameters (grossup pricing, commissions, taxes, markup, productionCost, freightCost)
-- `campaign_restaurants` — N:N campaign-restaurant relationship with coasters/usage allocation
-- `campaign_history` — Audit trail for campaign status changes and updates
-- `invoices` — Faturas emitidas para anunciantes (campaignId, clientId, invoiceNumber FAT-YYYY-NNNN, amount, issueDate, dueDate, paymentDate, status enum emitida/paga/vencida/cancelada, paymentMethod)
-- `operational_costs` — Custos operacionais por campanha (campaignId unique, productionCost, freightCost)
-- `restaurant_payments` — Pagamentos a restaurantes parceiros (restaurantId, campaignId, amount, referenceMonth, periodStart, periodEnd, proofUrl, status)
-- `suppliers` — Production suppliers (print shops)
-- `budgets` — Production budgets from suppliers
-- `budget_items` — Price tiers within budgets
+- `campaigns` — Campaigns with CMP-YYYY-NNNN numbering, 6-step workflow statuses, art URLs, veiculação dates
+- `campaign_restaurants` — N:N campaign-restaurant relationship
+- `campaign_history` — Audit trail for campaign status changes
+- `campaign_proofs` — Weekly proof photos per restaurant per campaign
+- `quotations` — Commercial quotations (QOT-YYYY-NNNN numbering, 6 statuses)
+- `leads` — CRM leads (anunciante/restaurante types, kanban stages)
+- `lead_interactions` — Interaction history per lead
+- `service_orders` — OS for anunciantes and production (OS-ANT/OS-PROD numbering)
+- `restaurant_terms` — Partnership terms per restaurant (TRM-YYYY-NNNN)
+- `library_items` — Coaster art archive (auto-populated on campaign finalization)
+- `invoices` — Billing invoices (FAT-YYYY-NNNN)
+- `operational_costs` — Production + freight costs per campaign
+- `restaurant_payments` — Payments to restaurant partners
+- `suppliers` — Production suppliers
+- `budgets` / `budget_items` — Production budgets
+
+## Campaign Workflow (6-Step Automated Flow)
+
+Statuses: `producao` → `transito` → `executar` → `veiculacao` → `inativa`
+
+1. **Cotação WIN** → Creates campaign CMP-YYYY-NNNN with status `producao`
+2. **Produção**: Upload art (PDF + images) → "Concluir Produção"
+3. **Trânsito**: Auto-generates OS-PROD → "Confirmar chegada do material"
+4. **Executar**: Allocate restaurants → "Iniciar Veiculação"
+5. **Em Veiculação**: 4-week period, weekly proof photos → "Finalizar Campanha"
+6. **Inativa**: Auto-archives to Biblioteca, read-only
+
+## Quotation Workflow
+
+Statuses: `rascunho` → `enviada` → `ativa` → `win` / `perdida` / `expirada`
+- WIN conversion auto-creates campaign with CMP-YYYY-NNNN number
+- Supports duplicate, mark lost with reason
+
+## Pricing Engine (calcPricing)
+
+- Located in `client/src/hooks/useSimulator.ts`
+- Grossup formula: CustoBruto = CustoPD / (1 - totalVarRate), then SellingPrice = CustoBruto × (1 + markup%)
+- Multiplier applied post-grossup from restaurant rating
+
+## Restaurant Rating System
+
+- Tiers: Bronze, Prata, Ouro, Diamante (score bands)
+- 6 weighted dimensions (drinks flow, ticket, location, tables, venue type, digital presence)
+- Configuration in `shared/rating-config.ts`
+
+## Theme & Visual Identity
+
+- Brand colors: Black (#0d0d0d) + Orange (hsl 22 100% 50%)
+- Light/dark mode with toggle, defaults to dark
+- DM Sans + JetBrains Mono fonts
+- Semantic colors: emerald (positive), red (negative), amber (warnings)
 
 ## Running
 
@@ -87,70 +137,3 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 
 - Server: `server/_core/index.ts`
 - Client: `client/src/main.tsx`
-
-## Simulator (Comercial > Simulador)
-
-- Route: `/comercial/simulador`
-- Page: `client/src/pages/Home.tsx`
-- Layout: sidebar inputs (InputPanel) + 3 tabs:
-  - **Simulação**: Budget selector, restaurant allocation, KPIs, DRE
-  - **Análise**: Charts, scenarios, unit economics
-  - **Tabelas**: Markup and discount tables
-- Actions in PageContainer header: "Criar Cotação" + "Resetar"
-- No hero banner — clean dashboard layout
-
-## Campaign Workflow
-
-- Statuses: draft → quotation → active (approved) / archived
-- Active campaigns can be paused, resumed, completed, or reactivated
-- Simulator creates quotations (status "quotation"), not active campaigns
-- Campaign detail page at `/campanhas/:id` with tabs: Painel, Financeiro, Distribuição, Cliente, Histórico
-- Restaurant allocation enforces max count from campaign's `activeRestaurants` parameter
-- Campaign history tracks all status changes with timestamps
-- Pricing uses grossup formula: CustoBruto = CustoPD / (1 - varRates), then SellingPrice = CustoBruto × (1 + markup%)
-
-## Restaurant Rating System
-
-- Tiers: Bronze, Prata, Ouro, Diamante (visual labels by score band ≤2/≤3/≤4/≤5)
-- Multiplier is continuous: score ≤ 2.0 → 1.00x; score > 2.0 → 1.0 + (score-2)/3, max 2.00x at score 5.0
-- Rating uses 6 weighted dimensions:
-  - Fluxo de bebidas / monthlyDrinksSold (25%)
-  - Ticket médio / ticketMedio (20%)
-  - Localização / locationRating 1-5 (20%)
-  - Mesas / tableCount (10%)
-  - Perfil do estabelecimento / venueType 1-5 (20%)
-  - Presença digital / digitalPresence 1-5 (5%)
-- Score calculated from 1.00 to 5.00 using `calcularRating()` from `shared/rating.ts`
-- Multiplier helper: `calcularMultiplicador(score)` exported from `shared/rating-config.ts`
-- Configuration centralized in `shared/rating-config.ts` (RATING_CONFIG object)
-
-## Simulator Restaurant Allocation
-
-- Restaurant selection panel in simulator Simulação tab (between Budget Selector and KPI Cards)
-- Multi-select dropdown with search to add restaurants from the active restaurant database
-- Per-restaurant coaster allocation with numeric input
-- "Capacidade Mensal" column: calculated as `monthlyDrinksSold × 0.6` with tooltip explaining the formula
-- Validation: sum of allocated coasters must equal total campaign coasters (coastersPerRestaurant × activeRestaurants)
-- Per-restaurant pricing view: toggle "Ver Preços" shows individual selling price, profit, and margin per restaurant
-- Weighted multiplier/score/commission: calculated as weighted average, weighted by coasters allocated
-- Hook: `client/src/hooks/useRestaurantAllocation.ts`
-- Component: `client/src/components/RestaurantAllocationPanel.tsx`
-
-## Pricing Engine (calcPricing)
-
-- Located in `client/src/hooks/useSimulator.ts`
-- Grossup formula: CustoBruto = CustoPD / (1 - totalVarRate), then SellingPrice = CustoBruto × (1 + markup%)
-- Multiplier applied post-grossup: `sellingPrice = baseSellingPrice × multiplier`
-- Two commission types in DRE:
-  - **Comissão Restaurante**: weighted avg of restaurant DB `commissionPercent`, applied as % of adjusted selling price
-  - **Comissão Agência/Parceiro**: from simulator input (variable % or fixed per coaster)
-
-## Theme & Visual Identity
-
-- Brand colors: Black (#0d0d0d) + Orange (hsl 22 100% 50%) — consistent across landing page and app
-- Light/dark mode with toggle in sidebar topbar, defaults to dark
-- Landing page: Separate dark-only marketing design with Outfit font, framer-motion animations
-- App: DM Sans + JetBrains Mono fonts, orange primary color, deep black backgrounds in dark mode
-- CSS variables in `client/src/index.css` (`:root` for light, `.dark` for dark)
-- ThemeContext at `client/src/contexts/ThemeContext.tsx`
-- Semantic colors preserved: emerald for positive/profit, red for negative/destructive, amber for warnings
