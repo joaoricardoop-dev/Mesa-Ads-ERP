@@ -32,14 +32,18 @@ import type { User } from "@shared/models/auth";
 import {
   BarChart3,
   Building2,
+  Calculator,
   ChevronRight,
   DollarSign,
   Factory,
+  FileBarChart,
   FileText,
+  HandCoins,
   Image,
   LogOut,
   Megaphone,
   PanelLeft,
+  Receipt,
   Search,
   Settings,
   Sun,
@@ -47,6 +51,7 @@ import {
   UserCog,
   UtensilsCrossed,
   Users,
+  Wallet,
   ClipboardList,
   Handshake,
   type LucideIcon,
@@ -90,6 +95,18 @@ const NAV_ENTRIES: NavEntry[] = [
     ],
   },
   { icon: Megaphone, label: "Campanhas", path: "/campanhas" },
+  {
+    icon: Wallet,
+    label: "Financeiro",
+    adminOnly: true,
+    items: [
+      { icon: BarChart3, label: "Dashboard", path: "/financeiro" },
+      { icon: Receipt, label: "Faturamento", path: "/financeiro/faturamento" },
+      { icon: HandCoins, label: "Pagamentos", path: "/financeiro/pagamentos" },
+      { icon: Calculator, label: "Custos", path: "/financeiro/custos" },
+      { icon: FileBarChart, label: "Relatórios", path: "/financeiro/relatorios" },
+    ],
+  },
   {
     icon: UtensilsCrossed,
     label: "Parceiros",
@@ -219,6 +236,7 @@ function DashboardLayoutContent({
             <SidebarMenu>
               {NAV_ENTRIES.map((entry) => {
                 if (isGroup(entry)) {
+                  if (entry.adminOnly && user.role !== "admin") return null;
                   const visibleItems = entry.items.filter(
                     (i) => !i.adminOnly || user.role === "admin"
                   );

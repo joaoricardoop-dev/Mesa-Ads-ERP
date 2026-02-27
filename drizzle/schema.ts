@@ -13,6 +13,7 @@ import {
 export const statusEnum = pgEnum("status", ["active", "inactive"]);
 export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "paused", "completed", "quotation", "archived"]);
 export const budgetStatusEnum = pgEnum("budget_status", ["active", "expired", "rejected"]);
+export const invoiceStatusEnum = pgEnum("invoice_status", ["emitida", "paga", "vencida", "cancelada"]);
 
 export { users, sessions } from "@shared/models/auth";
 export type { User, UpsertUser } from "@shared/models/auth";
@@ -102,6 +103,8 @@ export const campaigns = pgTable("campaigns", {
   batchCost: decimal("batchCost", { precision: 10, scale: 2 }).default("1200.00").notNull(),
   budgetId: integer("budgetId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  productionCost: decimal("productionCost", { precision: 12, scale: 2 }),
+  freightCost: decimal("freightCost", { precision: 12, scale: 2 }),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
@@ -216,11 +219,46 @@ export const restaurantPayments = pgTable("restaurant_payments", {
   status: varchar("status", { length: 20 }).default("pending").notNull(),
   pixKey: varchar("pixKey", { length: 255 }),
   notes: text("notes"),
+  periodStart: date("periodStart"),
+  periodEnd: date("periodEnd"),
+  proofUrl: text("proofUrl"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type RestaurantPayment = typeof restaurantPayments.$inferSelect;
 export type InsertRestaurantPayment = typeof restaurantPayments.$inferInsert;
+
+export const invoices = pgTable("invoices", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaignId").notNull(),
+  clientId: integer("clientId").notNull(),
+  invoiceNumber: varchar("invoiceNumber", { length: 20 }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  issueDate: date("issueDate").notNull(),
+  dueDate: date("dueDate").notNull(),
+  paymentDate: date("paymentDate"),
+  status: invoiceStatusEnum("status").default("emitida").notNull(),
+  paymentMethod: varchar("paymentMethod", { length: 50 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = typeof invoices.$inferInsert;
+
+export const operationalCosts = pgTable("operational_costs", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaignId").notNull(),
+  productionCost: decimal("productionCost", { precision: 12, scale: 2 }).default("0").notNull(),
+  freightCost: decimal("freightCost", { precision: 12, scale: 2 }).default("0").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type OperationalCost = typeof operationalCosts.$inferSelect;
+export type InsertOperationalCost = typeof operationalCosts.$inferInsert;
 
 export const suppliers = pgTable("suppliers", {
   id: serial("id").primaryKey(),

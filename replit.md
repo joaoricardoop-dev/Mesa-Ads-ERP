@@ -31,6 +31,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
   - Dashboard (`/`) — operational overview
   - Comercial (group): Cotações, Simulador (`/comercial/simulador`), Leads, Anunciantes (`/clientes`), OS Anunciantes, Termos Restaurantes
   - Campanhas (`/campanhas`)
+  - Financeiro (group, admin only): Dashboard (`/financeiro`), Faturamento (`/financeiro/faturamento`), Pagamentos (`/financeiro/pagamentos`), Custos (`/financeiro/custos`), Relatórios (`/financeiro/relatorios`)
   - Parceiros (group): Prospecção (`/prospeccao`), Restaurantes (`/restaurantes`)
   - Biblioteca (`/biblioteca`)
   - Configurações (group): Economics (`/economics`), Produção (`/producao`), Membros (`/membros`, admin only)
@@ -65,9 +66,12 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - `restaurants` — Prospecting/leads for partner restaurants
 - `active_restaurants` — Onboarded active restaurants with full operational data (tables, seats, customers, monthlyDrinksSold, excluded ad categories, Pix, rating system fields, etc.)
 - `clients` — Advertisers (47 imported with full address/contact/CNPJ data)
-- `campaigns` — Ad campaigns with full financial parameters (grossup pricing, commissions, taxes, markup)
+- `campaigns` — Ad campaigns with full financial parameters (grossup pricing, commissions, taxes, markup, productionCost, freightCost)
 - `campaign_restaurants` — N:N campaign-restaurant relationship with coasters/usage allocation
 - `campaign_history` — Audit trail for campaign status changes and updates
+- `invoices` — Faturas emitidas para anunciantes (campaignId, clientId, invoiceNumber FAT-YYYY-NNNN, amount, issueDate, dueDate, paymentDate, status enum emitida/paga/vencida/cancelada, paymentMethod)
+- `operational_costs` — Custos operacionais por campanha (campaignId unique, productionCost, freightCost)
+- `restaurant_payments` — Pagamentos a restaurantes parceiros (restaurantId, campaignId, amount, referenceMonth, periodStart, periodEnd, proofUrl, status)
 - `suppliers` — Production suppliers (print shops)
 - `budgets` — Production budgets from suppliers
 - `budget_items` — Price tiers within budgets

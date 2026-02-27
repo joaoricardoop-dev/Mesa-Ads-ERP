@@ -22,6 +22,11 @@ import Production from "./pages/Production";
 import Members from "./pages/Members";
 import LandingPage from "./pages/LandingPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import FinancialDashboard from "./pages/financial/FinancialDashboard";
+import Invoicing from "./pages/financial/Invoicing";
+import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
+import OperationalCosts from "./pages/financial/OperationalCosts";
+import FinancialReport from "./pages/financial/FinancialReport";
 
 function Router() {
   return (
@@ -49,6 +54,11 @@ function Router() {
       <Route path="/restaurantes" component={ActiveRestaurantsPage} />
       <Route path="/clientes" component={Clients} />
       <Route path="/cotacao/preview" component={QuotationPreview} />
+      <Route path="/financeiro" component={FinancialDashboard} />
+      <Route path="/financeiro/faturamento" component={Invoicing} />
+      <Route path="/financeiro/pagamentos" component={RestaurantPaymentsPage} />
+      <Route path="/financeiro/custos" component={OperationalCosts} />
+      <Route path="/financeiro/relatorios" component={FinancialReport} />
       <Route path="/campanhas/:id" component={CampaignDetail} />
       <Route path="/campanhas" component={Campaigns} />
       <Route path="/economics" component={Economics} />
