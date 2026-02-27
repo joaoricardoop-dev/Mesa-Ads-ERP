@@ -78,6 +78,19 @@ export const appRouter = router({
     }),
   }),
 
+  // ─── Dev Role Switcher (dev only) ───────────────────────────────────────
+  dev: router({
+    switchRole: protectedProcedure
+      .input(z.object({ role: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        if (process.env.NODE_ENV === "production") {
+          throw new Error("Not available in production");
+        }
+        const updated = await authStorage.updateUserRole(ctx.user!.id, input.role);
+        return updated;
+      }),
+  }),
+
   // ─── Members (Admin) ────────────────────────────────────────────────────
   members: router({
     list: adminProcedure.query(() => authStorage.listUsers()),

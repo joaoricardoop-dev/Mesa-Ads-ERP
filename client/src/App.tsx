@@ -26,6 +26,7 @@ import Library from "./pages/Library";
 import Quotations from "./pages/Quotations";
 import Leads from "./pages/Leads";
 import ServiceOrders from "./pages/ServiceOrders";
+import DevRoleSwitcher from "./components/DevRoleSwitcher";
 import FinancialDashboard from "./pages/financial/FinancialDashboard";
 import Invoicing from "./pages/financial/Invoicing";
 import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
@@ -90,6 +91,7 @@ function AuthenticatedApp() {
       <DashboardLayout user={user}>
         <Router />
       </DashboardLayout>
+      <DevRoleSwitcher currentRole={user?.role || undefined} />
     </div>
   );
 }
