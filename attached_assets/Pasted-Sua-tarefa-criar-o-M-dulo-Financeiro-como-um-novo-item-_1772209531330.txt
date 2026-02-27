@@ -1,0 +1,85 @@
+Sua tarefa é criar o Módulo Financeiro como um novo item na sidebar (💰 Financeiro), com as seguintes telas e funcionalidades:
+
+1. DASHBOARD FINANCEIRO (tela principal do módulo)
+Cards no topo:
+
+Faturamento do mês (realizado vs. meta, com % de atingimento)
+Custo operacional do mês (soma de: produção gráfica + frete + remuneração de restaurantes)
+Margem bruta (faturamento - custo operacional, em R$ e %)
+Inadimplência (total de faturas vencidas e não pagas)
+A receber (total de faturas emitidas ainda dentro do prazo)
+
+Gráficos:
+
+Faturamento mensal dos últimos 12 meses (gráfico de barras)
+Evolução da margem bruta mensal (gráfico de linha)
+Composição de custos do mês atual (gráfico de pizza: produção, frete, remuneração parceiros)
+
+Projeções:
+
+Pipeline comercial valorado: soma das cotações ativas × probabilidade de fechamento
+Receita projetada próximos 3 meses: baseada em campanhas confirmadas (status Produção até Em Veiculação) + pipeline ponderado
+
+
+2. FATURAMENTO (submenu)
+Lista de faturas emitidas para anunciantes:
+
+Filtros: status (emitida, paga, vencida, cancelada), anunciante, período, campanha
+Cada fatura contém: número, anunciante, campanha vinculada (CMP-YYYY-NNNN), valor, data de emissão, data de vencimento, status, forma de pagamento
+Ações: marcar como paga (com data de pagamento), cancelar, gerar PDF da fatura, enviar por e-mail
+Ao marcar cotação como WIN e criar campanha, o sistema deve permitir gerar a fatura vinculada à campanha
+Indicador visual para faturas vencidas (highlight vermelho)
+
+
+3. PAGAMENTOS A RESTAURANTES (submenu)
+Lista de pagamentos devidos aos restaurantes parceiros:
+
+Filtros: status (pendente, pago, atrasado), restaurante, período, campanha
+Cada registro contém: restaurante, campanha vinculada, período de veiculação, valor calculado, data prevista de pagamento, status, comprovante de pagamento (upload)
+O valor é calculado com base na regra de remuneração definida no sistema (configurável em Configurações)
+Quando uma campanha é finalizada (status Inativa), o sistema gera automaticamente os registros de pagamento para cada restaurante que participou
+Ações: marcar como pago (com data e comprovante), exportar lista para planilha
+
+
+4. CUSTOS OPERACIONAIS (submenu)
+Registro de custos por campanha:
+
+Cada campanha tem seus custos detalhados:
+
+Custo de produção gráfica (valor pago ao fornecedor pela impressão dos coasters)
+Custo de frete/entrega (valor pago pelo transporte do material)
+Custo de remuneração dos restaurantes (calculado automaticamente ao finalizar)
+
+
+Os custos de produção e frete são preenchidos manualmente pelo time durante o fluxo da campanha (etapas Trânsito/Executar)
+Visão consolidada: tabela com todas as campanhas e seus custos totais, com filtro por período
+Totalizadores: custo total do período, custo médio por campanha, custo médio por coaster
+
+
+5. RELATÓRIO FINANCEIRO (submenu)
+Relatório mensal consolidado com:
+
+Receita total (faturas pagas no período)
+Custos totais (produção + frete + remuneração)
+Margem bruta (R$ e %)
+Detalhamento por campanha: receita, custos e margem individual
+Detalhamento por anunciante: quanto cada anunciante gerou de receita no período
+Detalhamento por restaurante: quanto cada restaurante recebeu no período
+Exportar relatório em PDF ou planilha (.xlsx)
+Filtro por mês/período customizado
+
+
+REGRAS DE ACESSO:
+
+Perfil Admin: acesso total a todas as telas do módulo financeiro
+Perfil Financeiro: acesso total a todas as telas do módulo financeiro
+Perfil Comercial: somente leitura no dashboard financeiro (sem ver pagamentos a restaurantes)
+Perfis Operações, Parceiro e Anunciante: sem acesso ao módulo financeiro
+
+
+REGRAS TÉCNICAS:
+
+Todos os valores monetários em R$ (BRL), formatados com separador de milhar (ponto) e decimal (vírgula)
+Datas no formato DD/MM/YYYY
+Os dados financeiros se alimentam das campanhas existentes no sistema — não são tabelas isoladas. Uma fatura está sempre vinculada a uma campanha, um pagamento a restaurante está sempre vinculado a uma campanha finalizada
+Os campos de custo de produção e frete devem ser adicionados à ficha da campanha (nas etapas de Trânsito e Executar) para que o módulo financeiro possa consolidá-los
