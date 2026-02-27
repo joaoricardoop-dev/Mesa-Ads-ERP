@@ -349,10 +349,10 @@ export default function QuotationPreview() {
             <Button
               className="gap-2 bg-primary hover:bg-primary/90 px-6"
               onClick={handleCreate}
-              disabled={createCampaignMutation.isPending}
+              disabled={createQuotationMutation.isPending}
             >
               <Rocket className="w-4 h-4" />
-              {createCampaignMutation.isPending ? "Criando..." : "Confirmar e Criar Cotação"}
+              {createQuotationMutation.isPending ? "Criando..." : "Confirmar e Criar Cotação"}
             </Button>
           </div>
         </div>

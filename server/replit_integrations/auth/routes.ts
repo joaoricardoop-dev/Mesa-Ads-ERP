@@ -65,6 +65,43 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
+  if (process.env.NODE_ENV === "development") {
+    app.post("/api/auth/test-login", async (req: any, res) => {
+      try {
+        const { userId } = req.body;
+        if (!userId) {
+          return res.status(400).json({ message: "userId is required" });
+        }
+
+        const db = await getDb();
+        if (!db) return res.status(500).json({ message: "Database not available" });
+
+        const [user] = await db.select().from(users).where(eq(users.id, parseInt(userId)));
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
+
+        const sessionUser = {
+          claims: { sub: user.id, email: user.email, first_name: user.firstName, last_name: user.lastName },
+          expires_at: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
+        };
+
+        req.login(sessionUser, (err: any) => {
+          if (err) {
+            return res.status(500).json({ message: "Session error" });
+          }
+          const { passwordHash: _, ...safeUser } = user;
+          res.json(safeUser);
+        });
+      } catch (error) {
+        console.error("Test login error:", error);
+        res.status(500).json({ message: "Internal error" });
+      }
+    });
+  }
+
   app.post("/api/auth/change-password", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
