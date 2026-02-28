@@ -10,7 +10,11 @@ import {
   date,
   jsonb,
   boolean,
+  index,
+  unique,
 } from "drizzle-orm/pg-core";
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
 
 export const statusEnum = pgEnum("status", ["active", "inactive"]);
 export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa"]);
@@ -22,8 +26,12 @@ export const serviceOrderTypeEnum = pgEnum("service_order_type", ["anunciante", 
 export const serviceOrderStatusEnum = pgEnum("service_order_status", ["rascunho", "enviada", "assinada", "execucao", "concluida"]);
 export const termStatusEnum = pgEnum("term_status", ["rascunho", "enviado", "assinado", "vigente", "encerrado"]);
 
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
 export { users, sessions } from "@shared/models/auth";
 export type { User, UpsertUser } from "@shared/models/auth";
+
+// ─── Restaurants (cadastro geral) ────────────────────────────────────────────
 
 export const restaurants = pgTable("restaurants", {
   id: serial("id").primaryKey(),
@@ -56,10 +64,15 @@ export const restaurants = pgTable("restaurants", {
   status: statusEnum("status").default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_restaurants_status").on(t.status),
+  index("idx_restaurants_cnpj").on(t.cnpj),
+]);
 
 export type Restaurant = typeof restaurants.$inferSelect;
 export type InsertRestaurant = typeof restaurants.$inferInsert;
+
+// ─── Clients (anunciantes) ───────────────────────────────────────────────────
 
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
@@ -80,21 +93,26 @@ export const clients = pgTable("clients", {
   status: statusEnum("status").default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_clients_status").on(t.status),
+  index("idx_clients_cnpj").on(t.cnpj),
+]);
 
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = typeof clients.$inferInsert;
 
+// ─── Campaigns ───────────────────────────────────────────────────────────────
+
 export const campaigns = pgTable("campaigns", {
   id: serial("id").primaryKey(),
   campaignNumber: varchar("campaignNumber", { length: 20 }).unique(),
-  clientId: integer("clientId").notNull(),
+  clientId: integer("clientId").notNull().references(() => clients.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   startDate: date("startDate").notNull(),
   endDate: date("endDate").notNull(),
   status: campaignStatusEnum("status").default("draft").notNull(),
   notes: text("notes"),
-  quotationId: integer("quotationId"),
+  quotationId: integer("quotationId").references(() => quotations.id, { onDelete: "set null" }),
   campaignType: varchar("campaignType", { length: 50 }),
   artPdfUrl: text("artPdfUrl"),
   artImageUrls: text("artImageUrls"),
@@ -116,55 +134,80 @@ export const campaigns = pgTable("campaigns", {
   contractDuration: integer("contractDuration").default(6).notNull(),
   batchSize: integer("batchSize").default(10000).notNull(),
   batchCost: decimal("batchCost", { precision: 10, scale: 2 }).default("1200.00").notNull(),
-  budgetId: integer("budgetId"),
+  budgetId: integer("budgetId").references(() => budgets.id, { onDelete: "set null" }),
   productionCost: decimal("productionCost", { precision: 12, scale: 2 }),
   freightCost: decimal("freightCost", { precision: 12, scale: 2 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_campaigns_client_id").on(t.clientId),
+  index("idx_campaigns_status").on(t.status),
+  index("idx_campaigns_quotation_id").on(t.quotationId),
+  index("idx_campaigns_budget_id").on(t.budgetId),
+  index("idx_campaigns_dates").on(t.startDate, t.endDate),
+]);
 
 export type Campaign = typeof campaigns.$inferSelect;
 export type InsertCampaign = typeof campaigns.$inferInsert;
 
+// ─── Campaign ↔ Restaurant (junction) ────────────────────────────────────────
+
 export const campaignRestaurants = pgTable("campaign_restaurants", {
   id: serial("id").primaryKey(),
-  campaignId: integer("campaignId").notNull(),
-  restaurantId: integer("restaurantId").notNull(),
+  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  restaurantId: integer("restaurantId").notNull().references(() => restaurants.id, { onDelete: "cascade" }),
   coastersCount: integer("coastersCount").default(500).notNull(),
   usagePerDay: integer("usagePerDay").default(5).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_campaign_restaurants_campaign_id").on(t.campaignId),
+  index("idx_campaign_restaurants_restaurant_id").on(t.restaurantId),
+  unique("uq_campaign_restaurant").on(t.campaignId, t.restaurantId),
+]);
 
 export type CampaignRestaurant = typeof campaignRestaurants.$inferSelect;
 export type InsertCampaignRestaurant = typeof campaignRestaurants.$inferInsert;
 
+// ─── Campaign History ────────────────────────────────────────────────────────
+
 export const campaignHistory = pgTable("campaign_history", {
   id: serial("id").primaryKey(),
-  campaignId: integer("campaignId").notNull(),
+  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
   action: varchar("action", { length: 50 }).notNull(),
   details: text("details"),
   userId: varchar("userId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_campaign_history_campaign_id").on(t.campaignId),
+]);
 
 export type CampaignHistory = typeof campaignHistory.$inferSelect;
 export type InsertCampaignHistory = typeof campaignHistory.$inferInsert;
 
+// ─── Campaign Proofs ─────────────────────────────────────────────────────────
+
 export const campaignProofs = pgTable("campaign_proofs", {
   id: serial("id").primaryKey(),
-  campaignId: integer("campaignId").notNull(),
+  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
   restaurantId: integer("restaurantId").notNull(),
   week: integer("week").notNull(),
   photoUrl: text("photoUrl").notNull(),
   uploadedBy: varchar("uploadedBy", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_campaign_proofs_campaign_id").on(t.campaignId),
+  index("idx_campaign_proofs_restaurant_id").on(t.restaurantId),
+]);
 
 export type CampaignProof = typeof campaignProofs.$inferSelect;
 export type InsertCampaignProof = typeof campaignProofs.$inferInsert;
 
+// ─── Enums (restaurant-specific) ─────────────────────────────────────────────
+
 export const contactTypeEnum = pgEnum("contact_type", ["proprietario", "gerente", "marketing", "outro"]);
 export const socialClassEnum = pgEnum("social_class", ["A", "B", "C", "misto_ab", "misto_bc", "nao_sei", "AA", "D", "E"]);
+
+// ─── Active Restaurants (rede ativa com rating) ──────────────────────────────
 
 export const activeRestaurants = pgTable("active_restaurants", {
   id: serial("id").primaryKey(),
@@ -214,34 +257,45 @@ export const activeRestaurants = pgTable("active_restaurants", {
   ratingTier: varchar("ratingTier", { length: 20 }),
   ratingMultiplier: decimal("ratingMultiplier", { precision: 3, scale: 2 }),
   ratingUpdatedAt: timestamp("ratingUpdatedAt"),
-  parentRestaurantId: integer("parentRestaurantId"),
+  parentRestaurantId: integer("parentRestaurantId").references((): any => activeRestaurants.id, { onDelete: "set null" }),
   coastersAllocated: integer("coastersAllocated").default(500).notNull(),
   commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("20.00").notNull(),
   status: statusEnum("status").default("active").notNull(),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_active_restaurants_status").on(t.status),
+  index("idx_active_restaurants_parent_id").on(t.parentRestaurantId),
+  index("idx_active_restaurants_cnpj").on(t.cnpj),
+  index("idx_active_restaurants_rating_tier").on(t.ratingTier),
+]);
 
 export type ActiveRestaurant = typeof activeRestaurants.$inferSelect;
 export type InsertActiveRestaurant = typeof activeRestaurants.$inferInsert;
 
+// ─── Restaurant Photos ───────────────────────────────────────────────────────
+
 export const restaurantPhotos = pgTable("restaurant_photos", {
   id: serial("id").primaryKey(),
-  restaurantId: integer("restaurantId").notNull(),
+  restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
   url: text("url").notNull(),
   caption: varchar("caption", { length: 255 }),
   photoType: varchar("photoType", { length: 50 }).default("veiculacao").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_restaurant_photos_restaurant_id").on(t.restaurantId),
+]);
 
 export type RestaurantPhoto = typeof restaurantPhotos.$inferSelect;
 export type InsertRestaurantPhoto = typeof restaurantPhotos.$inferInsert;
 
+// ─── Restaurant Payments ─────────────────────────────────────────────────────
+
 export const restaurantPayments = pgTable("restaurant_payments", {
   id: serial("id").primaryKey(),
-  restaurantId: integer("restaurantId").notNull(),
-  campaignId: integer("campaignId"),
+  restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  campaignId: integer("campaignId").references(() => campaigns.id, { onDelete: "set null" }),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   referenceMonth: varchar("referenceMonth", { length: 7 }).notNull(),
   paymentDate: date("paymentDate"),
@@ -252,15 +306,22 @@ export const restaurantPayments = pgTable("restaurant_payments", {
   periodEnd: date("periodEnd"),
   proofUrl: text("proofUrl"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_restaurant_payments_restaurant_id").on(t.restaurantId),
+  index("idx_restaurant_payments_campaign_id").on(t.campaignId),
+  index("idx_restaurant_payments_status").on(t.status),
+  index("idx_restaurant_payments_ref_month").on(t.referenceMonth),
+]);
 
 export type RestaurantPayment = typeof restaurantPayments.$inferSelect;
 export type InsertRestaurantPayment = typeof restaurantPayments.$inferInsert;
 
+// ─── Invoices (faturamento) ──────────────────────────────────────────────────
+
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
-  campaignId: integer("campaignId").notNull(),
-  clientId: integer("clientId").notNull(),
+  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  clientId: integer("clientId").notNull().references(() => clients.id, { onDelete: "cascade" }),
   invoiceNumber: varchar("invoiceNumber", { length: 20 }).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   issueDate: date("issueDate").notNull(),
@@ -271,29 +332,40 @@ export const invoices = pgTable("invoices", {
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_invoices_campaign_id").on(t.campaignId),
+  index("idx_invoices_client_id").on(t.clientId),
+  index("idx_invoices_status").on(t.status),
+  index("idx_invoices_due_date").on(t.dueDate),
+]);
 
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoice = typeof invoices.$inferInsert;
 
+// ─── Operational Costs ───────────────────────────────────────────────────────
+
 export const operationalCosts = pgTable("operational_costs", {
   id: serial("id").primaryKey(),
-  campaignId: integer("campaignId").notNull(),
+  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
   productionCost: decimal("productionCost", { precision: 12, scale: 2 }).default("0").notNull(),
   freightCost: decimal("freightCost", { precision: 12, scale: 2 }).default("0").notNull(),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_operational_costs_campaign_id").on(t.campaignId),
+]);
 
 export type OperationalCost = typeof operationalCosts.$inferSelect;
 export type InsertOperationalCost = typeof operationalCosts.$inferInsert;
+
+// ─── Quotations (cotações) ───────────────────────────────────────────────────
 
 export const quotations = pgTable("quotations", {
   id: serial("id").primaryKey(),
   quotationNumber: varchar("quotationNumber", { length: 20 }).notNull().unique(),
   quotationName: varchar("quotationName", { length: 255 }),
-  clientId: integer("clientId").notNull(),
+  clientId: integer("clientId").notNull().references(() => clients.id, { onDelete: "cascade" }),
   campaignType: varchar("campaignType", { length: 50 }).default("padrao"),
   coasterVolume: integer("coasterVolume").notNull(),
   networkProfile: varchar("networkProfile", { length: 50 }),
@@ -309,10 +381,15 @@ export const quotations = pgTable("quotations", {
   createdBy: varchar("createdBy", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_quotations_client_id").on(t.clientId),
+  index("idx_quotations_status").on(t.status),
+]);
 
 export type Quotation = typeof quotations.$inferSelect;
 export type InsertQuotation = typeof quotations.$inferInsert;
+
+// ─── Leads ───────────────────────────────────────────────────────────────────
 
 export const leads = pgTable("leads", {
   id: serial("id").primaryKey(),
@@ -331,30 +408,39 @@ export const leads = pgTable("leads", {
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_leads_type").on(t.type),
+  index("idx_leads_stage").on(t.stage),
+]);
 
 export type Lead = typeof leads.$inferSelect;
 export type InsertLead = typeof leads.$inferInsert;
 
+// ─── Lead Interactions ───────────────────────────────────────────────────────
+
 export const leadInteractions = pgTable("lead_interactions", {
   id: serial("id").primaryKey(),
-  leadId: integer("leadId").notNull(),
+  leadId: integer("leadId").notNull().references(() => leads.id, { onDelete: "cascade" }),
   type: varchar("type", { length: 50 }).notNull(),
   content: text("content"),
   contactedBy: varchar("contactedBy", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_lead_interactions_lead_id").on(t.leadId),
+]);
 
 export type LeadInteraction = typeof leadInteractions.$inferSelect;
 export type InsertLeadInteraction = typeof leadInteractions.$inferInsert;
+
+// ─── Service Orders (OS) ─────────────────────────────────────────────────────
 
 export const serviceOrders = pgTable("service_orders", {
   id: serial("id").primaryKey(),
   orderNumber: varchar("orderNumber", { length: 30 }).notNull().unique(),
   type: serviceOrderTypeEnum("type").notNull(),
-  campaignId: integer("campaignId"),
-  clientId: integer("clientId"),
-  quotationId: integer("quotationId"),
+  campaignId: integer("campaignId").references(() => campaigns.id, { onDelete: "set null" }),
+  clientId: integer("clientId").references(() => clients.id, { onDelete: "set null" }),
+  quotationId: integer("quotationId").references(() => quotations.id, { onDelete: "set null" }),
   description: text("description"),
   coasterVolume: integer("coasterVolume"),
   networkAllocation: text("networkAllocation"),
@@ -371,26 +457,40 @@ export const serviceOrders = pgTable("service_orders", {
   signatureUrl: text("signatureUrl"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_service_orders_campaign_id").on(t.campaignId),
+  index("idx_service_orders_client_id").on(t.clientId),
+  index("idx_service_orders_quotation_id").on(t.quotationId),
+  index("idx_service_orders_status").on(t.status),
+  index("idx_service_orders_type").on(t.type),
+]);
 
 export type ServiceOrder = typeof serviceOrders.$inferSelect;
 export type InsertServiceOrder = typeof serviceOrders.$inferInsert;
 
+// ─── Quotation ↔ Restaurant (junction) ───────────────────────────────────────
+
 export const quotationRestaurants = pgTable("quotation_restaurants", {
   id: serial("id").primaryKey(),
-  quotationId: integer("quotationId").notNull(),
-  restaurantId: integer("restaurantId").notNull(),
+  quotationId: integer("quotationId").notNull().references(() => quotations.id, { onDelete: "cascade" }),
+  restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
   coasterQuantity: integer("coasterQuantity").notNull(),
   commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("20.00"),
-});
+}, (t) => [
+  index("idx_quotation_restaurants_quotation_id").on(t.quotationId),
+  index("idx_quotation_restaurants_restaurant_id").on(t.restaurantId),
+  unique("uq_quotation_restaurant").on(t.quotationId, t.restaurantId),
+]);
 
 export type QuotationRestaurant = typeof quotationRestaurants.$inferSelect;
 export type InsertQuotationRestaurant = typeof quotationRestaurants.$inferInsert;
 
+// ─── Restaurant Terms (termos de adesão) ─────────────────────────────────────
+
 export const restaurantTerms = pgTable("restaurant_terms", {
   id: serial("id").primaryKey(),
   termNumber: varchar("termNumber", { length: 20 }).notNull(),
-  restaurantId: integer("restaurantId").notNull(),
+  restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
   conditions: text("conditions"),
   remunerationRule: text("remunerationRule"),
   allowedCategories: text("allowedCategories"),
@@ -402,15 +502,20 @@ export const restaurantTerms = pgTable("restaurant_terms", {
   status: termStatusEnum("status").default("rascunho").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_restaurant_terms_restaurant_id").on(t.restaurantId),
+  index("idx_restaurant_terms_status").on(t.status),
+]);
 
 export type RestaurantTerm = typeof restaurantTerms.$inferSelect;
 export type InsertRestaurantTerm = typeof restaurantTerms.$inferInsert;
 
+// ─── Library Items (acervo de artes) ─────────────────────────────────────────
+
 export const libraryItems = pgTable("library_items", {
   id: serial("id").primaryKey(),
-  campaignId: integer("campaignId"),
-  clientId: integer("clientId"),
+  campaignId: integer("campaignId").references(() => campaigns.id, { onDelete: "set null" }),
+  clientId: integer("clientId").references(() => clients.id, { onDelete: "set null" }),
   title: varchar("title", { length: 255 }),
   thumbnailUrl: text("thumbnailUrl"),
   artPdfUrl: text("artPdfUrl"),
@@ -420,10 +525,15 @@ export const libraryItems = pgTable("library_items", {
   archivedAt: timestamp("archivedAt"),
   metrics: text("metrics"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_library_items_campaign_id").on(t.campaignId),
+  index("idx_library_items_client_id").on(t.clientId),
+]);
 
 export type LibraryItem = typeof libraryItems.$inferSelect;
 export type InsertLibraryItem = typeof libraryItems.$inferInsert;
+
+// ─── Suppliers (fornecedores) ────────────────────────────────────────────────
 
 export const suppliers = pgTable("suppliers", {
   id: serial("id").primaryKey(),
@@ -438,14 +548,18 @@ export const suppliers = pgTable("suppliers", {
   status: statusEnum("status").default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_suppliers_status").on(t.status),
+]);
 
 export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = typeof suppliers.$inferInsert;
 
+// ─── Budgets (orçamentos de produção) ────────────────────────────────────────
+
 export const budgets = pgTable("budgets", {
   id: serial("id").primaryKey(),
-  supplierId: integer("supplierId").notNull(),
+  supplierId: integer("supplierId").notNull().references(() => suppliers.id, { onDelete: "cascade" }),
   code: varchar("code", { length: 50 }),
   description: varchar("description", { length: 500 }).notNull(),
   productSpec: text("productSpec"),
@@ -454,22 +568,31 @@ export const budgets = pgTable("budgets", {
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_budgets_supplier_id").on(t.supplierId),
+  index("idx_budgets_status").on(t.status),
+]);
 
 export type Budget = typeof budgets.$inferSelect;
 export type InsertBudget = typeof budgets.$inferInsert;
 
+// ─── Budget Items (faixas de preço) ──────────────────────────────────────────
+
 export const budgetItems = pgTable("budget_items", {
   id: serial("id").primaryKey(),
-  budgetId: integer("budgetId").notNull(),
+  budgetId: integer("budgetId").notNull().references(() => budgets.id, { onDelete: "cascade" }),
   quantity: integer("quantity").notNull(),
   unitPrice: decimal("unitPrice", { precision: 10, scale: 3 }).notNull(),
   totalPrice: decimal("totalPrice", { precision: 12, scale: 2 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_budget_items_budget_id").on(t.budgetId),
+]);
 
 export type BudgetItem = typeof budgetItems.$inferSelect;
 export type InsertBudgetItem = typeof budgetItems.$inferInsert;
+
+// ─── Campaign Batches (lotes de produção) ────────────────────────────────────
 
 export const campaignBatches = pgTable("campaign_batches", {
   id: serial("id").primaryKey(),
@@ -481,17 +604,26 @@ export const campaignBatches = pgTable("campaign_batches", {
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_campaign_batches_year").on(t.year),
+  index("idx_campaign_batches_is_active").on(t.isActive),
+]);
 
 export type CampaignBatch = typeof campaignBatches.$inferSelect;
 export type InsertCampaignBatch = typeof campaignBatches.$inferInsert;
 
+// ─── Campaign ↔ Batch (junction) ─────────────────────────────────────────────
+
 export const campaignBatchAssignments = pgTable("campaign_batch_assignments", {
   id: serial("id").primaryKey(),
-  campaignId: integer("campaignId").notNull(),
-  batchId: integer("batchId").notNull(),
+  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  batchId: integer("batchId").notNull().references(() => campaignBatches.id, { onDelete: "cascade" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_batch_assignments_campaign_id").on(t.campaignId),
+  index("idx_batch_assignments_batch_id").on(t.batchId),
+  unique("uq_campaign_batch").on(t.campaignId, t.batchId),
+]);
 
 export type CampaignBatchAssignment = typeof campaignBatchAssignments.$inferSelect;
 
