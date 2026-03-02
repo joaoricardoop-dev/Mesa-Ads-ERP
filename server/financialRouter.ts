@@ -12,7 +12,7 @@ import {
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
-function requireFinancialAccess(role: string) {
+function requireFinancialAccess(role: string | null) {
   if (role !== "admin" && role !== "financeiro" && role !== "manager") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito ao módulo financeiro" });
   }

@@ -135,6 +135,17 @@ Statuses: `rascunho` → `enviada` → `ativa` → `os_gerada` → `win` / `perd
 - OS PDF generation: jsPDF + jspdf-autotable (client-side, `client/src/lib/generate-os-pdf.ts`)
 - Supports duplicate, mark lost with reason
 
+## Simulator UI
+
+- Single-page vertical flow (no sidebar) in `client/src/pages/Home.tsx`
+- Collapsible "Parâmetros da Simulação" card with 4 sections:
+  - Operacional (coasters/rest, restaurantes, uso/dia, dias/mês)
+  - Custo de Produção (budget selector, nº artes, batch manual, custo unitário efetivo)
+  - Precificação (markup type, markup/fixo, margem bruta + goal seek, desc. máximo, margem mínima)
+  - Comercial & Tributário (com. agência type/value, com. vendedor, carga tributária, duração contrato)
+- KPI Cards → DRE → Restaurant Allocation → Tabbed Analysis (Gráficos/Cenários/Tabelas)
+- `InputPanel.tsx` — legacy sidebar component (unused, kept for reference)
+
 ## Pricing Engine (calcPricing)
 
 - Located in `client/src/hooks/useSimulator.ts`

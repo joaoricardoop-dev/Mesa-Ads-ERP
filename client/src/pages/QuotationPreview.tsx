@@ -113,6 +113,8 @@ export default function QuotationPreview() {
         quantity: i.quantity,
         unitPrice: String(i.unitPrice),
         totalPrice: String(i.totalPrice),
+        numModels: i.numModels ?? 1,
+        qtyPerModel: i.qtyPerModel ?? i.quantity,
       })),
     };
   }, [savedBudgetId, budgetsList]);
