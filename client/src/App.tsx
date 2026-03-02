@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./hooks/use-auth";
 import { SignIn, useClerk } from "@clerk/clerk-react";
+import { ShieldX } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
 import Prospecting from "./pages/Restaurants";
@@ -124,7 +125,7 @@ function ClerkLoginPage() {
 }
 
 function AuthenticatedApp() {
-  const { user, isLoading, isAuthenticated, isAuthError, logout } = useAuth();
+  const { user, isLoading, isAuthenticated, isAuthError, isNotRegistered, logout, clerkUser } = useAuth();
 
   if (isLoading) {
     return (
@@ -132,6 +133,49 @@ function AuthenticatedApp() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isNotRegistered) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center" style={{ background: "hsl(0 0% 4%)" }}>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.05]"
+            style={{ background: "radial-gradient(circle, #ef4444 0%, transparent 70%)" }}
+          />
+        </div>
+        <div className="relative flex flex-col items-center max-w-md px-6 text-center">
+          <img src="/logo-white.png" alt="mesa.ads" className="h-10 mb-8" />
+          <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-2xl p-8 shadow-2xl w-full">
+            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-5">
+              <ShieldX className="w-8 h-8 text-red-400" />
+            </div>
+            <h2 className="text-xl font-bold text-[hsl(0,0%,95%)] mb-2">
+              Acesso não autorizado
+            </h2>
+            <p className="text-sm text-[hsl(0,0%,50%)] mb-2 leading-relaxed">
+              {clerkUser?.primaryEmailAddress?.emailAddress ? (
+                <>Sua conta <span className="text-[hsl(0,0%,70%)] font-medium">{clerkUser.primaryEmailAddress.emailAddress}</span> não está cadastrada na plataforma mesa.ads.</>
+              ) : (
+                <>Sua conta não está cadastrada na plataforma mesa.ads.</>
+              )}
+            </p>
+            <p className="text-sm text-[hsl(0,0%,50%)] mb-6 leading-relaxed">
+              Entre em contato com o administrador do sistema para solicitar acesso.
+            </p>
+            <button
+              onClick={() => logout()}
+              className="w-full px-4 py-2.5 bg-[hsl(0,0%,14%)] hover:bg-[hsl(0,0%,18%)] text-[hsl(0,0%,70%)] rounded-lg text-sm font-medium transition-colors"
+            >
+              Sair e usar outra conta
+            </button>
+          </div>
+          <p className="mt-6 text-[11px]" style={{ color: "hsl(0 0% 30%)" }}>
+            mesa.ads &copy; {new Date().getFullYear()} &mdash; Plataforma de gestão
+          </p>
         </div>
       </div>
     );

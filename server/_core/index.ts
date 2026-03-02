@@ -50,22 +50,7 @@ async function startServer() {
       const { authStorage } = await import("../replit_integrations/auth");
       let user = await authStorage.getUser(auth.userId);
       if (!user) {
-        const clerkModule = await import("@clerk/express");
-        const clerkClient = clerkModule.createClerkClient({
-          secretKey: process.env.CLERK_SECRET_KEY!,
-        });
-        const clerkUser = await clerkClient.users.getUser(auth.userId);
-        const role = (clerkUser.publicMetadata as any)?.role || "user";
-        const clientId = (clerkUser.publicMetadata as any)?.clientId || null;
-        user = await authStorage.upsertUser({
-          id: clerkUser.id,
-          email: clerkUser.emailAddresses?.[0]?.emailAddress || null,
-          firstName: clerkUser.firstName || null,
-          lastName: clerkUser.lastName || null,
-          profileImageUrl: clerkUser.imageUrl || null,
-          role,
-          clientId: clientId ? Number(clientId) : null,
-        });
+        return res.status(403).json({ code: "NOT_REGISTERED", message: "Usuário não cadastrado na plataforma." });
       }
       const { passwordHash: _, ...safeUser } = user;
       res.json(safeUser);
