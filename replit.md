@@ -100,7 +100,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - `operational_costs` — Production + freight costs per campaign
 - `restaurant_payments` — Payments to restaurant partners
 - `suppliers` — Production suppliers
-- `budgets` / `budget_items` — Production budgets
+- `budgets` / `budget_items` — Production budgets (with GPC spec fields: material, format, productSize, printType, colors, layoutType, paymentTerms, productionLeadDays; items support numModels/qtyPerModel for multi-model pricing)
 - `campaign_batches` — 4-week veiculação periods (13 per year, auto-generated from first Monday)
 - `campaign_batch_assignments` — N:N campaign-to-batch mapping (campaigns can span multiple batches)
 

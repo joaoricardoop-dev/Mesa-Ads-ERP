@@ -51,9 +51,14 @@ import {
   Package,
   TrendingDown,
   Eye,
+  Layers,
+  Palette,
+  Ruler,
+  Printer,
+  CreditCard,
+  Clock,
+  Copy,
 } from "lucide-react";
-
-// ─── Types ─────────────────────────────────────────────────────────────────
 
 type SupplierForm = {
   name: string;
@@ -71,6 +76,8 @@ type PriceItem = {
   quantity: number;
   unitPrice: string;
   totalPrice: string;
+  numModels: number;
+  qtyPerModel: number;
 };
 
 type BudgetForm = {
@@ -78,10 +85,19 @@ type BudgetForm = {
   code: string;
   description: string;
   productSpec: string;
+  material: string;
+  format: string;
+  productSize: string;
+  printType: string;
+  colors: string;
+  layoutType: string;
+  paymentTerms: string;
+  productionLeadDays: string;
   validUntil: string;
   status: "active" | "expired" | "rejected";
   notes: string;
-  items: PriceItem[];
+  singleModelItems: PriceItem[];
+  multiModelItems: PriceItem[];
 };
 
 const EMPTY_SUPPLIER: SupplierForm = {
@@ -101,10 +117,19 @@ const EMPTY_BUDGET: BudgetForm = {
   code: "",
   description: "",
   productSpec: "",
+  material: "Papelão Liner Extra Absorvente 850g, 1.6mm",
+  format: "Redondo",
+  productSize: "90mm diâmetro",
+  printType: "Off-Set (frente e verso)",
+  colors: "4x4",
+  layoutType: "unico",
+  paymentTerms: "15 dias",
+  productionLeadDays: "12 a 15 dias úteis",
   validUntil: "",
   status: "active",
   notes: "",
-  items: [{ quantity: 1000, unitPrice: "0.000", totalPrice: "0.00" }],
+  singleModelItems: [{ quantity: 1000, unitPrice: "0.000", totalPrice: "0.00", numModels: 1, qtyPerModel: 1000 }],
+  multiModelItems: [],
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -126,26 +151,42 @@ const STATES = [
   "PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO",
 ];
 
-// ─── Component ─────────────────────────────────────────────────────────────
+const GPC_PRESETS = {
+  singleModel: [
+    { quantity: 1000, unitPrice: "0.419", totalPrice: "419.00", numModels: 1, qtyPerModel: 1000 },
+    { quantity: 2000, unitPrice: "0.350", totalPrice: "699.00", numModels: 1, qtyPerModel: 2000 },
+    { quantity: 3000, unitPrice: "0.333", totalPrice: "999.00", numModels: 1, qtyPerModel: 3000 },
+    { quantity: 4000, unitPrice: "0.325", totalPrice: "1299.00", numModels: 1, qtyPerModel: 4000 },
+    { quantity: 5000, unitPrice: "0.300", totalPrice: "1499.00", numModels: 1, qtyPerModel: 5000 },
+    { quantity: 10000, unitPrice: "0.270", totalPrice: "2700.00", numModels: 1, qtyPerModel: 10000 },
+    { quantity: 20000, unitPrice: "0.260", totalPrice: "5200.00", numModels: 1, qtyPerModel: 20000 },
+  ],
+  multiModel: [
+    { quantity: 10000, unitPrice: "0.419", totalPrice: "4190.00", numModels: 10, qtyPerModel: 1000 },
+    { quantity: 10000, unitPrice: "0.350", totalPrice: "3495.00", numModels: 5, qtyPerModel: 2000 },
+    { quantity: 10000, unitPrice: "0.300", totalPrice: "2998.00", numModels: 2, qtyPerModel: 5000 },
+    { quantity: 20000, unitPrice: "0.410", totalPrice: "8200.00", numModels: 20, qtyPerModel: 1000 },
+    { quantity: 20000, unitPrice: "0.340", totalPrice: "6800.00", numModels: 10, qtyPerModel: 2000 },
+    { quantity: 20000, unitPrice: "0.290", totalPrice: "5800.00", numModels: 4, qtyPerModel: 5000 },
+  ],
+};
 
 export default function Production() {
   const [activeTab, setActiveTab] = useState("budgets");
   const [search, setSearch] = useState("");
 
-  // Suppliers state
   const [isSupplierDialogOpen, setIsSupplierDialogOpen] = useState(false);
   const [supplierForm, setSupplierForm] = useState<SupplierForm>(EMPTY_SUPPLIER);
   const [editingSupplierId, setEditingSupplierId] = useState<number | null>(null);
   const [deleteSupplierTarget, setDeleteSupplierTarget] = useState<number | null>(null);
 
-  // Budgets state
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
   const [budgetForm, setBudgetForm] = useState<BudgetForm>(EMPTY_BUDGET);
   const [editingBudgetId, setEditingBudgetId] = useState<number | null>(null);
   const [deleteBudgetTarget, setDeleteBudgetTarget] = useState<number | null>(null);
   const [viewBudgetId, setViewBudgetId] = useState<number | null>(null);
+  const [budgetPriceTab, setBudgetPriceTab] = useState("single");
 
-  // Queries
   const { data: suppliersList = [], isLoading: suppliersLoading } =
     trpc.supplier.list.useQuery();
   const { data: budgetsList = [], isLoading: budgetsLoading } =
@@ -157,7 +198,6 @@ export default function Production() {
 
   const utils = trpc.useUtils();
 
-  // Supplier mutations
   const createSupplierMut = trpc.supplier.create.useMutation({
     onSuccess: () => {
       utils.supplier.list.invalidate();
@@ -186,7 +226,6 @@ export default function Production() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
-  // Budget mutations
   const createBudgetMut = trpc.budget.create.useMutation({
     onSuccess: () => {
       utils.budget.list.invalidate();
@@ -213,8 +252,6 @@ export default function Production() {
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
-
-  // ─── Supplier handlers ───────────────────────────────────────────────────
 
   const handleNewSupplier = () => {
     setSupplierForm(EMPTY_SUPPLIER);
@@ -260,36 +297,55 @@ export default function Production() {
     }
   };
 
-  // ─── Budget handlers ─────────────────────────────────────────────────────
-
   const handleNewBudget = () => {
     setBudgetForm(EMPTY_BUDGET);
     setEditingBudgetId(null);
+    setBudgetPriceTab("single");
     setIsBudgetDialogOpen(true);
   };
 
   const handleEditBudget = async (b: (typeof budgetsList)[0]) => {
-    // Fetch items for this budget
     const items = await utils.budget.getItems.fetch({ budgetId: b.id });
+    const singleItems = items.filter((i: any) => !i.numModels || i.numModels === 1);
+    const multiItems = items.filter((i: any) => i.numModels && i.numModels > 1);
+
     setBudgetForm({
       supplierId: b.supplierId,
       code: b.code || "",
       description: b.description,
       productSpec: b.productSpec || "",
+      material: b.material || "",
+      format: b.format || "",
+      productSize: b.productSize || "",
+      printType: b.printType || "",
+      colors: b.colors || "",
+      layoutType: b.layoutType || "unico",
+      paymentTerms: b.paymentTerms || "",
+      productionLeadDays: b.productionLeadDays || "",
       validUntil: b.validUntil
         ? new Date(b.validUntil).toISOString().split("T")[0]
         : "",
       status: b.status,
       notes: b.notes || "",
-      items: items.length > 0
-        ? items.map((i) => ({
+      singleModelItems: singleItems.length > 0
+        ? singleItems.map((i: any) => ({
             quantity: i.quantity,
             unitPrice: String(i.unitPrice),
             totalPrice: String(i.totalPrice),
+            numModels: 1,
+            qtyPerModel: i.quantity,
           }))
-        : [{ quantity: 1000, unitPrice: "0.000", totalPrice: "0.00" }],
+        : [{ quantity: 1000, unitPrice: "0.000", totalPrice: "0.00", numModels: 1, qtyPerModel: 1000 }],
+      multiModelItems: multiItems.map((i: any) => ({
+        quantity: i.quantity,
+        unitPrice: String(i.unitPrice),
+        totalPrice: String(i.totalPrice),
+        numModels: i.numModels || 1,
+        qtyPerModel: i.qtyPerModel || i.quantity,
+      })),
     });
     setEditingBudgetId(b.id);
+    setBudgetPriceTab("single");
     setIsBudgetDialogOpen(true);
   };
 
@@ -302,10 +358,13 @@ export default function Production() {
       toast.error("Selecione um fornecedor");
       return;
     }
-    const validItems = budgetForm.items.filter(
-      (i) => i.quantity > 0 && parseFloat(i.unitPrice) > 0
-    );
-    if (validItems.length === 0) {
+
+    const allItems = [
+      ...budgetForm.singleModelItems.filter((i) => i.quantity > 0 && parseFloat(i.unitPrice) > 0),
+      ...budgetForm.multiModelItems.filter((i) => i.quantity > 0 && parseFloat(i.unitPrice) > 0),
+    ];
+
+    if (allItems.length === 0) {
       toast.error("Adicione pelo menos um item de preço válido");
       return;
     }
@@ -315,10 +374,18 @@ export default function Production() {
       code: budgetForm.code || undefined,
       description: budgetForm.description,
       productSpec: budgetForm.productSpec || undefined,
+      material: budgetForm.material || undefined,
+      format: budgetForm.format || undefined,
+      productSize: budgetForm.productSize || undefined,
+      printType: budgetForm.printType || undefined,
+      colors: budgetForm.colors || undefined,
+      layoutType: budgetForm.layoutType || undefined,
+      paymentTerms: budgetForm.paymentTerms || undefined,
+      productionLeadDays: budgetForm.productionLeadDays || undefined,
       validUntil: budgetForm.validUntil || undefined,
       status: budgetForm.status,
       notes: budgetForm.notes || undefined,
-      items: validItems,
+      items: allItems,
     };
 
     if (editingBudgetId) {
@@ -328,58 +395,105 @@ export default function Production() {
     }
   };
 
-  const addPriceItem = () => {
-    const lastItem = budgetForm.items[budgetForm.items.length - 1];
-    const nextQty = lastItem ? lastItem.quantity + 1000 : 1000;
+  const loadGpcPresets = () => {
     setBudgetForm({
       ...budgetForm,
-      items: [
-        ...budgetForm.items,
-        { quantity: nextQty, unitPrice: "0.000", totalPrice: "0.00" },
-      ],
+      description: "Bolachas de Chopp Personalizadas",
+      material: "Papelão Liner Extra Absorvente 850g, 1.6mm - Super Resistentes",
+      format: "Redondo ou Quadrado com cantos arredondados",
+      productSize: "90mm diâmetro | 9x9cm",
+      printType: "Off-Set (frente e verso)",
+      colors: "4x4 (frente e verso)",
+      layoutType: "ambos",
+      paymentTerms: "Faturamento: 15 dias",
+      productionLeadDays: "12 a 15 dias úteis",
+      singleModelItems: GPC_PRESETS.singleModel,
+      multiModelItems: GPC_PRESETS.multiModel,
+    });
+    toast.success("Tabela GPC carregada!");
+  };
+
+  const addPriceItem = (type: "single" | "multi") => {
+    const key = type === "single" ? "singleModelItems" : "multiModelItems";
+    const items = budgetForm[key];
+    const lastItem = items[items.length - 1];
+
+    const newItem: PriceItem = type === "single"
+      ? {
+          quantity: lastItem ? lastItem.quantity + 1000 : 1000,
+          unitPrice: "0.000",
+          totalPrice: "0.00",
+          numModels: 1,
+          qtyPerModel: lastItem ? lastItem.quantity + 1000 : 1000,
+        }
+      : {
+          quantity: 10000,
+          unitPrice: "0.000",
+          totalPrice: "0.00",
+          numModels: 10,
+          qtyPerModel: 1000,
+        };
+
+    setBudgetForm({
+      ...budgetForm,
+      [key]: [...items, newItem],
     });
   };
 
-  const removePriceItem = (index: number) => {
-    if (budgetForm.items.length <= 1) return;
+  const removePriceItem = (type: "single" | "multi", index: number) => {
+    const key = type === "single" ? "singleModelItems" : "multiModelItems";
+    const items = budgetForm[key];
+    if (type === "single" && items.length <= 1) return;
     setBudgetForm({
       ...budgetForm,
-      items: budgetForm.items.filter((_, i) => i !== index),
+      [key]: items.filter((_, i) => i !== index),
     });
   };
 
   const updatePriceItem = (
+    type: "single" | "multi",
     index: number,
     field: keyof PriceItem,
     value: string | number
   ) => {
-    const newItems = [...budgetForm.items];
+    const key = type === "single" ? "singleModelItems" : "multiModelItems";
+    const newItems = [...budgetForm[key]];
     const item = { ...newItems[index] };
 
     if (field === "quantity") {
       item.quantity = typeof value === "number" ? value : parseInt(value) || 0;
-      // Auto-calc total
+      if (type === "single") {
+        item.qtyPerModel = item.quantity;
+      } else if (item.numModels > 0) {
+        item.qtyPerModel = Math.floor(item.quantity / item.numModels);
+      }
       const unitP = parseFloat(item.unitPrice) || 0;
       item.totalPrice = (item.quantity * unitP).toFixed(2);
     } else if (field === "unitPrice") {
       item.unitPrice = String(value);
-      // Auto-calc total
       const unitP = parseFloat(String(value)) || 0;
       item.totalPrice = (item.quantity * unitP).toFixed(2);
     } else if (field === "totalPrice") {
       item.totalPrice = String(value);
-      // Auto-calc unit price
       if (item.quantity > 0) {
         const totalP = parseFloat(String(value)) || 0;
-        item.unitPrice = (totalP / item.quantity).toFixed(3);
+        item.unitPrice = (totalP / item.quantity).toFixed(4);
+      }
+    } else if (field === "numModels") {
+      item.numModels = typeof value === "number" ? value : parseInt(value) || 1;
+      if (item.numModels > 0 && item.quantity > 0) {
+        item.qtyPerModel = Math.floor(item.quantity / item.numModels);
+      }
+    } else if (field === "qtyPerModel") {
+      item.qtyPerModel = typeof value === "number" ? value : parseInt(value) || 0;
+      if (item.qtyPerModel > 0) {
+        item.numModels = Math.floor(item.quantity / item.qtyPerModel);
       }
     }
 
     newItems[index] = item;
-    setBudgetForm({ ...budgetForm, items: newItems });
+    setBudgetForm({ ...budgetForm, [key]: newItems });
   };
-
-  // ─── Filtered lists ──────────────────────────────────────────────────────
 
   const filteredSuppliers = suppliersList.filter(
     (s) =>
@@ -395,22 +509,10 @@ export default function Production() {
       (b.supplierName && b.supplierName.toLowerCase().includes(search.toLowerCase()))
   );
 
-  // ─── View budget ─────────────────────────────────────────────────────────
-
   const viewBudget = budgetsList.find((b) => b.id === viewBudgetId);
-
-  // ─── Best price calculation ──────────────────────────────────────────────
-
-  const getBestPrice = (qty: number) => {
-    let bestUnit = Infinity;
-    let bestBudget = "";
-    for (const b of budgetsList) {
-      if (b.status !== "active") continue;
-      // We need to check items - but we only have list data
-      // For now, just show from view items if available
-    }
-    return null;
-  };
+  const viewSingleItems = viewItems.filter((i: any) => !i.numModels || i.numModels === 1);
+  const viewMultiItems = viewItems.filter((i: any) => i.numModels && i.numModels > 1);
+  const [viewPriceTab, setViewPriceTab] = useState("single");
 
   return (
     <PageContainer
@@ -428,14 +530,10 @@ export default function Production() {
         </div>
       }
     >
-
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-card border border-border/20 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                FORNECEDORES
-              </span>
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">FORNECEDORES</span>
               <Building2 className="w-4 h-4 text-primary/60" />
             </div>
             <p className="text-2xl font-bold font-mono">
@@ -445,9 +543,7 @@ export default function Production() {
           </div>
           <div className="bg-card border border-border/20 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                ORÇAMENTOS
-              </span>
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">ORÇAMENTOS</span>
               <FileText className="w-4 h-4 text-primary/60" />
             </div>
             <p className="text-2xl font-bold font-mono">
@@ -457,22 +553,15 @@ export default function Production() {
           </div>
           <div className="bg-card border border-border/20 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                MENOR CUSTO/UN
-              </span>
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">MENOR CUSTO/UN</span>
               <TrendingDown className="w-4 h-4 text-emerald-400/60" />
             </div>
-            <p className="text-2xl font-bold font-mono text-primary">
-              {/* We'd need items to calculate this - show placeholder */}
-              —
-            </p>
+            <p className="text-2xl font-bold font-mono text-primary">—</p>
             <p className="text-xs text-muted-foreground">melhor preço disponível</p>
           </div>
           <div className="bg-card border border-border/20 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                TOTAL ORÇAMENTOS
-              </span>
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">TOTAL ORÇAMENTOS</span>
               <Package className="w-4 h-4 text-primary/60" />
             </div>
             <p className="text-2xl font-bold font-mono">{budgetsList.length}</p>
@@ -480,7 +569,6 @@ export default function Production() {
           </div>
         </div>
 
-        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex items-center justify-between mb-4">
             <TabsList className="bg-card border border-border/20">
@@ -509,48 +597,30 @@ export default function Production() {
             </div>
           </div>
 
-          {/* ─── Budgets Tab ──────────────────────────────────────────────── */}
           <TabsContent value="budgets" className="mt-0">
             <div className="bg-card border border-border/20 rounded-xl overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border/20 hover:bg-transparent">
-                    <TableHead className="text-xs text-muted-foreground font-medium">
-                      CÓDIGO
-                    </TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium">
-                      DESCRIÇÃO
-                    </TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium hidden md:table-cell">
-                      FORNECEDOR
-                    </TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium text-center hidden lg:table-cell">
-                      VALIDADE
-                    </TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium text-center">
-                      STATUS
-                    </TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium text-right">
-                      AÇÕES
-                    </TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium">CÓDIGO</TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium">DESCRIÇÃO</TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium hidden md:table-cell">FORNECEDOR</TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium hidden lg:table-cell">MATERIAL</TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium text-center hidden lg:table-cell">VALIDADE</TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium text-center">STATUS</TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium text-right">AÇÕES</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {budgetsLoading ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="text-center py-8 text-muted-foreground"
-                      >
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Carregando...
                       </TableCell>
                     </TableRow>
                   ) : filteredBudgets.length === 0 ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="text-center py-8 text-muted-foreground"
-                      >
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         {search
                           ? "Nenhum orçamento encontrado"
                           : 'Nenhum orçamento cadastrado. Clique em "Novo Orçamento" para começar.'}
@@ -558,18 +628,15 @@ export default function Production() {
                     </TableRow>
                   ) : (
                     filteredBudgets.map((b) => (
-                      <TableRow
-                        key={b.id}
-                        className="border-border/20 hover:bg-card/80"
-                      >
+                      <TableRow key={b.id} className="border-border/20 hover:bg-card/80">
                         <TableCell className="font-mono text-sm text-primary">
                           {b.code || "—"}
                         </TableCell>
                         <TableCell>
                           <p className="font-medium text-sm">{b.description}</p>
-                          {b.productSpec && (
-                            <p className="text-xs text-muted-foreground/60 truncate max-w-xs">
-                              {b.productSpec}
+                          {b.format && (
+                            <p className="text-xs text-muted-foreground/60">
+                              {b.format} {b.colors ? `• ${b.colors}` : ""}
                             </p>
                           )}
                         </TableCell>
@@ -581,44 +648,28 @@ export default function Production() {
                             </span>
                           )}
                         </TableCell>
+                        <TableCell className="hidden lg:table-cell text-muted-foreground text-xs max-w-[200px] truncate">
+                          {b.material || "—"}
+                        </TableCell>
                         <TableCell className="text-center hidden lg:table-cell text-sm text-muted-foreground">
                           {b.validUntil
                             ? new Date(b.validUntil).toLocaleDateString("pt-BR")
                             : "—"}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge
-                            variant="outline"
-                            className={STATUS_COLORS[b.status] || ""}
-                          >
+                          <Badge variant="outline" className={STATUS_COLORS[b.status] || ""}>
                             {STATUS_LABELS[b.status] || b.status}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => setViewBudgetId(b.id)}
-                              title="Ver preços"
-                            >
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setViewBudgetId(b.id); setViewPriceTab("single"); }} title="Ver preços">
                               <Eye className="w-3.5 h-3.5" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleEditBudget(b)}
-                            >
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditBudget(b)}>
                               <Pencil className="w-3.5 h-3.5" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteBudgetTarget(b.id)}
-                            >
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteBudgetTarget(b.id)}>
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </div>
@@ -631,104 +682,51 @@ export default function Production() {
             </div>
           </TabsContent>
 
-          {/* ─── Suppliers Tab ────────────────────────────────────────────── */}
           <TabsContent value="suppliers" className="mt-0">
             <div className="bg-card border border-border/20 rounded-xl overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border/20 hover:bg-transparent">
-                    <TableHead className="text-xs text-muted-foreground font-medium">
-                      FORNECEDOR
-                    </TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium hidden md:table-cell">
-                      CNPJ
-                    </TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium hidden lg:table-cell">
-                      CONTATO
-                    </TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium hidden md:table-cell">
-                      CIDADE/UF
-                    </TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium text-center">
-                      STATUS
-                    </TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium text-right">
-                      AÇÕES
-                    </TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium">FORNECEDOR</TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium hidden md:table-cell">CNPJ</TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium hidden lg:table-cell">CONTATO</TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium hidden md:table-cell">CIDADE/UF</TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium text-center">STATUS</TableHead>
+                    <TableHead className="text-xs text-muted-foreground font-medium text-right">AÇÕES</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {suppliersLoading ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="text-center py-8 text-muted-foreground"
-                      >
-                        Carregando...
-                      </TableCell>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
                     </TableRow>
                   ) : filteredSuppliers.length === 0 ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="text-center py-8 text-muted-foreground"
-                      >
-                        {search
-                          ? "Nenhum fornecedor encontrado"
-                          : 'Nenhum fornecedor cadastrado. Clique em "Novo Fornecedor" para começar.'}
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        {search ? "Nenhum fornecedor encontrado" : 'Nenhum fornecedor cadastrado. Clique em "Novo Fornecedor" para começar.'}
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredSuppliers.map((s) => (
-                      <TableRow
-                        key={s.id}
-                        className="border-border/20 hover:bg-card/80"
-                      >
-                        <TableCell>
-                          <p className="font-medium">{s.name}</p>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell text-muted-foreground text-sm font-mono">
-                          {s.cnpj || "—"}
-                        </TableCell>
+                      <TableRow key={s.id} className="border-border/20 hover:bg-card/80">
+                        <TableCell><p className="font-medium">{s.name}</p></TableCell>
+                        <TableCell className="hidden md:table-cell text-muted-foreground text-sm font-mono">{s.cnpj || "—"}</TableCell>
                         <TableCell className="hidden lg:table-cell text-sm">
-                          <p className="text-muted-foreground">
-                            {s.contactName || "—"}
-                          </p>
-                          {s.contactPhone && (
-                            <p className="text-xs text-muted-foreground/60">
-                              {s.contactPhone}
-                            </p>
-                          )}
+                          <p className="text-muted-foreground">{s.contactName || "—"}</p>
+                          {s.contactPhone && <p className="text-xs text-muted-foreground/60">{s.contactPhone}</p>}
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                          {s.city && s.state
-                            ? `${s.city}/${s.state}`
-                            : s.city || s.state || "—"}
+                          {s.city && s.state ? `${s.city}/${s.state}` : s.city || s.state || "—"}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge
-                            variant="outline"
-                            className={STATUS_COLORS[s.status] || ""}
-                          >
-                            {STATUS_LABELS[s.status] || s.status}
-                          </Badge>
+                          <Badge variant="outline" className={STATUS_COLORS[s.status] || ""}>{STATUS_LABELS[s.status] || s.status}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleEditSupplier(s)}
-                            >
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditSupplier(s)}>
                               <Pencil className="w-3.5 h-3.5" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteSupplierTarget(s.id)}
-                            >
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteSupplierTarget(s.id)}>
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </div>
@@ -742,55 +740,26 @@ export default function Production() {
           </TabsContent>
         </Tabs>
 
-        {/* ─── Supplier Dialog ──────────────────────────────────────────────── */}
-        <Dialog
-          open={isSupplierDialogOpen}
-          onOpenChange={setIsSupplierDialogOpen}
-        >
+        {/* Supplier Dialog */}
+        <Dialog open={isSupplierDialogOpen} onOpenChange={setIsSupplierDialogOpen}>
           <DialogContent className="sm:max-w-lg bg-card border-border/30">
             <DialogHeader>
-              <DialogTitle>
-                {editingSupplierId ? "Editar Fornecedor" : "Novo Fornecedor"}
-              </DialogTitle>
+              <DialogTitle>{editingSupplierId ? "Editar Fornecedor" : "Novo Fornecedor"}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label>Nome *</Label>
-                <Input
-                  value={supplierForm.name}
-                  onChange={(e) =>
-                    setSupplierForm({ ...supplierForm, name: e.target.value })
-                  }
-                  placeholder="Ex: Graftech Techsound"
-                  className="bg-background border-border/30"
-                />
+                <Input value={supplierForm.name} onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })} placeholder="Ex: Porta Copos Personalizados" className="bg-background border-border/30" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>CNPJ</Label>
-                  <Input
-                    value={supplierForm.cnpj}
-                    onChange={(e) =>
-                      setSupplierForm({ ...supplierForm, cnpj: e.target.value })
-                    }
-                    placeholder="00.000.000/0001-00"
-                    className="bg-background border-border/30"
-                  />
+                  <Input value={supplierForm.cnpj} onChange={(e) => setSupplierForm({ ...supplierForm, cnpj: e.target.value })} placeholder="00.000.000/0001-00" className="bg-background border-border/30" />
                 </div>
                 <div className="grid gap-2">
                   <Label>Status</Label>
-                  <Select
-                    value={supplierForm.status}
-                    onValueChange={(v) =>
-                      setSupplierForm({
-                        ...supplierForm,
-                        status: v as "active" | "inactive",
-                      })
-                    }
-                  >
-                    <SelectTrigger className="bg-background border-border/30">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={supplierForm.status} onValueChange={(v) => setSupplierForm({ ...supplierForm, status: v as "active" | "inactive" })}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Ativo</SelectItem>
                       <SelectItem value="inactive">Inativo</SelectItem>
@@ -801,517 +770,522 @@ export default function Production() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>Contato</Label>
-                  <Input
-                    value={supplierForm.contactName}
-                    onChange={(e) =>
-                      setSupplierForm({
-                        ...supplierForm,
-                        contactName: e.target.value,
-                      })
-                    }
-                    placeholder="Nome do contato"
-                    className="bg-background border-border/30"
-                  />
+                  <Input value={supplierForm.contactName} onChange={(e) => setSupplierForm({ ...supplierForm, contactName: e.target.value })} placeholder="Nome do contato" className="bg-background border-border/30" />
                 </div>
                 <div className="grid gap-2">
                   <Label>Telefone</Label>
-                  <Input
-                    value={supplierForm.contactPhone}
-                    onChange={(e) =>
-                      setSupplierForm({
-                        ...supplierForm,
-                        contactPhone: e.target.value,
-                      })
-                    }
-                    placeholder="(92) 99999-9999"
-                    className="bg-background border-border/30"
-                  />
+                  <Input value={supplierForm.contactPhone} onChange={(e) => setSupplierForm({ ...supplierForm, contactPhone: e.target.value })} placeholder="(11) 99999-0000" className="bg-background border-border/30" />
                 </div>
               </div>
               <div className="grid gap-2">
                 <Label>E-mail</Label>
-                <Input
-                  value={supplierForm.contactEmail}
-                  onChange={(e) =>
-                    setSupplierForm({
-                      ...supplierForm,
-                      contactEmail: e.target.value,
-                    })
-                  }
-                  placeholder="contato@fornecedor.com.br"
-                  className="bg-background border-border/30"
-                />
+                <Input value={supplierForm.contactEmail} onChange={(e) => setSupplierForm({ ...supplierForm, contactEmail: e.target.value })} placeholder="contato@fornecedor.com.br" className="bg-background border-border/30" />
               </div>
-              <div className="grid gap-2">
-                <Label>Endereço</Label>
-                <Input
-                  value={supplierForm.address}
-                  onChange={(e) =>
-                    setSupplierForm({
-                      ...supplierForm,
-                      address: e.target.value,
-                    })
-                  }
-                  placeholder="Rua, número"
-                  className="bg-background border-border/30"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-2 col-span-1">
+                  <Label>Endereço</Label>
+                  <Input value={supplierForm.address} onChange={(e) => setSupplierForm({ ...supplierForm, address: e.target.value })} placeholder="Rua..." className="bg-background border-border/30" />
+                </div>
                 <div className="grid gap-2">
                   <Label>Cidade</Label>
-                  <Input
-                    value={supplierForm.city}
-                    onChange={(e) =>
-                      setSupplierForm({
-                        ...supplierForm,
-                        city: e.target.value,
-                      })
-                    }
-                    placeholder="Manaus"
-                    className="bg-background border-border/30"
-                  />
+                  <Input value={supplierForm.city} onChange={(e) => setSupplierForm({ ...supplierForm, city: e.target.value })} placeholder="São Paulo" className="bg-background border-border/30" />
                 </div>
                 <div className="grid gap-2">
                   <Label>UF</Label>
-                  <Select
-                    value={supplierForm.state || "none"}
-                    onValueChange={(v) =>
-                      setSupplierForm({
-                        ...supplierForm,
-                        state: v === "none" ? "" : v,
-                      })
-                    }
-                  >
-                    <SelectTrigger className="bg-background border-border/30">
-                      <SelectValue placeholder="UF" />
-                    </SelectTrigger>
+                  <Select value={supplierForm.state || "none"} onValueChange={(v) => setSupplierForm({ ...supplierForm, state: v === "none" ? "" : v })}>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue placeholder="UF" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Selecione</SelectItem>
-                      {STATES.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="none">—</SelectItem>
+                      {STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             </div>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsSupplierDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleSubmitSupplier}
-                disabled={
-                  createSupplierMut.isPending || updateSupplierMut.isPending
-                }
-              >
+              <Button variant="outline" onClick={() => setIsSupplierDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSubmitSupplier} disabled={createSupplierMut.isPending || updateSupplierMut.isPending}>
                 {editingSupplierId ? "Salvar" : "Criar"}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* ─── Budget Dialog ────────────────────────────────────────────────── */}
+        {/* Budget Dialog */}
         <Dialog open={isBudgetDialogOpen} onOpenChange={setIsBudgetDialogOpen}>
-          <DialogContent className="sm:max-w-2xl bg-card border-border/30 max-h-[85vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-4xl bg-card border-border/30 max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>
-                {editingBudgetId ? "Editar Orçamento" : "Novo Orçamento"}
-              </DialogTitle>
+              <div className="flex items-center justify-between">
+                <DialogTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-primary" />
+                  {editingBudgetId ? "Editar Orçamento" : "Novo Orçamento de Produção"}
+                </DialogTitle>
+                {!editingBudgetId && (
+                  <Button variant="outline" size="sm" onClick={loadGpcPresets} className="gap-1.5 text-xs">
+                    <Copy className="w-3 h-3" />
+                    Carregar Tabela GPC
+                  </Button>
+                )}
+              </div>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-6 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>Fornecedor *</Label>
                   <Select
-                    value={
-                      budgetForm.supplierId
-                        ? String(budgetForm.supplierId)
-                        : "none"
-                    }
-                    onValueChange={(v) =>
-                      setBudgetForm({
-                        ...budgetForm,
-                        supplierId: v === "none" ? null : parseInt(v),
-                      })
-                    }
+                    value={budgetForm.supplierId ? String(budgetForm.supplierId) : ""}
+                    onValueChange={(v) => setBudgetForm({ ...budgetForm, supplierId: parseInt(v) })}
                   >
-                    <SelectTrigger className="bg-background border-border/30">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
+                    <SelectTrigger className="bg-background border-border/30"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Selecione um fornecedor</SelectItem>
-                      {suppliersList
-                        .filter((s) => s.status === "active")
-                        .map((s) => (
-                          <SelectItem key={s.id} value={String(s.id)}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Código do Orçamento</Label>
-                  <Input
-                    value={budgetForm.code}
-                    onChange={(e) =>
-                      setBudgetForm({ ...budgetForm, code: e.target.value })
-                    }
-                    placeholder="Ex: 038075"
-                    className="bg-background border-border/30"
-                  />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label>Descrição do Produto *</Label>
-                <Input
-                  value={budgetForm.description}
-                  onChange={(e) =>
-                    setBudgetForm({
-                      ...budgetForm,
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="Ex: Bolacha Para Copo (TAM. 8,5X8,5CM)"
-                  className="bg-background border-border/30"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Especificações Técnicas</Label>
-                <Input
-                  value={budgetForm.productSpec}
-                  onChange={(e) =>
-                    setBudgetForm({
-                      ...budgetForm,
-                      productSpec: e.target.value,
-                    })
-                  }
-                  placeholder="Ex: 4x0 cores, Reciclado 240g, Laminação Fosca..."
-                  className="bg-background border-border/30"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Validade</Label>
-                  <Input
-                    type="date"
-                    value={budgetForm.validUntil}
-                    onChange={(e) =>
-                      setBudgetForm({
-                        ...budgetForm,
-                        validUntil: e.target.value,
-                      })
-                    }
-                    className="bg-background border-border/30"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Status</Label>
-                  <Select
-                    value={budgetForm.status}
-                    onValueChange={(v) =>
-                      setBudgetForm({
-                        ...budgetForm,
-                        status: v as BudgetForm["status"],
-                      })
-                    }
-                  >
-                    <SelectTrigger className="bg-background border-border/30">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Ativo</SelectItem>
-                      <SelectItem value="expired">Expirado</SelectItem>
-                      <SelectItem value="rejected">Rejeitado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Price Items Table */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-primary font-semibold">
-                    Tabela de Preços por Quantidade
-                  </Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addPriceItem}
-                    className="gap-1"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Adicionar Faixa
-                  </Button>
-                </div>
-                <div className="border border-border/20 rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-border/20 hover:bg-transparent">
-                        <TableHead className="text-xs font-medium">
-                          QUANTIDADE
-                        </TableHead>
-                        <TableHead className="text-xs font-medium text-right">
-                          PREÇO UNIT. (R$)
-                        </TableHead>
-                        <TableHead className="text-xs font-medium text-right">
-                          TOTAL (R$)
-                        </TableHead>
-                        <TableHead className="text-xs font-medium w-10"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {budgetForm.items.map((item, idx) => (
-                        <TableRow
-                          key={idx}
-                          className="border-border/20"
-                        >
-                          <TableCell>
-                            <Input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) =>
-                                updatePriceItem(
-                                  idx,
-                                  "quantity",
-                                  parseInt(e.target.value) || 0
-                                )
-                              }
-                              className="w-28 h-8 text-sm bg-background border-border/30 font-mono"
-                            />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Input
-                              type="number"
-                              step="0.001"
-                              value={item.unitPrice}
-                              onChange={(e) =>
-                                updatePriceItem(idx, "unitPrice", e.target.value)
-                              }
-                              className="w-28 h-8 text-sm bg-background border-border/30 font-mono ml-auto"
-                            />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={item.totalPrice}
-                              onChange={(e) =>
-                                updatePriceItem(idx, "totalPrice", e.target.value)
-                              }
-                              className="w-32 h-8 text-sm bg-background border-border/30 font-mono ml-auto"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {budgetForm.items.length > 1 && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive hover:text-destructive"
-                                onClick={() => removePriceItem(idx)}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
+                      {suppliersList.filter((s) => s.status === "active").map((s) => (
+                        <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Código / Proposta</Label>
+                  <Input value={budgetForm.code} onChange={(e) => setBudgetForm({ ...budgetForm, code: e.target.value })} placeholder="Ex: 279/2026" className="bg-background border-border/30" />
                 </div>
               </div>
 
               <div className="grid gap-2">
-                <Label>Observações</Label>
-                <Input
-                  value={budgetForm.notes}
-                  onChange={(e) =>
-                    setBudgetForm({ ...budgetForm, notes: e.target.value })
-                  }
-                  placeholder="Notas adicionais..."
-                  className="bg-background border-border/30"
-                />
+                <Label>Descrição *</Label>
+                <Input value={budgetForm.description} onChange={(e) => setBudgetForm({ ...budgetForm, description: e.target.value })} placeholder="Ex: Bolachas de Chopp Personalizadas" className="bg-background border-border/30" />
+              </div>
+
+              <div className="border border-primary/20 rounded-lg p-4 space-y-4">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <Factory className="w-4 h-4" />
+                  Especificação Técnica
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <Layers className="w-3 h-3 text-muted-foreground" />
+                      Material
+                    </Label>
+                    <Input value={budgetForm.material} onChange={(e) => setBudgetForm({ ...budgetForm, material: e.target.value })} placeholder="Papelão Liner Extra Absorvente 850g, 1.6mm" className="bg-background border-border/30 text-sm" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <Ruler className="w-3 h-3 text-muted-foreground" />
+                      Formato
+                    </Label>
+                    <Select value={budgetForm.format || "custom"} onValueChange={(v) => setBudgetForm({ ...budgetForm, format: v === "custom" ? "" : v })}>
+                      <SelectTrigger className="bg-background border-border/30 text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Redondo">Redondo</SelectItem>
+                        <SelectItem value="Quadrado com cantos arredondados">Quadrado com cantos arredondados</SelectItem>
+                        <SelectItem value="Redondo ou Quadrado com cantos arredondados">Redondo ou Quadrado</SelectItem>
+                        <SelectItem value="custom">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="grid gap-2">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <Ruler className="w-3 h-3 text-muted-foreground" />
+                      Tamanho
+                    </Label>
+                    <Input value={budgetForm.productSize} onChange={(e) => setBudgetForm({ ...budgetForm, productSize: e.target.value })} placeholder="90mm diâmetro | 9x9cm" className="bg-background border-border/30 text-sm" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <Printer className="w-3 h-3 text-muted-foreground" />
+                      Impressão
+                    </Label>
+                    <Select value={budgetForm.printType || "custom"} onValueChange={(v) => setBudgetForm({ ...budgetForm, printType: v === "custom" ? "" : v })}>
+                      <SelectTrigger className="bg-background border-border/30 text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Off-Set (frente e verso)">Off-Set (frente e verso)</SelectItem>
+                        <SelectItem value="Off-Set (frente)">Off-Set (frente)</SelectItem>
+                        <SelectItem value="Digital (frente e verso)">Digital (frente e verso)</SelectItem>
+                        <SelectItem value="Digital (frente)">Digital (frente)</SelectItem>
+                        <SelectItem value="custom">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <Palette className="w-3 h-3 text-muted-foreground" />
+                      Cores
+                    </Label>
+                    <Select value={budgetForm.colors || "custom"} onValueChange={(v) => setBudgetForm({ ...budgetForm, colors: v === "custom" ? "" : v })}>
+                      <SelectTrigger className="bg-background border-border/30 text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="4x4 (frente e verso)">4x4 (frente e verso)</SelectItem>
+                        <SelectItem value="4x1">4x1</SelectItem>
+                        <SelectItem value="4x0">4x0</SelectItem>
+                        <SelectItem value="1x1">1x1</SelectItem>
+                        <SelectItem value="custom">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label className="text-xs">Layout</Label>
+                    <Select value={budgetForm.layoutType} onValueChange={(v) => setBudgetForm({ ...budgetForm, layoutType: v })}>
+                      <SelectTrigger className="bg-background border-border/30 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unico">1 face fixa + 1 personalizada</SelectItem>
+                        <SelectItem value="ambas">2 faces personalizadas</SelectItem>
+                        <SelectItem value="fixa">2 faces fixas</SelectItem>
+                        <SelectItem value="ambos">Modelo único + Múltiplos modelos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-xs">Especificação adicional</Label>
+                    <Input value={budgetForm.productSpec} onChange={(e) => setBudgetForm({ ...budgetForm, productSpec: e.target.value })} placeholder="Duram até 5X mais, etc." className="bg-background border-border/30 text-sm" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-border/20 rounded-lg p-4 space-y-4">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <CreditCard className="w-4 h-4" />
+                  Condições Comerciais
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="grid gap-2">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <CreditCard className="w-3 h-3 text-muted-foreground" />
+                      Pagamento
+                    </Label>
+                    <Input value={budgetForm.paymentTerms} onChange={(e) => setBudgetForm({ ...budgetForm, paymentTerms: e.target.value })} placeholder="Faturamento: 15 dias" className="bg-background border-border/30 text-sm" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <Clock className="w-3 h-3 text-muted-foreground" />
+                      Prazo de Produção
+                    </Label>
+                    <Input value={budgetForm.productionLeadDays} onChange={(e) => setBudgetForm({ ...budgetForm, productionLeadDays: e.target.value })} placeholder="12 a 15 dias úteis" className="bg-background border-border/30 text-sm" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-xs">Validade da Proposta</Label>
+                    <Input type="date" value={budgetForm.validUntil} onChange={(e) => setBudgetForm({ ...budgetForm, validUntil: e.target.value })} className="bg-background border-border/30 text-sm" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label className="text-xs">Status</Label>
+                    <Select value={budgetForm.status} onValueChange={(v) => setBudgetForm({ ...budgetForm, status: v as BudgetForm["status"] })}>
+                      <SelectTrigger className="bg-background border-border/30 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Ativo</SelectItem>
+                        <SelectItem value="expired">Expirado</SelectItem>
+                        <SelectItem value="rejected">Rejeitado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-xs">Observações</Label>
+                    <Input value={budgetForm.notes} onChange={(e) => setBudgetForm({ ...budgetForm, notes: e.target.value })} placeholder="Notas adicionais..." className="bg-background border-border/30 text-sm" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Tabs value={budgetPriceTab} onValueChange={setBudgetPriceTab}>
+                  <div className="flex items-center justify-between">
+                    <TabsList className="bg-background border border-border/20">
+                      <TabsTrigger value="single" className="gap-1.5 text-xs">
+                        Modelo Único
+                      </TabsTrigger>
+                      <TabsTrigger value="multi" className="gap-1.5 text-xs">
+                        Múltiplos Modelos
+                      </TabsTrigger>
+                    </TabsList>
+                    <Button type="button" variant="outline" size="sm" onClick={() => addPriceItem(budgetPriceTab as "single" | "multi")} className="gap-1 text-xs">
+                      <Plus className="w-3 h-3" />
+                      Adicionar Faixa
+                    </Button>
+                  </div>
+
+                  <TabsContent value="single" className="mt-3">
+                    <div className="border border-border/20 rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-border/20 hover:bg-transparent">
+                            <TableHead className="text-xs font-medium">QUANTIDADE</TableHead>
+                            <TableHead className="text-xs font-medium text-right">PREÇO UNIT. (R$)</TableHead>
+                            <TableHead className="text-xs font-medium text-right">TOTAL (R$)</TableHead>
+                            <TableHead className="text-xs font-medium text-right">CUSTO/1000</TableHead>
+                            <TableHead className="text-xs font-medium w-10"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {budgetForm.singleModelItems.map((item, idx) => (
+                            <TableRow key={idx} className="border-border/20">
+                              <TableCell>
+                                <Input type="number" value={item.quantity} onChange={(e) => updatePriceItem("single", idx, "quantity", parseInt(e.target.value) || 0)} className="w-24 h-8 text-sm bg-background border-border/30 font-mono" />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Input type="number" step="0.001" value={item.unitPrice} onChange={(e) => updatePriceItem("single", idx, "unitPrice", e.target.value)} className="w-28 h-8 text-sm bg-background border-border/30 font-mono ml-auto" />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Input type="number" step="0.01" value={item.totalPrice} onChange={(e) => updatePriceItem("single", idx, "totalPrice", e.target.value)} className="w-32 h-8 text-sm bg-background border-border/30 font-mono ml-auto" />
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                                R$ {((parseFloat(item.unitPrice) || 0) * 1000).toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                {budgetForm.singleModelItems.length > 1 && (
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removePriceItem("single", idx)}>
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="multi" className="mt-3">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Para pedidos com múltiplos modelos (artes diferentes). O preço unitário depende da quantidade por modelo.
+                    </p>
+                    <div className="border border-border/20 rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-border/20 hover:bg-transparent">
+                            <TableHead className="text-xs font-medium">QTD TOTAL</TableHead>
+                            <TableHead className="text-xs font-medium text-center">Nº MODELOS</TableHead>
+                            <TableHead className="text-xs font-medium text-center">QTD/MODELO</TableHead>
+                            <TableHead className="text-xs font-medium text-right">PREÇO UNIT.</TableHead>
+                            <TableHead className="text-xs font-medium text-right">TOTAL (R$)</TableHead>
+                            <TableHead className="text-xs font-medium w-10"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {budgetForm.multiModelItems.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center py-4 text-muted-foreground text-sm">
+                                Nenhuma faixa de múltiplos modelos. Clique em "Adicionar Faixa".
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            budgetForm.multiModelItems.map((item, idx) => (
+                              <TableRow key={idx} className="border-border/20">
+                                <TableCell>
+                                  <Input type="number" value={item.quantity} onChange={(e) => updatePriceItem("multi", idx, "quantity", parseInt(e.target.value) || 0)} className="w-24 h-8 text-sm bg-background border-border/30 font-mono" />
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Input type="number" value={item.numModels} onChange={(e) => updatePriceItem("multi", idx, "numModels", parseInt(e.target.value) || 1)} className="w-20 h-8 text-sm bg-background border-border/30 font-mono mx-auto" />
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Input type="number" value={item.qtyPerModel} onChange={(e) => updatePriceItem("multi", idx, "qtyPerModel", parseInt(e.target.value) || 0)} className="w-24 h-8 text-sm bg-background border-border/30 font-mono mx-auto" />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Input type="number" step="0.001" value={item.unitPrice} onChange={(e) => updatePriceItem("multi", idx, "unitPrice", e.target.value)} className="w-28 h-8 text-sm bg-background border-border/30 font-mono ml-auto" />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Input type="number" step="0.01" value={item.totalPrice} onChange={(e) => updatePriceItem("multi", idx, "totalPrice", e.target.value)} className="w-32 h-8 text-sm bg-background border-border/30 font-mono ml-auto" />
+                                </TableCell>
+                                <TableCell>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removePriceItem("multi", idx)}>
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             </div>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsBudgetDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleSubmitBudget}
-                disabled={
-                  createBudgetMut.isPending || updateBudgetMut.isPending
-                }
-              >
+              <Button variant="outline" onClick={() => setIsBudgetDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSubmitBudget} disabled={createBudgetMut.isPending || updateBudgetMut.isPending}>
                 {editingBudgetId ? "Salvar" : "Criar"}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* ─── View Budget Items Dialog ─────────────────────────────────────── */}
-        <Dialog
-          open={viewBudgetId !== null}
-          onOpenChange={() => setViewBudgetId(null)}
-        >
-          <DialogContent className="sm:max-w-xl bg-card border-border/30">
+        {/* View Budget Items Dialog */}
+        <Dialog open={viewBudgetId !== null} onOpenChange={() => setViewBudgetId(null)}>
+          <DialogContent className="sm:max-w-2xl bg-card border-border/30">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-primary" />
-                Tabela de Preços
+                Detalhes do Orçamento
               </DialogTitle>
             </DialogHeader>
             {viewBudget && (
               <div className="space-y-4">
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
                   <p className="font-medium text-sm">{viewBudget.description}</p>
-                  {viewBudget.productSpec && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {viewBudget.productSpec}
-                    </p>
-                  )}
                   <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                    <span>
-                      Fornecedor: <strong>{viewBudget.supplierName}</strong>
-                    </span>
-                    {viewBudget.code && (
-                      <span>
-                        Código: <strong>{viewBudget.code}</strong>
-                      </span>
-                    )}
+                    <span>Fornecedor: <strong>{viewBudget.supplierName}</strong></span>
+                    {viewBudget.code && <span>Proposta: <strong>{viewBudget.code}</strong></span>}
                   </div>
                 </div>
-                <div className="border border-border/20 rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-border/20 hover:bg-transparent">
-                        <TableHead className="text-xs font-medium">
-                          QUANTIDADE
-                        </TableHead>
-                        <TableHead className="text-xs font-medium text-right">
-                          PREÇO UNITÁRIO
-                        </TableHead>
-                        <TableHead className="text-xs font-medium text-right">
-                          VALOR TOTAL
-                        </TableHead>
-                        <TableHead className="text-xs font-medium text-right">
-                          CUSTO/1000
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {viewItems.length === 0 ? (
-                        <TableRow>
-                          <TableCell
-                            colSpan={4}
-                            className="text-center py-4 text-muted-foreground"
-                          >
-                            Nenhum item de preço cadastrado
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        viewItems.map((item) => (
-                          <TableRow
-                            key={item.id}
-                            className="border-border/20"
-                          >
-                            <TableCell className="font-mono font-medium">
-                              {item.quantity.toLocaleString("pt-BR")}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-primary">
-                              R$ {parseFloat(String(item.unitPrice)).toFixed(3)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              R${" "}
-                              {parseFloat(String(item.totalPrice)).toLocaleString(
-                                "pt-BR",
-                                { minimumFractionDigits: 2 }
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-muted-foreground">
-                              R${" "}
-                              {(
-                                (parseFloat(String(item.unitPrice)) * 1000)
-                              ).toLocaleString("pt-BR", {
-                                minimumFractionDigits: 2,
-                              })}
-                            </TableCell>
-                          </TableRow>
-                        ))
+
+                {(viewBudget.material || viewBudget.format || viewBudget.printType) && (
+                  <div className="bg-background/50 border border-border/20 rounded-lg p-4">
+                    <h4 className="text-xs font-semibold text-primary mb-2 uppercase tracking-wider">Especificação Técnica</h4>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                      {viewBudget.material && (
+                        <div className="flex gap-2"><span className="text-muted-foreground">Material:</span><span>{viewBudget.material}</span></div>
                       )}
-                    </TableBody>
-                  </Table>
-                </div>
+                      {viewBudget.format && (
+                        <div className="flex gap-2"><span className="text-muted-foreground">Formato:</span><span>{viewBudget.format}</span></div>
+                      )}
+                      {viewBudget.productSize && (
+                        <div className="flex gap-2"><span className="text-muted-foreground">Tamanho:</span><span>{viewBudget.productSize}</span></div>
+                      )}
+                      {viewBudget.printType && (
+                        <div className="flex gap-2"><span className="text-muted-foreground">Impressão:</span><span>{viewBudget.printType}</span></div>
+                      )}
+                      {viewBudget.colors && (
+                        <div className="flex gap-2"><span className="text-muted-foreground">Cores:</span><span>{viewBudget.colors}</span></div>
+                      )}
+                      {viewBudget.layoutType && (
+                        <div className="flex gap-2"><span className="text-muted-foreground">Layout:</span><span>{viewBudget.layoutType}</span></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {(viewBudget.paymentTerms || viewBudget.productionLeadDays) && (
+                  <div className="flex gap-4 text-sm">
+                    {viewBudget.paymentTerms && (
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">Pagamento:</span>
+                        <span>{viewBudget.paymentTerms}</span>
+                      </div>
+                    )}
+                    {viewBudget.productionLeadDays && (
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">Prazo:</span>
+                        <span>{viewBudget.productionLeadDays}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <Tabs value={viewPriceTab} onValueChange={setViewPriceTab}>
+                  <TabsList className="bg-background border border-border/20">
+                    <TabsTrigger value="single" className="text-xs gap-1.5">
+                      Modelo Único
+                      <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">{viewSingleItems.length}</Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="multi" className="text-xs gap-1.5">
+                      Múltiplos Modelos
+                      <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">{viewMultiItems.length}</Badge>
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="single" className="mt-3">
+                    <div className="border border-border/20 rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-border/20 hover:bg-transparent">
+                            <TableHead className="text-xs font-medium">QUANTIDADE</TableHead>
+                            <TableHead className="text-xs font-medium text-right">PREÇO UNITÁRIO</TableHead>
+                            <TableHead className="text-xs font-medium text-right">VALOR TOTAL</TableHead>
+                            <TableHead className="text-xs font-medium text-right">CUSTO/1000</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {viewSingleItems.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">Nenhum item</TableCell>
+                            </TableRow>
+                          ) : (
+                            viewSingleItems.map((item: any) => (
+                              <TableRow key={item.id} className="border-border/20">
+                                <TableCell className="font-mono font-medium">{item.quantity.toLocaleString("pt-BR")}</TableCell>
+                                <TableCell className="text-right font-mono text-primary">R$ {parseFloat(String(item.unitPrice)).toFixed(4)}</TableCell>
+                                <TableCell className="text-right font-mono">R$ {parseFloat(String(item.totalPrice)).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
+                                <TableCell className="text-right font-mono text-muted-foreground">R$ {(parseFloat(String(item.unitPrice)) * 1000).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="multi" className="mt-3">
+                    <div className="border border-border/20 rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-border/20 hover:bg-transparent">
+                            <TableHead className="text-xs font-medium">QTD TOTAL</TableHead>
+                            <TableHead className="text-xs font-medium text-center">Nº MODELOS</TableHead>
+                            <TableHead className="text-xs font-medium text-center">QTD/MODELO</TableHead>
+                            <TableHead className="text-xs font-medium text-right">PREÇO UNIT.</TableHead>
+                            <TableHead className="text-xs font-medium text-right">VALOR TOTAL</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {viewMultiItems.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">Nenhum item</TableCell>
+                            </TableRow>
+                          ) : (
+                            viewMultiItems.map((item: any) => (
+                              <TableRow key={item.id} className="border-border/20">
+                                <TableCell className="font-mono font-medium">{item.quantity.toLocaleString("pt-BR")}</TableCell>
+                                <TableCell className="text-center font-mono">{item.numModels}</TableCell>
+                                <TableCell className="text-center font-mono">{(item.qtyPerModel || 0).toLocaleString("pt-BR")}</TableCell>
+                                <TableCell className="text-right font-mono text-primary">R$ {parseFloat(String(item.unitPrice)).toFixed(4)}</TableCell>
+                                <TableCell className="text-right font-mono">R$ {parseFloat(String(item.totalPrice)).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             )}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setViewBudgetId(null)}>
-                Fechar
-              </Button>
+              <Button variant="outline" onClick={() => setViewBudgetId(null)}>Fechar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* ─── Delete Supplier Confirmation ──────────────────────────────────── */}
-        <AlertDialog
-          open={deleteSupplierTarget !== null}
-          onOpenChange={() => setDeleteSupplierTarget(null)}
-        >
+        {/* Delete Supplier Confirmation */}
+        <AlertDialog open={deleteSupplierTarget !== null} onOpenChange={() => setDeleteSupplierTarget(null)}>
           <AlertDialogContent className="bg-card border-border/30">
             <AlertDialogHeader>
               <AlertDialogTitle>Remover fornecedor?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta ação não pode ser desfeita. O fornecedor e todos os seus
-                orçamentos serão removidos.
-              </AlertDialogDescription>
+              <AlertDialogDescription>Esta ação não pode ser desfeita. O fornecedor e todos os seus orçamentos serão removidos.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() =>
-                  deleteSupplierTarget &&
-                  deleteSupplierMut.mutate({ id: deleteSupplierTarget })
-                }
-              >
+              <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteSupplierTarget && deleteSupplierMut.mutate({ id: deleteSupplierTarget })}>
                 Remover
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* ─── Delete Budget Confirmation ────────────────────────────────────── */}
-        <AlertDialog
-          open={deleteBudgetTarget !== null}
-          onOpenChange={() => setDeleteBudgetTarget(null)}
-        >
+        {/* Delete Budget Confirmation */}
+        <AlertDialog open={deleteBudgetTarget !== null} onOpenChange={() => setDeleteBudgetTarget(null)}>
           <AlertDialogContent className="bg-card border-border/30">
             <AlertDialogHeader>
               <AlertDialogTitle>Remover orçamento?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta ação não pode ser desfeita. O orçamento e todos os seus
-                itens de preço serão removidos.
-              </AlertDialogDescription>
+              <AlertDialogDescription>Esta ação não pode ser desfeita. O orçamento e todos os seus itens de preço serão removidos.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() =>
-                  deleteBudgetTarget &&
-                  deleteBudgetMut.mutate({ id: deleteBudgetTarget })
-                }
-              >
+              <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteBudgetTarget && deleteBudgetMut.mutate({ id: deleteBudgetTarget })}>
                 Remover
               </AlertDialogAction>
             </AlertDialogFooter>

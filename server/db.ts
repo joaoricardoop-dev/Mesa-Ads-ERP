@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, or, gte, lte, sql, desc, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import ws from "ws";
 import { Pool, neonConfig } from "@neondatabase/serverless";
@@ -489,6 +489,14 @@ export async function listBudgets() {
       code: budgets.code,
       description: budgets.description,
       productSpec: budgets.productSpec,
+      material: budgets.material,
+      format: budgets.format,
+      productSize: budgets.productSize,
+      printType: budgets.printType,
+      colors: budgets.colors,
+      layoutType: budgets.layoutType,
+      paymentTerms: budgets.paymentTerms,
+      productionLeadDays: budgets.productionLeadDays,
       validUntil: budgets.validUntil,
       status: budgets.status,
       notes: budgets.notes,
@@ -506,7 +514,7 @@ export async function listBudgets() {
 
 export async function createBudget(
   data: Omit<InsertBudget, "id" | "createdAt" | "updatedAt">,
-  items: Array<{ quantity: number; unitPrice: string; totalPrice: string }>
+  items: Array<{ quantity: number; unitPrice: string; totalPrice: string; numModels?: number; qtyPerModel?: number }>
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -520,6 +528,8 @@ export async function createBudget(
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         totalPrice: item.totalPrice,
+        numModels: item.numModels ?? 1,
+        qtyPerModel: item.qtyPerModel ?? item.quantity,
       }))
     );
   }
@@ -530,7 +540,7 @@ export async function createBudget(
 export async function updateBudget(
   id: number,
   data: Partial<InsertBudget>,
-  items?: Array<{ quantity: number; unitPrice: string; totalPrice: string }>
+  items?: Array<{ quantity: number; unitPrice: string; totalPrice: string; numModels?: number; qtyPerModel?: number }>
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -545,6 +555,8 @@ export async function updateBudget(
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           totalPrice: item.totalPrice,
+          numModels: item.numModels ?? 1,
+          qtyPerModel: item.qtyPerModel ?? item.quantity,
         }))
       );
     }
@@ -606,7 +618,12 @@ export async function listActiveBudgetsWithItems() {
         totalPrice: budgetItems.totalPrice,
       })
       .from(budgetItems)
-      .where(eq(budgetItems.budgetId, b.id))
+      .where(
+        and(
+          eq(budgetItems.budgetId, b.id),
+          or(eq(budgetItems.numModels, 1), isNull(budgetItems.numModels))
+        )
+      )
       .orderBy(budgetItems.quantity);
 
     result.push({

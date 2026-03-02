@@ -173,8 +173,9 @@ function interpolateUnitCost(
     const lower = sorted[i];
     const upper = sorted[i + 1];
     if (quantity >= lower.quantity && quantity <= upper.quantity) {
-      const ratio =
-        (quantity - lower.quantity) / (upper.quantity - lower.quantity);
+      const denom = upper.quantity - lower.quantity;
+      if (denom === 0) return parseFloat(lower.unitPrice);
+      const ratio = (quantity - lower.quantity) / denom;
       const lowerPrice = parseFloat(lower.unitPrice);
       const upperPrice = parseFloat(upper.unitPrice);
       return lowerPrice + (upperPrice - lowerPrice) * ratio;
