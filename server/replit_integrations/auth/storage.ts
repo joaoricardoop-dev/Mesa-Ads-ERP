@@ -1,6 +1,6 @@
 import { users, type User, type UpsertUser } from "@shared/models/auth";
 import { getDb } from "../../db";
-import { eq } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -21,6 +21,14 @@ class AuthStorage implements IAuthStorage {
   async upsertUser(userData: UpsertUser): Promise<User> {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
+    if (!userData.id) throw new Error("User ID is required for upsert");
+
+    if (userData.email) {
+      await db.delete(users).where(
+        and(eq(users.email, userData.email), ne(users.id, userData.id as string))
+      );
+    }
+
     const [user] = await db
       .insert(users)
       .values(userData)

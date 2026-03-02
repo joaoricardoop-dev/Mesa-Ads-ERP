@@ -23,11 +23,12 @@ export function useAuth() {
   const { user: clerkUser } = useUser();
   const { signOut } = useClerk();
 
-  const { data: dbUser, isLoading: isDbLoading } = useQuery<User | null>({
+  const { data: dbUser, isLoading: isDbLoading, isError: isDbError } = useQuery<User | null>({
     queryKey: ["/api/auth/user", clerkUser?.id],
     queryFn: fetchDbUser,
     enabled: isLoaded && isSignedIn,
-    retry: false,
+    retry: 3,
+    retryDelay: 1000,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -37,6 +38,7 @@ export function useAuth() {
     user,
     isLoading: !isLoaded || (isSignedIn && isDbLoading),
     isAuthenticated: isLoaded && isSignedIn && !!user,
+    isAuthError: isLoaded && isSignedIn && isDbError && !user,
     logout: () => signOut(),
     isLoggingOut: false,
     clerkUser,

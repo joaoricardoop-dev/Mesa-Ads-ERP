@@ -143,10 +143,10 @@ export default function Members() {
   });
 
   const toggleActiveMutation = trpc.members.toggleActive.useMutation({
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       utils.members.list.invalidate();
       setConfirmAction(null);
-      toast.success("Status do membro atualizado!");
+      toast.success(variables.isActive ? "Membro desbanido com sucesso!" : "Membro banido com sucesso!");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
@@ -216,7 +216,7 @@ export default function Members() {
           <div className="bg-card border border-border/30 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-1">
               <UserX className="w-4 h-4 text-red-400" />
-              <p className="text-xs text-muted-foreground">Inativos</p>
+              <p className="text-xs text-muted-foreground">Banidos</p>
             </div>
             <p className="text-2xl font-bold font-mono text-red-400">{inactiveCount}</p>
           </div>
@@ -352,7 +352,7 @@ export default function Members() {
                         </span>
                       ) : (
                         <span className="flex items-center gap-1">
-                          <UserX className="w-3.5 h-3.5" /> Inativo
+                          <UserX className="w-3.5 h-3.5" /> Banido
                         </span>
                       )}
                     </Button>
@@ -484,13 +484,13 @@ export default function Members() {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirmAction?.action === "deactivate"
-                ? "Desativar membro?"
-                : "Reativar membro?"}
+                ? "Banir membro?"
+                : "Desbanir membro?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmAction?.action === "deactivate"
-                ? `${confirmAction.userName} não poderá mais acessar a plataforma.`
-                : `${confirmAction?.userName} terá o acesso restaurado à plataforma.`}
+                ? `${confirmAction.userName} será banido e não poderá mais acessar a plataforma.`
+                : `${confirmAction?.userName} será desbanido e terá o acesso restaurado.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -510,7 +510,7 @@ export default function Members() {
                 }
               }}
             >
-              {confirmAction?.action === "deactivate" ? "Desativar" : "Reativar"}
+              {confirmAction?.action === "deactivate" ? "Banir" : "Desbanir"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
