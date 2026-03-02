@@ -104,9 +104,8 @@ function EmailLoginModal({ open, onClose }: { open: boolean; onClose: () => void
             <X className="w-5 h-5" />
           </button>
 
-          <div className="flex items-baseline gap-1.5 mb-6">
-            <span className="font-display-landing text-xl font-extrabold" style={{ color: "hsl(0 0% 95%)" }}>Mesa</span>
-            <span className="bg-brand text-white font-display-landing font-bold text-xs px-1.5 py-0.5 rounded">Ads</span>
+          <div className="mb-6">
+            <img src="/logo-white.png" alt="mesa.ads" className="h-7" />
           </div>
 
           <h3 className="text-lg font-bold mb-1" style={{ color: "hsl(0 0% 95%)" }}>Entrar com e-mail</h3>
@@ -121,7 +120,7 @@ function EmailLoginModal({ open, onClose }: { open: boolean; onClose: () => void
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-10 pl-10 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[hsl(22,100%,50%)]"
+                  className="w-full h-10 pl-10 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#27d803]"
                   style={{ background: "hsl(0 0% 11%)", border: "1px solid hsl(0 0% 18%)", color: "hsl(0 0% 95%)" }}
                   placeholder="seu@email.com"
                   autoFocus
@@ -136,7 +135,7 @@ function EmailLoginModal({ open, onClose }: { open: boolean; onClose: () => void
                   type={showPw ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-10 pl-10 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[hsl(22,100%,50%)]"
+                  className="w-full h-10 pl-10 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#27d803]"
                   style={{ background: "hsl(0 0% 11%)", border: "1px solid hsl(0 0% 18%)", color: "hsl(0 0% 95%)" }}
                   placeholder="Sua senha"
                 />
@@ -151,7 +150,7 @@ function EmailLoginModal({ open, onClose }: { open: boolean; onClose: () => void
             <button
               type="submit"
               disabled={loading || !email || !password}
-              className="w-full h-10 bg-brand text-white font-semibold rounded-lg text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-10 bg-brand text-black font-semibold rounded-lg text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Entrando..." : "Entrar"}
             </button>
@@ -197,11 +196,8 @@ function Hero() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.3 }}
       >
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-display-landing text-2xl font-extrabold" style={{ color: "hsl(0 0% 95%)" }}>Mesa</span>
-          <span className="bg-brand text-white font-display-landing font-bold text-sm px-2 py-0.5 rounded-md">
-            Ads
-          </span>
+        <div>
+          <img src="/logo-white.png" alt="mesa.ads" className="h-8" />
         </div>
         <a
           href="#contato"
@@ -248,7 +244,7 @@ function Hero() {
             href="#ideia"
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
-            className="bg-brand px-8 py-3.5 rounded-xl font-display-landing font-bold text-white glow transition-all"
+            className="bg-brand px-8 py-3.5 rounded-xl font-display-landing font-bold text-black glow transition-all"
           >
             Saiba mais
           </motion.a>
@@ -312,7 +308,7 @@ function Idea() {
                   </span>
                 </div>
               </motion.div>
-              <div className="absolute inset-0 -z-10 rounded-full blur-3xl scale-110" style={{ background: "hsl(22 100% 50% / 0.1)" }} />
+              <div className="absolute inset-0 -z-10 rounded-full blur-3xl scale-110" style={{ background: "rgba(39, 216, 3, 0.1)" }} />
             </div>
 
             <div className="text-center md:text-left max-w-md">
@@ -335,7 +331,7 @@ function Idea() {
           ].map((item, i) => (
             <Reveal key={item.label} delay={0.1 + i * 0.1}>
               <div className="card-glass p-8 h-full transition-colors duration-300" style={{ cursor: "default" }}>
-                <span className="font-display-landing font-extrabold text-sm tracking-wider" style={{ color: "hsl(22 100% 50%)" }}>
+                <span className="font-display-landing font-extrabold text-sm tracking-wider" style={{ color: "#27d803" }}>
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <h3 className="font-display-landing font-bold text-xl mt-3 mb-2" style={{ color: "hsl(0 0% 95%)" }}>{item.label}</h3>
@@ -372,7 +368,7 @@ function Problem() {
           {items.map((item, i) => (
             <Reveal key={i} delay={i * 0.08}>
               <div className="card-glass p-8 h-full group transition-colors duration-300">
-                <item.icon className="w-8 h-8 mb-5 opacity-80 group-hover:opacity-100 transition-opacity" style={{ color: "hsl(22 100% 50%)" }} />
+                <item.icon className="w-8 h-8 mb-5 opacity-80 group-hover:opacity-100 transition-opacity" style={{ color: "#27d803" }} />
                 <h3 className="font-display-landing font-bold text-xl mb-2" style={{ color: "hsl(0 0% 95%)" }}>{item.title}</h3>
                 <p className="text-sm leading-relaxed" style={{ color: "hsl(0 0% 50%)" }}>{item.text}</p>
               </div>
@@ -393,7 +389,7 @@ function Solution() {
 
   return (
     <section className="py-28 md:py-36 relative overflow-hidden" style={{ borderBottom: "1px solid hsl(0 0% 14%)" }}>
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[100px] pointer-events-none" style={{ background: "hsl(22 100% 50% / 0.04)" }} />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[100px] pointer-events-none" style={{ background: "rgba(39, 216, 3, 0.04)" }} />
 
       <div className="container mx-auto px-6 relative">
         <Reveal>
@@ -416,7 +412,7 @@ function Solution() {
                 <span className="block font-display-landing text-6xl font-black select-none" style={{ color: "hsl(0 0% 95% / 0.04)" }}>
                   0{i + 1}
                 </span>
-                <f.icon className="w-7 h-7 mb-4 opacity-80" style={{ color: "hsl(22 100% 50%)" }} />
+                <f.icon className="w-7 h-7 mb-4 opacity-80" style={{ color: "#27d803" }} />
                 <h3 className="font-display-landing font-bold text-xl mb-3" style={{ color: "hsl(0 0% 95%)" }}>{f.title}</h3>
                 <p className="text-sm leading-relaxed" style={{ color: "hsl(0 0% 50%)" }}>{f.desc}</p>
               </div>
@@ -466,7 +462,7 @@ function Market() {
               A mídia OOH atinge <span className="font-semibold" style={{ color: "hsl(0 0% 95%)" }}>89% da população brasileira</span>,
               e o segmento cresceu para representar mais que o dobro do valor de uma década atrás.
               O meio físico segue forte — sobretudo em campanhas com foco em{" "}
-              <span className="font-semibold" style={{ color: "hsl(22 100% 50%)" }}>presença local</span>.
+              <span className="font-semibold" style={{ color: "#27d803" }}>presença local</span>.
             </p>
           </div>
         </Reveal>
@@ -478,7 +474,7 @@ function Market() {
 function CTA() {
   return (
     <section id="contato" className="py-28 md:py-36 relative overflow-hidden">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none" style={{ background: "hsl(22 100% 50% / 0.06)" }} />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none" style={{ background: "rgba(39, 216, 3, 0.06)" }} />
 
       <div className="container mx-auto px-6 relative text-center">
         <Reveal>
@@ -488,7 +484,7 @@ function CTA() {
             <span className="text-gradient-brand">na mesa certa.</span>
           </h2>
           <p className="text-lg max-w-md mx-auto mb-12 leading-relaxed" style={{ color: "hsl(0 0% 50%)" }}>
-            Fale com a gente e descubra como a Mesa Ads transforma a presença da sua marca.
+            Fale com a gente e descubra como a mesa.ads transforma a presença da sua marca.
           </p>
         </Reveal>
 
@@ -498,7 +494,7 @@ function CTA() {
               href="mailto:contato@mesaads.com.br"
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.97 }}
-              className="inline-block bg-brand px-12 py-4 rounded-xl font-display-landing font-bold text-lg text-white glow transition-all"
+              className="inline-block bg-brand px-12 py-4 rounded-xl font-display-landing font-bold text-lg text-black glow transition-all"
             >
               Entre em contato
             </motion.a>
@@ -522,14 +518,11 @@ function CTA() {
 
       <div className="container mx-auto px-6 mt-28">
         <div className="pt-8 flex flex-col md:flex-row justify-between items-center gap-4" style={{ borderTop: "1px solid hsl(0 0% 14%)" }}>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-display-landing text-lg font-extrabold" style={{ color: "hsl(0 0% 95%)" }}>Mesa</span>
-            <span className="bg-brand text-white font-display-landing font-bold text-xs px-1.5 py-0.5 rounded">
-              Ads
-            </span>
+          <div>
+            <img src="/logo-white.png" alt="mesa.ads" className="h-6" />
           </div>
           <p className="text-xs" style={{ color: "hsl(0 0% 50%)" }}>
-            © 2026 Mesa Ads. Todos os direitos reservados.
+            © {new Date().getFullYear()} mesa.ads — Todos os direitos reservados.
           </p>
         </div>
       </div>

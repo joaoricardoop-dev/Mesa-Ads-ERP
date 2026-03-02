@@ -89,14 +89,11 @@ function ClerkLoginPage() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.07]"
-          style={{ background: "radial-gradient(circle, hsl(22 100% 50%) 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, #27d803 0%, transparent 70%)" }}
         />
       </div>
       <div className="relative flex flex-col items-center">
-        <div className="flex items-baseline gap-1.5 justify-center mb-8">
-          <span className="text-3xl font-extrabold tracking-tight" style={{ color: "hsl(0 0% 95%)" }}>Mesa</span>
-          <span className="bg-[hsl(22,100%,50%)] text-white font-bold text-sm px-2 py-0.5 rounded">Ads</span>
-        </div>
+        <img src="/logo-white.png" alt="mesa.ads" className="h-10 mb-8" />
         <SignIn
           appearance={{
             elements: {
@@ -106,7 +103,7 @@ function ClerkLoginPage() {
               headerSubtitle: "text-[hsl(0,0%,50%)]",
               formFieldLabel: "text-[hsl(0,0%,50%)]",
               formFieldInput: "bg-[hsl(0,0%,11%)] border-[hsl(0,0%,18%)] text-[hsl(0,0%,95%)]",
-              formButtonPrimary: "bg-[hsl(22,100%,50%)] hover:bg-[hsl(22,100%,45%)]",
+              formButtonPrimary: "bg-[#27d803] hover:bg-[#22c003] text-black",
               footerAction: "hidden",
               footerActionLink: "hidden",
               socialButtonsBlockButton: "border-[hsl(0,0%,18%)] text-[hsl(0,0%,70%)]",
@@ -114,12 +111,12 @@ function ClerkLoginPage() {
               dividerText: "text-[hsl(0,0%,40%)]",
               identityPreview: "bg-[hsl(0,0%,11%)]",
               identityPreviewText: "text-[hsl(0,0%,95%)]",
-              identityPreviewEditButton: "text-[hsl(22,100%,50%)]",
+              identityPreviewEditButton: "text-[#27d803]",
             },
           }}
         />
         <p className="text-center mt-6 text-[11px]" style={{ color: "hsl(0 0% 30%)" }}>
-          Mesa Ads &copy; {new Date().getFullYear()} &mdash; Plataforma de gestão
+          mesa.ads &copy; {new Date().getFullYear()} &mdash; Plataforma de gestão
         </p>
       </div>
     </div>

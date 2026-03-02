@@ -27,7 +27,7 @@ import {
   Legend,
 } from "recharts";
 
-const COLORS = ["hsl(22, 100%, 50%)", "hsl(200, 70%, 50%)", "hsl(150, 60%, 45%)"];
+const COLORS = ["#27d803", "hsl(200, 70%, 50%)", "hsl(150, 60%, 45%)"];
 
 export default function FinancialDashboard() {
   const { data, isLoading } = trpc.financial.dashboard.useQuery();
@@ -124,7 +124,7 @@ export default function FinancialDashboard() {
                   formatter={(value: number) => [formatCurrency(value), "Faturamento"]}
                   contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
                 />
-                <Bar dataKey="revenue" fill="hsl(22, 100%, 50%)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="revenue" fill="#27d803" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -178,7 +178,7 @@ export default function FinancialDashboard() {
                 formatter={(value: number) => [formatCurrency(value), "Receita"]}
                 contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
               />
-              <Line type="monotone" dataKey="revenue" stroke="hsl(22, 100%, 50%)" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="revenue" stroke="#27d803" strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         ) : (

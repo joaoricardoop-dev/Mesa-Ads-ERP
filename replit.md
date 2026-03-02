@@ -164,7 +164,9 @@ Statuses: `rascunho` → `enviada` → `ativa` → `os_gerada` → `win` / `perd
 
 ## Theme & Visual Identity
 
-- Brand colors: Black (#0d0d0d) + Orange (hsl 22 100% 50%)
+- Brand: mesa.ads (lowercase, with dot)
+- Logo: `/logo-white.png` (dark backgrounds), `/logo-black.png` (light backgrounds)
+- Brand colors: Black (#0d0d0d) + Green (#27d803, hsl 110 97% 43%)
 - Light/dark mode with toggle, defaults to dark
 - DM Sans + JetBrains Mono fonts
 - Semantic colors: emerald (positive), red (negative), amber (warnings)

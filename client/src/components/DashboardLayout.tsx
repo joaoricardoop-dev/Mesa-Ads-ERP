@@ -229,12 +229,10 @@ function DashboardLayoutContent({
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed && (
-                <div className="flex items-baseline gap-1 min-w-0">
-                  <span className="font-display-landing text-sm font-extrabold tracking-tight">Mesa</span>
-                  <span className="bg-brand text-white font-display-landing font-bold text-[9px] px-1.5 py-0.5 rounded-md leading-none">
-                    Ads
-                  </span>
-                </div>
+                <img src="/logo-white.png" alt="mesa.ads" className="h-5 dark:block hidden" />
+              )}
+              {!isCollapsed && (
+                <img src="/logo-black.png" alt="mesa.ads" className="h-5 dark:hidden block" />
               )}
             </div>
           </SidebarHeader>
