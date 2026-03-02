@@ -48,6 +48,13 @@ publicDir = "dist/public"
 [userenv]
 
 [userenv.shared]
+
+[userenv.development]
 CLERK_PUBLISHABLE_KEY = "pk_test_bm90ZWQtYW50LTQyLmNsZXJrLmFjY291bnRzLmRldiQ"
 CLERK_SECRET_KEY = "sk_test_ko7pDQJAB2gvinwrTxyvrnHmb3ZhUBMruM0fgBrZEa"
 VITE_CLERK_PUBLISHABLE_KEY = "pk_test_bm90ZWQtYW50LTQyLmNsZXJrLmFjY291bnRzLmRldiQ"
+
+[userenv.production]
+CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsubWVzYWFkcy5jb20uYnIk"
+CLERK_SECRET_KEY = "sk_live_MlqEZFFvkV3WYMp9EL4gQVhGNPr8nKXd03aw8LQphH"
+VITE_CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsubWVzYWFkcy5jb20uYnIk"
