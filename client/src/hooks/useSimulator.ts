@@ -32,6 +32,8 @@ export interface BudgetOption {
     quantity: number;
     unitPrice: string;
     totalPrice: string;
+    numModels: number;
+    qtyPerModel: number | null;
   }>;
 }
 

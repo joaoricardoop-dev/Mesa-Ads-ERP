@@ -44,23 +44,43 @@ export default function Home() {
     return savedId !== null ? String(savedId) : "manual";
   });
 
+  const [numArts, setNumArts] = useState<number>(1);
+
+  const availableNumModels = useMemo<number[]>(() => {
+    if (selectedBudgetId === "manual") return [1];
+    const id = parseInt(selectedBudgetId);
+    const found = budgetsList.find((b) => b.id === id);
+    if (!found) return [1];
+    const models = new Set(found.items.map((i) => i.numModels ?? 1));
+    return Array.from(models).sort((a, b) => a - b);
+  }, [selectedBudgetId, budgetsList]);
+
+  useEffect(() => {
+    if (!availableNumModels.includes(numArts)) {
+      setNumArts(availableNumModels[0] ?? 1);
+    }
+  }, [availableNumModels, numArts]);
+
   const selectedBudget = useMemo<BudgetOption | null>(() => {
     if (selectedBudgetId === "manual") return null;
     const id = parseInt(selectedBudgetId);
     const found = budgetsList.find((b) => b.id === id);
     if (!found) return null;
+    const filtered = found.items.filter((i) => (i.numModels ?? 1) === numArts);
     return {
       id: found.id,
       code: found.code,
       description: found.description,
       supplierName: found.supplierName,
-      items: found.items.map((i) => ({
+      items: filtered.map((i) => ({
         quantity: i.quantity,
         unitPrice: String(i.unitPrice),
         totalPrice: String(i.totalPrice),
+        numModels: i.numModels ?? 1,
+        qtyPerModel: i.qtyPerModel ?? i.quantity,
       })),
     };
-  }, [selectedBudgetId, budgetsList]);
+  }, [selectedBudgetId, budgetsList, numArts]);
 
   const [activeTab, setActiveTab] = useState("simulation");
   const [, navigate] = useLocation();
@@ -101,6 +121,7 @@ export default function Home() {
     simulator.resetInputs();
     allocation.clearAllocations();
     setSelectedBudgetId("manual");
+    setNumArts(1);
     saveBudgetId(null);
     setAllocMultiplier(undefined);
     setAllocCommission(undefined);
@@ -211,7 +232,7 @@ export default function Home() {
               <div className="p-4 lg:p-6">
                 <TabsContent value="simulation" className="mt-0 space-y-6">
                   <Section title="Custo de Produção" icon={FileText} description="Selecione um orçamento cadastrado ou use valores manuais">
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid md:grid-cols-3 gap-4">
                       <div>
                         <Label className="text-xs text-muted-foreground mb-1.5 block">
                           Orçamento de Produção
@@ -236,6 +257,29 @@ export default function Home() {
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {selectedBudgetId !== "manual" && availableNumModels.length > 1 && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground mb-1.5 block">
+                            Nº de Artes (Modelos)
+                          </Label>
+                          <Select
+                            value={String(numArts)}
+                            onValueChange={(v) => setNumArts(parseInt(v))}
+                          >
+                            <SelectTrigger className="bg-background/50 border-border/50 h-9 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableNumModels.map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                  {n === 1 ? "1 arte (modelo único)" : `${n} artes`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
                       <div className="flex items-end gap-4">
                         <div className="flex-1">
@@ -267,9 +311,13 @@ export default function Home() {
                     {selectedBudget && selectedBudget.items.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-border/20">
                         <p className="text-xs text-muted-foreground mb-2">
-                          Tabela de preços do orçamento{" "}
+                          Tabela de preços{" "}
                           <span className="text-foreground font-medium">{selectedBudget.code}</span>{" "}
-                          ({selectedBudget.supplierName}):
+                          ({selectedBudget.supplierName})
+                          {numArts > 1 && (
+                            <span className="text-primary font-medium"> — {numArts} artes ({selectedBudget.items[0]?.qtyPerModel?.toLocaleString("pt-BR")} un/arte)</span>
+                          )}
+                          :
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {selectedBudget.items.map((item, i) => {
@@ -287,6 +335,9 @@ export default function Home() {
                                 }`}
                               >
                                 <span className="font-semibold">{item.quantity.toLocaleString("pt-BR")}</span>
+                                {numArts > 1 && item.qtyPerModel && (
+                                  <span className="text-[10px] opacity-60"> ({item.qtyPerModel.toLocaleString("pt-BR")}/arte)</span>
+                                )}
                                 <span className="mx-1">→</span>
                                 <span>R$ {parseFloat(item.unitPrice).toFixed(4)}</span>
                               </div>

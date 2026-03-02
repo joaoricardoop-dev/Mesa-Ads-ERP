@@ -616,15 +616,12 @@ export async function listActiveBudgetsWithItems() {
         quantity: budgetItems.quantity,
         unitPrice: budgetItems.unitPrice,
         totalPrice: budgetItems.totalPrice,
+        numModels: budgetItems.numModels,
+        qtyPerModel: budgetItems.qtyPerModel,
       })
       .from(budgetItems)
-      .where(
-        and(
-          eq(budgetItems.budgetId, b.id),
-          or(eq(budgetItems.numModels, 1), isNull(budgetItems.numModels))
-        )
-      )
-      .orderBy(budgetItems.quantity);
+      .where(eq(budgetItems.budgetId, b.id))
+      .orderBy(budgetItems.numModels, budgetItems.quantity);
 
     result.push({
       ...b,
