@@ -590,7 +590,7 @@ export const budgetItems = pgTable("budget_items", {
   id: serial("id").primaryKey(),
   budgetId: integer("budgetId").notNull().references(() => budgets.id, { onDelete: "cascade" }),
   quantity: integer("quantity").notNull(),
-  unitPrice: decimal("unitPrice", { precision: 10, scale: 3 }).notNull(),
+  unitPrice: decimal("unitPrice", { precision: 10, scale: 4 }).notNull(),
   totalPrice: decimal("totalPrice", { precision: 12, scale: 2 }).notNull(),
   numModels: integer("numModels").default(1),
   qtyPerModel: integer("qtyPerModel"),

@@ -128,7 +128,7 @@ const EMPTY_BUDGET: BudgetForm = {
   validUntil: "",
   status: "active",
   notes: "",
-  singleModelItems: [{ quantity: 1000, unitPrice: "0.000", totalPrice: "0.00", numModels: 1, qtyPerModel: 1000 }],
+  singleModelItems: [{ quantity: 1000, unitPrice: "0.0000", totalPrice: "0.00", numModels: 1, qtyPerModel: 1000 }],
   multiModelItems: [],
 };
 
@@ -153,21 +153,21 @@ const STATES = [
 
 const GPC_PRESETS = {
   singleModel: [
-    { quantity: 1000, unitPrice: "0.419", totalPrice: "419.00", numModels: 1, qtyPerModel: 1000 },
-    { quantity: 2000, unitPrice: "0.350", totalPrice: "699.00", numModels: 1, qtyPerModel: 2000 },
-    { quantity: 3000, unitPrice: "0.333", totalPrice: "999.00", numModels: 1, qtyPerModel: 3000 },
-    { quantity: 4000, unitPrice: "0.325", totalPrice: "1299.00", numModels: 1, qtyPerModel: 4000 },
-    { quantity: 5000, unitPrice: "0.300", totalPrice: "1499.00", numModels: 1, qtyPerModel: 5000 },
-    { quantity: 10000, unitPrice: "0.270", totalPrice: "2700.00", numModels: 1, qtyPerModel: 10000 },
-    { quantity: 20000, unitPrice: "0.260", totalPrice: "5200.00", numModels: 1, qtyPerModel: 20000 },
+    { quantity: 1000, unitPrice: "0.4190", totalPrice: "419.00", numModels: 1, qtyPerModel: 1000 },
+    { quantity: 2000, unitPrice: "0.3495", totalPrice: "699.00", numModels: 1, qtyPerModel: 2000 },
+    { quantity: 3000, unitPrice: "0.3330", totalPrice: "999.00", numModels: 1, qtyPerModel: 3000 },
+    { quantity: 4000, unitPrice: "0.3248", totalPrice: "1299.00", numModels: 1, qtyPerModel: 4000 },
+    { quantity: 5000, unitPrice: "0.2998", totalPrice: "1499.00", numModels: 1, qtyPerModel: 5000 },
+    { quantity: 10000, unitPrice: "0.2700", totalPrice: "2700.00", numModels: 1, qtyPerModel: 10000 },
+    { quantity: 20000, unitPrice: "0.2600", totalPrice: "5200.00", numModels: 1, qtyPerModel: 20000 },
   ],
   multiModel: [
-    { quantity: 10000, unitPrice: "0.419", totalPrice: "4190.00", numModels: 10, qtyPerModel: 1000 },
-    { quantity: 10000, unitPrice: "0.350", totalPrice: "3495.00", numModels: 5, qtyPerModel: 2000 },
-    { quantity: 10000, unitPrice: "0.300", totalPrice: "2998.00", numModels: 2, qtyPerModel: 5000 },
-    { quantity: 20000, unitPrice: "0.410", totalPrice: "8200.00", numModels: 20, qtyPerModel: 1000 },
-    { quantity: 20000, unitPrice: "0.340", totalPrice: "6800.00", numModels: 10, qtyPerModel: 2000 },
-    { quantity: 20000, unitPrice: "0.290", totalPrice: "5800.00", numModels: 4, qtyPerModel: 5000 },
+    { quantity: 10000, unitPrice: "0.4190", totalPrice: "4190.00", numModels: 10, qtyPerModel: 1000 },
+    { quantity: 10000, unitPrice: "0.3495", totalPrice: "3495.00", numModels: 5, qtyPerModel: 2000 },
+    { quantity: 10000, unitPrice: "0.2998", totalPrice: "2998.00", numModels: 2, qtyPerModel: 5000 },
+    { quantity: 20000, unitPrice: "0.4100", totalPrice: "8200.00", numModels: 20, qtyPerModel: 1000 },
+    { quantity: 20000, unitPrice: "0.3400", totalPrice: "6800.00", numModels: 10, qtyPerModel: 2000 },
+    { quantity: 20000, unitPrice: "0.2900", totalPrice: "5800.00", numModels: 4, qtyPerModel: 5000 },
   ],
 };
 
@@ -335,7 +335,7 @@ export default function Production() {
             numModels: 1,
             qtyPerModel: i.quantity,
           }))
-        : [{ quantity: 1000, unitPrice: "0.000", totalPrice: "0.00", numModels: 1, qtyPerModel: 1000 }],
+        : [{ quantity: 1000, unitPrice: "0.0000", totalPrice: "0.00", numModels: 1, qtyPerModel: 1000 }],
       multiModelItems: multiItems.map((i: any) => ({
         quantity: i.quantity,
         unitPrice: String(i.unitPrice),
@@ -421,14 +421,14 @@ export default function Production() {
     const newItem: PriceItem = type === "single"
       ? {
           quantity: lastItem ? lastItem.quantity + 1000 : 1000,
-          unitPrice: "0.000",
+          unitPrice: "0.0000",
           totalPrice: "0.00",
           numModels: 1,
           qtyPerModel: lastItem ? lastItem.quantity + 1000 : 1000,
         }
       : {
           quantity: 10000,
-          unitPrice: "0.000",
+          unitPrice: "0.0000",
           totalPrice: "0.00",
           numModels: 10,
           qtyPerModel: 1000,
@@ -461,7 +461,7 @@ export default function Production() {
     const item = { ...newItems[index] };
 
     if (field === "quantity") {
-      item.quantity = typeof value === "number" ? value : parseInt(value) || 0;
+      item.quantity = typeof value === "number" ? value : parseInt(String(value)) || 0;
       if (type === "single") {
         item.qtyPerModel = item.quantity;
       } else if (item.numModels > 0) {
@@ -1025,7 +1025,7 @@ export default function Production() {
                                 <Input type="number" value={item.quantity} onChange={(e) => updatePriceItem("single", idx, "quantity", parseInt(e.target.value) || 0)} className="w-24 h-8 text-sm bg-background border-border/30 font-mono" />
                               </TableCell>
                               <TableCell className="text-right">
-                                <Input type="number" step="0.001" value={item.unitPrice} onChange={(e) => updatePriceItem("single", idx, "unitPrice", e.target.value)} className="w-28 h-8 text-sm bg-background border-border/30 font-mono ml-auto" />
+                                <Input type="number" step="0.0001" value={item.unitPrice} onChange={(e) => updatePriceItem("single", idx, "unitPrice", e.target.value)} className="w-28 h-8 text-sm bg-background border-border/30 font-mono ml-auto" />
                               </TableCell>
                               <TableCell className="text-right">
                                 <Input type="number" step="0.01" value={item.totalPrice} onChange={(e) => updatePriceItem("single", idx, "totalPrice", e.target.value)} className="w-32 h-8 text-sm bg-background border-border/30 font-mono ml-auto" />
@@ -1083,7 +1083,7 @@ export default function Production() {
                                   <Input type="number" value={item.qtyPerModel} onChange={(e) => updatePriceItem("multi", idx, "qtyPerModel", parseInt(e.target.value) || 0)} className="w-24 h-8 text-sm bg-background border-border/30 font-mono mx-auto" />
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  <Input type="number" step="0.001" value={item.unitPrice} onChange={(e) => updatePriceItem("multi", idx, "unitPrice", e.target.value)} className="w-28 h-8 text-sm bg-background border-border/30 font-mono ml-auto" />
+                                  <Input type="number" step="0.0001" value={item.unitPrice} onChange={(e) => updatePriceItem("multi", idx, "unitPrice", e.target.value)} className="w-28 h-8 text-sm bg-background border-border/30 font-mono ml-auto" />
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <Input type="number" step="0.01" value={item.totalPrice} onChange={(e) => updatePriceItem("multi", idx, "totalPrice", e.target.value)} className="w-32 h-8 text-sm bg-background border-border/30 font-mono ml-auto" />
