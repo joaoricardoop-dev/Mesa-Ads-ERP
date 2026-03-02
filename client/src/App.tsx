@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./hooks/use-auth";
+import { SignIn, useClerk } from "@clerk/clerk-react";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
 import Prospecting from "./pages/Restaurants";
@@ -20,8 +21,6 @@ import QuotationPreview from "./pages/QuotationPreview";
 import Economics from "./pages/Economics";
 import Production from "./pages/Production";
 import Members from "./pages/Members";
-// import LandingPage from "./pages/LandingPage";
-import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import Library from "./pages/Library";
 import Quotations from "./pages/Quotations";
@@ -29,8 +28,6 @@ import QuotationDetail from "./pages/QuotationDetail";
 import Leads from "./pages/Leads";
 import ServiceOrders from "./pages/ServiceOrders";
 import BatchManagement from "./pages/BatchManagement";
-import DevRoleSwitcher from "./components/DevRoleSwitcher";
-import ForcePasswordChange from "./components/ForcePasswordChange";
 import FinancialDashboard from "./pages/financial/FinancialDashboard";
 import Invoicing from "./pages/financial/Invoicing";
 import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
@@ -86,6 +83,48 @@ function Router() {
   );
 }
 
+function ClerkLoginPage() {
+  return (
+    <div className="h-screen w-full flex items-center justify-center" style={{ background: "hsl(0 0% 4%)" }}>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.07]"
+          style={{ background: "radial-gradient(circle, hsl(22 100% 50%) 0%, transparent 70%)" }}
+        />
+      </div>
+      <div className="relative flex flex-col items-center">
+        <div className="flex items-baseline gap-1.5 justify-center mb-8">
+          <span className="text-3xl font-extrabold tracking-tight" style={{ color: "hsl(0 0% 95%)" }}>Mesa</span>
+          <span className="bg-[hsl(22,100%,50%)] text-white font-bold text-sm px-2 py-0.5 rounded">Ads</span>
+        </div>
+        <SignIn
+          appearance={{
+            elements: {
+              rootBox: "mx-auto",
+              card: "bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] shadow-2xl",
+              headerTitle: "text-[hsl(0,0%,95%)]",
+              headerSubtitle: "text-[hsl(0,0%,50%)]",
+              formFieldLabel: "text-[hsl(0,0%,50%)]",
+              formFieldInput: "bg-[hsl(0,0%,11%)] border-[hsl(0,0%,18%)] text-[hsl(0,0%,95%)]",
+              formButtonPrimary: "bg-[hsl(22,100%,50%)] hover:bg-[hsl(22,100%,45%)]",
+              footerActionLink: "text-[hsl(22,100%,50%)]",
+              socialButtonsBlockButton: "border-[hsl(0,0%,18%)] text-[hsl(0,0%,70%)]",
+              dividerLine: "bg-[hsl(0,0%,14%)]",
+              dividerText: "text-[hsl(0,0%,40%)]",
+              identityPreview: "bg-[hsl(0,0%,11%)]",
+              identityPreviewText: "text-[hsl(0,0%,95%)]",
+              identityPreviewEditButton: "text-[hsl(22,100%,50%)]",
+            },
+          }}
+        />
+        <p className="text-center mt-6 text-[11px]" style={{ color: "hsl(0 0% 30%)" }}>
+          Mesa Ads &copy; {new Date().getFullYear()} &mdash; Plataforma de gestão
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AuthenticatedApp() {
   const { user, isLoading, isAuthenticated } = useAuth();
 
@@ -101,7 +140,7 @@ function AuthenticatedApp() {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage />;
+    return <ClerkLoginPage />;
   }
 
   const isAnunciante = user?.role === "anunciante";
@@ -112,7 +151,6 @@ function AuthenticatedApp() {
         <DashboardLayout user={user}>
           <AnuncianteRouter />
         </DashboardLayout>
-        <ForcePasswordChange />
       </div>
     );
   }
@@ -122,8 +160,6 @@ function AuthenticatedApp() {
       <DashboardLayout user={user}>
         <Router />
       </DashboardLayout>
-      <DevRoleSwitcher currentRole={user?.role || undefined} />
-      <ForcePasswordChange />
     </div>
   );
 }

@@ -1,3 +1,2 @@
-export { setupAuth, isAuthenticated, getSession } from "./replitAuth";
+export { setupClerkAuth } from "./clerk";
 export { authStorage, type IAuthStorage } from "./storage";
-export { registerAuthRoutes } from "./routes";

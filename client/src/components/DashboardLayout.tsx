@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useClerk } from "@clerk/clerk-react";
 import type { User } from "@shared/models/auth";
 import {
   BarChart3,
@@ -183,6 +184,7 @@ function DashboardLayoutContent({
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const { theme, toggleTheme } = useTheme();
+  const { signOut } = useClerk();
 
   const activeLabel = findActiveLabel(location);
 
@@ -312,11 +314,12 @@ function DashboardLayoutContent({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem asChild className="cursor-pointer text-destructive focus:text-destructive">
-                  <a href="/api/logout">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sair</span>
-                  </a>
+                <DropdownMenuItem
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                  onClick={() => signOut()}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sair</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

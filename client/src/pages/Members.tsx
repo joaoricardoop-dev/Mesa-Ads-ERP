@@ -44,7 +44,6 @@ import {
   Clock,
   CalendarDays,
   UserPlus,
-  KeyRound,
   Eye,
   EyeOff,
   Copy,
@@ -128,13 +127,8 @@ export default function Members() {
   });
   const [showTempPassword, setShowTempPassword] = useState(false);
 
-  const [resetDialogTarget, setResetDialogTarget] = useState<{
-    userId: string;
-    userName: string;
-    email: string;
-  } | null>(null);
-  const [resetPassword, setResetPassword] = useState(generateTempPassword());
-  const [showResetPassword, setShowResetPassword] = useState(false);
+
+
 
   const utils = trpc.useUtils();
   const { data: membersList = [], isLoading } = trpc.members.list.useQuery();
@@ -167,14 +161,8 @@ export default function Members() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
-  const resetPasswordMutation = trpc.members.resetPassword.useMutation({
-    onSuccess: () => {
-      utils.members.list.invalidate();
-      toast.success("Senha resetada! O usuário precisará definir uma nova senha no próximo login.");
-      setResetDialogTarget(null);
-    },
-    onError: (err) => toast.error(`Erro: ${err.message}`),
-  });
+
+
 
   const filtered = membersList.filter(
     (m) =>
@@ -342,24 +330,6 @@ export default function Members() {
                   </div>
 
                   <div className="flex items-center justify-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10"
-                      title="Resetar senha"
-                      onClick={() => {
-                        const pw = generateTempPassword();
-                        setResetPassword(pw);
-                        setShowResetPassword(false);
-                        setResetDialogTarget({
-                          userId: member.id,
-                          userName: `${member.firstName || ""} ${member.lastName || ""}`.trim() || "Usuário",
-                          email: member.email || "",
-                        });
-                      }}
-                    >
-                      <KeyRound className="w-3.5 h-3.5" />
-                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -554,7 +524,7 @@ export default function Members() {
               Cadastrar Novo Usuário
             </DialogTitle>
             <DialogDescription>
-              O usuário receberá uma senha temporária e precisará definir sua própria senha no primeiro login.
+              O usuário será criado com a senha informada. Ele poderá redefini-la pelo Clerk.
             </DialogDescription>
           </DialogHeader>
 
@@ -663,7 +633,7 @@ export default function Members() {
                 </Button>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Copie e envie esta senha ao usuário. Ele terá que trocá-la no primeiro acesso.
+                Copie e envie esta senha ao usuário.
               </p>
             </div>
           </div>
@@ -692,81 +662,8 @@ export default function Members() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!resetDialogTarget} onOpenChange={(open) => !open && setResetDialogTarget(null)}>
-        <DialogContent className="bg-card border-border/30 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <KeyRound className="w-5 h-5 text-amber-400" />
-              Resetar Senha
-            </DialogTitle>
-            <DialogDescription>
-              Definir uma nova senha temporária para <strong>{resetDialogTarget?.userName}</strong> ({resetDialogTarget?.email}).
-              O usuário precisará definir uma nova senha no próximo login.
-            </DialogDescription>
-          </DialogHeader>
 
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <Label>Nova Senha Temporária</Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    type={showResetPassword ? "text" : "password"}
-                    value={resetPassword}
-                    onChange={(e) => setResetPassword(e.target.value)}
-                    className="bg-background border-border/30 pr-10 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowResetPassword(!showResetPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="border-border/30 flex-shrink-0"
-                  title="Copiar senha"
-                  onClick={() => {
-                    navigator.clipboard.writeText(resetPassword);
-                    toast.success("Senha copiada!");
-                  }}
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Copie e envie esta senha ao usuário.
-              </p>
-            </div>
-          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setResetDialogTarget(null)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (!resetDialogTarget) return;
-                if (resetPassword.length < 6) {
-                  toast.error("A senha deve ter pelo menos 6 caracteres.");
-                  return;
-                }
-                resetPasswordMutation.mutate({
-                  userId: resetDialogTarget.userId,
-                  newPassword: resetPassword,
-                });
-              }}
-              disabled={resetPasswordMutation.isPending}
-            >
-              {resetPasswordMutation.isPending ? "Resetando..." : "Resetar Senha"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </PageContainer>
   );
 }

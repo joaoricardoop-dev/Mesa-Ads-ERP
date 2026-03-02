@@ -6,7 +6,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 
 - **Frontend**: React 19, Vite, Tailwind CSS 4, shadcn/ui, TanStack Query, tRPC, Recharts, wouter
 - **Backend**: Node.js, Express, tRPC, Drizzle ORM
-- **Auth**: Replit Auth (OpenID Connect) — supports Google, GitHub, Apple, email login
+- **Auth**: Clerk (clerk.com) — supports Google, GitHub, Apple, email login; user management via Clerk Dashboard
 - **Database**: PostgreSQL (Replit built-in, via @neondatabase/serverless + drizzle-orm/neon-serverless)
 - **Package Manager**: pnpm
 
@@ -15,7 +15,8 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - `client/` — React frontend
 - `server/` — Backend (Express + tRPC)
 - `server/_core/` — Server entry point, OAuth, Vite config
-- `server/replit_integrations/auth/` — Auth module (Replit Auth OIDC)
+- `server/replit_integrations/auth/` — Auth module (Clerk integration)
+- `server/clerkWebhook.ts` — Clerk webhook handler for user sync
 - `server/db.ts` — Database connection and query functions
 - `server/financialRouter.ts` — Financial module tRPC router
 - `server/quotationRouter.ts` — Quotations tRPC router
@@ -51,18 +52,17 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 
 ## Authentication
 
-- **Replit Auth** via OpenID Connect (supports Google, GitHub, Apple, email)
-- **Email/password auth**: Admin creates users with temp password → user logs in → ForcePasswordChange modal on first access → user sets own password
-- **Anunciante self-registration**: Login page → "Sou anunciante" → enter CNPJ → system looks up client in DB → if found, fill name/email/password → creates account linked to client → auto-login to portal
-- Login page shown when not logged in (`LoginPage.tsx`) — direct email/password form + social login + anunciante registration
-- Original landing page (`LandingPage.tsx`) commented out but preserved
-- Sidebar footer shows user avatar, name, role, and logout button
-- Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`, `/api/auth/email-login`, `/api/auth/change-password`, `/api/auth/register-advertiser`, `/api/auth/lookup-client`, `/api/auth/test-login` (dev only)
-- Test login (dev only): `POST /api/auth/test-login` with `{"userId": <id>}` — bypasses password, sets session with `expires_at`
-- Admin mutations: `members.createUser` (with temp password + clientId for anunciante), `members.resetPassword` (sets mustChangePassword)
-- All user-returning endpoints sanitize `passwordHash` before sending to client
-- Session stored in PostgreSQL `sessions` table
-- `ForcePasswordChange` component (`client/src/components/ForcePasswordChange.tsx`) — modal overlay when `mustChangePassword` is true
+- **Clerk** (clerk.com) for identity management — handles login UI, sessions, JWT tokens, password management
+- Frontend: `<ClerkProvider>` wraps app in `main.tsx`, `<SignIn>` component for login page
+- Backend: `@clerk/express` middleware validates JWT on every request
+- User roles stored in Clerk `publicMetadata.role` and synced to local `users` table
+- Anunciante `clientId` stored in Clerk `publicMetadata.clientId`
+- Webhook endpoint `POST /api/webhooks/clerk` syncs user data from Clerk to local DB
+- Local `users` table kept for joins and app-specific data (role, clientId, isActive)
+- `useAuth` hook (`client/src/hooks/use-auth.ts`) uses Clerk's `useUser()` + fetches DB user via `/api/auth/user`
+- Sidebar footer shows user info from DB, logout via `useClerk().signOut()`
+- Admin mutations: `members.createUser` (creates user in Clerk + syncs to DB), `members.updateRole` (syncs to Clerk metadata)
+- Env vars: `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
 
 ## Roles & Permissions
 

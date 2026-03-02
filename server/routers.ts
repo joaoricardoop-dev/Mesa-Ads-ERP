@@ -1,5 +1,3 @@
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { financialRouter } from "./financialRouter";
 import { quotationRouter } from "./quotationRouter";
@@ -74,24 +72,6 @@ export const appRouter = router({
   batch: batchRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return { success: true } as const;
-    }),
-  }),
-
-  // ─── Dev Role Switcher (dev only) ───────────────────────────────────────
-  dev: router({
-    switchRole: protectedProcedure
-      .input(z.object({ role: z.string() }))
-      .mutation(async ({ ctx, input }) => {
-        if (process.env.NODE_ENV === "production") {
-          throw new Error("Not available in production");
-        }
-        const updated = await authStorage.updateUserRole(ctx.user!.id, input.role);
-        return updated;
-      }),
   }),
 
   // ─── Members (Admin) ────────────────────────────────────────────────────
@@ -104,6 +84,19 @@ export const appRouter = router({
     updateRole: adminProcedure
       .input(z.object({ userId: z.string(), role: z.string() }))
       .mutation(async ({ input }) => {
+        try {
+          const { createClerkClient } = await import("@clerk/express");
+          const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+          const clerkUser = await clerkClient.users.getUser(input.userId);
+          await clerkClient.users.updateUser(input.userId, {
+            publicMetadata: {
+              ...clerkUser.publicMetadata,
+              role: input.role,
+            },
+          });
+        } catch (err: any) {
+          console.error("Failed to update Clerk metadata:", err);
+        }
         const user = await authStorage.updateUserRole(input.userId, input.role);
         if (!user) return undefined;
         const { passwordHash: _, ...safe } = user;
@@ -113,6 +106,17 @@ export const appRouter = router({
     toggleActive: adminProcedure
       .input(z.object({ userId: z.string(), isActive: z.boolean() }))
       .mutation(async ({ input }) => {
+        try {
+          const { createClerkClient } = await import("@clerk/express");
+          const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+          if (input.isActive) {
+            await clerkClient.users.unbanUser(input.userId);
+          } else {
+            await clerkClient.users.banUser(input.userId);
+          }
+        } catch (err: any) {
+          console.error("Failed to ban/unban Clerk user:", err);
+        }
         const user = await authStorage.updateUserActive(input.userId, input.isActive);
         if (!user) return undefined;
         const { passwordHash: _, ...safe } = user;
@@ -129,59 +133,43 @@ export const appRouter = router({
         clientId: z.number().nullable().optional(),
       }))
       .mutation(async ({ input }) => {
-        const bcrypt = await import("bcryptjs");
-        const { getDb: getDatabase } = await import("./db");
-        const db = await getDatabase();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-
-        const { users: usersTable } = await import("../shared/models/auth");
-        const { eq } = await import("drizzle-orm");
-        const existing = await db.select().from(usersTable).where(eq(usersTable.email, input.email.toLowerCase().trim()));
-        if (existing.length > 0) {
-          throw new TRPCError({ code: "CONFLICT", message: "Já existe um usuário com este e-mail." });
-        }
-
         if (input.role === "anunciante" && !input.clientId) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Anunciantes devem ser vinculados a um cliente." });
         }
 
-        const hash = await bcrypt.hash(input.tempPassword, 10);
-        const [user] = await db.insert(usersTable).values({
-          email: input.email.toLowerCase().trim(),
-          firstName: input.firstName,
-          lastName: input.lastName || null,
-          role: input.role,
-          isActive: true,
-          passwordHash: hash,
-          mustChangePassword: true,
-          clientId: input.role === "anunciante" ? input.clientId : null,
-        }).returning();
-        const { passwordHash: _ph, ...safeUser } = user;
-        return safeUser;
-      }),
+        const { createClerkClient } = await import("@clerk/express");
+        const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
 
-    resetPassword: adminProcedure
-      .input(z.object({
-        userId: z.string(),
-        newPassword: z.string().min(6),
-      }))
-      .mutation(async ({ input }) => {
-        const bcrypt = await import("bcryptjs");
-        const { getDb: getDatabase } = await import("./db");
-        const db = await getDatabase();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        try {
+          const clerkUser = await clerkClient.users.createUser({
+            emailAddress: [input.email.toLowerCase().trim()],
+            firstName: input.firstName,
+            lastName: input.lastName || undefined,
+            password: input.tempPassword,
+            publicMetadata: {
+              role: input.role,
+              clientId: input.role === "anunciante" ? input.clientId : null,
+            },
+          });
 
-        const { users: usersTable } = await import("../shared/models/auth");
-        const { eq } = await import("drizzle-orm");
-        const hash = await bcrypt.hash(input.newPassword, 10);
-        const [updated] = await db.update(usersTable).set({
-          passwordHash: hash,
-          mustChangePassword: true,
-          updatedAt: new Date(),
-        }).where(eq(usersTable.id, input.userId)).returning();
+          const newUser = await authStorage.upsertUser({
+            id: clerkUser.id,
+            email: input.email.toLowerCase().trim(),
+            firstName: input.firstName,
+            lastName: input.lastName || null,
+            role: input.role,
+            isActive: true,
+            clientId: input.role === "anunciante" ? input.clientId : null,
+          });
 
-        if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado." });
-        return { success: true };
+          const { passwordHash: _ph, ...safeUser } = newUser;
+          return safeUser;
+        } catch (err: any) {
+          if (err?.errors?.[0]?.code === "form_identifier_exists") {
+            throw new TRPCError({ code: "CONFLICT", message: "Já existe um usuário com este e-mail." });
+          }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err?.message || "Erro ao criar usuário." });
+        }
       }),
   }),
 

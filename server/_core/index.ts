@@ -3,11 +3,11 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { setupAuth, registerAuthRoutes } from "../replit_integrations/auth";
+import { setupClerkAuth } from "../replit_integrations/auth";
+import { clerkWebhookHandler } from "../clerkWebhook";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -31,15 +31,99 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
+  app.post(
+    "/api/webhooks/clerk",
+    express.raw({ type: "application/json" }),
+    clerkWebhookHandler
+  );
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // Auth setup (must be before other routes)
-  await setupAuth(app);
-  registerAuthRoutes(app);
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
-  // tRPC API
+  setupClerkAuth(app);
+
+  app.get("/api/auth/user", async (req, res) => {
+    try {
+      const { getAuth } = await import("@clerk/express");
+      const auth = getAuth(req);
+      if (!auth?.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const { authStorage } = await import("../replit_integrations/auth");
+      let user = await authStorage.getUser(auth.userId);
+      if (!user) {
+        const clerkModule = await import("@clerk/express");
+        const clerkClient = clerkModule.createClerkClient({
+          secretKey: process.env.CLERK_SECRET_KEY!,
+        });
+        const clerkUser = await clerkClient.users.getUser(auth.userId);
+        const role = (clerkUser.publicMetadata as any)?.role || "user";
+        const clientId = (clerkUser.publicMetadata as any)?.clientId || null;
+        user = await authStorage.upsertUser({
+          id: clerkUser.id,
+          email: clerkUser.emailAddresses?.[0]?.emailAddress || null,
+          firstName: clerkUser.firstName || null,
+          lastName: clerkUser.lastName || null,
+          profileImageUrl: clerkUser.imageUrl || null,
+          role,
+          clientId: clientId ? Number(clientId) : null,
+        });
+      }
+      const { passwordHash: _, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.get("/api/auth/lookup-client", async (req, res) => {
+    try {
+      const cnpj = (req.query.cnpj as string || "").replace(/\D/g, "");
+      if (cnpj.length !== 14) {
+        return res.status(400).json({ message: "CNPJ invalido." });
+      }
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) return res.status(500).json({ message: "Database not available" });
+      const { clients } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const formattedCnpj = cnpj.replace(
+        /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+        "$1.$2.$3/$4-$5"
+      );
+      const results = await db.select({
+        id: clients.id,
+        name: clients.name,
+        company: clients.company,
+        razaoSocial: clients.razaoSocial,
+        cnpj: clients.cnpj,
+        segment: clients.segment,
+        city: clients.city,
+        state: clients.state,
+      }).from(clients).where(eq(clients.cnpj, formattedCnpj));
+      let client = results[0];
+      if (!client) {
+        const results2 = await db.select({
+          id: clients.id,
+          name: clients.name,
+          company: clients.company,
+          razaoSocial: clients.razaoSocial,
+          cnpj: clients.cnpj,
+          segment: clients.segment,
+          city: clients.city,
+          state: clients.state,
+        }).from(clients).where(eq(clients.cnpj, cnpj));
+        client = results2[0];
+      }
+      if (!client) {
+        return res.status(404).json({ message: "CNPJ nao cadastrado no sistema." });
+      }
+      res.json(client);
+    } catch (error) {
+      console.error("Lookup client error:", error);
+      res.status(500).json({ message: "Erro interno." });
+    }
+  });
+
   app.use(
     "/api/trpc",
     createExpressMiddleware({
@@ -47,7 +131,6 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
