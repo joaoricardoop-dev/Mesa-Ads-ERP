@@ -44,9 +44,7 @@ import {
   Clock,
   CalendarDays,
   UserPlus,
-  Eye,
-  EyeOff,
-  Copy,
+  Send,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -94,13 +92,6 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof S
   },
 };
 
-function generateTempPassword() {
-  const chars = "abcdefghijkmnpqrstuvwxyz23456789";
-  let result = "";
-  for (let i = 0; i < 8; i++) result += chars[Math.floor(Math.random() * chars.length)];
-  return result;
-}
-
 export default function Members() {
   const [search, setSearch] = useState("");
   const [confirmAction, setConfirmAction] = useState<{
@@ -115,17 +106,14 @@ export default function Members() {
     firstName: string;
     lastName: string;
     role: string;
-    tempPassword: string;
     clientId: number | null;
   }>({
     email: "",
     firstName: "",
     lastName: "",
     role: "user",
-    tempPassword: generateTempPassword(),
     clientId: null,
   });
-  const [showTempPassword, setShowTempPassword] = useState(false);
 
 
 
@@ -151,12 +139,12 @@ export default function Members() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
-  const createUserMutation = trpc.members.createUser.useMutation({
-    onSuccess: () => {
+  const inviteUserMutation = trpc.members.inviteUser.useMutation({
+    onSuccess: (data) => {
       utils.members.list.invalidate();
       setCreateDialogOpen(false);
-      setCreateForm({ email: "", firstName: "", lastName: "", role: "user", tempPassword: generateTempPassword(), clientId: null });
-      toast.success("Usuário cadastrado com sucesso!");
+      setCreateForm({ email: "", firstName: "", lastName: "", role: "user", clientId: null });
+      toast.success(`Convite enviado para ${data.email}! O usuário receberá um e-mail para criar sua conta.`);
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
@@ -181,12 +169,11 @@ export default function Members() {
       description="Cadastrar, gerenciar papéis e permissões dos usuários da plataforma"
       actions={
         <Button onClick={() => {
-          setCreateForm({ email: "", firstName: "", lastName: "", role: "user", tempPassword: generateTempPassword(), clientId: null });
-          setShowTempPassword(false);
+          setCreateForm({ email: "", firstName: "", lastName: "", role: "user", clientId: null });
           setCreateDialogOpen(true);
         }}>
-          <UserPlus className="w-4 h-4 mr-2" />
-          Cadastrar Usuário
+          <Send className="w-4 h-4 mr-2" />
+          Convidar Usuário
         </Button>
       }
     >
@@ -520,11 +507,11 @@ export default function Members() {
         <DialogContent className="bg-card border-border/30 max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-primary" />
-              Cadastrar Novo Usuário
+              <Send className="w-5 h-5 text-primary" />
+              Convidar Usuário
             </DialogTitle>
             <DialogDescription>
-              O usuário será criado com a senha informada. Ele poderá redefini-la pelo Clerk.
+              O usuário receberá um e-mail com um link para criar sua conta e definir a própria senha.
             </DialogDescription>
           </DialogHeader>
 
@@ -601,41 +588,6 @@ export default function Members() {
                 </p>
               </div>
             )}
-            <div className="grid gap-2">
-              <Label>Senha Temporária</Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    type={showTempPassword ? "text" : "password"}
-                    value={createForm.tempPassword}
-                    onChange={(e) => setCreateForm({ ...createForm, tempPassword: e.target.value })}
-                    className="bg-background border-border/30 pr-10 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowTempPassword(!showTempPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showTempPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="border-border/30 flex-shrink-0"
-                  title="Copiar senha"
-                  onClick={() => {
-                    navigator.clipboard.writeText(createForm.tempPassword);
-                    toast.success("Senha copiada!");
-                  }}
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Copie e envie esta senha ao usuário.
-              </p>
-            </div>
           </div>
 
           <DialogFooter>
@@ -648,15 +600,12 @@ export default function Members() {
                   toast.error("Nome e e-mail são obrigatórios.");
                   return;
                 }
-                if (createForm.tempPassword.length < 6) {
-                  toast.error("A senha deve ter pelo menos 6 caracteres.");
-                  return;
-                }
-                createUserMutation.mutate(createForm);
+                inviteUserMutation.mutate(createForm);
               }}
-              disabled={createUserMutation.isPending}
+              disabled={inviteUserMutation.isPending}
             >
-              {createUserMutation.isPending ? "Cadastrando..." : "Cadastrar Usuário"}
+              <Send className="w-4 h-4 mr-2" />
+              {inviteUserMutation.isPending ? "Enviando..." : "Enviar Convite"}
             </Button>
           </DialogFooter>
         </DialogContent>

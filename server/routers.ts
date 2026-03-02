@@ -184,13 +184,12 @@ export const appRouter = router({
         return safe;
       }),
 
-    createUser: adminProcedure
+    inviteUser: adminProcedure
       .input(z.object({
         email: z.string().email(),
         firstName: z.string().min(1),
         lastName: z.string().optional(),
         role: z.string().default("user"),
-        tempPassword: z.string().min(6),
         clientId: z.number().nullable().optional(),
       }))
       .mutation(async ({ input }) => {
@@ -200,36 +199,33 @@ export const appRouter = router({
 
         const { createClerkClient } = await import("@clerk/express");
         const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+        const email = input.email.toLowerCase().trim();
 
         try {
-          const clerkUser = await clerkClient.users.createUser({
-            emailAddress: [input.email.toLowerCase().trim()],
-            firstName: input.firstName,
-            lastName: input.lastName || undefined,
-            password: input.tempPassword,
+          const invitation = await clerkClient.invitations.createInvitation({
+            emailAddress: email,
             publicMetadata: {
               role: input.role,
               clientId: input.role === "anunciante" ? input.clientId : null,
+              firstName: input.firstName,
+              lastName: input.lastName || null,
             },
+            redirectUrl: undefined,
           });
 
-          const newUser = await authStorage.upsertUser({
-            id: clerkUser.id,
-            email: input.email.toLowerCase().trim(),
+          return {
+            id: invitation.id,
+            email,
             firstName: input.firstName,
             lastName: input.lastName || null,
             role: input.role,
-            isActive: true,
-            clientId: input.role === "anunciante" ? input.clientId : null,
-          });
-
-          const { passwordHash: _ph, ...safeUser } = newUser;
-          return safeUser;
+            status: invitation.status,
+          };
         } catch (err: any) {
           if (err?.errors?.[0]?.code === "form_identifier_exists") {
-            throw new TRPCError({ code: "CONFLICT", message: "Já existe um usuário com este e-mail." });
+            throw new TRPCError({ code: "CONFLICT", message: "Já existe um convite pendente ou usuário com este e-mail." });
           }
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err?.message || "Erro ao criar usuário." });
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err?.message || "Erro ao convidar usuário." });
         }
       }),
   }),
