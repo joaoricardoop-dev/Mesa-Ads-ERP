@@ -50,7 +50,33 @@ async function startServer() {
       const { authStorage } = await import("../replit_integrations/auth");
       let user = await authStorage.getUser(auth.userId);
       if (!user) {
-        return res.status(403).json({ code: "NOT_REGISTERED", message: "Usuário não cadastrado na plataforma." });
+        try {
+          const clerkModule = await import("@clerk/express");
+          const clerkClient = clerkModule.createClerkClient({
+            secretKey: process.env.CLERK_SECRET_KEY!,
+          });
+          const clerkUser = await clerkClient.users.getUser(auth.userId);
+          const meta = (clerkUser.publicMetadata || {}) as any;
+          const role = meta.role || null;
+
+          if (!role) {
+            return res.status(403).json({ code: "NOT_REGISTERED", message: "Usuário não cadastrado na plataforma." });
+          }
+
+          const clientId = meta.clientId || null;
+          user = await authStorage.upsertUser({
+            id: clerkUser.id,
+            email: clerkUser.emailAddresses?.[0]?.emailAddress || null,
+            firstName: clerkUser.firstName || meta.firstName || null,
+            lastName: clerkUser.lastName || meta.lastName || null,
+            profileImageUrl: clerkUser.imageUrl || null,
+            role,
+            clientId: clientId ? Number(clientId) : null,
+          });
+        } catch (err) {
+          console.error("Failed to auto-provision user from Clerk:", err);
+          return res.status(403).json({ code: "NOT_REGISTERED", message: "Usuário não cadastrado na plataforma." });
+        }
       }
       const { passwordHash: _, ...safeUser } = user;
       res.json(safeUser);
