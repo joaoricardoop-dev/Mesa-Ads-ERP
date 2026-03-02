@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import {
   ArrowLeft,
+  Undo2,
   FileText,
   Calendar,
   CheckCircle2,
@@ -378,15 +379,27 @@ export default function QuotationDetail() {
                       </h3>
                       <p className="text-xs text-muted-foreground mt-1">O cliente aceitou? Ative para seguir o fluxo operacional.</p>
                     </div>
-                    <Button
-                      size="sm"
-                      className="gap-1.5 bg-primary hover:bg-primary/90"
-                      onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "ativa" })}
-                      disabled={statusChangeMutation.isPending}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      {statusChangeMutation.isPending ? "Ativando..." : "Ativar Cotação"}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "rascunho" })}
+                        disabled={statusChangeMutation.isPending}
+                      >
+                        <Undo2 className="w-3.5 h-3.5" />
+                        Voltar p/ Rascunho
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="gap-1.5 bg-primary hover:bg-primary/90"
+                        onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "ativa" })}
+                        disabled={statusChangeMutation.isPending}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {statusChangeMutation.isPending ? "Ativando..." : "Ativar Cotação"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -400,25 +413,49 @@ export default function QuotationDetail() {
                       </h3>
                       <p className="text-xs text-muted-foreground mt-1">Gere a OS Anunciante para formalizar o contrato.</p>
                     </div>
-                    <Button
-                      size="sm"
-                      className="gap-1.5 bg-amber-600 hover:bg-amber-700"
-                      onClick={() => { setOsForm({ description: "", periodStart: "", periodEnd: "", paymentTerms: "" }); setOsDialogOpen(true); }}
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      Gerar OS
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "enviada" })}
+                        disabled={statusChangeMutation.isPending}
+                      >
+                        <Undo2 className="w-3.5 h-3.5" />
+                        Voltar p/ Enviada
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="gap-1.5 bg-amber-600 hover:bg-amber-700"
+                        onClick={() => { setOsForm({ description: "", periodStart: "", periodEnd: "", paymentTerms: "" }); setOsDialogOpen(true); }}
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        Gerar OS
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
 
               {status === "os_gerada" && (
                 <div className="bg-card border border-amber-500/30 rounded-xl p-5 space-y-5">
-                  <div>
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <Store className="w-4 h-4 text-amber-400" /> Alocação de Restaurantes e Assinatura
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-1">Aloque os restaurantes, baixe o PDF da OS e assine para converter em campanha.</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Store className="w-4 h-4 text-amber-400" /> Alocação de Restaurantes e Assinatura
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">Aloque os restaurantes, baixe o PDF da OS e assine para converter em campanha.</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 shrink-0"
+                      onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "ativa" })}
+                      disabled={statusChangeMutation.isPending}
+                    >
+                      <Undo2 className="w-3.5 h-3.5" />
+                      Voltar p/ Ativa
+                    </Button>
                   </div>
 
                   {os && (
