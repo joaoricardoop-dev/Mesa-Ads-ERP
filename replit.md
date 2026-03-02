@@ -53,12 +53,13 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 
 - **Replit Auth** via OpenID Connect (supports Google, GitHub, Apple, email)
 - **Email/password auth**: Admin creates users with temp password → user logs in → ForcePasswordChange modal on first access → user sets own password
-- Login page shown when not logged in (`LoginPage.tsx`) — direct email/password form + social login option
+- **Anunciante self-registration**: Login page → "Sou anunciante" → enter CNPJ → system looks up client in DB → if found, fill name/email/password → creates account linked to client → auto-login to portal
+- Login page shown when not logged in (`LoginPage.tsx`) — direct email/password form + social login + anunciante registration
 - Original landing page (`LandingPage.tsx`) commented out but preserved
 - Sidebar footer shows user avatar, name, role, and logout button
-- Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`, `/api/auth/email-login`, `/api/auth/change-password`, `/api/auth/test-login` (dev only)
+- Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`, `/api/auth/email-login`, `/api/auth/change-password`, `/api/auth/register-advertiser`, `/api/auth/lookup-client`, `/api/auth/test-login` (dev only)
 - Test login (dev only): `POST /api/auth/test-login` with `{"userId": <id>}` — bypasses password, sets session with `expires_at`
-- Admin mutations: `members.createUser` (with temp password), `members.resetPassword` (sets mustChangePassword)
+- Admin mutations: `members.createUser` (with temp password + clientId for anunciante), `members.resetPassword` (sets mustChangePassword)
 - All user-returning endpoints sanitize `passwordHash` before sending to client
 - Session stored in PostgreSQL `sessions` table
 - `ForcePasswordChange` component (`client/src/components/ForcePasswordChange.tsx`) — modal overlay when `mustChangePassword` is true
