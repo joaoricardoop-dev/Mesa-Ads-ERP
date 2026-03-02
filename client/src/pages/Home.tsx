@@ -87,7 +87,7 @@ export default function Home() {
   const [numArts, setNumArts] = useState<number>(1);
   const [paramsOpen, setParamsOpen] = useState(true);
   const [goalSeekOpen, setGoalSeekOpen] = useState(false);
-  const [targetMargin, setTargetMargin] = useState("");
+  const [targetMargin, setTargetMargin] = useState("35");
   const [goalResult, setGoalResult] = useState<{ markup: number } | { error: string } | null>(null);
 
   const availableNumModels = useMemo<number[]>(() => {
