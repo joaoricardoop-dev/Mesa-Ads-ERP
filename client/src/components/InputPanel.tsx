@@ -5,10 +5,13 @@
  * Acentos em verde-esmeralda (#10B981)
  */
 
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { SimulatorInputs, CommissionType, PricingType } from "@/hooks/useSimulator";
 import {
   Package,
@@ -23,6 +26,7 @@ import {
   Clock,
   DollarSign,
   TrendingUp,
+  Crosshair,
 } from "lucide-react";
 
 interface InputPanelProps {
@@ -99,6 +103,132 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
       <div className="w-1.5 h-1.5 rounded-full bg-primary" />
       {children}
     </h3>
+  );
+}
+
+function solveMarkupForMargin(targetMargin: number, inputs: SimulatorInputs, restDbRate: number = 10): number | null {
+  const sellerRate = inputs.sellerCommission / 100;
+  const taxRateDecimal = inputs.taxRate / 100;
+  const agencyVarRate = inputs.commissionType === "variable" ? inputs.restaurantCommission / 100 : 0;
+  const totalVarRate = sellerRate + taxRateDecimal + agencyVarRate + (restDbRate / 100);
+  const denom = 1 - totalVarRate - targetMargin / 100;
+  if (denom <= 0) return null;
+  const mult = 1.0;
+  const markup = 100 * ((1 - totalVarRate) / (denom * mult) - 1);
+  if (markup < 0) return null;
+  return Math.round(markup * 10) / 10;
+}
+
+function GoalSeekMargin({ grossMargin, inputs, updateInput }: {
+  grossMargin: number;
+  inputs: SimulatorInputs;
+  updateInput: <K extends keyof SimulatorInputs>(key: K, value: SimulatorInputs[K]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [targetMargin, setTargetMargin] = useState("");
+  const [result, setResult] = useState<{ markup: number } | { error: string } | null>(null);
+
+  const handleSolve = () => {
+    const target = parseFloat(targetMargin);
+    if (isNaN(target) || target <= 0 || target >= 100) {
+      setResult({ error: "Informe uma margem entre 0% e 100%" });
+      return;
+    }
+    const markup = solveMarkupForMargin(target, inputs);
+    if (markup === null) {
+      setResult({ error: "Margem impossível com as taxas atuais" });
+    } else {
+      setResult({ markup });
+    }
+  };
+
+  const handleApply = () => {
+    if (result && "markup" in result) {
+      updateInput("pricingType", "variable" as PricingType);
+      updateInput("markupPercent", result.markup);
+      setOpen(false);
+      setResult(null);
+      setTargetMargin("");
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
+        <Shield className="w-3 h-3" />
+        Margem bruta atual
+      </Label>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 flex items-center gap-2 bg-background/50 border border-border/50 rounded-md h-9 px-3">
+          <span className={`font-mono text-sm font-semibold tabular-nums ${
+            grossMargin >= 40 ? "text-primary" : grossMargin >= 20 ? "text-amber-400" : "text-destructive"
+          }`}>
+            {grossMargin.toFixed(1)}
+          </span>
+          <span className="text-xs text-muted-foreground">%</span>
+        </div>
+        <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setResult(null); setTargetMargin(""); } }}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0 border-primary/30 hover:bg-primary/10 hover:border-primary/50"
+              title="Atingir meta de margem"
+            >
+              <Crosshair className="w-4 h-4 text-primary" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-4" side="right" align="start">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Target className="w-4 h-4 text-primary" />
+                Atingir Meta
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Informe a margem bruta desejada e o sistema calculará o markup necessário.
+              </p>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Margem bruta desejada</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={targetMargin}
+                    onChange={(e) => { setTargetMargin(e.target.value); setResult(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSolve(); }}
+                    placeholder="ex: 35"
+                    className="font-mono text-sm h-8"
+                    min={1}
+                    max={99}
+                    step={0.1}
+                    autoFocus
+                  />
+                  <span className="text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
+              <Button onClick={handleSolve} size="sm" className="w-full gap-2" variant="secondary">
+                <Crosshair className="w-3.5 h-3.5" />
+                Calcular
+              </Button>
+              {result && "error" in result && (
+                <p className="text-xs text-destructive font-medium">{result.error}</p>
+              )}
+              {result && "markup" in result && (
+                <div className="space-y-2 pt-1 border-t border-border/30">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Markup necessário:</span>
+                    <span className="font-mono font-bold text-primary">{result.markup.toFixed(1)}%</span>
+                  </div>
+                  <Button onClick={handleApply} size="sm" className="w-full gap-2">
+                    <Target className="w-3.5 h-3.5" />
+                    Aplicar markup de {result.markup.toFixed(1)}%
+                  </Button>
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
   );
 }
 
@@ -317,20 +447,11 @@ export default function InputPanel({ inputs, updateInput, grossMargin = 0 }: Inp
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
-              <Shield className="w-3 h-3" />
-              Margem bruta atual
-            </Label>
-            <div className="flex items-center gap-2 bg-background/50 border border-border/50 rounded-md h-9 px-3">
-              <span className={`font-mono text-sm font-semibold tabular-nums ${
-                grossMargin >= 40 ? "text-primary" : grossMargin >= 20 ? "text-amber-400" : "text-destructive"
-              }`}>
-                {grossMargin.toFixed(1)}
-              </span>
-              <span className="text-xs text-muted-foreground">%</span>
-            </div>
-          </div>
+          <GoalSeekMargin
+            grossMargin={grossMargin}
+            inputs={inputs}
+            updateInput={updateInput}
+          />
           <InputField
             label="Desconto máximo"
             value={inputs.maxDiscount}
