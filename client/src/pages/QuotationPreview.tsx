@@ -1,11 +1,11 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useSimulator, type BudgetOption, loadSavedBudgetId } from "@/hooks/useSimulator";
+import { useRestaurantAllocation, type AllocationEntry } from "@/hooks/useRestaurantAllocation";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -23,13 +23,10 @@ import {
   Banknote,
   TrendingUp,
   Target,
-  Calendar,
   FileText,
-  ShieldCheck,
-  Eye,
-  Percent,
-  DollarSign,
   BarChart3,
+  Star,
+  MapPin,
 } from "lucide-react";
 
 function SummaryCard({ label, value, sub, icon, accent, warn }: {
@@ -67,7 +64,7 @@ function ParamRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CostRow({ label, perRest, total, contract, pct, sub, bold, accent, warn }: {
+function CostRow({ label, perRest, total, contract, pct, sub, bold, accent, warn, separator }: {
   label: string;
   perRest: string;
   total: string;
@@ -77,18 +74,36 @@ function CostRow({ label, perRest, total, contract, pct, sub, bold, accent, warn
   bold?: boolean;
   accent?: boolean;
   warn?: boolean;
+  separator?: boolean;
 }) {
   const textClass = warn ? "text-red-400" : accent ? "text-emerald-400" : bold ? "text-foreground" : "text-muted-foreground";
   const fontClass = bold ? "font-semibold" : "font-normal";
   return (
-    <tr className={`text-xs ${textClass}`}>
-      <td className={`py-1.5 ${sub ? "pl-4" : "pl-0"} ${fontClass}`}>{label}</td>
-      <td className={`py-1.5 text-right font-mono tabular-nums ${fontClass}`}>{perRest}</td>
-      <td className={`py-1.5 text-right font-mono tabular-nums ${fontClass}`}>{total}</td>
-      <td className={`py-1.5 text-right font-mono tabular-nums ${fontClass}`}>{contract}</td>
-      <td className={`py-1.5 text-right font-mono tabular-nums text-[10px] ${textClass}`}>{pct}</td>
-    </tr>
+    <>
+      {separator && <tr><td colSpan={5} className="py-1"><div className="border-t border-border/20" /></td></tr>}
+      <tr className={`text-xs ${textClass}`}>
+        <td className={`py-1.5 ${sub ? "pl-4" : "pl-0"} ${fontClass}`}>{label}</td>
+        <td className={`py-1.5 text-right font-mono tabular-nums ${fontClass}`}>{perRest}</td>
+        <td className={`py-1.5 text-right font-mono tabular-nums ${fontClass}`}>{total}</td>
+        <td className={`py-1.5 text-right font-mono tabular-nums ${fontClass}`}>{contract}</td>
+        <td className={`py-1.5 text-right font-mono tabular-nums text-[10px] ${textClass}`}>{pct}</td>
+      </tr>
+    </>
   );
+}
+
+function getTierLabel(score: number): string {
+  if (score >= 4.0) return "Diamante";
+  if (score >= 3.0) return "Ouro";
+  if (score >= 2.0) return "Prata";
+  return "Bronze";
+}
+
+function getTierColor(score: number): string {
+  if (score >= 4.0) return "text-cyan-400";
+  if (score >= 3.0) return "text-amber-400";
+  if (score >= 2.0) return "text-gray-300";
+  return "text-orange-600";
 }
 
 export default function QuotationPreview() {
@@ -97,6 +112,7 @@ export default function QuotationPreview() {
 
   const { data: budgetsList = [] } = trpc.budget.listActiveWithItems.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
   const utils = trpc.useUtils();
 
   const savedBudgetId = loadSavedBudgetId();
@@ -119,21 +135,69 @@ export default function QuotationPreview() {
     };
   }, [savedBudgetId, budgetsList]);
 
-  const simulator = useSimulator(selectedBudget);
+  const restaurantsForAllocation = useMemo(
+    () => restaurantsList.map(r => ({
+      id: r.id,
+      name: r.name,
+      neighborhood: r.neighborhood,
+      ratingScore: r.ratingScore,
+      ratingMultiplier: r.ratingMultiplier,
+      commissionPercent: r.commissionPercent,
+      monthlyDrinksSold: r.monthlyDrinksSold,
+      status: r.status,
+    })),
+    [restaurantsList]
+  );
+
+  const simulatorBase = useSimulator(selectedBudget);
+  const totalCoasters = simulatorBase.inputs.coastersPerRestaurant * simulatorBase.inputs.activeRestaurants;
+
+  const allocation = useRestaurantAllocation(restaurantsForAllocation, totalCoasters);
+
+  const allocCommission = allocation.isValid ? allocation.weightedCommission : undefined;
+  const allocMultiplier = allocation.isValid ? allocation.weightedMultiplier : undefined;
+
+  const simulator = useSimulator(selectedBudget, allocCommission, allocMultiplier);
   const pr = simulator.perRestaurant;
   const ue = simulator.unitEconomics;
   const inputs = simulator.inputs;
   const n = inputs.activeRestaurants;
   const d = inputs.contractDuration;
 
-  const totalProduction = pr.productionCost * n;
+  const receitaProducaoPerRest = pr.productionCost;
+  const receitaVeiculacaoPerRest = pr.sellingPrice - pr.productionCost;
+  const receitaProducaoTotal = receitaProducaoPerRest * n;
+  const receitaVeiculacaoTotal = receitaVeiculacaoPerRest * n;
+
   const totalRestComm = pr.restaurantCommission * n;
+  const totalAgencyComm = pr.agencyCommission * n;
   const totalSellerComm = pr.sellerCommissionValue * n;
   const totalTax = pr.taxValue * n;
   const totalCosts = pr.totalCosts * n;
   const revenue = pr.sellingPrice * n;
   const grossProfit = pr.grossProfit * n;
   const pctOf = (val: number) => revenue > 0 ? `${((val / revenue) * 100).toFixed(1)}%` : "—";
+
+  const allocatedRestaurants = useMemo(() => {
+    if (!allocation.hasAllocations) return [];
+    return allocation.allocations
+      .filter(a => a.coasters > 0)
+      .map(a => {
+        const rest = restaurantsForAllocation.find(r => r.id === a.restaurantId);
+        const score = rest?.ratingScore ? parseFloat(rest.ratingScore) : 0;
+        const mult = rest?.ratingMultiplier ? parseFloat(rest.ratingMultiplier) : 1.0;
+        return {
+          id: a.restaurantId,
+          name: rest?.name || `#${a.restaurantId}`,
+          neighborhood: rest?.neighborhood || "",
+          coasters: a.coasters,
+          commissionPercent: a.commissionPercent,
+          ratingScore: score,
+          ratingMultiplier: mult,
+        };
+      })
+      .sort((a, b) => b.coasters - a.coasters);
+  }, [allocation.allocations, allocation.hasAllocations, restaurantsForAllocation]);
 
   const createQuotationMutation = trpc.quotation.create.useMutation({
     onSuccess: () => {
@@ -152,7 +216,7 @@ export default function QuotationPreview() {
     createQuotationMutation.mutate({
       clientId: parseInt(selectedClientId),
       campaignType: "bolachas",
-      coasterVolume: inputs.coastersPerRestaurant * n,
+      coasterVolume: totalCoasters,
       unitPrice: String(pr.sellingPrice),
       totalValue: String(totalValueCalc),
       includesProduction: true,
@@ -270,9 +334,17 @@ export default function QuotationPreview() {
               </div>
 
               <div className="bg-card border border-border/30 rounded-xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-border/20">
-                  <h3 className="text-sm font-semibold">DRE da Cotação</h3>
-                  <p className="text-[10px] text-muted-foreground">Demonstrativo de Resultado — {n} restaurantes, {d} meses</p>
+                <div className="px-5 py-3 border-b border-border/20 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold">DRE da Cotação</h3>
+                    <p className="text-[10px] text-muted-foreground">Demonstrativo de Resultado — {n} restaurantes, {d} meses</p>
+                  </div>
+                  {allocation.hasAllocations && (
+                    <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-lg px-3 py-1.5">
+                      <Star className="w-3.5 h-3.5 text-primary fill-primary" />
+                      <span className="text-xs font-mono font-bold text-primary">{allocation.weightedMultiplier.toFixed(2)}x</span>
+                    </div>
+                  )}
                 </div>
                 <div className="px-5 py-3 overflow-x-auto">
                   <table className="w-full">
@@ -286,43 +358,150 @@ export default function QuotationPreview() {
                       </tr>
                     </thead>
                     <tbody>
-                      <CostRow label="Receita Bruta" perRest={formatCurrency(pr.sellingPrice)} total={formatCurrency(revenue)} contract={formatCurrency(revenue * d)} pct="100%" bold />
-                      <tr><td colSpan={5} className="py-1"><div className="border-t border-border/20" /></td></tr>
-                      <CostRow label="(-) Produção" perRest={formatCurrency(pr.productionCost)} total={formatCurrency(totalProduction)} contract={formatCurrency(totalProduction * d)} pct={pctOf(totalProduction)} sub />
-                      <CostRow label="(-) Com. Restaurante" perRest={formatCurrency(pr.restaurantCommission)} total={formatCurrency(totalRestComm)} contract={formatCurrency(totalRestComm * d)} pct={pctOf(totalRestComm)} sub />
-                      <CostRow label="(-) Com. Vendedor" perRest={formatCurrency(pr.sellerCommissionValue)} total={formatCurrency(totalSellerComm)} contract={formatCurrency(totalSellerComm * d)} pct={pctOf(totalSellerComm)} sub />
+                      <CostRow
+                        label="Receita de Veiculação"
+                        perRest={formatCurrency(receitaVeiculacaoPerRest)}
+                        total={formatCurrency(receitaVeiculacaoTotal)}
+                        contract={formatCurrency(receitaVeiculacaoTotal * d)}
+                        pct={pctOf(receitaVeiculacaoTotal)}
+                        bold accent
+                      />
+                      <CostRow
+                        label="Receita de Produção"
+                        perRest={formatCurrency(receitaProducaoPerRest)}
+                        total={formatCurrency(receitaProducaoTotal)}
+                        contract={formatCurrency(receitaProducaoTotal * d)}
+                        pct={pctOf(receitaProducaoTotal)}
+                        bold
+                      />
+                      <CostRow
+                        label="Receita Total"
+                        perRest={formatCurrency(pr.sellingPrice)}
+                        total={formatCurrency(revenue)}
+                        contract={formatCurrency(revenue * d)}
+                        pct="100,0%"
+                        bold separator
+                      />
+
+                      <CostRow label="" perRest="" total="" contract="" pct="" separator />
+
+                      <CostRow label="(-) Custo de Produção" perRest={formatCurrency(pr.productionCost)} total={formatCurrency(receitaProducaoTotal)} contract={formatCurrency(receitaProducaoTotal * d)} pct={pctOf(receitaProducaoTotal)} sub />
+                      <CostRow label="(-) Comissão Restaurante" perRest={formatCurrency(pr.restaurantCommission)} total={formatCurrency(totalRestComm)} contract={formatCurrency(totalRestComm * d)} pct={pctOf(totalRestComm)} sub />
+                      <CostRow label="(-) Comissão Agência/Parceiro" perRest={formatCurrency(pr.agencyCommission)} total={formatCurrency(totalAgencyComm)} contract={formatCurrency(totalAgencyComm * d)} pct={pctOf(totalAgencyComm)} sub />
+                      <CostRow label="(-) Comissão Vendedor" perRest={formatCurrency(pr.sellerCommissionValue)} total={formatCurrency(totalSellerComm)} contract={formatCurrency(totalSellerComm * d)} pct={pctOf(totalSellerComm)} sub />
                       <CostRow label="(-) Impostos" perRest={formatCurrency(pr.taxValue)} total={formatCurrency(totalTax)} contract={formatCurrency(totalTax * d)} pct={pctOf(totalTax)} sub />
-                      <tr><td colSpan={5} className="py-1"><div className="border-t border-border/20" /></td></tr>
-                      <CostRow label="Total Custos" perRest={formatCurrency(pr.totalCosts)} total={formatCurrency(totalCosts)} contract={formatCurrency(totalCosts * d)} pct={pctOf(totalCosts)} bold warn={pr.grossMargin < inputs.minMargin} />
-                      <tr><td colSpan={5} className="py-1"><div className="border-t border-border/20" /></td></tr>
-                      <CostRow label="Lucro Líquido" perRest={formatCurrency(pr.grossProfit)} total={formatCurrency(grossProfit)} contract={formatCurrency(grossProfit * d)} pct={formatPercent(pr.grossMargin)} bold accent={pr.grossProfit > 0} warn={pr.grossProfit <= 0} />
+
+                      <CostRow label="Total de Custos" perRest={formatCurrency(pr.totalCosts)} total={formatCurrency(totalCosts)} contract={formatCurrency(totalCosts * d)} pct={pctOf(totalCosts)} bold warn={pr.grossMargin < inputs.minMargin} separator />
+
+                      <CostRow label="Lucro Líquido (Mesa Ads)" perRest={formatCurrency(pr.grossProfit)} total={formatCurrency(grossProfit)} contract={formatCurrency(grossProfit * d)} pct={formatPercent(pr.grossMargin)} bold accent={pr.grossProfit > 0} warn={pr.grossProfit <= 0} separator />
                     </tbody>
                   </table>
                 </div>
+
+                <div className="px-5 py-3 border-t border-border/20 bg-card/50">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Veiculação (contrato)</p>
+                      <p className="font-mono font-bold text-sm text-primary">{formatCurrency(receitaVeiculacaoTotal * d)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Produção (contrato)</p>
+                      <p className="font-mono font-bold text-sm">{formatCurrency(receitaProducaoTotal * d)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Receita Total</p>
+                      <p className="font-mono font-bold text-sm text-primary">{formatCurrency(revenue * d)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Lucro Contrato</p>
+                      <p className={`font-mono font-bold text-sm ${ue.contractProfit > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        {formatCurrency(ue.contractProfit)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-card border border-border/30 rounded-lg p-3 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Custo Produção</p>
-                  <p className="font-mono font-bold text-sm mt-1">{formatCurrency(totalProduction * d)}</p>
-                  <p className="text-[10px] text-muted-foreground">{formatCurrency(totalProduction)}/mês</p>
+              {allocatedRestaurants.length > 0 && (
+                <div className="bg-card border border-border/30 rounded-xl overflow-hidden">
+                  <div className="px-5 py-3 border-b border-border/20 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Store className="w-4 h-4 text-primary" />
+                        Restaurantes Alocados
+                      </h3>
+                      <p className="text-[10px] text-muted-foreground">
+                        {allocatedRestaurants.length} restaurantes · {formatNumber(allocation.allocatedTotal)} coasters alocados
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 text-right">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Score Ponderado</p>
+                        <p className="font-mono text-sm font-bold">{allocation.weightedScore.toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Multiplicador</p>
+                        <p className="font-mono text-sm font-bold text-primary">{allocation.weightedMultiplier.toFixed(2)}x</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/20">
+                          <th className="text-left px-5 py-2 font-medium">Restaurante</th>
+                          <th className="text-left px-3 py-2 font-medium">Bairro</th>
+                          <th className="text-right px-3 py-2 font-medium">Coasters</th>
+                          <th className="text-right px-3 py-2 font-medium">Rating</th>
+                          <th className="text-right px-3 py-2 font-medium">Mult.</th>
+                          <th className="text-right px-3 py-2 font-medium">Com. %</th>
+                          <th className="text-right px-5 py-2 font-medium">% Volume</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allocatedRestaurants.map((r) => (
+                          <tr key={r.id} className="text-xs border-b border-border/10 hover:bg-muted/30">
+                            <td className="px-5 py-2 font-medium">{r.name}</td>
+                            <td className="px-3 py-2 text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                {r.neighborhood || "—"}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums">{r.coasters.toLocaleString("pt-BR")}</td>
+                            <td className="px-3 py-2 text-right">
+                              <span className={`font-mono font-semibold ${getTierColor(r.ratingScore)}`}>
+                                {r.ratingScore > 0 ? r.ratingScore.toFixed(2) : "—"}
+                              </span>
+                              {r.ratingScore > 0 && (
+                                <span className={`text-[9px] ml-1 ${getTierColor(r.ratingScore)}`}>
+                                  {getTierLabel(r.ratingScore)}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums text-primary font-semibold">{r.ratingMultiplier.toFixed(2)}x</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums">{r.commissionPercent}%</td>
+                            <td className="px-5 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                              {allocation.allocatedTotal > 0 ? ((r.coasters / allocation.allocatedTotal) * 100).toFixed(1) : "0"}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="text-xs font-semibold border-t border-border/30 bg-muted/20">
+                          <td className="px-5 py-2">Total</td>
+                          <td className="px-3 py-2"></td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{allocation.allocatedTotal.toLocaleString("pt-BR")}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{allocation.weightedScore.toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-primary">{allocation.weightedMultiplier.toFixed(2)}x</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{allocation.weightedCommission.toFixed(1)}%</td>
+                          <td className="px-5 py-2 text-right font-mono tabular-nums">100%</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
-                <div className="bg-card border border-border/30 rounded-lg p-3 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Com. Restaurante</p>
-                  <p className="font-mono font-bold text-sm mt-1">{formatCurrency(totalRestComm * d)}</p>
-                  <p className="text-[10px] text-muted-foreground">{formatCurrency(totalRestComm)}/mês</p>
-                </div>
-                <div className="bg-card border border-border/30 rounded-lg p-3 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Com. Vendedor</p>
-                  <p className="font-mono font-bold text-sm mt-1">{formatCurrency(totalSellerComm * d)}</p>
-                  <p className="text-[10px] text-muted-foreground">{formatCurrency(totalSellerComm)}/mês</p>
-                </div>
-                <div className="bg-card border border-border/30 rounded-lg p-3 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Impostos</p>
-                  <p className="font-mono font-bold text-sm mt-1">{formatCurrency(totalTax * d)}</p>
-                  <p className="text-[10px] text-muted-foreground">{formatCurrency(totalTax)}/mês</p>
-                </div>
-              </div>
+              )}
 
               <div className="bg-card border border-border/30 rounded-xl p-5">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
@@ -334,13 +513,19 @@ export default function QuotationPreview() {
                   <ParamRow label="Uso Médio/Dia" value={`${inputs.usagePerDay}x`} />
                   <ParamRow label="Dias/Mês" value={String(inputs.daysPerMonth)} />
                   <ParamRow label="Impressões/Rest./Mês" value={formatNumber(pr.impressions)} />
-                  <ParamRow label="Total Coasters" value={formatNumber(inputs.coastersPerRestaurant * n)} />
+                  <ParamRow label="Total Coasters" value={formatNumber(totalCoasters)} />
                   <ParamRow label={inputs.pricingType === "variable" ? "Markup" : "Preço Fixo"} value={inputs.pricingType === "variable" ? `${inputs.markupPercent}%` : formatCurrency(inputs.fixedPrice)} />
                   <ParamRow label="Duração" value={`${d} meses`} />
-                  <ParamRow label={inputs.commissionType === "variable" ? "Com. Rest. (%)" : "Com. Rest. (R$/un)"} value={inputs.commissionType === "variable" ? `${inputs.restaurantCommission}%` : `R$ ${inputs.fixedCommission.toFixed(4)}`} />
+                  <ParamRow label={inputs.commissionType === "variable" ? "Com. Agência (%)" : "Com. Agência (R$/un)"} value={inputs.commissionType === "variable" ? `${inputs.restaurantCommission}%` : `R$ ${inputs.fixedCommission.toFixed(4)}`} />
                   <ParamRow label="Com. Vendedor" value={`${inputs.sellerCommission}%`} />
                   <ParamRow label="Impostos" value={`${inputs.taxRate}%`} />
                   <ParamRow label="Custo Unitário" value={`R$ ${simulator.effectiveUnitCost.toFixed(4)}`} />
+                  {allocation.hasAllocations && (
+                    <>
+                      <ParamRow label="Com. Rest. Ponderada" value={`${allocation.weightedCommission.toFixed(1)}%`} />
+                      <ParamRow label="Multiplicador Rating" value={`${allocation.weightedMultiplier.toFixed(2)}x`} />
+                    </>
+                  )}
                 </div>
               </div>
             </div>
