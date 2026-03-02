@@ -111,12 +111,20 @@ export default function Members() {
   } | null>(null);
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({
+  const [createForm, setCreateForm] = useState<{
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    tempPassword: string;
+    clientId: number | null;
+  }>({
     email: "",
     firstName: "",
     lastName: "",
     role: "user",
     tempPassword: generateTempPassword(),
+    clientId: null,
   });
   const [showTempPassword, setShowTempPassword] = useState(false);
 
@@ -130,6 +138,7 @@ export default function Members() {
 
   const utils = trpc.useUtils();
   const { data: membersList = [], isLoading } = trpc.members.list.useQuery();
+  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
 
   const updateRoleMutation = trpc.members.updateRole.useMutation({
     onSuccess: () => {
@@ -152,7 +161,7 @@ export default function Members() {
     onSuccess: () => {
       utils.members.list.invalidate();
       setCreateDialogOpen(false);
-      setCreateForm({ email: "", firstName: "", lastName: "", role: "user", tempPassword: generateTempPassword() });
+      setCreateForm({ email: "", firstName: "", lastName: "", role: "user", tempPassword: generateTempPassword(), clientId: null });
       toast.success("Usuário cadastrado com sucesso! A senha temporária foi definida.");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -184,7 +193,7 @@ export default function Members() {
       description="Cadastrar, gerenciar papéis e permissões dos usuários da plataforma"
       actions={
         <Button onClick={() => {
-          setCreateForm({ email: "", firstName: "", lastName: "", role: "user", tempPassword: generateTempPassword() });
+          setCreateForm({ email: "", firstName: "", lastName: "", role: "user", tempPassword: generateTempPassword(), clientId: null });
           setShowTempPassword(false);
           setCreateDialogOpen(true);
         }}>
@@ -599,6 +608,29 @@ export default function Members() {
                 </SelectContent>
               </Select>
             </div>
+            {createForm.role === "anunciante" && (
+              <div className="grid gap-2">
+                <Label>Anunciante vinculado</Label>
+                <Select
+                  value={createForm.clientId?.toString() || ""}
+                  onValueChange={(val) => setCreateForm({ ...createForm, clientId: val ? parseInt(val) : null })}
+                >
+                  <SelectTrigger className="bg-background border-border/30">
+                    <SelectValue placeholder="Selecione o anunciante..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientsList.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>
+                        {c.company || c.name} {c.cnpj ? `(${c.cnpj})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  O anunciante verá apenas campanhas, cotações e faturas desta empresa.
+                </p>
+              </div>
+            )}
             <div className="grid gap-2">
               <Label>Senha Temporária</Label>
               <div className="flex gap-2">

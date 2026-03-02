@@ -36,11 +36,23 @@ import Invoicing from "./pages/financial/Invoicing";
 import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
 import OperationalCosts from "./pages/financial/OperationalCosts";
 import FinancialReport from "./pages/financial/FinancialReport";
+import AnunciantePortal from "./pages/AnunciantePortal";
+
+function AnuncianteRouter() {
+  return (
+    <Switch>
+      <Route path="/" component={AnunciantePortal} />
+      <Route path="/portal" component={AnunciantePortal} />
+      <Route component={AnunciantePortal} />
+    </Switch>
+  );
+}
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/portal" component={AnunciantePortal} />
       <Route path="/comercial/simulador" component={Home} />
       <Route path="/comercial/cotacoes/:id" component={QuotationDetail} />
       <Route path="/comercial/cotacoes" component={Quotations} />
@@ -90,6 +102,19 @@ function AuthenticatedApp() {
 
   if (!isAuthenticated) {
     return <LoginPage />;
+  }
+
+  const isAnunciante = user?.role === "anunciante";
+
+  if (isAnunciante) {
+    return (
+      <div className="h-screen flex overflow-hidden">
+        <DashboardLayout user={user}>
+          <AnuncianteRouter />
+        </DashboardLayout>
+        <ForcePasswordChange />
+      </div>
+    );
   }
 
   return (

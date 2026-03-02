@@ -76,7 +76,7 @@ export function registerAuthRoutes(app: Express): void {
         const db = await getDb();
         if (!db) return res.status(500).json({ message: "Database not available" });
 
-        const [user] = await db.select().from(users).where(eq(users.id, parseInt(userId)));
+        const [user] = await db.select().from(users).where(eq(users.id, String(userId)));
         if (!user) {
           return res.status(404).json({ message: "User not found" });
         }

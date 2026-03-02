@@ -69,7 +69,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - **Comercial**: Cotações (create, WIN), Simulador, Leads/CRM, Cadastro Anunciantes, OS Anunciantes, Biblioteca
 - **Operações**: Campanhas (all workflow steps), OS Produção, Biblioteca, Provas de execução
 - **Financeiro**: Dashboard financeiro, Faturamento, Pagamentos, Custos, Relatórios
-- **Anunciante**: Portal — view own campaigns, request new campaigns, edit own profile
+- **Anunciante**: Portal (`/portal`, `AnunciantePortal.tsx`) — view own campaigns, cotações, faturas, edit own profile; user linked to client via `users.clientId`
 - **Manager/User/Viewer**: Legacy roles (backward compatibility)
 - Admin-only pages: Gestão de Usuários, Financeiro module
 - **Backend role procedures**: `comercialProcedure`, `operacoesProcedure`, `financeiroProcedure`, `internalProcedure` (admin always allowed)
@@ -79,7 +79,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 
 ## Database Tables
 
-- `users` — Auth users with role, isActive, lastLoginAt
+- `users` — Auth users with role, isActive, clientId (links anunciante to client), lastLoginAt
 - `sessions` — Auth sessions (Replit Auth)
 - `restaurants` — Prospecting/leads for partner restaurants
 - `active_restaurants` — Onboarded active restaurants with full operational data

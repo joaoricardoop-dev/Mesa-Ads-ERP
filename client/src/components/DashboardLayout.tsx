@@ -82,6 +82,10 @@ function isGroup(entry: NavEntry): entry is NavGroup {
   return "items" in entry;
 }
 
+const ANUNCIANTE_NAV_ENTRIES: NavEntry[] = [
+  { icon: BarChart3, label: "Meu Portal", path: "/" },
+];
+
 const NAV_ENTRIES: NavEntry[] = [
   { icon: BarChart3, label: "Dashboard", path: "/" },
   {
@@ -235,7 +239,7 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0 px-2 py-2">
             <SidebarMenu>
-              {NAV_ENTRIES.map((entry) => {
+              {(user.role === "anunciante" ? ANUNCIANTE_NAV_ENTRIES : NAV_ENTRIES).map((entry) => {
                 const userRole = user.role || "user";
                 const canSee = (item: { adminOnly?: boolean; allowedRoles?: string[] }) => {
                   if (item.adminOnly && userRole !== "admin") return false;

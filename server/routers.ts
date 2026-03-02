@@ -8,7 +8,7 @@ import { serviceOrderRouter } from "./serviceOrderRouter";
 import { termRouter } from "./termRouter";
 import { libraryRouter } from "./libraryRouter";
 import { batchRouter } from "./batchRouter";
-import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, anuncianteProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { authStorage } from "./replit_integrations/auth";
@@ -126,6 +126,7 @@ export const appRouter = router({
         lastName: z.string().optional(),
         role: z.string().default("user"),
         tempPassword: z.string().min(6),
+        clientId: z.number().nullable().optional(),
       }))
       .mutation(async ({ input }) => {
         const bcrypt = await import("bcryptjs");
@@ -140,6 +141,10 @@ export const appRouter = router({
           throw new TRPCError({ code: "CONFLICT", message: "Já existe um usuário com este e-mail." });
         }
 
+        if (input.role === "anunciante" && !input.clientId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Anunciantes devem ser vinculados a um cliente." });
+        }
+
         const hash = await bcrypt.hash(input.tempPassword, 10);
         const [user] = await db.insert(usersTable).values({
           email: input.email.toLowerCase().trim(),
@@ -149,6 +154,7 @@ export const appRouter = router({
           isActive: true,
           passwordHash: hash,
           mustChangePassword: true,
+          clientId: input.role === "anunciante" ? input.clientId : null,
         }).returning();
         const { passwordHash: _ph, ...safeUser } = user;
         return safeUser;
@@ -938,6 +944,84 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteBudget(input.id)),
+  }),
+
+  portal: router({
+    myProfile: anuncianteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.clientId) return null;
+      return getClient(user.clientId);
+    }),
+
+    myCampaigns: anuncianteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.clientId) return [];
+      const allCampaigns = await listCampaigns();
+      return allCampaigns.filter((c: any) => c.clientId === user.clientId);
+    }),
+
+    myQuotations: anuncianteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.clientId) return [];
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return [];
+      const { quotations } = await import("../drizzle/schema");
+      const { eq, desc } = await import("drizzle-orm");
+      const results = await db.select({
+        id: quotations.id,
+        quotationNumber: quotations.quotationNumber,
+        quotationName: quotations.quotationName,
+        coasterVolume: quotations.coasterVolume,
+        totalValue: quotations.totalValue,
+        status: quotations.status,
+        validUntil: quotations.validUntil,
+        createdAt: quotations.createdAt,
+      }).from(quotations).where(eq(quotations.clientId, user.clientId)).orderBy(desc(quotations.createdAt));
+      return results;
+    }),
+
+    myInvoices: anuncianteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.clientId) return [];
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return [];
+      const { invoices, campaigns } = await import("../drizzle/schema");
+      const { eq, desc } = await import("drizzle-orm");
+      const results = await db.select({
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        campaignName: campaigns.name,
+        amount: invoices.amount,
+        issueDate: invoices.issueDate,
+        dueDate: invoices.dueDate,
+        paymentDate: invoices.paymentDate,
+        status: invoices.status,
+      }).from(invoices)
+        .leftJoin(campaigns, eq(invoices.campaignId, campaigns.id))
+        .where(eq(invoices.clientId, user.clientId))
+        .orderBy(desc(invoices.issueDate));
+      return results;
+    }),
+
+    updateProfile: anuncianteProcedure
+      .input(z.object({
+        contactEmail: z.string().optional(),
+        contactPhone: z.string().optional(),
+        instagram: z.string().optional(),
+        address: z.string().optional(),
+        addressNumber: z.string().optional(),
+        neighborhood: z.string().optional(),
+        city: z.string().optional(),
+        state: z.string().optional(),
+        cep: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const user = ctx.user;
+        if (!user || !user.clientId) throw new TRPCError({ code: "FORBIDDEN", message: "Sem perfil vinculado" });
+        return updateClient(user.clientId, input);
+      }),
   }),
 });
 

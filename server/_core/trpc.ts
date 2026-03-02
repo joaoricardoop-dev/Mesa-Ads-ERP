@@ -75,3 +75,4 @@ export const comercialProcedure = createRoleProcedure(["comercial", "manager"]);
 export const operacoesProcedure = createRoleProcedure(["operacoes", "manager"]);
 export const financeiroProcedure = createRoleProcedure(["financeiro", "manager"]);
 export const internalProcedure = createRoleProcedure(["comercial", "operacoes", "financeiro", "manager"]);
+export const anuncianteProcedure = createRoleProcedure(["anunciante"]);
