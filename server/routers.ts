@@ -220,6 +220,56 @@ export const appRouter = router({
         return safe;
       }),
 
+    listInvitations: adminProcedure.query(async () => {
+      const { createClerkClient } = await import("@clerk/express");
+      const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+
+      try {
+        const allInvitations: any[] = [];
+        let offset = 0;
+        const pageSize = 100;
+
+        while (true) {
+          const page = await clerkClient.invitations.getInvitationList({ limit: pageSize, offset });
+          allInvitations.push(...page.data);
+          if (page.data.length < pageSize) break;
+          offset += pageSize;
+        }
+
+        return allInvitations.map((inv) => {
+          const meta = inv.publicMetadata as any;
+          return {
+            id: inv.id,
+            email: inv.emailAddress,
+            status: inv.status,
+            role: meta?.role || "user",
+            firstName: meta?.firstName || null,
+            lastName: meta?.lastName || null,
+            createdAt: inv.createdAt ? new Date(inv.createdAt).toISOString() : null,
+            updatedAt: inv.updatedAt ? new Date(inv.updatedAt).toISOString() : null,
+          };
+        });
+      } catch (err: any) {
+        console.error("Failed to fetch invitations:", err);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao buscar convites do Clerk." });
+      }
+    }),
+
+    revokeInvitation: adminProcedure
+      .input(z.object({ invitationId: z.string() }))
+      .mutation(async ({ input }) => {
+        const { createClerkClient } = await import("@clerk/express");
+        const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+
+        try {
+          await clerkClient.invitations.revokeInvitation(input.invitationId);
+          return { success: true };
+        } catch (err: any) {
+          console.error("Failed to revoke invitation:", err);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao revogar convite." });
+        }
+      }),
+
     inviteUser: adminProcedure
       .input(z.object({
         email: z.string().email(),

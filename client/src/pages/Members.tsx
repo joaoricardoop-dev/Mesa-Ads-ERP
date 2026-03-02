@@ -45,6 +45,10 @@ import {
   CalendarDays,
   UserPlus,
   Send,
+  XCircle,
+  CheckCircle2,
+  Hourglass,
+  Ban,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -121,6 +125,7 @@ export default function Members() {
   const utils = trpc.useUtils();
   const { data: membersList = [], isLoading } = trpc.members.list.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: invitationsList = [], isLoading: isLoadingInvitations } = trpc.members.listInvitations.useQuery();
 
   const updateRoleMutation = trpc.members.updateRole.useMutation({
     onSuccess: () => {
@@ -142,9 +147,18 @@ export default function Members() {
   const inviteUserMutation = trpc.members.inviteUser.useMutation({
     onSuccess: (data) => {
       utils.members.list.invalidate();
+      utils.members.listInvitations.invalidate();
       setCreateDialogOpen(false);
       setCreateForm({ email: "", firstName: "", lastName: "", role: "user", clientId: null });
       toast.success(`Convite enviado para ${data.email}! O usuário receberá um e-mail para criar sua conta.`);
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const revokeInvitationMutation = trpc.members.revokeInvitation.useMutation({
+    onSuccess: () => {
+      utils.members.listInvitations.invalidate();
+      toast.success("Convite revogado com sucesso!");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
@@ -349,6 +363,90 @@ export default function Members() {
             })
           )}
         </div>
+
+        {invitationsList.length > 0 && (
+          <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-border/20 bg-muted/30 flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Send className="w-4 h-4 text-primary" />
+                Convites Enviados
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  {invitationsList.filter((i) => i.status === "pending").length} pendente{invitationsList.filter((i) => i.status === "pending").length !== 1 ? "s" : ""}
+                </Badge>
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-[1fr_140px_120px_100px] gap-4 px-4 py-2.5 border-b border-border/20 bg-muted/20">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Convidado</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Papel</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Enviado</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Status</p>
+            </div>
+
+            {invitationsList.map((inv) => {
+              const roleConfig = ROLE_CONFIG[inv.role || "user"] || ROLE_CONFIG.user;
+              const statusConfig = {
+                pending: { label: "Pendente", icon: Hourglass, color: "text-amber-400" },
+                accepted: { label: "Aceito", icon: CheckCircle2, color: "text-green-400" },
+                revoked: { label: "Revogado", icon: Ban, color: "text-red-400" },
+              }[inv.status] || { label: inv.status, icon: Clock, color: "text-muted-foreground" };
+
+              return (
+                <div
+                  key={inv.id}
+                  className={`grid grid-cols-[1fr_140px_120px_100px] gap-4 px-4 py-3 border-b border-border/10 items-center hover:bg-muted/20 transition-colors ${inv.status === "revoked" ? "opacity-50" : ""}`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                      {inv.email}
+                    </p>
+                    {(inv.firstName || inv.lastName) && (
+                      <p className="text-xs text-muted-foreground mt-0.5 pl-5">
+                        {[inv.firstName, inv.lastName].filter(Boolean).join(" ")}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Badge variant="outline" className={`text-[10px] ${roleConfig.color}`}>
+                      {roleConfig.label}
+                    </Badge>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {inv.createdAt
+                        ? formatDistanceToNow(new Date(inv.createdAt), { addSuffix: true, locale: ptBR })
+                        : "—"}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-1">
+                    {inv.status === "pending" ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs px-2 text-amber-400 hover:text-red-400 hover:bg-red-500/10"
+                        onClick={() => revokeInvitationMutation.mutate({ invitationId: inv.id })}
+                        disabled={revokeInvitationMutation.isPending}
+                        title="Revogar convite"
+                      >
+                        <XCircle className="w-3.5 h-3.5 mr-1" />
+                        Revogar
+                      </Button>
+                    ) : (
+                      <span className={`flex items-center gap-1 text-xs ${statusConfig.color}`}>
+                        <statusConfig.icon className="w-3.5 h-3.5" />
+                        {statusConfig.label}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         <div className="bg-card/50 border border-border/30 rounded-xl p-5 space-y-4">
           <h3 className="text-sm font-semibold flex items-center gap-2">
