@@ -2,6 +2,7 @@ import { useState, Fragment, useCallback } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
+import { generateProposalPdf } from "@/lib/generate-proposal-pdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -521,6 +522,40 @@ export default function Quotations() {
                         title="Abrir"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-emerald-500 hover:text-emerald-400"
+                        onClick={() => {
+                          const numRest = q.unitPrice && q.totalValue
+                            ? Math.round(Number(q.totalValue) / Number(q.unitPrice))
+                            : 1;
+                          const duration = q.cycles || 1;
+                          const pricePerRest = q.unitPrice ? Number(q.unitPrice) : 0;
+                          const monthlyTotal = pricePerRest * numRest;
+                          generateProposalPdf({
+                            clientName: q.clientName || "Cliente",
+                            clientCompany: q.clientCompany || undefined,
+                            clientCnpj: q.clientCnpj || undefined,
+                            clientEmail: q.clientEmail || undefined,
+                            clientPhone: q.clientPhone || undefined,
+                            quotationName: q.quotationName || q.quotationNumber,
+                            coasterVolume: q.coasterVolume,
+                            numRestaurants: numRest,
+                            coastersPerRestaurant: numRest > 0 ? Math.round(q.coasterVolume / numRest) : q.coasterVolume,
+                            contractDuration: duration,
+                            pricePerRestaurant: pricePerRest,
+                            monthlyTotal,
+                            contractTotal: Number(q.totalValue || 0),
+                            includesProduction: q.includesProduction ?? true,
+                            restaurants: [],
+                          });
+                          toast.success("PDF da proposta gerado!");
+                        }}
+                        title="Exportar Proposta PDF"
+                      >
+                        <Download className="w-3.5 h-3.5" />
                       </Button>
                       {q.status === "ativa" && (
                         <Button
