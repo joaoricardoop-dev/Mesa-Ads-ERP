@@ -244,7 +244,7 @@ export default function Home() {
                           </Label>
                           <div className="bg-background/50 border border-border/50 rounded-md h-9 flex items-center px-3">
                             <span className="font-mono text-sm font-semibold text-primary">
-                              R$ {simulator.effectiveUnitCost.toFixed(3)}
+                              R$ {simulator.effectiveUnitCost.toFixed(4)}
                             </span>
                             <span className="text-xs text-muted-foreground ml-2">/ coaster</span>
                           </div>
@@ -288,7 +288,7 @@ export default function Home() {
                               >
                                 <span className="font-semibold">{item.quantity.toLocaleString("pt-BR")}</span>
                                 <span className="mx-1">→</span>
-                                <span>R$ {parseFloat(item.unitPrice).toFixed(3)}</span>
+                                <span>R$ {parseFloat(item.unitPrice).toFixed(4)}</span>
                               </div>
                             );
                           })}

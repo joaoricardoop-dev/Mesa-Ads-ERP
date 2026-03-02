@@ -253,7 +253,7 @@ export default function QuotationPreview() {
                   <p className="text-sm font-medium">{selectedBudget.supplierName}</p>
                   <p className="text-xs text-muted-foreground">{selectedBudget.code || selectedBudget.description}</p>
                   <p className="text-xs font-mono text-amber-400">
-                    Custo unitário: R$ {simulator.effectiveUnitCost.toFixed(3)}
+                    Custo unitário: R$ {simulator.effectiveUnitCost.toFixed(4)}
                   </p>
                 </div>
               )}
@@ -338,7 +338,7 @@ export default function QuotationPreview() {
                   <ParamRow label={inputs.commissionType === "variable" ? "Com. Rest. (%)" : "Com. Rest. (R$/un)"} value={inputs.commissionType === "variable" ? `${inputs.restaurantCommission}%` : `R$ ${inputs.fixedCommission.toFixed(4)}`} />
                   <ParamRow label="Com. Vendedor" value={`${inputs.sellerCommission}%`} />
                   <ParamRow label="Impostos" value={`${inputs.taxRate}%`} />
-                  <ParamRow label="Custo Unitário" value={`R$ ${simulator.effectiveUnitCost.toFixed(3)}`} />
+                  <ParamRow label="Custo Unitário" value={`R$ ${simulator.effectiveUnitCost.toFixed(4)}`} />
                 </div>
               </div>
             </div>
