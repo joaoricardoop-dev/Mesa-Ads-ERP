@@ -297,10 +297,10 @@ export default function Home() {
                   <Package className="w-3.5 h-3.5 text-primary" />
                   <span className="text-xs font-semibold text-primary uppercase tracking-wider">Custo de Produção</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <CompactField label="Orçamento">
+                <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr] gap-3">
+                  <CompactField label="Orçamento" className="min-w-0">
                     <Select value={selectedBudgetId} onValueChange={(v) => { setSelectedBudgetId(v); saveBudgetId(v === "manual" ? null : parseInt(v)); }}>
-                      <SelectTrigger className="bg-background/50 border-border/50 h-8 text-sm">
+                      <SelectTrigger className="bg-background/50 border-border/50 h-8 text-sm [&>span]:truncate [&>span]:block">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
