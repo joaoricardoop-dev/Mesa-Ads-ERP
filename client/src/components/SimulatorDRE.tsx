@@ -1,7 +1,6 @@
 import type { PerRestaurantMetrics, UnitEconomics } from "@/hooks/useSimulator";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { motion } from "framer-motion";
-import { Star } from "lucide-react";
 
 interface SimulatorDREProps {
   perRestaurant: PerRestaurantMetrics;
@@ -9,7 +8,6 @@ interface SimulatorDREProps {
   activeRestaurants: number;
   contractDuration: number;
   minMargin: number;
-  weightedMultiplier?: number;
   weightedScore?: number;
   allocationValid?: boolean;
 }
@@ -78,7 +76,6 @@ export default function SimulatorDRE({
   activeRestaurants,
   contractDuration,
   minMargin,
-  weightedMultiplier,
   weightedScore,
   allocationValid,
 }: SimulatorDREProps) {
@@ -212,32 +209,6 @@ export default function SimulatorDRE({
           </tbody>
         </table>
       </div>
-
-      {weightedMultiplier !== undefined && weightedScore !== undefined && (
-        <div className="px-5 py-3 border-t border-border/20 bg-primary/5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Star className="w-4 h-4 text-primary fill-primary" />
-              <span className="text-sm font-semibold">Multiplicador de Rating</span>
-              {!allocationValid && (
-                <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                  Alocação pendente
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Score Ponderado</p>
-                <p className="font-mono font-bold text-sm">{weightedScore > 0 ? weightedScore.toFixed(2) : "—"}<span className="text-[10px] text-muted-foreground font-normal"> / 5.00</span></p>
-              </div>
-              <div className="text-right bg-primary/10 border border-primary/20 rounded-lg px-3 py-1.5">
-                <p className="text-[10px] text-primary/70 uppercase tracking-wider">Multiplicador</p>
-                <p className="font-mono font-bold text-lg text-primary leading-tight">{weightedMultiplier.toFixed(2)}x</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="px-5 py-3 border-t border-border/20 bg-card/50">
         <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 font-medium">

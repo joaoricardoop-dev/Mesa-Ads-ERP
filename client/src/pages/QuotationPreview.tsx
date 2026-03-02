@@ -25,7 +25,6 @@ import {
   Target,
   FileText,
   BarChart3,
-  Star,
   MapPin,
 } from "lucide-react";
 
@@ -155,9 +154,8 @@ export default function QuotationPreview() {
   const allocation = useRestaurantAllocation(restaurantsForAllocation, totalCoasters);
 
   const allocCommission = allocation.isValid ? allocation.weightedCommission : undefined;
-  const allocMultiplier = allocation.isValid ? allocation.weightedMultiplier : undefined;
 
-  const simulator = useSimulator(selectedBudget, allocCommission, allocMultiplier);
+  const simulator = useSimulator(selectedBudget, allocCommission);
   const pr = simulator.perRestaurant;
   const ue = simulator.unitEconomics;
   const inputs = simulator.inputs;
@@ -185,7 +183,6 @@ export default function QuotationPreview() {
       .map(a => {
         const rest = restaurantsForAllocation.find(r => r.id === a.restaurantId);
         const score = rest?.ratingScore ? parseFloat(rest.ratingScore) : 0;
-        const mult = rest?.ratingMultiplier ? parseFloat(rest.ratingMultiplier) : 1.0;
         return {
           id: a.restaurantId,
           name: rest?.name || `#${a.restaurantId}`,
@@ -193,7 +190,6 @@ export default function QuotationPreview() {
           coasters: a.coasters,
           commissionPercent: a.commissionPercent,
           ratingScore: score,
-          ratingMultiplier: mult,
         };
       })
       .sort((a, b) => b.coasters - a.coasters);
@@ -334,17 +330,9 @@ export default function QuotationPreview() {
               </div>
 
               <div className="bg-card border border-border/30 rounded-xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-border/20 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold">DRE da Cotação</h3>
-                    <p className="text-[10px] text-muted-foreground">Demonstrativo de Resultado — {n} restaurantes, {d} meses</p>
-                  </div>
-                  {allocation.hasAllocations && (
-                    <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-lg px-3 py-1.5">
-                      <Star className="w-3.5 h-3.5 text-primary fill-primary" />
-                      <span className="text-xs font-mono font-bold text-primary">{allocation.weightedMultiplier.toFixed(2)}x</span>
-                    </div>
-                  )}
+                <div className="px-5 py-3 border-b border-border/20">
+                  <h3 className="text-sm font-semibold">DRE da Cotação</h3>
+                  <p className="text-[10px] text-muted-foreground">Demonstrativo de Resultado — {n} restaurantes, {d} meses</p>
                 </div>
                 <div className="px-5 py-3 overflow-x-auto">
                   <table className="w-full">
@@ -439,10 +427,6 @@ export default function QuotationPreview() {
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Score Ponderado</p>
                         <p className="font-mono text-sm font-bold">{allocation.weightedScore.toFixed(2)}</p>
                       </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Multiplicador</p>
-                        <p className="font-mono text-sm font-bold text-primary">{allocation.weightedMultiplier.toFixed(2)}x</p>
-                      </div>
                     </div>
                   </div>
                   <div className="overflow-x-auto">
@@ -453,7 +437,6 @@ export default function QuotationPreview() {
                           <th className="text-left px-3 py-2 font-medium">Bairro</th>
                           <th className="text-right px-3 py-2 font-medium">Coasters</th>
                           <th className="text-right px-3 py-2 font-medium">Rating</th>
-                          <th className="text-right px-3 py-2 font-medium">Mult.</th>
                           <th className="text-right px-3 py-2 font-medium">Com. %</th>
                           <th className="text-right px-5 py-2 font-medium">% Volume</th>
                         </tr>
@@ -479,7 +462,6 @@ export default function QuotationPreview() {
                                 </span>
                               )}
                             </td>
-                            <td className="px-3 py-2 text-right font-mono tabular-nums text-primary font-semibold">{r.ratingMultiplier.toFixed(2)}x</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums">{r.commissionPercent}%</td>
                             <td className="px-5 py-2 text-right font-mono tabular-nums text-muted-foreground">
                               {allocation.allocatedTotal > 0 ? ((r.coasters / allocation.allocatedTotal) * 100).toFixed(1) : "0"}%
@@ -493,7 +475,6 @@ export default function QuotationPreview() {
                           <td className="px-3 py-2"></td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums">{allocation.allocatedTotal.toLocaleString("pt-BR")}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums">{allocation.weightedScore.toFixed(2)}</td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-primary">{allocation.weightedMultiplier.toFixed(2)}x</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums">{allocation.weightedCommission.toFixed(1)}%</td>
                           <td className="px-5 py-2 text-right font-mono tabular-nums">100%</td>
                         </tr>
@@ -521,10 +502,7 @@ export default function QuotationPreview() {
                   <ParamRow label="Impostos" value={`${inputs.taxRate}%`} />
                   <ParamRow label="Custo Unitário" value={`R$ ${simulator.effectiveUnitCost.toFixed(4)}`} />
                   {allocation.hasAllocations && (
-                    <>
-                      <ParamRow label="Com. Rest. Ponderada" value={`${allocation.weightedCommission.toFixed(1)}%`} />
-                      <ParamRow label="Multiplicador Rating" value={`${allocation.weightedMultiplier.toFixed(2)}x`} />
-                    </>
+                    <ParamRow label="Com. Rest. Ponderada" value={`${allocation.weightedCommission.toFixed(1)}%`} />
                   )}
                 </div>
               </div>

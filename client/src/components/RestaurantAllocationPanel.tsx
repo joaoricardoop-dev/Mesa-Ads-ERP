@@ -39,7 +39,6 @@ interface RestaurantAllocationPanelProps {
   remaining: number;
   isValid: boolean;
   hasAllocations: boolean;
-  weightedMultiplier: number;
   weightedScore: number;
   weightedCommission: number;
   onAddRestaurant: (id: number) => void;
@@ -51,7 +50,7 @@ interface RestaurantAllocationPanelProps {
   effectiveUnitCost: number;
 }
 
-function RatingBadgeInline({ score, multiplier }: { score: string | null; multiplier: string | null }) {
+function RatingBadgeInline({ score }: { score: string | null }) {
   if (!score) {
     return (
       <Badge variant="outline" className="border-border/30 text-muted-foreground text-[10px] px-1.5 py-0">
@@ -60,12 +59,10 @@ function RatingBadgeInline({ score, multiplier }: { score: string | null; multip
     );
   }
   const s = parseFloat(score);
-  const m = multiplier ? parseFloat(multiplier) : 1.0;
   return (
     <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary gap-1 text-[11px] px-1.5 py-0 font-mono">
       <Star className="w-2.5 h-2.5 fill-primary" />
       {s.toFixed(2)}
-      <span className="text-primary/60">({m.toFixed(2)}x)</span>
     </Badge>
   );
 }
@@ -73,7 +70,6 @@ function RatingBadgeInline({ score, multiplier }: { score: string | null; multip
 function calcPerRestaurantPricing(
   coasters: number,
   commissionPercent: number,
-  multiplier: number,
   inputs: SimulatorInputs,
   effectiveUnitCost: number
 ) {
@@ -81,7 +77,6 @@ function calcPerRestaurantPricing(
   const perRestInputs = { ...inputs, coastersPerRestaurant: coasters };
   const result = calcPricing(productionCost, perRestInputs, {
     restaurantCommissionRate: commissionPercent,
-    multiplier,
   });
   return {
     productionCost: result.productionCost,
@@ -108,7 +103,6 @@ export default function RestaurantAllocationPanel({
   remaining,
   isValid,
   hasAllocations,
-  weightedMultiplier,
   weightedScore,
   weightedCommission,
   onAddRestaurant,
@@ -151,11 +145,9 @@ export default function RestaurantAllocationPanel({
     if (!showPricing) return new Map<number, ReturnType<typeof calcPerRestaurantPricing>>();
     const map = new Map<number, ReturnType<typeof calcPerRestaurantPricing>>();
     for (const r of selectedRestaurants) {
-      const mult = r.ratingMultiplier ? parseFloat(r.ratingMultiplier) : 1.0;
       const pricing = calcPerRestaurantPricing(
         r.coasters,
         r.allocCommission,
-        mult,
         simulatorInputs,
         effectiveUnitCost
       );
@@ -203,7 +195,7 @@ export default function RestaurantAllocationPanel({
                 )}
                 <Badge className="bg-primary/10 text-primary border-primary/30 gap-1 text-[11px] font-mono">
                   <Star className="w-3 h-3 fill-primary" />
-                  {weightedMultiplier.toFixed(2)}x
+                  Score: {weightedScore.toFixed(2)}
                 </Badge>
               </div>
             )}
@@ -279,7 +271,7 @@ export default function RestaurantAllocationPanel({
                                   )}
                                 </div>
                               </div>
-                              <RatingBadgeInline score={r.ratingScore} multiplier={r.ratingMultiplier} />
+                              <RatingBadgeInline score={r.ratingScore} />
                             </button>
                           );
                         })
@@ -358,7 +350,6 @@ export default function RestaurantAllocationPanel({
                       const coasters = alloc?.coasters || 0;
                       const pct = totalCoasters > 0 ? (coasters / totalCoasters) * 100 : 0;
                       const score = r.ratingScore ? parseFloat(r.ratingScore) : null;
-                      const mult = r.ratingMultiplier ? parseFloat(r.ratingMultiplier) : null;
                       const capacity = r.monthlyDrinksSold
                         ? Math.round(r.monthlyDrinksSold * COASTER_CAPACITY_FACTOR)
                         : null;
@@ -381,9 +372,6 @@ export default function RestaurantAllocationPanel({
                               <div className="flex items-center justify-center gap-1">
                                 <Star className="w-3 h-3 text-primary fill-primary" />
                                 <span className="font-mono text-xs font-semibold">{score.toFixed(1)}</span>
-                                {mult !== null && (
-                                  <span className="font-mono text-[10px] text-muted-foreground">{mult.toFixed(2)}x</span>
-                                )}
                               </div>
                             ) : (
                               <span className="text-[11px] text-muted-foreground">—</span>
@@ -476,17 +464,17 @@ export default function RestaurantAllocationPanel({
                   {selectedRestaurants.map(r => {
                     const pricing = perRestaurantPricing.get(r.id);
                     if (!pricing || r.coasters === 0) return null;
-                    const mult = r.ratingMultiplier ? parseFloat(r.ratingMultiplier) : 1.0;
-
                     return (
                       <div key={r.id} className="bg-card border border-border/20 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold truncate max-w-[200px]">{r.name}</span>
-                            <Badge variant="outline" className="border-primary/30 text-primary text-[10px] px-1.5 py-0 font-mono gap-0.5">
-                              <Star className="w-2.5 h-2.5 fill-primary" />
-                              {mult.toFixed(2)}x
-                            </Badge>
+                            {r.ratingScore && (
+                              <Badge variant="outline" className="border-primary/30 text-primary text-[10px] px-1.5 py-0 font-mono gap-0.5">
+                                <Star className="w-2.5 h-2.5 fill-primary" />
+                                {parseFloat(r.ratingScore).toFixed(1)}
+                              </Badge>
+                            )}
                           </div>
                           <span className="text-xs text-muted-foreground font-mono">{r.coasters.toLocaleString("pt-BR")} coasters</span>
                         </div>
@@ -570,10 +558,6 @@ export default function RestaurantAllocationPanel({
                       <span className="font-mono text-xl font-bold">{weightedScore > 0 ? weightedScore.toFixed(2) : "—"}</span>
                       <span className="text-xs text-muted-foreground">/ 5.00</span>
                     </div>
-                  </div>
-                  <div className="bg-primary/10 rounded-lg p-4 text-center border border-primary/20">
-                    <p className="text-xs text-primary/70 uppercase tracking-wider mb-2 font-medium">Multiplicador</p>
-                    <span className="font-mono text-xl font-bold text-primary">{weightedMultiplier.toFixed(2)}x</span>
                   </div>
                   <div className="bg-muted/30 rounded-lg p-4 text-center border border-border/10">
                     <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2 font-medium">Com. Ponderada</p>

@@ -150,12 +150,14 @@ Statuses: `rascunho` → `enviada` → `ativa` → `os_gerada` → `win` / `perd
 
 - Located in `client/src/hooks/useSimulator.ts`
 - Grossup formula: CustoBruto = CustoPD / (1 - totalVarRate), then SellingPrice = CustoBruto × (1 + markup%)
-- Multiplier applied post-grossup from restaurant rating
+- No multiplier — pricing is purely cost-based with markup
+- Restaurant weighted commission applied when allocation is valid
 
 ## Restaurant Rating System
 
 - Tiers: Bronze, Prata, Ouro, Diamante (score bands)
 - 6 weighted dimensions (drinks flow, ticket, location, tables, venue type, digital presence)
+- Rating score used for display/classification only, does NOT affect pricing
 - Configuration in `shared/rating-config.ts`
 
 ## Theme & Visual Identity

@@ -54,16 +54,14 @@ function solveMarkupForMargin(
   targetMargin: number,
   inputs: SimulatorInputs,
   restCommOverride?: number,
-  multiplierOverride?: number
 ): number | null {
   const sellerRate = inputs.sellerCommission / 100;
   const taxRateDecimal = inputs.taxRate / 100;
   const agencyVarRate = inputs.commissionType === "variable" ? inputs.restaurantCommission / 100 : 0;
   const restDbRate = (restCommOverride ?? 10) / 100;
   const totalVarRate = sellerRate + taxRateDecimal + agencyVarRate + restDbRate;
-  const mult = multiplierOverride ?? 1.0;
   const tm = targetMargin / 100;
-  const denom = mult * (1 - totalVarRate) - tm * mult;
+  const denom = (1 - totalVarRate) - tm;
   if (denom <= 0) return null;
   const markup = 100 * ((1 - totalVarRate) / denom - 1);
   if (markup < 0) return null;
@@ -145,10 +143,9 @@ export default function Home() {
     [restaurantsList]
   );
 
-  const [allocMultiplier, setAllocMultiplier] = useState<number | undefined>();
   const [allocCommission, setAllocCommission] = useState<number | undefined>();
 
-  const simulator = useSimulator(selectedBudget, allocCommission, allocMultiplier);
+  const simulator = useSimulator(selectedBudget, allocCommission);
 
   const totalCoasters =
     simulator.inputs.coastersPerRestaurant * simulator.inputs.activeRestaurants;
@@ -156,9 +153,8 @@ export default function Home() {
   const allocation = useRestaurantAllocation(restaurantsForAllocation, totalCoasters);
 
   useEffect(() => {
-    setAllocMultiplier(allocation.hasAllocations ? allocation.weightedMultiplier : undefined);
     setAllocCommission(allocation.hasAllocations ? allocation.weightedCommission : undefined);
-  }, [allocation.hasAllocations, allocation.weightedMultiplier, allocation.weightedCommission]);
+  }, [allocation.hasAllocations, allocation.weightedCommission]);
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
@@ -168,7 +164,6 @@ export default function Home() {
     setSelectedBudgetId("manual");
     setNumArts(1);
     saveBudgetId(null);
-    setAllocMultiplier(undefined);
     setAllocCommission(undefined);
     setShowResetConfirm(false);
   };
@@ -179,7 +174,7 @@ export default function Home() {
       setGoalResult({ error: "Informe entre 0% e 100%" });
       return;
     }
-    const markup = solveMarkupForMargin(target, simulator.inputs, allocCommission, allocMultiplier);
+    const markup = solveMarkupForMargin(target, simulator.inputs, allocCommission);
     if (markup === null) {
       setGoalResult({ error: "Margem impossível com as taxas atuais" });
     } else {
@@ -567,7 +562,6 @@ export default function Home() {
           activeRestaurants={simulator.inputs.activeRestaurants}
           contractDuration={simulator.inputs.contractDuration}
           minMargin={simulator.inputs.minMargin}
-          weightedMultiplier={allocation.hasAllocations ? allocation.weightedMultiplier : undefined}
           weightedScore={allocation.hasAllocations ? allocation.weightedScore : undefined}
           allocationValid={allocation.isValid}
         />
@@ -581,7 +575,6 @@ export default function Home() {
           remaining={allocation.remaining}
           isValid={allocation.isValid}
           hasAllocations={allocation.hasAllocations}
-          weightedMultiplier={allocation.weightedMultiplier}
           weightedScore={allocation.weightedScore}
           weightedCommission={allocation.weightedCommission}
           onAddRestaurant={allocation.addRestaurant}
