@@ -72,6 +72,42 @@ export const appRouter = router({
   batch: batchRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
+
+    updateProfile: protectedProcedure
+      .input(z.object({
+        firstName: z.string().min(1),
+        lastName: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const userId = ctx.user?.id;
+        if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        const { createClerkClient } = await import("@clerk/express");
+        const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+
+        try {
+          await clerkClient.users.updateUser(userId, {
+            firstName: input.firstName,
+            lastName: input.lastName || "",
+          });
+        } catch (err: any) {
+          console.error("Failed to update Clerk profile:", err);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao atualizar perfil no Clerk." });
+        }
+
+        const user = await authStorage.upsertUser({
+          id: userId,
+          email: ctx.user!.email,
+          firstName: input.firstName,
+          lastName: input.lastName || null,
+          profileImageUrl: ctx.user!.profileImageUrl,
+          role: ctx.user!.role,
+          clientId: ctx.user!.clientId,
+        });
+
+        const { passwordHash: _, ...safe } = user;
+        return safe;
+      }),
   }),
 
   // ─── Members (Admin) ────────────────────────────────────────────────────

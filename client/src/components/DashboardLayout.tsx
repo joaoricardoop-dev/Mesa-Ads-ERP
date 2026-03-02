@@ -8,8 +8,23 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -43,6 +58,7 @@ import {
   Image,
   LogOut,
   Megaphone,
+  Pencil,
   PanelLeft,
   Receipt,
   Search,
@@ -185,6 +201,20 @@ function DashboardLayoutContent({
   const isMobile = useIsMobile();
   const { theme, toggleTheme } = useTheme();
   const { signOut } = useClerk();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    firstName: user.firstName || "",
+    lastName: user.lastName || "",
+  });
+  const queryClient = useQueryClient();
+  const updateProfileMutation = trpc.auth.updateProfile.useMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setProfileOpen(false);
+      toast.success("Perfil atualizado com sucesso!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
 
   const activeLabel = findActiveLabel(location);
 
@@ -313,6 +343,20 @@ function DashboardLayoutContent({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => {
+                    setProfileForm({
+                      firstName: user.firstName || "",
+                      lastName: user.lastName || "",
+                    });
+                    setProfileOpen(true);
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  <span>Meu Perfil</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
                   className="cursor-pointer text-destructive focus:text-destructive"
                   onClick={() => signOut()}
                 >
@@ -322,6 +366,71 @@ function DashboardLayoutContent({
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarFooter>
+
+          <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+            <DialogContent className="bg-card border-border/30 max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Pencil className="w-5 h-5 text-primary" />
+                  Meu Perfil
+                </DialogTitle>
+                <DialogDescription>
+                  Atualize suas informações pessoais.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2">
+                  <Label>E-mail</Label>
+                  <Input
+                    value={user.email || ""}
+                    disabled
+                    className="bg-muted border-border/30 text-muted-foreground"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    O e-mail não pode ser alterado por aqui.
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Nome *</Label>
+                  <Input
+                    value={profileForm.firstName}
+                    onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
+                    placeholder="Nome"
+                    className="bg-background border-border/30"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Sobrenome</Label>
+                  <Input
+                    value={profileForm.lastName}
+                    onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
+                    placeholder="Sobrenome"
+                    className="bg-background border-border/30"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setProfileOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!profileForm.firstName.trim()) {
+                      toast.error("O nome é obrigatório.");
+                      return;
+                    }
+                    updateProfileMutation.mutate({
+                      firstName: profileForm.firstName.trim(),
+                      lastName: profileForm.lastName.trim() || undefined,
+                    });
+                  }}
+                  disabled={updateProfileMutation.isPending}
+                >
+                  {updateProfileMutation.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </Sidebar>
 
         <div
