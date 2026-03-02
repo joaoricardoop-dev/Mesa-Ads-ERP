@@ -61,7 +61,9 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - Local `users` table kept for joins and app-specific data (role, clientId, isActive)
 - `useAuth` hook (`client/src/hooks/use-auth.ts`) uses Clerk's `useUser()` + fetches DB user via `/api/auth/user`
 - Sidebar footer shows user info from DB, logout via `useClerk().signOut()`
-- Admin mutations: `members.createUser` (creates user in Clerk + syncs to DB), `members.updateRole` (syncs to Clerk metadata)
+- Sign-up disabled — only admins can create users via Gestão de Usuários page
+- `members.list` fetches from Clerk API (source of truth), syncs to local DB
+- Admin mutations: `members.createUser` (creates user in Clerk + syncs to DB), `members.updateRole` (syncs to Clerk metadata), `members.toggleActive` (ban/unban in Clerk)
 - Env vars: `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
 
 ## Roles & Permissions

@@ -77,16 +77,72 @@ export const appRouter = router({
   // ─── Members (Admin) ────────────────────────────────────────────────────
   members: router({
     list: adminProcedure.query(async () => {
-        const allUsers = await authStorage.listUsers();
-        return allUsers.map(({ passwordHash: _, ...u }) => u);
+        const { createClerkClient } = await import("@clerk/express");
+        let clerkClient;
+        try {
+          clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+        } catch (err: any) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Clerk não configurado corretamente." });
+        }
+
+        const allClerkUsers: any[] = [];
+        let offset = 0;
+        const pageSize = 100;
+
+        try {
+          while (true) {
+            const page = await clerkClient.users.getUserList({ limit: pageSize, offset });
+            allClerkUsers.push(...page.data);
+            if (page.data.length < pageSize) break;
+            offset += pageSize;
+          }
+        } catch (err: any) {
+          console.error("Failed to fetch Clerk users:", err);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao buscar usuários do Clerk." });
+        }
+
+        const mapped = allClerkUsers.map((cu) => {
+          const meta = cu.publicMetadata as any;
+          return {
+            id: cu.id,
+            email: cu.emailAddresses?.[0]?.emailAddress || null,
+            firstName: cu.firstName || null,
+            lastName: cu.lastName || null,
+            profileImageUrl: cu.imageUrl || null,
+            role: meta?.role || "user",
+            isActive: !cu.banned,
+            clientId: meta?.clientId ? Number(meta.clientId) : null,
+            lastLoginAt: cu.lastSignInAt ? new Date(cu.lastSignInAt).toISOString() : null,
+            createdAt: cu.createdAt ? new Date(cu.createdAt).toISOString() : null,
+            updatedAt: cu.updatedAt ? new Date(cu.updatedAt).toISOString() : null,
+          };
+        });
+
+        for (const u of mapped) {
+          try {
+            await authStorage.upsertUser({
+              id: u.id,
+              email: u.email,
+              firstName: u.firstName,
+              lastName: u.lastName,
+              profileImageUrl: u.profileImageUrl,
+              role: u.role,
+              clientId: u.clientId,
+              isActive: u.isActive,
+            });
+          } catch {}
+        }
+
+        return mapped;
       }),
 
     updateRole: adminProcedure
       .input(z.object({ userId: z.string(), role: z.string() }))
       .mutation(async ({ input }) => {
+        const { createClerkClient } = await import("@clerk/express");
+        const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+
         try {
-          const { createClerkClient } = await import("@clerk/express");
-          const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
           const clerkUser = await clerkClient.users.getUser(input.userId);
           await clerkClient.users.updateUser(input.userId, {
             publicMetadata: {
@@ -96,7 +152,9 @@ export const appRouter = router({
           });
         } catch (err: any) {
           console.error("Failed to update Clerk metadata:", err);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao atualizar papel no Clerk." });
         }
+
         const user = await authStorage.updateUserRole(input.userId, input.role);
         if (!user) return undefined;
         const { passwordHash: _, ...safe } = user;
@@ -106,9 +164,10 @@ export const appRouter = router({
     toggleActive: adminProcedure
       .input(z.object({ userId: z.string(), isActive: z.boolean() }))
       .mutation(async ({ input }) => {
+        const { createClerkClient } = await import("@clerk/express");
+        const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+
         try {
-          const { createClerkClient } = await import("@clerk/express");
-          const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
           if (input.isActive) {
             await clerkClient.users.unbanUser(input.userId);
           } else {
@@ -116,7 +175,9 @@ export const appRouter = router({
           }
         } catch (err: any) {
           console.error("Failed to ban/unban Clerk user:", err);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao alterar status no Clerk." });
         }
+
         const user = await authStorage.updateUserActive(input.userId, input.isActive);
         if (!user) return undefined;
         const { passwordHash: _, ...safe } = user;

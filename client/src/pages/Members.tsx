@@ -156,7 +156,7 @@ export default function Members() {
       utils.members.list.invalidate();
       setCreateDialogOpen(false);
       setCreateForm({ email: "", firstName: "", lastName: "", role: "user", tempPassword: generateTempPassword(), clientId: null });
-      toast.success("Usuário cadastrado com sucesso! A senha temporária foi definida.");
+      toast.success("Usuário cadastrado com sucesso!");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
