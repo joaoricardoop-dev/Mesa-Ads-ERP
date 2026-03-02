@@ -8,6 +8,7 @@ import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./hooks/use-auth";
 import { SignIn, useClerk } from "@clerk/clerk-react";
 import { ShieldX } from "lucide-react";
+import PublicProposal from "./pages/PublicProposal";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
 import Prospecting from "./pages/Restaurants";
@@ -231,7 +232,12 @@ function App() {
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster />
-          <AuthenticatedApp />
+          <Switch>
+            <Route path="/proposta/:token" component={PublicProposal} />
+            <Route>
+              <AuthenticatedApp />
+            </Route>
+          </Switch>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
