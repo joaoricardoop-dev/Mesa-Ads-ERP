@@ -162,11 +162,10 @@ export default function QuotationPreview() {
   const n = inputs.activeRestaurants;
   const d = inputs.contractDuration;
 
-  const receitaProducaoPerRest = pr.productionCost;
-  const receitaVeiculacaoPerRest = pr.sellingPrice - pr.productionCost;
-  const receitaProducaoTotal = receitaProducaoPerRest * n;
-  const receitaVeiculacaoTotal = receitaVeiculacaoPerRest * n;
+  const veiculacaoPerRest = pr.grossProfit;
+  const veiculacaoTotal = pr.grossProfit * n;
 
+  const totalProduction = pr.productionCost * n;
   const totalRestComm = pr.restaurantCommission * n;
   const totalAgencyComm = pr.agencyCommission * n;
   const totalSellerComm = pr.sellerCommissionValue * n;
@@ -331,57 +330,43 @@ export default function QuotationPreview() {
 
               <div className="bg-card border border-border/30 rounded-xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-border/20">
-                  <h3 className="text-sm font-semibold">DRE da Cotação</h3>
-                  <p className="text-[10px] text-muted-foreground">Demonstrativo de Resultado — {n} restaurantes, {d} meses</p>
+                  <h3 className="text-sm font-semibold">Orçamento da Cotação</h3>
+                  <p className="text-[10px] text-muted-foreground">Composição do preço — {n} restaurantes, {d} meses</p>
                 </div>
                 <div className="px-5 py-3 overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/20">
-                        <th className="text-left pb-2 font-medium">Item</th>
+                        <th className="text-left pb-2 font-medium">Componente</th>
                         <th className="text-right pb-2 font-medium">/ Rest.</th>
                         <th className="text-right pb-2 font-medium">Total / Mês</th>
                         <th className="text-right pb-2 font-medium">Contrato ({d}m)</th>
-                        <th className="text-right pb-2 font-medium">%</th>
+                        <th className="text-right pb-2 font-medium">% Preço</th>
                       </tr>
                     </thead>
                     <tbody>
                       <CostRow
                         label="Receita de Veiculação"
-                        perRest={formatCurrency(receitaVeiculacaoPerRest)}
-                        total={formatCurrency(receitaVeiculacaoTotal)}
-                        contract={formatCurrency(receitaVeiculacaoTotal * d)}
-                        pct={pctOf(receitaVeiculacaoTotal)}
-                        bold accent
-                      />
-                      <CostRow
-                        label="Receita de Produção"
-                        perRest={formatCurrency(receitaProducaoPerRest)}
-                        total={formatCurrency(receitaProducaoTotal)}
-                        contract={formatCurrency(receitaProducaoTotal * d)}
-                        pct={pctOf(receitaProducaoTotal)}
+                        perRest={formatCurrency(veiculacaoPerRest)}
+                        total={formatCurrency(veiculacaoTotal)}
+                        contract={formatCurrency(veiculacaoTotal * d)}
+                        pct={pctOf(veiculacaoTotal)}
                         bold
-                      />
-                      <CostRow
-                        label="Receita Total"
-                        perRest={formatCurrency(pr.sellingPrice)}
-                        total={formatCurrency(revenue)}
-                        contract={formatCurrency(revenue * d)}
-                        pct="100,0%"
-                        bold separator
+                        accent={veiculacaoPerRest > 0}
+                        warn={veiculacaoPerRest <= 0}
                       />
 
                       <CostRow label="" perRest="" total="" contract="" pct="" separator />
 
-                      <CostRow label="(-) Custo de Produção" perRest={formatCurrency(pr.productionCost)} total={formatCurrency(receitaProducaoTotal)} contract={formatCurrency(receitaProducaoTotal * d)} pct={pctOf(receitaProducaoTotal)} sub />
-                      <CostRow label="(-) Comissão Restaurante" perRest={formatCurrency(pr.restaurantCommission)} total={formatCurrency(totalRestComm)} contract={formatCurrency(totalRestComm * d)} pct={pctOf(totalRestComm)} sub />
-                      <CostRow label="(-) Comissão Agência/Parceiro" perRest={formatCurrency(pr.agencyCommission)} total={formatCurrency(totalAgencyComm)} contract={formatCurrency(totalAgencyComm * d)} pct={pctOf(totalAgencyComm)} sub />
-                      <CostRow label="(-) Comissão Vendedor" perRest={formatCurrency(pr.sellerCommissionValue)} total={formatCurrency(totalSellerComm)} contract={formatCurrency(totalSellerComm * d)} pct={pctOf(totalSellerComm)} sub />
-                      <CostRow label="(-) Impostos" perRest={formatCurrency(pr.taxValue)} total={formatCurrency(totalTax)} contract={formatCurrency(totalTax * d)} pct={pctOf(totalTax)} sub />
+                      <CostRow label="Receita de Produção" perRest={formatCurrency(pr.productionCost)} total={formatCurrency(totalProduction)} contract={formatCurrency(totalProduction * d)} pct={pctOf(totalProduction)} sub />
+                      <CostRow label="Receita de Comissão Restaurante" perRest={formatCurrency(pr.restaurantCommission)} total={formatCurrency(totalRestComm)} contract={formatCurrency(totalRestComm * d)} pct={pctOf(totalRestComm)} sub />
+                      <CostRow label="Receita de Comissão Agência" perRest={formatCurrency(pr.agencyCommission)} total={formatCurrency(totalAgencyComm)} contract={formatCurrency(totalAgencyComm * d)} pct={pctOf(totalAgencyComm)} sub />
+                      <CostRow label="Receita de Comissão Vendedor" perRest={formatCurrency(pr.sellerCommissionValue)} total={formatCurrency(totalSellerComm)} contract={formatCurrency(totalSellerComm * d)} pct={pctOf(totalSellerComm)} sub />
+                      <CostRow label="Impostos" perRest={formatCurrency(pr.taxValue)} total={formatCurrency(totalTax)} contract={formatCurrency(totalTax * d)} pct={pctOf(totalTax)} sub />
 
-                      <CostRow label="Total de Custos" perRest={formatCurrency(pr.totalCosts)} total={formatCurrency(totalCosts)} contract={formatCurrency(totalCosts * d)} pct={pctOf(totalCosts)} bold warn={pr.grossMargin < inputs.minMargin} separator />
+                      <CostRow label="Preço Total (cobrado do cliente)" perRest={formatCurrency(pr.sellingPrice)} total={formatCurrency(revenue)} contract={formatCurrency(revenue * d)} pct="100,0%" bold separator />
 
-                      <CostRow label="Lucro Líquido (Mesa Ads)" perRest={formatCurrency(pr.grossProfit)} total={formatCurrency(grossProfit)} contract={formatCurrency(grossProfit * d)} pct={formatPercent(pr.grossMargin)} bold accent={pr.grossProfit > 0} warn={pr.grossProfit <= 0} separator />
+                      <CostRow label="Margem Mesa Ads" perRest={formatCurrency(pr.grossProfit)} total={formatCurrency(grossProfit)} contract={formatCurrency(grossProfit * d)} pct={formatPercent(pr.grossMargin)} bold accent={pr.grossProfit > 0} warn={pr.grossProfit <= 0} separator />
                     </tbody>
                   </table>
                 </div>
@@ -390,18 +375,18 @@ export default function QuotationPreview() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
                     <div>
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Veiculação (contrato)</p>
-                      <p className="font-mono font-bold text-sm text-primary">{formatCurrency(receitaVeiculacaoTotal * d)}</p>
+                      <p className={`font-mono font-bold text-sm ${veiculacaoTotal > 0 ? "text-emerald-400" : "text-red-400"}`}>{formatCurrency(veiculacaoTotal * d)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Produção (contrato)</p>
-                      <p className="font-mono font-bold text-sm">{formatCurrency(receitaProducaoTotal * d)}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Repasses (contrato)</p>
+                      <p className="font-mono font-bold text-sm">{formatCurrency(totalCosts * d)}</p>
                     </div>
                     <div>
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Receita Total</p>
                       <p className="font-mono font-bold text-sm text-primary">{formatCurrency(revenue * d)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Lucro Contrato</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Margem Contrato</p>
                       <p className={`font-mono font-bold text-sm ${ue.contractProfit > 0 ? "text-emerald-400" : "text-red-400"}`}>
                         {formatCurrency(ue.contractProfit)}
                       </p>

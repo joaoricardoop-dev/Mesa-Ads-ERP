@@ -23,6 +23,7 @@ function DRERow({
   warn,
   sub,
   separator,
+  muted,
 }: {
   label: string;
   perRest: string;
@@ -34,14 +35,17 @@ function DRERow({
   warn?: boolean;
   sub?: boolean;
   separator?: boolean;
+  muted?: boolean;
 }) {
   const textClass = warn
     ? "text-red-400"
     : accent
       ? "text-emerald-400"
-      : bold
-        ? "text-foreground"
-        : "text-muted-foreground";
+      : muted
+        ? "text-muted-foreground/60"
+        : bold
+          ? "text-foreground"
+          : "text-muted-foreground";
   const fontClass = bold ? "font-semibold" : "font-normal";
 
   return (
@@ -92,6 +96,9 @@ export default function SimulatorDRE({
   const revenue = pr.sellingPrice * n;
   const grossProfit = pr.grossProfit * n;
 
+  const veiculacaoPerRest = pr.grossProfit;
+  const veiculacaoTotal = grossProfit;
+
   const pctOf = (val: number) => revenue > 0 ? `${((val / revenue) * 100).toFixed(1)}%` : "—";
 
   return (
@@ -103,8 +110,8 @@ export default function SimulatorDRE({
     >
       <div className="px-5 py-3 border-b border-border/20 flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold">DRE da Simulação</h3>
-          <p className="text-[10px] text-muted-foreground">Demonstrativo de Resultado — por restaurante, mensal e contrato</p>
+          <h3 className="text-sm font-semibold">Orçamento da Simulação</h3>
+          <p className="text-[10px] text-muted-foreground">Composição do preço — por restaurante, mensal e contrato</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
@@ -122,27 +129,29 @@ export default function SimulatorDRE({
         <table className="w-full">
           <thead>
             <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/20">
-              <th className="text-left pb-2 font-medium">Item</th>
+              <th className="text-left pb-2 font-medium">Componente</th>
               <th className="text-right pb-2 font-medium">/ Rest.</th>
               <th className="text-right pb-2 font-medium">Total / Mês</th>
               <th className="text-right pb-2 font-medium">Contrato ({d}m)</th>
-              <th className="text-right pb-2 font-medium">% Receita</th>
+              <th className="text-right pb-2 font-medium">% Preço</th>
             </tr>
           </thead>
           <tbody>
             <DRERow
-              label="Receita Bruta (Preço de Venda)"
-              perRest={formatCurrency(pr.sellingPrice)}
-              total={formatCurrency(revenue)}
-              contract={formatCurrency(revenue * d)}
-              pct="100,0%"
+              label="Receita de Veiculação"
+              perRest={formatCurrency(veiculacaoPerRest)}
+              total={formatCurrency(veiculacaoTotal)}
+              contract={formatCurrency(veiculacaoTotal * d)}
+              pct={pctOf(veiculacaoTotal)}
               bold
+              accent={veiculacaoPerRest > 0}
+              warn={veiculacaoPerRest <= 0}
             />
 
             <DRERow label="" perRest="" total="" contract="" pct="" separator />
 
             <DRERow
-              label="(-) Custo de Produção"
+              label="Receita de Produção"
               perRest={formatCurrency(pr.productionCost)}
               total={formatCurrency(totalProduction)}
               contract={formatCurrency(totalProduction * d)}
@@ -150,7 +159,7 @@ export default function SimulatorDRE({
               sub
             />
             <DRERow
-              label="(-) Comissão Restaurante"
+              label="Receita de Comissão Restaurante"
               perRest={formatCurrency(pr.restaurantCommission)}
               total={formatCurrency(totalRestComm)}
               contract={formatCurrency(totalRestComm * d)}
@@ -158,7 +167,7 @@ export default function SimulatorDRE({
               sub
             />
             <DRERow
-              label="(-) Comissão Agência/Parceiro"
+              label="Receita de Comissão Agência"
               perRest={formatCurrency(pr.agencyCommission)}
               total={formatCurrency(totalAgencyComm)}
               contract={formatCurrency(totalAgencyComm * d)}
@@ -166,7 +175,7 @@ export default function SimulatorDRE({
               sub
             />
             <DRERow
-              label="(-) Comissão Vendedor"
+              label="Receita de Comissão Vendedor"
               perRest={formatCurrency(pr.sellerCommissionValue)}
               total={formatCurrency(totalSellerComm)}
               contract={formatCurrency(totalSellerComm * d)}
@@ -174,7 +183,7 @@ export default function SimulatorDRE({
               sub
             />
             <DRERow
-              label="(-) Impostos"
+              label="Impostos"
               perRest={formatCurrency(pr.taxValue)}
               total={formatCurrency(totalTax)}
               contract={formatCurrency(totalTax * d)}
@@ -185,19 +194,18 @@ export default function SimulatorDRE({
             <DRERow label="" perRest="" total="" contract="" pct="" separator />
 
             <DRERow
-              label="Total de Custos"
-              perRest={formatCurrency(pr.totalCosts)}
-              total={formatCurrency(totalCosts)}
-              contract={formatCurrency(totalCosts * d)}
-              pct={pctOf(totalCosts)}
+              label="Preço Total (cobrado do cliente)"
+              perRest={formatCurrency(pr.sellingPrice)}
+              total={formatCurrency(revenue)}
+              contract={formatCurrency(revenue * d)}
+              pct="100,0%"
               bold
-              warn={pr.grossMargin < minMargin}
             />
 
             <DRERow label="" perRest="" total="" contract="" pct="" separator />
 
             <DRERow
-              label="Lucro Líquido (Mesa Ads)"
+              label="Margem Mesa Ads"
               perRest={formatCurrency(pr.grossProfit)}
               total={formatCurrency(grossProfit)}
               contract={formatCurrency(grossProfit * d)}
@@ -212,9 +220,10 @@ export default function SimulatorDRE({
 
       <div className="px-5 py-3 border-t border-border/20 bg-card/50">
         <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 font-medium">
-          Custos do Contrato ({d} meses × {n} restaurantes)
+          Composição do Contrato ({d} meses × {n} restaurantes)
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+          <CostCard label="Veiculação" value={formatCurrency(veiculacaoTotal * d)} monthly={formatCurrency(veiculacaoTotal)} />
           <CostCard label="Produção" value={formatCurrency(totalProduction * d)} monthly={formatCurrency(totalProduction)} />
           <CostCard label="Com. Restaurante" value={formatCurrency(totalRestComm * d)} monthly={formatCurrency(totalRestComm)} />
           <CostCard label="Com. Agência" value={formatCurrency(totalAgencyComm * d)} monthly={formatCurrency(totalAgencyComm)} />
@@ -227,11 +236,11 @@ export default function SimulatorDRE({
             <p className="font-mono font-bold text-sm text-primary">{formatCurrency(unitEconomics.contractValue)}</p>
           </div>
           <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Custos Contrato</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Repasses</p>
             <p className="font-mono font-bold text-sm text-red-400">{formatCurrency(totalCosts * d)}</p>
           </div>
           <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Lucro Contrato</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Margem Contrato</p>
             <p className={`font-mono font-bold text-sm ${unitEconomics.contractProfit > 0 ? "text-emerald-400" : "text-red-400"}`}>
               {formatCurrency(unitEconomics.contractProfit)}
             </p>
