@@ -26,7 +26,9 @@ import {
   FileText,
   BarChart3,
   MapPin,
+  Download,
 } from "lucide-react";
+import { generateProposalPdf } from "@/lib/generate-proposal-pdf";
 
 function SummaryCard({ label, value, sub, icon, accent, warn }: {
   label: string;
@@ -203,6 +205,35 @@ export default function QuotationPreview() {
     onError: (err) => toast.error(`Erro ao criar cotação: ${err.message}`),
   });
 
+  const handleExportPdf = () => {
+    if (selectedClientId === "none") { toast.error("Selecione um cliente antes de exportar"); return; }
+    try {
+    generateProposalPdf({
+      clientName: selectedClient?.name || "Cliente",
+      clientCompany: selectedClient?.company || undefined,
+      clientCnpj: selectedClient?.cnpj || undefined,
+      clientEmail: selectedClient?.contactEmail || undefined,
+      clientPhone: selectedClient?.contactPhone || undefined,
+      coasterVolume: totalCoasters,
+      numRestaurants: n,
+      coastersPerRestaurant: inputs.coastersPerRestaurant,
+      contractDuration: d,
+      pricePerRestaurant: pr.sellingPrice,
+      monthlyTotal: revenue,
+      contractTotal: ue.contractValue,
+      includesProduction: true,
+      restaurants: allocatedRestaurants.map(r => ({
+        name: r.name,
+        neighborhood: r.neighborhood,
+        coasters: r.coasters,
+      })),
+    });
+    toast.success("PDF da proposta gerado!");
+    } catch {
+      toast.error("Erro ao gerar PDF");
+    }
+  };
+
   const handleCreate = () => {
     if (selectedClientId === "none") { toast.error("Selecione um cliente"); return; }
 
@@ -244,6 +275,15 @@ export default function QuotationPreview() {
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => navigate("/comercial/simulador")}>Voltar ao Simulador</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleExportPdf}
+              >
+                <Download className="w-3.5 h-3.5" />
+                Exportar Proposta
+              </Button>
               <Button
                 size="sm"
                 className="gap-1.5 bg-primary hover:bg-primary/90"
