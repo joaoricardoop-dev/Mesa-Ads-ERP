@@ -434,6 +434,90 @@ export function generatePriceTablePDF() {
   doc.text("• Cotações realizadas com referências de caixas padrões", 22, ftY + 11);
   doc.text("• Caixa 1.000 unidades: 12×27×47  |  Caixa 2.000 unidades: 24×27×47", 22, ftY + 15.5);
 
+  const bkY = ftY + 24;
+  const bkH = 62;
+  doc.setFillColor(...CARD_BG);
+  doc.roundedRect(15, bkY, pageW - 30, bkH, 3, 3, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...TEXT_GRAY);
+  doc.text("BREAKDOWN DE CUSTOS E FÓRMULA DE PRECIFICAÇÃO", 22, bkY + 7);
+
+  doc.setDrawColor(...BRAND_GREEN);
+  doc.setLineWidth(0.5);
+  doc.line(22, bkY + 10, pageW - 22, bkY + 10);
+
+  const leftX = 22;
+  const midX = 150;
+  let bkLineY = bkY + 17;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...BRAND_GREEN);
+  doc.text("COMPOSIÇÃO DO PREÇO DE VENDA", leftX, bkLineY);
+
+  doc.setTextColor(...TEXT_WHITE);
+  doc.text("FÓRMULA", midX, bkLineY);
+
+  bkLineY += 7;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...TEXT_LIGHT);
+
+  const components = [
+    { label: "Custo de Produção (GPC)", pct: "25%", desc: "Custo unitário × faces × quantidade" },
+    { label: "Frete (Azul Cargo)", pct: "variável", desc: "Custo fixo por faixa de volume" },
+    { label: "Margem Bruta", pct: "35%", desc: "Lucro operacional da mesa.ads" },
+    { label: "IRPJ (tributário)", pct: "15%", desc: "Imposto sobre receita" },
+    { label: "Comissão Restaurante", pct: "15%", desc: "Repasse ao parceiro restaurante" },
+    { label: "Comissão Comercial", pct: "10%", desc: "Comissão do vendedor" },
+  ];
+
+  for (const c of components) {
+    doc.setTextColor(...TEXT_LIGHT);
+    doc.text(`• ${c.label}`, leftX + 2, bkLineY);
+    doc.setTextColor(...TEXT_GRAY);
+    doc.text(`(${c.pct})`, leftX + 62, bkLineY);
+    doc.text(`— ${c.desc}`, leftX + 82, bkLineY);
+    bkLineY += 5;
+  }
+
+  const fmLeftX = midX;
+  let fmY = bkY + 24;
+  doc.setFillColor(20, 20, 20);
+  doc.roundedRect(fmLeftX - 2, fmY - 3, pageW - fmLeftX - 20, 34, 2, 2, "F");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...TEXT_GRAY);
+  doc.text("1.", fmLeftX + 4, fmY + 2);
+  doc.setTextColor(...TEXT_LIGHT);
+  doc.text("Custo Base = (GPC unit. × faces × qtd) + Frete", fmLeftX + 10, fmY + 2);
+
+  fmY += 7;
+  doc.setTextColor(...TEXT_GRAY);
+  doc.text("2.", fmLeftX + 4, fmY + 2);
+  doc.setTextColor(...TEXT_LIGHT);
+  doc.text("Denominador = 1 − 0,35 − 0,15 − 0,15 − 0,10 =", fmLeftX + 10, fmY + 2);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...BRAND_GREEN);
+  doc.text("0,25", fmLeftX + 115, fmY + 2);
+
+  fmY += 7;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...TEXT_GRAY);
+  doc.text("3.", fmLeftX + 4, fmY + 2);
+  doc.setTextColor(...TEXT_LIGHT);
+  doc.text("Preço Unitário = Custo Base / qtd / 0,25", fmLeftX + 10, fmY + 2);
+
+  fmY += 7;
+  doc.setTextColor(...TEXT_GRAY);
+  doc.text("4.", fmLeftX + 4, fmY + 2);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...BRAND_GREEN);
+  doc.text("Preço Total = Preço Unit. × quantidade × (semanas / 4)", fmLeftX + 10, fmY + 2);
+
   drawFooter(doc);
 
   doc.save("tabela-precos-mesa-ads.pdf");
