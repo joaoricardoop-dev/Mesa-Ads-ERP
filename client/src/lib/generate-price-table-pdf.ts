@@ -2,13 +2,13 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 const GPC_COSTS = [
-  { qty: 1000, unit: 0.4190 },
-  { qty: 2000, unit: 0.3495 },
-  { qty: 3000, unit: 0.3330 },
-  { qty: 4000, unit: 0.3248 },
-  { qty: 5000, unit: 0.2998 },
-  { qty: 10000, unit: 0.2700 },
-  { qty: 20000, unit: 0.2600 },
+  { qty: 1000, unit: 0.4190, margin: 0.50 },
+  { qty: 2000, unit: 0.3495, margin: 0.48 },
+  { qty: 3000, unit: 0.3330, margin: 0.45 },
+  { qty: 4000, unit: 0.3248, margin: 0.43 },
+  { qty: 5000, unit: 0.2998, margin: 0.40 },
+  { qty: 10000, unit: 0.2700, margin: 0.37 },
+  { qty: 20000, unit: 0.2600, margin: 0.35 },
 ];
 
 const FREIGHT_AZUL: Record<number, number> = {
@@ -130,11 +130,13 @@ function getFreightForQty(qty: number): number {
 }
 
 export function generatePriceTablePDF() {
-  const margin = 0.35;
   const irpj = 0.15;
   const comissaoRest = 0.15;
   const comissaoComercial = 0.10;
-  const denominator = 1 - margin - irpj - comissaoRest - comissaoComercial;
+  const varCosts = irpj + comissaoRest + comissaoComercial;
+
+  function getDenominator(m: number) { return 1 - m - varCosts; }
+  function fmtPct(n: number) { return `${(n * 100).toFixed(0)}%`; }
 
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -155,16 +157,16 @@ export function generatePriceTablePDF() {
   doc.text(`Gerada em ${today}  |  Inclui frete (Azul Cargo)`, 20, 40);
 
   doc.setFillColor(...CARD_BG);
-  doc.roundedRect(pageW - 145, 12, 130, 24, 3, 3, "F");
+  doc.roundedRect(pageW - 155, 12, 140, 24, 3, 3, "F");
   doc.setFontSize(8);
   doc.setTextColor(...TEXT_GRAY);
-  doc.text("COMPOSIÇÃO DO PREÇO", pageW - 140, 19);
+  doc.text("COMPOSIÇÃO DO PREÇO", pageW - 150, 19);
   doc.setFontSize(8.5);
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text(`Margem: 35%  |  IRPJ: 15%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%  |  + Frete`, pageW - 140, 26);
+  doc.text(`Margem: 50%→35% (escalonada)  |  IRPJ: 15%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%`, pageW - 150, 26);
   doc.setTextColor(...TEXT_GRAY);
   doc.setFontSize(8);
-  doc.text(`Preço = (Custo Produção + Frete) / ${denominator.toFixed(2).replace(".", ",")}`, pageW - 140, 32);
+  doc.text(`Preço = (Custo Produção + Frete) / (1 − margem − 40%)`, pageW - 150, 32);
 
   function drawPriceTable(faces: number, startY: number) {
     const label = faces === 1 ? "1 FACE (frente)" : "2 FACES (frente e verso)";
@@ -178,19 +180,21 @@ export function generatePriceTablePDF() {
     doc.text(label, 30, yPos + 5);
     yPos += 10;
 
-    const head = [["Volume", "Produção", "Frete", "Custo Total", "Preço Unit.", "4 sem", "8 sem", "12 sem", "16 sem", "Lucro (4 sem)"]];
+    const head = [["Volume", "Margem", "Produção", "Frete", "Custo Total", "Preço Unit.", "4 sem", "8 sem", "12 sem", "16 sem", "Lucro (4 sem)"]];
     const body: string[][] = [];
 
-    for (const { qty, unit } of GPC_COSTS) {
+    for (const { qty, unit, margin: rowMargin } of GPC_COSTS) {
       const prodCost = unit * faces * qty;
       const freight = getFreightForQty(qty);
       const totalCost = prodCost + freight;
       const totalCostUnit = totalCost / qty;
-      const priceUnit = totalCostUnit / denominator;
+      const denom = getDenominator(rowMargin);
+      const priceUnit = totalCostUnit / denom;
       const total4 = priceUnit * qty;
-      const lucro = total4 * margin;
+      const lucro = total4 * rowMargin;
       const row = [
         fmtQty(qty),
+        fmtPct(rowMargin),
         fmtBRL(prodCost),
         fmtBRL(freight),
         fmtBRL(totalCost),
@@ -206,11 +210,11 @@ export function generatePriceTablePDF() {
       head,
       body,
       theme: "plain",
-      margin: { left: 15, right: 10 },
+      margin: { left: 12, right: 8 },
       styles: {
-        fontSize: 8,
+        fontSize: 7.5,
         textColor: TEXT_LIGHT as unknown as number[],
-        cellPadding: { top: 2.5, bottom: 2.5, left: 2.5, right: 2.5 },
+        cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
         lineColor: [40, 40, 40],
         lineWidth: 0.3,
       },
@@ -219,7 +223,7 @@ export function generatePriceTablePDF() {
         textColor: TEXT_GRAY as unknown as number[],
         fontSize: 6.5,
         fontStyle: "bold",
-        cellPadding: { top: 2.5, bottom: 2.5, left: 2.5, right: 2.5 },
+        cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
       },
       bodyStyles: {
         fillColor: CARD_BG as unknown as number[],
@@ -229,15 +233,16 @@ export function generatePriceTablePDF() {
       },
       columnStyles: {
         0: { fontStyle: "bold", cellWidth: 16 },
-        1: { halign: "right", cellWidth: 24 },
-        2: { halign: "right", cellWidth: 24 },
-        3: { halign: "right", cellWidth: 26 },
-        4: { fontStyle: "bold", textColor: BRAND_GREEN as unknown as number[], cellWidth: 26 },
-        5: { halign: "right", cellWidth: 27 },
-        6: { halign: "right", cellWidth: 27 },
-        7: { halign: "right", cellWidth: 27 },
-        8: { halign: "right", cellWidth: 27 },
-        9: { halign: "right", fontStyle: "bold", textColor: [52, 211, 153] as unknown as number[], cellWidth: 28 },
+        1: { halign: "center", fontStyle: "bold", textColor: AMBER as unknown as number[], cellWidth: 15 },
+        2: { halign: "right", cellWidth: 22 },
+        3: { halign: "right", cellWidth: 22 },
+        4: { halign: "right", cellWidth: 24 },
+        5: { fontStyle: "bold", textColor: BRAND_GREEN as unknown as number[], cellWidth: 24 },
+        6: { halign: "right", cellWidth: 26 },
+        7: { halign: "right", cellWidth: 26 },
+        8: { halign: "right", cellWidth: 26 },
+        9: { halign: "right", cellWidth: 26 },
+        10: { halign: "right", fontStyle: "bold", textColor: [52, 211, 153] as unknown as number[], cellWidth: 26 },
       },
     });
 
@@ -254,12 +259,14 @@ export function generatePriceTablePDF() {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...TEXT_GRAY);
-  doc.text("EXEMPLO: 5.000 BOLACHAS, 1 FACE, 4 SEMANAS", 28, boxY + 7);
+  doc.text("EXEMPLO: 5.000 BOLACHAS, 1 FACE, 4 SEMANAS (MARGEM 40%)", 28, boxY + 7);
 
+  const exMargin = 0.40;
+  const exDenom = getDenominator(exMargin);
   const exProd = 0.2998 * 5000;
   const exFreight = FREIGHT_AZUL[5000];
   const exCostTotal = exProd + exFreight;
-  const exPriceUnit = (exCostTotal / 5000) / denominator;
+  const exPriceUnit = (exCostTotal / 5000) / exDenom;
   const exTotal = exPriceUnit * 5000;
 
   const col1X = 28;
@@ -290,7 +297,7 @@ export function generatePriceTablePDF() {
   lineY += 6;
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text(`Margem bruta (35%): ${fmtBRL(exTotal * margin)}`, col1X, lineY);
+  doc.text(`Margem bruta (40%): ${fmtBRL(exTotal * exMargin)}`, col1X, lineY);
 
   drawFooter(doc);
 
@@ -309,16 +316,16 @@ export function generatePriceTablePDF() {
   doc.text(`Gerada em ${today}  |  Inclui frete (Azul Cargo)`, 20, 40);
 
   doc.setFillColor(...CARD_BG);
-  doc.roundedRect(pageW - 145, 12, 130, 24, 3, 3, "F");
+  doc.roundedRect(pageW - 155, 12, 140, 24, 3, 3, "F");
   doc.setFontSize(8);
   doc.setTextColor(...TEXT_GRAY);
-  doc.text("COMPOSIÇÃO DO PREÇO", pageW - 140, 19);
+  doc.text("COMPOSIÇÃO DO PREÇO", pageW - 150, 19);
   doc.setFontSize(8.5);
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text(`Margem: 35%  |  IRPJ: 15%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%  |  + Frete`, pageW - 140, 26);
+  doc.text(`Margem: 50%→35% (escalonada)  |  IRPJ: 15%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%`, pageW - 150, 26);
   doc.setTextColor(...TEXT_GRAY);
   doc.setFontSize(8);
-  doc.text(`Preço = (Custo Produção × 2 + Frete) / ${denominator.toFixed(2).replace(".", ",")}`, pageW - 140, 32);
+  doc.text(`Preço = (Custo Produção × 2 + Frete) / (1 − margem − 40%)`, pageW - 150, 32);
 
   drawPriceTable(2, 50);
   drawFooter(doc);
@@ -438,7 +445,7 @@ export function generatePriceTablePDF() {
   doc.text("• Caixa 1.000 unidades: 12×27×47  |  Caixa 2.000 unidades: 24×27×47", 22, ftY + 15.5);
 
   const bkY = ftY + 24;
-  const bkH = 62;
+  const bkH = 70;
   doc.setFillColor(...CARD_BG);
   doc.roundedRect(15, bkY, pageW - 30, bkH, 3, 3, "F");
 
@@ -469,9 +476,9 @@ export function generatePriceTablePDF() {
   doc.setTextColor(...TEXT_LIGHT);
 
   const components = [
-    { label: "Custo de Produção (GPC)", pct: "25%", desc: "Custo unitário × faces × quantidade" },
+    { label: "Custo de Produção (GPC)", pct: "variável", desc: "Custo unitário × faces × quantidade" },
     { label: "Frete (Azul Cargo)", pct: "variável", desc: "Custo fixo por faixa de volume" },
-    { label: "Margem Bruta", pct: "35%", desc: "Lucro operacional da mesa.ads" },
+    { label: "Margem Bruta (escalonada)", pct: "50%→35%", desc: "Maior volume = menor margem" },
     { label: "IRPJ (tributário)", pct: "15%", desc: "Imposto sobre receita" },
     { label: "Comissão Restaurante", pct: "15%", desc: "Repasse ao parceiro restaurante" },
     { label: "Comissão Comercial", pct: "10%", desc: "Comissão do vendedor" },
@@ -489,7 +496,7 @@ export function generatePriceTablePDF() {
   const fmLeftX = midX;
   let fmY = bkY + 24;
   doc.setFillColor(20, 20, 20);
-  doc.roundedRect(fmLeftX - 2, fmY - 3, pageW - fmLeftX - 20, 34, 2, 2, "F");
+  doc.roundedRect(fmLeftX - 2, fmY - 3, pageW - fmLeftX - 20, 41, 2, 2, "F");
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
@@ -502,17 +509,22 @@ export function generatePriceTablePDF() {
   doc.setTextColor(...TEXT_GRAY);
   doc.text("2.", fmLeftX + 4, fmY + 2);
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text("Denominador = 1 − 0,35 − 0,15 − 0,15 − 0,10 =", fmLeftX + 10, fmY + 2);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...BRAND_GREEN);
-  doc.text("0,25", fmLeftX + 115, fmY + 2);
+  doc.text("Denominador = 1 − margem − 0,15 − 0,15 − 0,10", fmLeftX + 10, fmY + 2);
+
+  fmY += 7;
+  doc.setTextColor(...TEXT_GRAY);
+  doc.text("", fmLeftX + 4, fmY + 2);
+  doc.setTextColor(...TEXT_LIGHT);
+  doc.setFontSize(7);
+  doc.text("1k→0,10  |  2k→0,12  |  3k→0,15  |  4k→0,17  |  5k→0,20  |  10k→0,23  |  20k→0,25", fmLeftX + 10, fmY + 2);
+  doc.setFontSize(8);
 
   fmY += 7;
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...TEXT_GRAY);
   doc.text("3.", fmLeftX + 4, fmY + 2);
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text("Preço Unitário = Custo Base / qtd / 0,25", fmLeftX + 10, fmY + 2);
+  doc.text("Preço Unitário = Custo Base / qtd / denominador", fmLeftX + 10, fmY + 2);
 
   fmY += 7;
   doc.setTextColor(...TEXT_GRAY);
