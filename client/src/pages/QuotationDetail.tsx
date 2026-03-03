@@ -54,8 +54,6 @@ import {
   Package,
   DollarSign,
   Clock,
-  Link,
-  CheckCircle,
 } from "lucide-react";
 
 type QuotationStatus = "rascunho" | "enviada" | "ativa" | "os_gerada" | "win" | "perdida" | "expirada";
@@ -149,19 +147,6 @@ export default function QuotationDetail() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
-  const generateProposalLinkMutation = trpc.quotation.generateProposalLink.useMutation({
-    onSuccess: (data) => {
-      utils.quotation.get.invalidate({ id: quotationId });
-      const fullUrl = `${window.location.origin}${data.url}`;
-      navigator.clipboard.writeText(fullUrl).then(() => {
-        toast.success("Link da proposta copiado!");
-      }).catch(() => {
-        toast.success("Link gerado: " + fullUrl);
-      });
-    },
-    onError: (err) => toast.error(`Erro: ${err.message}`),
-  });
-
   const openEdit = () => {
     if (!quotation) return;
     setEditForm({
@@ -239,42 +224,13 @@ export default function QuotationDetail() {
                   <Badge variant="outline" className={STATUS_CONFIG[status]?.className || ""}>
                     {STATUS_CONFIG[status]?.label || status}
                   </Badge>
-                  {quotation.signedAt && (
-                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 gap-1">
-                      <CheckCircle className="w-3 h-3" />
-                      Assinada em {new Date(quotation.signedAt).toLocaleDateString("pt-BR")} por {quotation.signedBy}
-                    </Badge>
-                  )}
                 </div>
                 {quotation.quotationName && (
                   <p className="text-xs text-muted-foreground mt-0.5">{quotation.quotationName}</p>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {!isTerminal && status !== "rascunho" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => {
-                    if (quotation.publicToken) {
-                      const fullUrl = `${window.location.origin}/proposta/${quotation.publicToken}`;
-                      navigator.clipboard.writeText(fullUrl).then(() => {
-                        toast.success("Link copiado!");
-                      }).catch(() => {
-                        toast.info("Link: " + fullUrl);
-                      });
-                    } else {
-                      generateProposalLinkMutation.mutate({ quotationId });
-                    }
-                  }}
-                  disabled={generateProposalLinkMutation.isPending}
-                >
-                  <Link className="w-3.5 h-3.5" />
-                  {quotation.publicToken ? "Copiar Link" : "Gerar Link da Proposta"}
-                </Button>
-              )}
+            <div className="flex items-center gap-2">
               {!isTerminal && (
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={openEdit}>
                   <Pencil className="w-3.5 h-3.5" /> Editar
