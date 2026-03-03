@@ -2,6 +2,7 @@ import { useState } from "react";
 import PageContainer from "@/components/PageContainer";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { generatePriceTablePDF } from "@/lib/generate-price-table-pdf";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +59,7 @@ import {
   CreditCard,
   Clock,
   Copy,
+  Download,
 } from "lucide-react";
 
 type SupplierForm = {
@@ -519,14 +521,25 @@ export default function Production() {
       title="Produção"
       description="Gestão de fornecedores e orçamentos de produção"
       actions={
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar..."
-            className="pl-9 w-64 bg-card border-border/30"
-          />
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => { generatePriceTablePDF(); toast.success("PDF gerado!"); }}
+          >
+            <Download className="w-3.5 h-3.5" />
+            Tabela de Preços
+          </Button>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar..."
+              className="pl-9 w-64 bg-card border-border/30"
+            />
+          </div>
         </div>
       }
     >
