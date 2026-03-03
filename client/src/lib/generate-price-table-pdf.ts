@@ -11,6 +11,66 @@ const GPC_COSTS = [
   { qty: 20000, unit: 0.2600 },
 ];
 
+const FREIGHT_AZUL: Record<number, number> = {
+  1000: 152.01,
+  2000: 279.06,
+  3000: 430.26,
+  4000: 566.51,
+  5000: 723.32,
+  10000: 1548.62,
+};
+
+const FREIGHT_TABLE = [
+  {
+    qty: 1000,
+    azul: 152.01,
+    melhorEnvioPrazo: { logistica: "Sedex", valor: 202.03, prazo: "4 dias úteis" },
+    melhorEnvioPreco: { logistica: "Latam", valor: 80.38, prazo: "7 dias úteis" },
+    centralFretePrazo: null,
+    centralFretePreco: null,
+  },
+  {
+    qty: 2000,
+    azul: 279.06,
+    melhorEnvioPrazo: { logistica: "Sedex", valor: 386.50, prazo: "4 dias úteis" },
+    melhorEnvioPreco: { logistica: "Latam", valor: 138.16, prazo: "7 dias úteis" },
+    centralFretePrazo: null,
+    centralFretePreco: null,
+  },
+  {
+    qty: 3000,
+    azul: 430.26,
+    melhorEnvioPrazo: { logistica: "Sedex", valor: 609.54, prazo: "4 dias úteis" },
+    melhorEnvioPreco: { logistica: "Latam", valor: 219.03, prazo: "7 dias úteis" },
+    centralFretePrazo: null,
+    centralFretePreco: null,
+  },
+  {
+    qty: 4000,
+    azul: 566.51,
+    melhorEnvioPrazo: null,
+    melhorEnvioPreco: null,
+    centralFretePrazo: { logistica: "Atual Cargas", valor: 532.13, prazo: "19 dias úteis" },
+    centralFretePreco: { logistica: "Amazon", valor: 194.87, prazo: "20 dias úteis" },
+  },
+  {
+    qty: 5000,
+    azul: 723.32,
+    melhorEnvioPrazo: null,
+    melhorEnvioPreco: null,
+    centralFretePrazo: { logistica: "Atual Cargas", valor: 551.14, prazo: "19 dias úteis" },
+    centralFretePreco: { logistica: "Favorita", valor: 234.64, prazo: "27 dias úteis" },
+  },
+  {
+    qty: 10000,
+    azul: 1548.62,
+    melhorEnvioPrazo: null,
+    melhorEnvioPreco: null,
+    centralFretePrazo: { logistica: "Atual Cargas", valor: 624.49, prazo: "19 dias úteis" },
+    centralFretePreco: { logistica: "Favorita", valor: 275.57, prazo: "27 dias úteis" },
+  },
+];
+
 const WEEKS = [4, 8, 12, 16];
 
 const BRAND_GREEN = [39, 216, 3] as const;
@@ -20,6 +80,7 @@ const HEADER_BG = [30, 30, 30] as const;
 const TEXT_WHITE = [240, 240, 240] as const;
 const TEXT_GRAY = [140, 140, 140] as const;
 const TEXT_LIGHT = [200, 200, 200] as const;
+const AMBER = [245, 158, 11] as const;
 
 function fmtBRL(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -33,6 +94,41 @@ function fmtQty(n: number): string {
   return n.toLocaleString("pt-BR");
 }
 
+function drawPageBg(doc: jsPDF) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  doc.setFillColor(...DARK_BG);
+  doc.rect(0, 0, pageW, pageH, "F");
+  doc.setFillColor(...BRAND_GREEN);
+  doc.rect(0, 0, pageW, 3, "F");
+}
+
+function drawLogo(doc: jsPDF, x: number, y: number) {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(...TEXT_WHITE);
+  doc.text("mesa", x, y);
+  const mesaW = doc.getTextWidth("mesa");
+  doc.setTextColor(...BRAND_GREEN);
+  doc.text(".ads", x + mesaW, y);
+}
+
+function drawFooter(doc: jsPDF) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  doc.setFontSize(7);
+  doc.setTextColor(...TEXT_GRAY);
+  doc.setFont("helvetica", "normal");
+  doc.text("mesa.ads — Plataforma de gestão", pageW / 2, pageH - 8, { align: "center" });
+  doc.text("Documento confidencial — uso interno", pageW / 2, pageH - 4, { align: "center" });
+}
+
+function getFreightForQty(qty: number): number {
+  if (FREIGHT_AZUL[qty]) return FREIGHT_AZUL[qty];
+  if (qty === 20000) return FREIGHT_AZUL[10000] * 2;
+  return 0;
+}
+
 export function generatePriceTablePDF() {
   const margin = 0.35;
   const irpj = 0.15;
@@ -44,27 +140,8 @@ export function generatePriceTablePDF() {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
 
-  doc.setFillColor(...DARK_BG);
-  doc.rect(0, 0, pageW, pageH, "F");
-
-  doc.setFillColor(...BRAND_GREEN);
-  doc.rect(0, 0, pageW, 3, "F");
-
-  let logoLoaded = false;
-  try {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.setTextColor(...TEXT_WHITE);
-    doc.text("mesa", 20, 22);
-    const mesaW = doc.getTextWidth("mesa");
-    doc.setTextColor(...BRAND_GREEN);
-    doc.text(".ads", 20 + mesaW, 22);
-  } catch {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.setTextColor(...BRAND_GREEN);
-    doc.text("mesa.ads", 20, 22);
-  }
+  drawPageBg(doc);
+  drawLogo(doc, 20, 22);
 
   doc.setFontSize(16);
   doc.setTextColor(...TEXT_WHITE);
@@ -75,19 +152,19 @@ export function generatePriceTablePDF() {
   doc.setTextColor(...TEXT_GRAY);
   doc.setFont("helvetica", "normal");
   const today = new Date().toLocaleDateString("pt-BR");
-  doc.text(`Gerada em ${today}`, 20, 40);
+  doc.text(`Gerada em ${today}  |  Inclui frete (Azul Cargo)`, 20, 40);
 
   doc.setFillColor(...CARD_BG);
-  doc.roundedRect(pageW - 135, 12, 120, 24, 3, 3, "F");
+  doc.roundedRect(pageW - 145, 12, 130, 24, 3, 3, "F");
   doc.setFontSize(8);
   doc.setTextColor(...TEXT_GRAY);
-  doc.text("COMPOSIÇÃO DO PREÇO", pageW - 130, 19);
-  doc.setFontSize(9);
+  doc.text("COMPOSIÇÃO DO PREÇO", pageW - 140, 19);
+  doc.setFontSize(8.5);
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text(`Margem: 35%  |  IRPJ: 15%  |  Comissão Rest.: 15%  |  Comissão Comerc.: 10%`, pageW - 130, 26);
+  doc.text(`Margem: 35%  |  IRPJ: 15%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%  |  + Frete`, pageW - 140, 26);
   doc.setTextColor(...TEXT_GRAY);
   doc.setFontSize(8);
-  doc.text(`Preço = Custo GPC / ${denominator.toFixed(2).replace(".", ",")}`, pageW - 130, 32);
+  doc.text(`Preço = (Custo Produção + Frete) / ${denominator.toFixed(2).replace(".", ",")}`, pageW - 140, 32);
 
   let yPos = 50;
 
@@ -102,17 +179,22 @@ export function generatePriceTablePDF() {
     doc.text(label, 30, yPos + 5);
     yPos += 10;
 
-    const head = [["Volume", "Custo GPC", "Preço Unit.", "4 semanas", "8 semanas", "12 semanas", "16 semanas"]];
+    const head = [["Volume", "Produção", "Frete", "Custo Total", "Preço Unit.", "4 sem", "8 sem", "12 sem", "16 sem"]];
     const body: string[][] = [];
 
     for (const { qty, unit } of GPC_COSTS) {
-      const cost = unit * faces;
-      const price = cost / denominator;
-      const total4 = price * qty;
+      const prodCost = unit * faces * qty;
+      const freight = getFreightForQty(qty);
+      const totalCost = prodCost + freight;
+      const totalCostUnit = totalCost / qty;
+      const priceUnit = totalCostUnit / denominator;
+      const total4 = priceUnit * qty;
       const row = [
         fmtQty(qty),
-        fmtUnit(cost),
-        fmtUnit(price),
+        fmtBRL(prodCost),
+        fmtBRL(freight),
+        fmtBRL(totalCost),
+        fmtUnit(priceUnit),
         ...WEEKS.map(w => fmtBRL(total4 * (w / 4))),
       ];
       body.push(row);
@@ -125,18 +207,18 @@ export function generatePriceTablePDF() {
       theme: "plain",
       margin: { left: 20, right: 15 },
       styles: {
-        fontSize: 9,
+        fontSize: 8.5,
         textColor: TEXT_LIGHT as unknown as number[],
-        cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
+        cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
         lineColor: [40, 40, 40],
         lineWidth: 0.3,
       },
       headStyles: {
         fillColor: HEADER_BG as unknown as number[],
         textColor: TEXT_GRAY as unknown as number[],
-        fontSize: 7.5,
+        fontSize: 7,
         fontStyle: "bold",
-        cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
+        cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
       },
       bodyStyles: {
         fillColor: CARD_BG as unknown as number[],
@@ -145,72 +227,184 @@ export function generatePriceTablePDF() {
         fillColor: [20, 20, 20],
       },
       columnStyles: {
-        0: { fontStyle: "bold", cellWidth: 22 },
-        1: { cellWidth: 28 },
-        2: { fontStyle: "bold", textColor: BRAND_GREEN as unknown as number[], cellWidth: 28 },
-        3: { halign: "right", cellWidth: 35 },
-        4: { halign: "right", cellWidth: 35 },
-        5: { halign: "right", cellWidth: 35 },
-        6: { halign: "right", cellWidth: 35 },
+        0: { fontStyle: "bold", cellWidth: 18 },
+        1: { halign: "right", cellWidth: 26 },
+        2: { halign: "right", cellWidth: 26 },
+        3: { halign: "right", cellWidth: 28 },
+        4: { fontStyle: "bold", textColor: BRAND_GREEN as unknown as number[], cellWidth: 28 },
+        5: { halign: "right", cellWidth: 30 },
+        6: { halign: "right", cellWidth: 30 },
+        7: { halign: "right", cellWidth: 30 },
+        8: { halign: "right", cellWidth: 30 },
       },
     });
 
-    yPos = (doc as any).lastAutoTable.finalY + 12;
+    yPos = (doc as any).lastAutoTable.finalY + 10;
   }
 
   doc.setFillColor(...CARD_BG);
   const boxY = yPos;
-  const boxH = 38;
+  const boxH = 32;
   doc.roundedRect(20, boxY, pageW - 35, boxH, 3, 3, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...TEXT_GRAY);
-  doc.text("EXEMPLO: 5.000 BOLACHAS, 1 FACE, 4 SEMANAS", 28, boxY + 8);
+  doc.text("EXEMPLO: 5.000 BOLACHAS, 1 FACE, 4 SEMANAS", 28, boxY + 7);
 
-  const exCost = 0.2998;
-  const exPrice = exCost / denominator;
-  const exTotal = exPrice * 5000;
+  const exProd = 0.2998 * 5000;
+  const exFreight = FREIGHT_AZUL[5000];
+  const exCostTotal = exProd + exFreight;
+  const exPriceUnit = (exCostTotal / 5000) / denominator;
+  const exTotal = exPriceUnit * 5000;
 
   const col1X = 28;
-  const col2X = 110;
+  const col2X = 105;
   const col3X = 192;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(...TEXT_LIGHT);
 
-  let lineY = boxY + 15;
-  doc.text(`Custo produção (25%):`, col1X, lineY);
-  doc.text(fmtBRL(exCost * 5000), col1X + 55, lineY);
-  doc.text(`IRPJ (15%):`, col2X, lineY);
-  doc.text(fmtBRL(exTotal * irpj), col2X + 40, lineY);
+  let lineY = boxY + 13;
+  doc.text(`Produção: ${fmtBRL(exProd)}`, col1X, lineY);
+  doc.text(`Frete (Azul Cargo): ${fmtBRL(exFreight)}`, col1X + 50, lineY);
   doc.setFont("helvetica", "bold");
+  doc.text(`Custo base: ${fmtBRL(exCostTotal)}`, col2X + 32, lineY);
   doc.setTextColor(...BRAND_GREEN);
-  doc.text(`PREÇO TOTAL:`, col3X, lineY);
-  doc.text(fmtBRL(exTotal), col3X + 40, lineY);
+  doc.text(`PREÇO TOTAL: ${fmtBRL(exTotal)}`, col3X, lineY);
 
   lineY += 6;
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text(`Comissão rest. (15%):`, col1X, lineY);
-  doc.text(fmtBRL(exTotal * comissaoRest), col1X + 55, lineY);
-  doc.text(`Comissão comerc. (10%):`, col2X, lineY);
-  doc.text(fmtBRL(exTotal * comissaoComercial), col2X + 40, lineY);
+  doc.text(`IRPJ (15%): ${fmtBRL(exTotal * irpj)}`, col1X, lineY);
+  doc.text(`Com. rest. (15%): ${fmtBRL(exTotal * comissaoRest)}`, col1X + 50, lineY);
+  doc.text(`Com. comerc. (10%): ${fmtBRL(exTotal * comissaoComercial)}`, col2X + 32, lineY);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...BRAND_GREEN);
-  doc.text(`Preço unitário:`, col3X, lineY);
-  doc.text(fmtUnit(exPrice), col3X + 40, lineY);
+  doc.text(`Preço unit.: ${fmtUnit(exPriceUnit)}`, col3X, lineY);
 
   lineY += 6;
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text(`Margem bruta (35%):`, col1X, lineY);
-  doc.text(fmtBRL(exTotal * margin), col1X + 55, lineY);
+  doc.text(`Margem bruta (35%): ${fmtBRL(exTotal * margin)}`, col1X, lineY);
 
-  doc.setFontSize(7);
+  drawFooter(doc);
+
+  doc.addPage("a4", "landscape");
+  drawPageBg(doc);
+  drawLogo(doc, 20, 22);
+
+  doc.setFontSize(16);
+  doc.setTextColor(...TEXT_WHITE);
+  doc.setFont("helvetica", "bold");
+  doc.text("Cotações de Frete", 20, 34);
+
+  doc.setFontSize(9);
   doc.setTextColor(...TEXT_GRAY);
-  doc.text("mesa.ads — Plataforma de gestão", pageW / 2, pageH - 8, { align: "center" });
-  doc.text("Documento confidencial — uso interno", pageW / 2, pageH - 4, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.text("Azul Cargo e Plataformas  |  Referência: caixas padrão (1.000 un: 12×27×47 / 2.000 un: 24×27×47)", 20, 40);
+
+  const freightHead = [[
+    "Volume",
+    "Azul Cargo",
+    "ME - Melhor Prazo",
+    "",
+    "ME - Menor Preço",
+    "",
+    "CF - Melhor Prazo",
+    "",
+    "CF - Menor Preço",
+    "",
+  ]];
+
+  const freightSubHead = [[
+    "",
+    "",
+    "Logística / Valor",
+    "Prazo",
+    "Logística / Valor",
+    "Prazo",
+    "Logística / Valor",
+    "Prazo",
+    "Logística / Valor",
+    "Prazo",
+  ]];
+
+  const freightBody: string[][] = [];
+
+  for (const row of FREIGHT_TABLE) {
+    const mePrazo = row.melhorEnvioPrazo;
+    const mePreco = row.melhorEnvioPreco;
+    const cfPrazo = row.centralFretePrazo;
+    const cfPreco = row.centralFretePreco;
+
+    freightBody.push([
+      fmtQty(row.qty),
+      fmtBRL(row.azul),
+      mePrazo ? `${mePrazo.logistica} / ${fmtBRL(mePrazo.valor)}` : "—",
+      mePrazo ? mePrazo.prazo : "—",
+      mePreco ? `${mePreco.logistica} / ${fmtBRL(mePreco.valor)}` : "—",
+      mePreco ? mePreco.prazo : "—",
+      cfPrazo ? `${cfPrazo.logistica} / ${fmtBRL(cfPrazo.valor)}` : "—",
+      cfPrazo ? cfPrazo.prazo : "—",
+      cfPreco ? `${cfPreco.logistica} / ${fmtBRL(cfPreco.valor)}` : "—",
+      cfPreco ? cfPreco.prazo : "—",
+    ]);
+  }
+
+  autoTable(doc, {
+    startY: 48,
+    head: freightHead,
+    body: [freightSubHead[0], ...freightBody],
+    theme: "plain",
+    margin: { left: 15, right: 15 },
+    styles: {
+      fontSize: 8,
+      textColor: TEXT_LIGHT as unknown as number[],
+      cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+      lineColor: [40, 40, 40],
+      lineWidth: 0.3,
+    },
+    headStyles: {
+      fillColor: HEADER_BG as unknown as number[],
+      textColor: TEXT_GRAY as unknown as number[],
+      fontSize: 7,
+      fontStyle: "bold",
+    },
+    bodyStyles: {
+      fillColor: CARD_BG as unknown as number[],
+    },
+    alternateRowStyles: {
+      fillColor: [20, 20, 20],
+    },
+    columnStyles: {
+      0: { fontStyle: "bold", cellWidth: 18 },
+      1: { fontStyle: "bold", textColor: AMBER as unknown as number[], cellWidth: 24 },
+    },
+    didParseCell: (data: any) => {
+      if (data.section === "body" && data.row.index === 0) {
+        data.cell.styles.fillColor = HEADER_BG;
+        data.cell.styles.textColor = TEXT_GRAY;
+        data.cell.styles.fontSize = 6.5;
+        data.cell.styles.fontStyle = "bold";
+      }
+    },
+  });
+
+  const ftY = (doc as any).lastAutoTable.finalY + 10;
+  doc.setFillColor(...CARD_BG);
+  doc.roundedRect(15, ftY, pageW - 30, 18, 3, 3, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...TEXT_GRAY);
+  doc.text("OBSERVAÇÕES", 22, ftY + 6);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...TEXT_LIGHT);
+  doc.text("• Cotações realizadas com referências de caixas padrões", 22, ftY + 11);
+  doc.text("• Caixa 1.000 unidades: 12×27×47  |  Caixa 2.000 unidades: 24×27×47", 22, ftY + 15.5);
+
+  drawFooter(doc);
 
   doc.save("tabela-precos-mesa-ads.pdf");
 }
