@@ -166,10 +166,9 @@ export function generatePriceTablePDF() {
   doc.setFontSize(8);
   doc.text(`Preço = (Custo Produção + Frete) / ${denominator.toFixed(2).replace(".", ",")}`, pageW - 140, 32);
 
-  let yPos = 50;
-
-  for (const faces of [1, 2]) {
+  function drawPriceTable(faces: number, startY: number) {
     const label = faces === 1 ? "1 FACE (frente)" : "2 FACES (frente e verso)";
+    let yPos = startY;
 
     doc.setFillColor(...BRAND_GREEN);
     doc.roundedRect(20, yPos, 6, 6, 1, 1, "F");
@@ -239,12 +238,14 @@ export function generatePriceTablePDF() {
       },
     });
 
-    yPos = (doc as any).lastAutoTable.finalY + 10;
+    return (doc as any).lastAutoTable.finalY;
   }
 
-  doc.setFillColor(...CARD_BG);
-  const boxY = yPos;
+  const tableEndY = drawPriceTable(1, 50);
+
+  const boxY = tableEndY + 10;
   const boxH = 32;
+  doc.setFillColor(...CARD_BG);
   doc.roundedRect(20, boxY, pageW - 35, boxH, 3, 3, "F");
 
   doc.setFont("helvetica", "bold");
@@ -288,6 +289,35 @@ export function generatePriceTablePDF() {
   doc.setTextColor(...TEXT_LIGHT);
   doc.text(`Margem bruta (35%): ${fmtBRL(exTotal * margin)}`, col1X, lineY);
 
+  drawFooter(doc);
+
+  doc.addPage("a4", "landscape");
+  drawPageBg(doc);
+  drawLogo(doc, 20, 22);
+
+  doc.setFontSize(16);
+  doc.setTextColor(...TEXT_WHITE);
+  doc.setFont("helvetica", "bold");
+  doc.text("Tabela de Preços — 2 Faces", 20, 34);
+
+  doc.setFontSize(9);
+  doc.setTextColor(...TEXT_GRAY);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Gerada em ${today}  |  Inclui frete (Azul Cargo)`, 20, 40);
+
+  doc.setFillColor(...CARD_BG);
+  doc.roundedRect(pageW - 145, 12, 130, 24, 3, 3, "F");
+  doc.setFontSize(8);
+  doc.setTextColor(...TEXT_GRAY);
+  doc.text("COMPOSIÇÃO DO PREÇO", pageW - 140, 19);
+  doc.setFontSize(8.5);
+  doc.setTextColor(...TEXT_LIGHT);
+  doc.text(`Margem: 35%  |  IRPJ: 15%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%  |  + Frete`, pageW - 140, 26);
+  doc.setTextColor(...TEXT_GRAY);
+  doc.setFontSize(8);
+  doc.text(`Preço = (Custo Produção × 2 + Frete) / ${denominator.toFixed(2).replace(".", ",")}`, pageW - 140, 32);
+
+  drawPriceTable(2, 50);
   drawFooter(doc);
 
   doc.addPage("a4", "landscape");
