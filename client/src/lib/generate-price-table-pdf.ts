@@ -178,7 +178,7 @@ export function generatePriceTablePDF() {
     doc.text(label, 30, yPos + 5);
     yPos += 10;
 
-    const head = [["Volume", "Produção", "Frete", "Custo Total", "Preço Unit.", "4 sem", "8 sem", "12 sem", "16 sem"]];
+    const head = [["Volume", "Produção", "Frete", "Custo Total", "Preço Unit.", "4 sem", "8 sem", "12 sem", "16 sem", "Lucro (4 sem)"]];
     const body: string[][] = [];
 
     for (const { qty, unit } of GPC_COSTS) {
@@ -188,6 +188,7 @@ export function generatePriceTablePDF() {
       const totalCostUnit = totalCost / qty;
       const priceUnit = totalCostUnit / denominator;
       const total4 = priceUnit * qty;
+      const lucro = total4 * margin;
       const row = [
         fmtQty(qty),
         fmtBRL(prodCost),
@@ -195,6 +196,7 @@ export function generatePriceTablePDF() {
         fmtBRL(totalCost),
         fmtUnit(priceUnit),
         ...WEEKS.map(w => fmtBRL(total4 * (w / 4))),
+        fmtBRL(lucro),
       ];
       body.push(row);
     }
@@ -204,20 +206,20 @@ export function generatePriceTablePDF() {
       head,
       body,
       theme: "plain",
-      margin: { left: 20, right: 15 },
+      margin: { left: 15, right: 10 },
       styles: {
-        fontSize: 8.5,
+        fontSize: 8,
         textColor: TEXT_LIGHT as unknown as number[],
-        cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+        cellPadding: { top: 2.5, bottom: 2.5, left: 2.5, right: 2.5 },
         lineColor: [40, 40, 40],
         lineWidth: 0.3,
       },
       headStyles: {
         fillColor: HEADER_BG as unknown as number[],
         textColor: TEXT_GRAY as unknown as number[],
-        fontSize: 7,
+        fontSize: 6.5,
         fontStyle: "bold",
-        cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+        cellPadding: { top: 2.5, bottom: 2.5, left: 2.5, right: 2.5 },
       },
       bodyStyles: {
         fillColor: CARD_BG as unknown as number[],
@@ -226,15 +228,16 @@ export function generatePriceTablePDF() {
         fillColor: [20, 20, 20],
       },
       columnStyles: {
-        0: { fontStyle: "bold", cellWidth: 18 },
-        1: { halign: "right", cellWidth: 26 },
-        2: { halign: "right", cellWidth: 26 },
-        3: { halign: "right", cellWidth: 28 },
-        4: { fontStyle: "bold", textColor: BRAND_GREEN as unknown as number[], cellWidth: 28 },
-        5: { halign: "right", cellWidth: 30 },
-        6: { halign: "right", cellWidth: 30 },
-        7: { halign: "right", cellWidth: 30 },
-        8: { halign: "right", cellWidth: 30 },
+        0: { fontStyle: "bold", cellWidth: 16 },
+        1: { halign: "right", cellWidth: 24 },
+        2: { halign: "right", cellWidth: 24 },
+        3: { halign: "right", cellWidth: 26 },
+        4: { fontStyle: "bold", textColor: BRAND_GREEN as unknown as number[], cellWidth: 26 },
+        5: { halign: "right", cellWidth: 27 },
+        6: { halign: "right", cellWidth: 27 },
+        7: { halign: "right", cellWidth: 27 },
+        8: { halign: "right", cellWidth: 27 },
+        9: { halign: "right", fontStyle: "bold", textColor: [52, 211, 153] as unknown as number[], cellWidth: 28 },
       },
     });
 
