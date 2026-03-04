@@ -500,7 +500,7 @@ export default function Leads() {
     setFormData(newForm);
     setCnpjInput("");
     setCnpjFetched(false);
-    setCreateStep(activeTab === "restaurante" ? "cnpj" : "form");
+    setCreateStep("cnpj");
     setCreateOpen(true);
   }
 
@@ -935,7 +935,7 @@ export default function Leads() {
             <DialogTitle>Novo Lead — {activeTab === "anunciante" ? "Anunciante" : "Restaurante"}</DialogTitle>
           </DialogHeader>
 
-          {activeTab === "restaurante" && createStep === "cnpj" && (
+          {createStep === "cnpj" && (
             <div className="space-y-4">
               <div className="bg-muted/30 border border-border/30 rounded-lg p-4 space-y-3">
                 <div className="flex items-center gap-2">
@@ -978,7 +978,7 @@ export default function Leads() {
             </div>
           )}
 
-          {(activeTab === "anunciante" || createStep === "form") && (
+          {createStep === "form" && (
             <>
               {cnpjFetched && (
                 <div className="flex items-center gap-2 p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs">
@@ -986,7 +986,7 @@ export default function Leads() {
                   <span>Dados preenchidos via CNPJ. Revise e complete.</span>
                 </div>
               )}
-              {activeTab === "restaurante" && !cnpjFetched && (
+              {!cnpjFetched && (
                 <Button variant="ghost" size="sm" className="text-xs w-fit" onClick={() => { setCreateStep("cnpj"); setCnpjFetched(false); }}>
                   ← Voltar para busca CNPJ
                 </Button>
