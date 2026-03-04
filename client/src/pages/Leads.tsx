@@ -1070,10 +1070,10 @@ export default function Leads() {
 
       {/* Lead Detail Sheet */}
       <Sheet open={!!selectedLeadId} onOpenChange={(open) => { if (!open) { setSelectedLeadId(null); setIsEditing(false); } }}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto px-5 pt-6">
           {selectedLead.data && (
             <>
-              <SheetHeader>
+              <SheetHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <SheetTitle className="flex items-center gap-2 text-base">
                     {selectedLead.data.type === "anunciante" ? (
@@ -1083,7 +1083,7 @@ export default function Leads() {
                     )}
                     <span className="truncate">{selectedLead.data.name}</span>
                   </SheetTitle>
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
                     {!isEditing && selectedLead.data.type === "anunciante" && isConverted && selectedLead.data.convertedToId && (
                       <Button
                         variant="outline"
@@ -1126,7 +1126,7 @@ export default function Leads() {
                 </div>
               </SheetHeader>
 
-              <div className="mt-6 space-y-6">
+              <div className="mt-8 space-y-8">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Estágio</span>
@@ -1345,7 +1345,7 @@ export default function Leads() {
 
                 <Separator />
 
-                <div className="flex justify-end pt-2 pb-4">
+                <div className="flex justify-end pb-6">
                   <Button
                     variant="destructive"
                     size="sm"
