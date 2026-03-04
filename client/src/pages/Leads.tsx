@@ -1110,15 +1110,15 @@ export default function Leads() {
                 </div>
               </SheetHeader>
 
-              <div className="mt-4 space-y-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
+              <div className="mt-6 space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Estágio</span>
                     <Badge variant="outline" className={`text-[10px] ${getStageConfig(selectedLead.data.stage).color}`}>
                       {getStageConfig(selectedLead.data.stage).label}
                     </Badge>
                   </div>
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {STAGES.map((stage) => (
                       <Button
                         key={stage.key}
@@ -1137,12 +1137,12 @@ export default function Leads() {
                 <Separator />
 
                 {isEditing ? (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Editar Informações</span>
                     </div>
                     {renderLeadForm(editData, setEditData)}
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex items-center gap-2 pt-2">
                       <Button size="sm" className="gap-1 flex-1" onClick={handleUpdate} disabled={updateMutation.isPending}>
                         <Check className="w-3 h-3" />
                         {updateMutation.isPending ? "Salvando..." : "Salvar"}
@@ -1154,7 +1154,7 @@ export default function Leads() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Informações</span>
                     <div className="grid gap-1.5 text-sm">
                       {selectedLead.data.company && (
@@ -1248,11 +1248,11 @@ export default function Leads() {
 
                 <Separator />
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Nova Interação</span>
                   <div className="flex gap-2">
                     <Select value={interactionType} onValueChange={setInteractionType}>
-                      <SelectTrigger className="w-[120px] h-8 text-xs">
+                      <SelectTrigger className="w-[130px] h-8 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1267,7 +1267,7 @@ export default function Leads() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-end">
                     <Textarea
                       value={interactionContent}
                       onChange={(e) => setInteractionContent(e.target.value)}
@@ -1277,7 +1277,7 @@ export default function Leads() {
                     />
                     <Button
                       size="sm"
-                      className="self-end h-8"
+                      className="h-8"
                       onClick={handleAddInteraction}
                       disabled={!interactionContent.trim() || addInteractionMutation.isPending}
                     >
@@ -1288,7 +1288,7 @@ export default function Leads() {
 
                 <Separator />
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Histórico</span>
                   <ScrollArea className="max-h-[250px]">
                     <div className="space-y-2.5">
@@ -1329,7 +1329,7 @@ export default function Leads() {
 
                 <Separator />
 
-                <div className="flex justify-end pb-2">
+                <div className="flex justify-end pt-2 pb-4">
                   <Button
                     variant="destructive"
                     size="sm"
