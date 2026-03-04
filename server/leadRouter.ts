@@ -64,6 +64,8 @@ export const leadRouter = router({
       nextFollowUp: z.string().optional(),
       tags: z.string().optional(),
       notes: z.string().optional(),
+      opportunityType: z.enum(["new", "upsell"]).optional(),
+      revenueType: z.enum(["mrr", "oneshot"]).optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -96,6 +98,8 @@ export const leadRouter = router({
       nextFollowUp: z.string().nullable().optional(),
       tags: z.string().optional(),
       notes: z.string().optional(),
+      opportunityType: z.enum(["new", "upsell"]).nullable().optional(),
+      revenueType: z.enum(["mrr", "oneshot"]).nullable().optional(),
       convertedToId: z.number().optional(),
       convertedToType: z.string().optional(),
     }))

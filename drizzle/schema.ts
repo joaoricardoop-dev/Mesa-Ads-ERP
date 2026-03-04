@@ -420,6 +420,8 @@ export const leads = pgTable("leads", {
   nextFollowUp: date("nextFollowUp"),
   tags: text("tags"),
   notes: text("notes"),
+  opportunityType: varchar("opportunityType", { length: 20 }),
+  revenueType: varchar("revenueType", { length: 20 }),
   convertedToId: integer("convertedToId"),
   convertedToType: varchar("convertedToType", { length: 50 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

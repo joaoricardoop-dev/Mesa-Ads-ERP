@@ -48,6 +48,12 @@ import {
   AlertTriangle,
   Instagram,
   FileText,
+  ChevronsLeftRight,
+  Sparkles,
+  Zap,
+  RotateCcw,
+  TrendingUp,
+  Calculator,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -271,6 +277,11 @@ export default function Leads() {
   const [quotationVolume, setQuotationVolume] = useState("");
   const [quotationNotes, setQuotationNotes] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
+  const [collapsedStages, setCollapsedStages] = useState<string[]>(["ganho", "perdido"]);
+  const [simNumRestaurants, setSimNumRestaurants] = useState("10");
+  const [simCoastersPerRest, setSimCoastersPerRest] = useState("500");
+  const [simUnitCost, setSimUnitCost] = useState("0.12");
+  const [simMarkup, setSimMarkup] = useState("80");
 
   const utils = trpc.useUtils();
 
@@ -919,7 +930,39 @@ export default function Leads() {
         <TabsContent value={activeTab} className="mt-4">
           <div className="overflow-x-auto pb-4 -mx-2 px-2">
             <div className="inline-flex gap-3">
-              {leadsByStage.map((column) => (
+              {leadsByStage.map((column) => {
+                const isCollapsed = collapsedStages.includes(column.key);
+                const toggleCollapse = () => setCollapsedStages((prev) =>
+                  prev.includes(column.key) ? prev.filter((s) => s !== column.key) : [...prev, column.key]
+                );
+
+                if (isCollapsed) {
+                  return (
+                    <div
+                      key={column.key}
+                      className={`w-[44px] shrink-0 rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${dragOverStage === column.key ? "bg-primary/5 ring-2 ring-primary/30" : "bg-muted/20"}`}
+                      onClick={toggleCollapse}
+                      onDragOver={(e) => handleDragOver(e, column.key)}
+                      onDragLeave={(e) => handleDragLeave(e, column.key)}
+                      onDrop={(e) => handleDrop(e, column.key)}
+                    >
+                      <div className="flex flex-col items-center py-3 gap-2">
+                        <Badge variant="outline" className={`text-[9px] px-1 py-0 ${column.color}`}>
+                          {column.leads.length}
+                        </Badge>
+                        <span
+                          className="text-[10px] font-medium text-muted-foreground"
+                          style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+                        >
+                          {column.label}
+                        </span>
+                        <ChevronsLeftRight className="w-3 h-3 text-muted-foreground mt-1" />
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
                 <div
                   key={column.key}
                   className={`w-[240px] shrink-0 rounded-lg transition-colors ${dragOverStage === column.key ? "bg-primary/5 ring-2 ring-primary/30" : ""}`}
@@ -934,6 +977,11 @@ export default function Leads() {
                     <span className="text-[10px] text-muted-foreground font-medium">
                       {column.leads.length}
                     </span>
+                    {(column.key === "ganho" || column.key === "perdido") && (
+                      <button onClick={toggleCollapse} className="ml-auto text-muted-foreground hover:text-foreground transition-colors" title="Minimizar">
+                        <ChevronsLeftRight className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
 
                   <div className="space-y-2 min-h-[120px]">
@@ -976,6 +1024,23 @@ export default function Leads() {
                           </div>
                         )}
 
+                        {activeTab === "anunciante" && (lead.opportunityType || lead.revenueType) && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {lead.opportunityType === "new" && (
+                              <Badge className="text-[9px] h-3.5 px-1 bg-green-500/15 text-green-500 border-green-500/30">New</Badge>
+                            )}
+                            {lead.opportunityType === "upsell" && (
+                              <Badge className="text-[9px] h-3.5 px-1 bg-blue-500/15 text-blue-500 border-blue-500/30">Upsell</Badge>
+                            )}
+                            {lead.revenueType === "mrr" && (
+                              <Badge className="text-[9px] h-3.5 px-1 bg-purple-500/15 text-purple-500 border-purple-500/30">MRR</Badge>
+                            )}
+                            {lead.revenueType === "oneshot" && (
+                              <Badge className="text-[9px] h-3.5 px-1 bg-amber-500/15 text-amber-500 border-amber-500/30">One Shot</Badge>
+                            )}
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"
@@ -1011,7 +1076,8 @@ export default function Leads() {
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </TabsContent>
@@ -1175,6 +1241,63 @@ export default function Leads() {
                     ))}
                   </div>
                 </div>
+
+                {selectedLead.data.type === "anunciante" && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Classificação</span>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] text-muted-foreground">Tipo</Label>
+                          <Select
+                            value={selectedLead.data.opportunityType || "none"}
+                            onValueChange={(v) => {
+                              const val = v === "none" ? null : v;
+                              updateMutation.mutate({ id: selectedLead.data!.id, opportunityType: val as any });
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">—</SelectItem>
+                              <SelectItem value="new">
+                                <span className="flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-green-500" /> New</span>
+                              </SelectItem>
+                              <SelectItem value="upsell">
+                                <span className="flex items-center gap-1.5"><TrendingUp className="w-3 h-3 text-blue-500" /> Upsell</span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] text-muted-foreground">Receita</Label>
+                          <Select
+                            value={selectedLead.data.revenueType || "none"}
+                            onValueChange={(v) => {
+                              const val = v === "none" ? null : v;
+                              updateMutation.mutate({ id: selectedLead.data!.id, revenueType: val as any });
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">—</SelectItem>
+                              <SelectItem value="mrr">
+                                <span className="flex items-center gap-1.5"><RotateCcw className="w-3 h-3 text-purple-500" /> MRR</span>
+                              </SelectItem>
+                              <SelectItem value="oneshot">
+                                <span className="flex items-center gap-1.5"><Zap className="w-3 h-3 text-amber-500" /> One Shot</span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <Separator />
 
@@ -1718,12 +1841,12 @@ export default function Leads() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Create Quotation from Lead Dialog */}
+      {/* Create Quotation from Lead Dialog — Mini-Simulator */}
       <Dialog open={quotationOpen} onOpenChange={setQuotationOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
+              <Calculator className="w-5 h-5 text-primary" />
               Nova Cotação
             </DialogTitle>
           </DialogHeader>
@@ -1749,64 +1872,109 @@ export default function Leads() {
             </div>
           )}
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-xs">Volume de bolachas *</Label>
-              <Input
-                type="number"
-                min={1}
-                value={quotationVolume}
-                onChange={(e) => setQuotationVolume(e.target.value)}
-                placeholder="Ex: 5000"
-                className="h-9"
-              />
-            </div>
+          {(() => {
+            const nRest = parseInt(simNumRestaurants) || 0;
+            const cPerR = parseInt(simCoastersPerRest) || 0;
+            const totalVol = nRest * cPerR;
+            const unitCost = parseFloat(simUnitCost) || 0;
+            const markup = parseFloat(simMarkup) || 0;
+            const unitPrice = unitCost * (1 + markup / 100);
+            const totalValue = totalVol * unitPrice;
+            const grossMargin = unitPrice > 0 ? ((unitPrice - unitCost) / unitPrice) * 100 : 0;
 
-            <div className="space-y-2">
-              <Label className="text-xs">Observações</Label>
-              <Textarea
-                value={quotationNotes}
-                onChange={(e) => setQuotationNotes(e.target.value)}
-                placeholder="Detalhes da cotação..."
-                rows={3}
-                className="text-sm"
-              />
-            </div>
-          </div>
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] text-muted-foreground">Nº Restaurantes</Label>
+                    <Input type="number" min={1} value={simNumRestaurants} onChange={(e) => setSimNumRestaurants(e.target.value)} className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] text-muted-foreground">Bolachas/Restaurante</Label>
+                    <Input type="number" min={1} value={simCoastersPerRest} onChange={(e) => setSimCoastersPerRest(e.target.value)} className="h-8 text-sm" />
+                  </div>
+                </div>
 
-          <DialogFooter className="flex-col gap-2 sm:flex-row">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs text-muted-foreground"
-              onClick={() => {
-                setQuotationOpen(false);
-                const clientId = selectedLead.data?.convertedToId;
-                navigate(clientId ? `/comercial/simulador?clientId=${clientId}` : "/comercial/simulador");
-              }}
-            >
-              Ir ao Simulador →
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setQuotationOpen(false)}>Cancelar</Button>
-              <Button
-                onClick={() => {
-                  const vol = parseInt(quotationVolume, 10);
-                  if (!vol || vol < 1) { toast.error("Informe o volume de bolachas"); return; }
-                  const lead = selectedLead.data!;
-                  createQuotationMutation.mutate({
-                    ...(isConverted && lead.convertedToId ? { clientId: lead.convertedToId } : {}),
-                    leadId: lead.id,
-                    coasterVolume: vol,
-                    notes: quotationNotes || undefined,
-                  });
-                }}
-                disabled={createQuotationMutation.isPending}
-              >
-                {createQuotationMutation.isPending ? "Criando..." : "Criar Cotação"}
-              </Button>
-            </div>
-          </DialogFooter>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] text-muted-foreground">Custo Unitário (R$)</Label>
+                    <Input type="number" step="0.01" min={0} value={simUnitCost} onChange={(e) => setSimUnitCost(e.target.value)} className="h-8 text-sm font-mono" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] text-muted-foreground">Markup (%)</Label>
+                    <Input type="number" min={0} value={simMarkup} onChange={(e) => setSimMarkup(e.target.value)} className="h-8 text-sm font-mono" />
+                  </div>
+                </div>
+
+                <div className="bg-muted/40 border border-border/30 rounded-lg p-3 grid grid-cols-2 gap-y-2 gap-x-4">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Volume Total</p>
+                    <p className="text-sm font-semibold font-mono">{totalVol.toLocaleString("pt-BR")}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Preço Unitário</p>
+                    <p className="text-sm font-semibold font-mono text-primary">R$ {unitPrice.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Valor Total</p>
+                    <p className="text-sm font-semibold font-mono">R$ {totalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Margem Bruta</p>
+                    <p className={`text-sm font-semibold font-mono ${grossMargin >= 30 ? "text-emerald-500" : grossMargin >= 15 ? "text-amber-500" : "text-red-500"}`}>{grossMargin.toFixed(1)}%</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-muted-foreground">Observações</Label>
+                  <Textarea
+                    value={quotationNotes}
+                    onChange={(e) => setQuotationNotes(e.target.value)}
+                    placeholder="Detalhes adicionais..."
+                    rows={2}
+                    className="text-sm"
+                  />
+                </div>
+
+                <DialogFooter className="flex-col gap-2 sm:flex-row">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-muted-foreground"
+                    onClick={() => {
+                      setQuotationOpen(false);
+                      const clientId = selectedLead.data?.convertedToId;
+                      navigate(clientId ? `/comercial/simulador?clientId=${clientId}` : "/comercial/simulador");
+                    }}
+                  >
+                    Simulador completo →
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setQuotationOpen(false)}>Cancelar</Button>
+                    <Button
+                      onClick={() => {
+                        if (totalVol < 1) { toast.error("Volume deve ser maior que zero"); return; }
+                        const lead = selectedLead.data!;
+                        createQuotationMutation.mutate({
+                          ...(isConverted && lead.convertedToId ? { clientId: lead.convertedToId } : {}),
+                          leadId: lead.id,
+                          coasterVolume: totalVol,
+                          unitPrice: unitPrice.toFixed(2),
+                          totalValue: totalValue.toFixed(2),
+                          notes: quotationNotes
+                            ? `${nRest} restaurantes, ${cPerR} bol/rest, custo R$${unitCost.toFixed(2)}, markup ${markup}% | ${quotationNotes}`
+                            : `${nRest} restaurantes, ${cPerR} bol/rest, custo R$${unitCost.toFixed(2)}, markup ${markup}%`,
+                        });
+                      }}
+                      disabled={createQuotationMutation.isPending}
+                    >
+                      {createQuotationMutation.isPending ? "Criando..." : "Criar Cotação"}
+                    </Button>
+                  </div>
+                </DialogFooter>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
       <Confetti active={showConfetti} />
