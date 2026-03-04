@@ -1,7 +1,7 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants } from "../drizzle/schema";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads } from "../drizzle/schema";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -70,6 +70,7 @@ export const quotationRouter = router({
           quotationNumber: quotations.quotationNumber,
           quotationName: quotations.quotationName,
           clientId: quotations.clientId,
+          leadId: quotations.leadId,
           campaignType: quotations.campaignType,
           coasterVolume: quotations.coasterVolume,
           networkProfile: quotations.networkProfile,
@@ -90,9 +91,12 @@ export const quotationRouter = router({
           clientCnpj: clients.cnpj,
           clientEmail: clients.contactEmail,
           clientPhone: clients.contactPhone,
+          leadName: leads.name,
+          leadCompany: leads.company,
         })
         .from(quotations)
         .leftJoin(clients, eq(quotations.clientId, clients.id))
+        .leftJoin(leads, eq(quotations.leadId, leads.id))
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(quotations.createdAt));
 
@@ -109,6 +113,7 @@ export const quotationRouter = router({
           quotationNumber: quotations.quotationNumber,
           quotationName: quotations.quotationName,
           clientId: quotations.clientId,
+          leadId: quotations.leadId,
           campaignType: quotations.campaignType,
           coasterVolume: quotations.coasterVolume,
           networkProfile: quotations.networkProfile,
@@ -129,9 +134,12 @@ export const quotationRouter = router({
           clientCnpj: clients.cnpj,
           clientEmail: clients.contactEmail,
           clientPhone: clients.contactPhone,
+          leadName: leads.name,
+          leadCompany: leads.company,
         })
         .from(quotations)
         .leftJoin(clients, eq(quotations.clientId, clients.id))
+        .leftJoin(leads, eq(quotations.leadId, leads.id))
         .where(eq(quotations.id, input.id))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
@@ -140,7 +148,8 @@ export const quotationRouter = router({
 
   create: comercialProcedure
     .input(z.object({
-      clientId: z.number(),
+      clientId: z.number().optional(),
+      leadId: z.number().optional(),
       campaignType: z.string().optional(),
       coasterVolume: z.number().int().min(1),
       networkProfile: z.string().optional(),
@@ -156,17 +165,30 @@ export const quotationRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDatabase();
 
-      const client = await db.select().from(clients).where(eq(clients.id, input.clientId)).limit(1);
-      if (!client[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado" });
+      if (!input.clientId && !input.leadId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Informe um cliente ou lead para a cotação" });
+      }
+
+      let entityName = "Lead";
+
+      if (input.clientId) {
+        const client = await db.select().from(clients).where(eq(clients.id, input.clientId)).limit(1);
+        if (!client[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado" });
+        entityName = client[0].name || client[0].company || "Cliente";
+      } else if (input.leadId) {
+        const lead = await db.select().from(leads).where(eq(leads.id, input.leadId)).limit(1);
+        if (!lead[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado" });
+        entityName = lead[0].company || lead[0].name || "Lead";
+      }
 
       const quotationNumber = await generateQuotationNumber(db);
-      const clientName = client[0].name || client[0].company || "Cliente";
-      const quotationName = generateQuotationName(clientName, input.coasterVolume);
+      const quotationName = generateQuotationName(entityName, input.coasterVolume);
 
       const [created] = await db.insert(quotations).values({
         quotationNumber,
         quotationName,
-        clientId: input.clientId,
+        clientId: input.clientId ?? null,
+        leadId: input.leadId ?? null,
         campaignType: input.campaignType,
         coasterVolume: input.coasterVolume,
         networkProfile: input.networkProfile,

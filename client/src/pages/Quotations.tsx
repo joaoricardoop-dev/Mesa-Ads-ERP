@@ -336,8 +336,8 @@ export default function Quotations() {
     const matchesSearch =
       (q.quotationNumber || "").toLowerCase().includes(search.toLowerCase()) ||
       (q.quotationName || "").toLowerCase().includes(search.toLowerCase()) ||
-      (q.clientName || "").toLowerCase().includes(search.toLowerCase()) ||
-      (q.clientCompany || "").toLowerCase().includes(search.toLowerCase()) ||
+      (q.clientName || q.leadName || "").toLowerCase().includes(search.toLowerCase()) ||
+      (q.clientCompany || q.leadCompany || "").toLowerCase().includes(search.toLowerCase()) ||
       (q.notes || "").toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || q.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -349,7 +349,7 @@ export default function Quotations() {
       case "quotationNumber":
         return (a.quotationNumber || "").localeCompare(b.quotationNumber || "") * dir;
       case "clientName":
-        return (a.clientName || "").localeCompare(b.clientName || "") * dir;
+        return (a.clientName || a.leadName || "").localeCompare(b.clientName || b.leadName || "") * dir;
       case "totalValue":
         return (Number(a.totalValue || 0) - Number(b.totalValue || 0)) * dir;
       case "status":
@@ -485,9 +485,12 @@ export default function Quotations() {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{q.clientName || "—"}</p>
-                      {q.clientCompany && (
-                        <p className="text-xs text-muted-foreground">{q.clientCompany}</p>
+                      <p className="font-medium">{q.clientName || q.leadName || "—"}</p>
+                      {(q.clientCompany || q.leadCompany) && (
+                        <p className="text-xs text-muted-foreground">{q.clientCompany || q.leadCompany}</p>
+                      )}
+                      {!q.clientId && q.leadId && (
+                        <Badge variant="outline" className="text-[9px] h-4 px-1 mt-0.5 text-amber-500 border-amber-500/30">Lead</Badge>
                       )}
                     </div>
                   </TableCell>

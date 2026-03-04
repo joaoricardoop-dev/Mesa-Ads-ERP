@@ -289,11 +289,11 @@ export default function QuotationDetail() {
             <div className="lg:col-span-1 space-y-4">
               <div className="bg-card border border-border/30 rounded-xl p-5 space-y-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2">
-                  <Building2 className="w-3.5 h-3.5" /> Cliente
+                  <Building2 className="w-3.5 h-3.5" /> {quotation.clientId ? "Cliente" : "Lead"}
                 </h3>
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold">{quotation.clientName || "—"}</p>
-                  {quotation.clientCompany && <p className="text-xs text-muted-foreground">{quotation.clientCompany}</p>}
+                  <p className="text-sm font-semibold">{quotation.clientName || quotation.leadName || "—"}</p>
+                  {(quotation.clientCompany || quotation.leadCompany) && <p className="text-xs text-muted-foreground">{quotation.clientCompany || quotation.leadCompany}</p>}
                 </div>
               </div>
 

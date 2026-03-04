@@ -266,6 +266,10 @@ export default function Leads() {
   const [convertForm, setConvertForm] = useState<ConvertRestaurantForm>(emptyConvertRestaurantForm);
   const [convertAnuncianteOpen, setConvertAnuncianteOpen] = useState(false);
 
+  const [quotationOpen, setQuotationOpen] = useState(false);
+  const [quotationVolume, setQuotationVolume] = useState("");
+  const [quotationNotes, setQuotationNotes] = useState("");
+
   const utils = trpc.useUtils();
 
   const leadsQuery = trpc.lead.list.useQuery({ type: activeTab });
@@ -376,6 +380,22 @@ export default function Leads() {
       utils.advertiser.list.invalidate();
     },
     onError: (err: any) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const createQuotationMutation = trpc.quotation.create.useMutation({
+    onSuccess: (data) => {
+      setQuotationOpen(false);
+      setQuotationVolume("");
+      setQuotationNotes("");
+      toast.success(`Cotação ${data.quotationNumber} criada!`, {
+        action: {
+          label: "Ver cotação",
+          onClick: () => navigate(`/comercial/cotacoes/${data.id}`),
+        },
+      });
+      utils.quotation.list.invalidate();
+    },
+    onError: (err: any) => toast.error(`Erro ao criar cotação: ${err.message}`),
   });
 
   useEffect(() => {
@@ -1084,13 +1104,15 @@ export default function Leads() {
                     <span className="truncate">{selectedLead.data.name}</span>
                   </SheetTitle>
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    {!isEditing && selectedLead.data.type === "anunciante" && isConverted && selectedLead.data.convertedToId && (
+                    {!isEditing && selectedLead.data.type === "anunciante" && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="gap-1 text-primary border-primary/30 hover:bg-primary/10"
                         onClick={() => {
-                          navigate(`/comercial/simulador?clientId=${selectedLead.data!.convertedToId}`);
+                          setQuotationVolume("");
+                          setQuotationNotes("");
+                          setQuotationOpen(true);
                         }}
                       >
                         <FileText className="w-3 h-3" />
@@ -1689,6 +1711,97 @@ export default function Leads() {
               <Building2 className="w-4 h-4" />
               {createClientMutation.isPending ? "Cadastrando..." : "Cadastrar Anunciante"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Create Quotation from Lead Dialog */}
+      <Dialog open={quotationOpen} onOpenChange={setQuotationOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Nova Cotação
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedLead.data && (
+            <div className="space-y-1 text-sm bg-muted/30 rounded-lg p-3">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Lead:</span>
+                <span className="font-medium">{selectedLead.data.name}</span>
+              </div>
+              {selectedLead.data.company && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Empresa:</span>
+                  <span>{selectedLead.data.company}</span>
+                </div>
+              )}
+              {isConverted && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Vínculo:</span>
+                  <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30 text-[10px]">Anunciante cadastrado</Badge>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Volume de bolachas *</Label>
+              <Input
+                type="number"
+                min={1}
+                value={quotationVolume}
+                onChange={(e) => setQuotationVolume(e.target.value)}
+                placeholder="Ex: 5000"
+                className="h-9"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Observações</Label>
+              <Textarea
+                value={quotationNotes}
+                onChange={(e) => setQuotationNotes(e.target.value)}
+                placeholder="Detalhes da cotação..."
+                rows={3}
+                className="text-sm"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground"
+              onClick={() => {
+                setQuotationOpen(false);
+                const clientId = selectedLead.data?.convertedToId;
+                navigate(clientId ? `/comercial/simulador?clientId=${clientId}` : "/comercial/simulador");
+              }}
+            >
+              Ir ao Simulador →
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setQuotationOpen(false)}>Cancelar</Button>
+              <Button
+                onClick={() => {
+                  const vol = parseInt(quotationVolume, 10);
+                  if (!vol || vol < 1) { toast.error("Informe o volume de bolachas"); return; }
+                  const lead = selectedLead.data!;
+                  createQuotationMutation.mutate({
+                    ...(isConverted && lead.convertedToId ? { clientId: lead.convertedToId } : {}),
+                    leadId: lead.id,
+                    coasterVolume: vol,
+                    notes: quotationNotes || undefined,
+                  });
+                }}
+                disabled={createQuotationMutation.isPending}
+              >
+                {createQuotationMutation.isPending ? "Criando..." : "Criar Cotação"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
