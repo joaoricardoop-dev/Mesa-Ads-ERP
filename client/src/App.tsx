@@ -10,8 +10,6 @@ import { SignIn, useClerk } from "@clerk/clerk-react";
 import { ShieldX } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
-import Prospecting from "./pages/Restaurants";
-import ProspectForm from "./pages/ProspectForm";
 import ActiveRestaurantsPage from "./pages/ActiveRestaurants";
 import ActiveRestaurantForm from "./pages/ActiveRestaurantForm";
 import ActiveRestaurantProfile from "./pages/ActiveRestaurantProfile";
@@ -55,9 +53,6 @@ function Router() {
       <Route path="/comercial/cotacoes/:id" component={QuotationDetail} />
       <Route path="/comercial/cotacoes" component={Quotations} />
       <Route path="/comercial/leads" component={Leads} />
-      <Route path="/prospeccao/novo" component={ProspectForm} />
-      <Route path="/prospeccao/:id" component={ProspectForm} />
-      <Route path="/prospeccao" component={Prospecting} />
       <Route path="/restaurantes/perfil/:id" component={ActiveRestaurantProfile} />
       <Route path="/restaurantes/novo" component={ActiveRestaurantForm} />
       <Route path="/restaurantes/:id" component={ActiveRestaurantForm} />

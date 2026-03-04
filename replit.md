@@ -40,7 +40,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
   - Anunciantes (`/clientes`) — top-level item
   - Campanhas (`/campanhas`)
   - Financeiro (group, admin only): Dashboard (`/financeiro`), Faturamento (`/financeiro/faturamento`), Pagamentos (`/financeiro/pagamentos`), Custos (`/financeiro/custos`), Relatórios (`/financeiro/relatorios`)
-  - Parceiros (group): Prospecção (`/prospeccao`), Restaurantes (`/restaurantes`)
+  - Restaurantes (`/restaurantes`) — top-level item
   - Biblioteca (`/biblioteca`)
   - Configurações (group): Economics (`/economics`), Produção (`/producao`), Gestão de Usuários (`/configuracoes/usuarios`, admin only)
 - **Reusable layout components**:
@@ -93,7 +93,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - `campaign_proofs` — Weekly proof photos per restaurant per campaign
 - `quotations` — Commercial quotations (QOT-YYYY-NNNN numbering, 6 statuses, quotationName auto-generated)
 - `quotation_restaurants` — N:N quotation-restaurant allocation with coaster quantities + frozen commissionPercent
-- `leads` — CRM leads (anunciante/restaurante types, kanban stages)
+- `leads` — CRM leads (anunciante/restaurante types, kanban stages, CNPJ/address fields, convertedToId/convertedToType for tracking conversions)
 - `lead_interactions` — Interaction history per lead
 - `service_orders` — OS for anunciantes and production (OS-ANT/OS-PROD numbering)
 - `restaurant_terms` — Partnership terms per restaurant (TRM-YYYY-NNNN)

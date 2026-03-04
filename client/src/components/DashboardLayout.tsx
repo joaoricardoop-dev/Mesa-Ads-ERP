@@ -61,7 +61,6 @@ import {
   Pencil,
   PanelLeft,
   Receipt,
-  Search,
   Settings,
   Sun,
   Moon,
@@ -128,14 +127,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: FileBarChart, label: "Relatórios", path: "/financeiro/relatorios" },
     ],
   },
-  {
-    icon: UtensilsCrossed,
-    label: "Parceiros",
-    items: [
-      { icon: Search, label: "Prospecção", path: "/prospeccao" },
-      { icon: UtensilsCrossed, label: "Restaurantes", path: "/restaurantes" },
-    ],
-  },
+  { icon: UtensilsCrossed, label: "Restaurantes", path: "/restaurantes" },
   { icon: Image, label: "Biblioteca", path: "/biblioteca" },
   {
     icon: Settings,
