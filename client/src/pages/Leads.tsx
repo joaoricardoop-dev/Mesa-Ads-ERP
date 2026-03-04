@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import PageContainer from "@/components/PageContainer";
+import Confetti from "@/components/Confetti";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -269,6 +270,7 @@ export default function Leads() {
   const [quotationOpen, setQuotationOpen] = useState(false);
   const [quotationVolume, setQuotationVolume] = useState("");
   const [quotationNotes, setQuotationNotes] = useState("");
+  const [showConfetti, setShowConfetti] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -376,6 +378,8 @@ export default function Leads() {
         });
       }
       setConvertAnuncianteOpen(false);
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 3000);
       toast.success("Anunciante cadastrado!");
       utils.advertiser.list.invalidate();
     },
@@ -1805,6 +1809,7 @@ export default function Leads() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Confetti active={showConfetti} />
     </PageContainer>
   );
 }
