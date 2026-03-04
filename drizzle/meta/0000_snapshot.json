@@ -1,5 +1,5 @@
 {
-  "id": "c4ab96ab-1b4d-47be-b1b9-21dbf86f82bc",
+  "id": "a8d88e68-b6e5-44ac-bb39-22c20bac2460",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2585,6 +2585,30 @@
           "primaryKey": false,
           "notNull": false
         },
+        "publicToken": {
+          "name": "publicToken",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signedAt": {
+          "name": "signedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signedBy": {
+          "name": "signedBy",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signatureData": {
+          "name": "signatureData",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdBy": {
           "name": "createdBy",
           "type": "varchar(255)",
@@ -2660,6 +2684,13 @@
           "nullsNotDistinct": false,
           "columns": [
             "quotationNumber"
+          ]
+        },
+        "quotations_publicToken_unique": {
+          "name": "quotations_publicToken_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "publicToken"
           ]
         }
       },
