@@ -207,7 +207,11 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => navigate("/cotacao/preview")}
+              onClick={() => {
+                const params = new URLSearchParams(window.location.search);
+                const clientId = params.get("clientId");
+                navigate(clientId ? `/cotacao/preview?clientId=${clientId}` : "/cotacao/preview");
+              }}
               className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
               size="sm"
             >

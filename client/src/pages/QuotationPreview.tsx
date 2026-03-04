@@ -109,7 +109,8 @@ function getTierColor(score: number): string {
 
 export default function QuotationPreview() {
   const [, navigate] = useLocation();
-  const [selectedClientId, setSelectedClientId] = useState<string>("none");
+  const urlClientId = new URLSearchParams(window.location.search).get("clientId");
+  const [selectedClientId, setSelectedClientId] = useState<string>(urlClientId || "none");
 
   const { data: budgetsList = [] } = trpc.budget.listActiveWithItems.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();

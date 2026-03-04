@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import PageContainer from "@/components/PageContainer";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ import {
   ArrowRightCircle,
   AlertTriangle,
   Instagram,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -244,6 +246,7 @@ function formatCnpj(cnpj: string): string {
 }
 
 export default function Leads() {
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<LeadType>("anunciante");
   const [createOpen, setCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState<"cnpj" | "form">("form");
@@ -1081,6 +1084,19 @@ export default function Leads() {
                     <span className="truncate">{selectedLead.data.name}</span>
                   </SheetTitle>
                   <div className="flex items-center gap-1 shrink-0 ml-2">
+                    {!isEditing && selectedLead.data.type === "anunciante" && isConverted && selectedLead.data.convertedToId && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1 text-primary border-primary/30 hover:bg-primary/10"
+                        onClick={() => {
+                          navigate(`/comercial/simulador?clientId=${selectedLead.data!.convertedToId}`);
+                        }}
+                      >
+                        <FileText className="w-3 h-3" />
+                        Cotação
+                      </Button>
+                    )}
                     {!isEditing && !isConverted && (
                       <Button
                         variant="outline"
