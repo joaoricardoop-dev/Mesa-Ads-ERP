@@ -256,6 +256,9 @@ export default function Leads() {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<LeadFormData>(emptyForm);
 
+  const [draggedLeadId, setDraggedLeadId] = useState<number | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertForm, setConvertForm] = useState<ConvertRestaurantForm>(emptyConvertRestaurantForm);
   const [convertAnuncianteOpen, setConvertAnuncianteOpen] = useState(false);
@@ -465,6 +468,54 @@ export default function Leads() {
 
   function moveToStage(leadId: number, stage: string) {
     changeStageMutation.mutate({ id: leadId, stage });
+  }
+
+  function handleDragStart(e: React.DragEvent, leadId: number) {
+    setDraggedLeadId(leadId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(leadId));
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = "0.5";
+    }
+  }
+
+  function handleDragEnd(e: React.DragEvent) {
+    setDraggedLeadId(null);
+    setDragOverStage(null);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = "1";
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent, stageKey: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverStage !== stageKey) {
+      setDragOverStage(stageKey);
+    }
+  }
+
+  function handleDragLeave(e: React.DragEvent, stageKey: string) {
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    const currentTarget = e.currentTarget as HTMLElement;
+    if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+      if (dragOverStage === stageKey) {
+        setDragOverStage(null);
+      }
+    }
+  }
+
+  function handleDrop(e: React.DragEvent, stageKey: string) {
+    e.preventDefault();
+    setDragOverStage(null);
+    const leadId = parseInt(e.dataTransfer.getData("text/plain"), 10);
+    if (!isNaN(leadId)) {
+      const lead = leads.find((l) => l.id === leadId);
+      if (lead && lead.stage !== stageKey) {
+        changeStageMutation.mutate({ id: leadId, stage: stageKey });
+      }
+    }
+    setDraggedLeadId(null);
   }
 
   function handleAddInteraction() {
@@ -842,7 +893,13 @@ export default function Leads() {
           <div className="overflow-x-auto pb-4 -mx-2 px-2">
             <div className="inline-flex gap-3">
               {leadsByStage.map((column) => (
-                <div key={column.key} className="w-[240px] shrink-0">
+                <div
+                  key={column.key}
+                  className={`w-[240px] shrink-0 rounded-lg transition-colors ${dragOverStage === column.key ? "bg-primary/5 ring-2 ring-primary/30" : ""}`}
+                  onDragOver={(e) => handleDragOver(e, column.key)}
+                  onDragLeave={(e) => handleDragLeave(e, column.key)}
+                  onDrop={(e) => handleDrop(e, column.key)}
+                >
                   <div className="flex items-center gap-2 mb-3 px-1">
                     <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${column.color}`}>
                       {column.label}
@@ -856,7 +913,10 @@ export default function Leads() {
                     {column.leads.map((lead) => (
                       <Card
                         key={lead.id}
-                        className="p-2.5 cursor-pointer hover:border-primary/40 transition-colors group"
+                        className={`p-2.5 cursor-grab hover:border-primary/40 transition-all group ${draggedLeadId === lead.id ? "opacity-50 scale-95" : ""}`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, lead.id)}
+                        onDragEnd={handleDragEnd}
                         onClick={() => { setSelectedLeadId(lead.id); setIsEditing(false); }}
                       >
                         <div className="min-w-0">
@@ -916,8 +976,10 @@ export default function Leads() {
                     ))}
 
                     {column.leads.length === 0 && (
-                      <div className="flex items-center justify-center h-[80px] rounded-lg border border-dashed border-border/40">
-                        <p className="text-[10px] text-muted-foreground">Nenhum lead</p>
+                      <div className={`flex items-center justify-center h-[80px] rounded-lg border border-dashed transition-colors ${dragOverStage === column.key ? "border-primary/60 bg-primary/5" : "border-border/40"}`}>
+                        <p className="text-[10px] text-muted-foreground">
+                          {draggedLeadId ? "Soltar aqui" : "Nenhum lead"}
+                        </p>
                       </div>
                     )}
                   </div>
