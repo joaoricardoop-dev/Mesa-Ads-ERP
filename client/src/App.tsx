@@ -35,6 +35,7 @@ import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
 import OperationalCosts from "./pages/financial/OperationalCosts";
 import FinancialReport from "./pages/financial/FinancialReport";
 import AnunciantePortal from "./pages/AnunciantePortal";
+import Onboarding from "./pages/Onboarding";
 
 function AnuncianteRouter() {
   return (
@@ -102,8 +103,8 @@ function ClerkLoginPage() {
               formFieldLabel: "text-[hsl(0,0%,50%)]",
               formFieldInput: "bg-[hsl(0,0%,11%)] border-[hsl(0,0%,18%)] text-[hsl(0,0%,95%)]",
               formButtonPrimary: "bg-[#27d803] hover:bg-[#22c003] text-black",
-              footerAction: "hidden",
-              footerActionLink: "hidden",
+              footerActionText: "text-[hsl(0,0%,50%)]",
+              footerActionLink: "text-[#27d803] hover:text-[#22c003]",
               socialButtonsBlockButton: "border-[hsl(0,0%,18%)] text-[hsl(0,0%,70%)]",
               dividerLine: "bg-[hsl(0,0%,14%)]",
               dividerText: "text-[hsl(0,0%,40%)]",
@@ -212,6 +213,22 @@ function AuthenticatedApp() {
     : user;
 
   const isAnunciante = effectiveUser?.role === "anunciante";
+  const needsOnboarding = isAnunciante && effectiveUser?.onboardingComplete === false;
+
+  if (needsOnboarding) {
+    return (
+      <>
+        <Onboarding userName={effectiveUser?.firstName || null} />
+        <DevToolsPanel
+          currentRole={user?.role || "user"}
+          overrideRole={devRoleOverride}
+          overrideClientId={devClientIdOverride}
+          onSetOverride={setDevRoleOverride}
+          onSetClientId={setDevClientIdOverride}
+        />
+      </>
+    );
+  }
 
   if (isAnunciante) {
     return (

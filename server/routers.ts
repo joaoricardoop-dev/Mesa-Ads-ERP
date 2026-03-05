@@ -1173,6 +1173,63 @@ export const appRouter = router({
         if (!user || !user.clientId) throw new TRPCError({ code: "FORBIDDEN", message: "Sem perfil vinculado" });
         return updateClient(user.clientId, input);
       }),
+
+    completeOnboarding: anuncianteProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        company: z.string().optional(),
+        razaoSocial: z.string().optional(),
+        cnpj: z.string().optional(),
+        instagram: z.string().optional(),
+        contactEmail: z.string().optional(),
+        contactPhone: z.string().optional(),
+        address: z.string().optional(),
+        addressNumber: z.string().optional(),
+        neighborhood: z.string().optional(),
+        city: z.string().optional(),
+        state: z.string().optional(),
+        cep: z.string().optional(),
+        segment: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const user = ctx.user;
+        if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        if (user.onboardingComplete || user.clientId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Onboarding já foi concluído." });
+        }
+
+        const newClient = await createClient({
+          ...input,
+          selfRegistered: true,
+          status: "active",
+        });
+
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { users } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+
+        await db.update(users).set({
+          clientId: newClient.id,
+          onboardingComplete: true,
+          updatedAt: new Date(),
+        }).where(eq(users.id, user.id));
+
+        try {
+          const { createClerkClient } = await import("@clerk/express");
+          const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+          const clerkUser = await clerkClient.users.getUser(user.id);
+          const existingMeta = (clerkUser.publicMetadata || {}) as any;
+          await clerkClient.users.updateUserMetadata(user.id, {
+            publicMetadata: { ...existingMeta, clientId: newClient.id },
+          });
+        } catch (err) {
+          console.error("Failed to update Clerk metadata with clientId:", err);
+        }
+
+        return newClient;
+      }),
   }),
 });
 

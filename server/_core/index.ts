@@ -57,11 +57,8 @@ async function startServer() {
           });
           const clerkUser = await clerkClient.users.getUser(auth.userId);
           const meta = (clerkUser.publicMetadata || {}) as any;
-          const role = meta.role || null;
-
-          if (!role) {
-            return res.status(403).json({ code: "NOT_REGISTERED", message: "Usuário não cadastrado na plataforma." });
-          }
+          const role = meta.role || "anunciante";
+          const isSelfRegistered = !meta.role;
 
           const clientId = meta.clientId || null;
           user = await authStorage.upsertUser({
@@ -72,7 +69,19 @@ async function startServer() {
             profileImageUrl: clerkUser.imageUrl || null,
             role,
             clientId: clientId ? Number(clientId) : null,
+            onboardingComplete: !isSelfRegistered,
+            selfRegistered: isSelfRegistered,
           });
+
+          if (isSelfRegistered) {
+            try {
+              await clerkClient.users.updateUserMetadata(clerkUser.id, {
+                publicMetadata: { ...meta, role: "anunciante" },
+              });
+            } catch (metaErr) {
+              console.error("Failed to set anunciante role in Clerk metadata:", metaErr);
+            }
+          }
         } catch (err) {
           console.error("Failed to auto-provision user from Clerk:", err);
           return res.status(403).json({ code: "NOT_REGISTERED", message: "Usuário não cadastrado na plataforma." });

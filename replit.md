@@ -61,7 +61,8 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - Local `users` table kept for joins and app-specific data (role, clientId, isActive)
 - `useAuth` hook (`client/src/hooks/use-auth.ts`) uses Clerk's `useUser()` + fetches DB user via `/api/auth/user`
 - Sidebar footer shows user info from DB, logout via `useClerk().signOut()`
-- Sign-up disabled — only admins can create users via Gestão de Usuários page
+- Self-registration enabled: new users without a role in Clerk metadata are auto-provisioned as `anunciante` with `onboardingComplete: false` and `selfRegistered: true`; after completing the onboarding flow (`Onboarding.tsx`), a client record is created with `selfRegistered: true` and linked to the user
+- Admins can also create users via Gestão de Usuários page
 - `members.list` fetches from Clerk API (source of truth), syncs to local DB
 - Admin mutations: `members.createUser` (creates user in Clerk + syncs to DB), `members.updateRole` (syncs to Clerk metadata), `members.toggleActive` (ban/unban in Clerk)
 - Env vars: `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
@@ -83,7 +84,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 
 ## Database Tables
 
-- `users` — Auth users with role, isActive, clientId (links anunciante to client), lastLoginAt
+- `users` — Auth users with role, isActive, clientId (links anunciante to client), onboardingComplete, selfRegistered, lastLoginAt
 - `sessions` — Auth sessions (Replit Auth)
 - `restaurants` — Prospecting/leads for partner restaurants
 - `active_restaurants` — Onboarded active restaurants with full operational data

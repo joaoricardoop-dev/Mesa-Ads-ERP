@@ -325,6 +325,11 @@ export default function Clients() {
                       <div className="flex items-center gap-2">
                         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === c.id ? "rotate-180" : ""}`} />
                         {c.name}
+                        {(c as any).selfRegistered && (
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-[10px] px-1.5 py-0">
+                            Self-registered
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground text-sm">

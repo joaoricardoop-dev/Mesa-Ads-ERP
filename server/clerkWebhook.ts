@@ -44,7 +44,8 @@ export async function clerkWebhookHandler(req: Request, res: Response) {
       const userData = event.data;
       const email = userData.email_addresses?.[0]?.email_address || null;
       const meta = userData.public_metadata || {};
-      const role = meta.role || "user";
+      const isSelfRegistered = type === "user.created" && !meta.role;
+      const role = meta.role || "anunciante";
       const clientId = meta.clientId || null;
 
       const firstName = userData.first_name || meta.firstName || null;
@@ -58,12 +59,20 @@ export async function clerkWebhookHandler(req: Request, res: Response) {
         profileImageUrl: userData.image_url || null,
         role,
         clientId: clientId ? Number(clientId) : null,
+        ...(isSelfRegistered ? { onboardingComplete: false, selfRegistered: true } : {}),
       });
 
-      if (type === "user.created" && (meta.firstName || meta.lastName)) {
+      if (type === "user.created") {
         try {
           const { createClerkClient } = await import("@clerk/express");
           const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+
+          if (isSelfRegistered) {
+            await clerkClient.users.updateUserMetadata(userData.id, {
+              publicMetadata: { ...meta, role: "anunciante" },
+            });
+          }
+
           const updateData: any = {};
           if (meta.firstName && !userData.first_name) updateData.firstName = meta.firstName;
           if (meta.lastName && !userData.last_name) updateData.lastName = meta.lastName;
@@ -71,7 +80,7 @@ export async function clerkWebhookHandler(req: Request, res: Response) {
             await clerkClient.users.updateUser(userData.id, updateData);
           }
         } catch (err) {
-          console.error("Failed to set user name from invitation metadata:", err);
+          console.error("Failed to update Clerk user on creation:", err);
         }
       }
     }

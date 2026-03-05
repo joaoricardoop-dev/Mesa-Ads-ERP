@@ -90,6 +90,7 @@ export const clients = pgTable("clients", {
   state: varchar("state", { length: 2 }),
   cep: varchar("cep", { length: 10 }),
   segment: varchar("segment", { length: 255 }),
+  selfRegistered: boolean("self_registered").default(false),
   status: statusEnum("status").default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
