@@ -65,6 +65,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - `members.list` fetches from Clerk API (source of truth), syncs to local DB
 - Admin mutations: `members.createUser` (creates user in Clerk + syncs to DB), `members.updateRole` (syncs to Clerk metadata), `members.toggleActive` (ban/unban in Clerk)
 - Env vars: `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
+- **Dev Tools Panel** (`client/src/components/DevToolsPanel.tsx`): Floating button (bottom-right, amber bug icon) in dev mode only; allows switching the visible user role to simulate Admin/Comercial/Operações/Financeiro/Anunciante/Usuário views without changing backend data; override applied in `App.tsx` via `effectiveUser`; hidden in production builds
 
 ## Roles & Permissions
 

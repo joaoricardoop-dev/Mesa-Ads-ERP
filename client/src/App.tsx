@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -5,6 +6,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
+import DevToolsPanel from "./components/DevToolsPanel";
 import { useAuth } from "./hooks/use-auth";
 import { SignIn, useClerk } from "@clerk/clerk-react";
 import { ShieldX } from "lucide-react";
@@ -121,6 +123,7 @@ function ClerkLoginPage() {
 
 function AuthenticatedApp() {
   const { user, isLoading, isAuthenticated, isAuthError, isNotRegistered, logout, clerkUser } = useAuth();
+  const [devRoleOverride, setDevRoleOverride] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -199,23 +202,37 @@ function AuthenticatedApp() {
     return <ClerkLoginPage />;
   }
 
-  const isAnunciante = user?.role === "anunciante";
+  const effectiveUser = devRoleOverride && user
+    ? { ...user, role: devRoleOverride }
+    : user;
+
+  const isAnunciante = effectiveUser?.role === "anunciante";
 
   if (isAnunciante) {
     return (
       <div className="h-screen flex overflow-hidden">
-        <DashboardLayout user={user}>
+        <DashboardLayout user={effectiveUser}>
           <AnuncianteRouter />
         </DashboardLayout>
+        <DevToolsPanel
+          currentRole={user?.role || "user"}
+          overrideRole={devRoleOverride}
+          onSetOverride={setDevRoleOverride}
+        />
       </div>
     );
   }
 
   return (
     <div className="h-screen flex overflow-hidden">
-      <DashboardLayout user={user}>
+      <DashboardLayout user={effectiveUser}>
         <Router />
       </DashboardLayout>
+      <DevToolsPanel
+        currentRole={user?.role || "user"}
+        overrideRole={devRoleOverride}
+        onSetOverride={setDevRoleOverride}
+      />
     </div>
   );
 }
