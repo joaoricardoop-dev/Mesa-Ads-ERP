@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -34,9 +33,6 @@ import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
 import OperationalCosts from "./pages/financial/OperationalCosts";
 import FinancialReport from "./pages/financial/FinancialReport";
 import AnunciantePortal from "./pages/AnunciantePortal";
-import LandingPage from "./pages/LandingPage";
-import LandingRestaurantes from "./pages/LandingRestaurantes";
-import LandingAnunciantes from "./pages/LandingAnunciantes";
 
 function AnuncianteRouter() {
   return (
@@ -224,56 +220,13 @@ function AuthenticatedApp() {
   );
 }
 
-function LandingRouter() {
-  return (
-    <Switch>
-      <Route path="/landing" component={LandingPage} />
-      <Route path="/restaurantes" component={LandingRestaurantes} />
-      <Route path="/anunciantes" component={LandingAnunciantes} />
-    </Switch>
-  );
-}
-
-function AppRouter() {
-  const [isLanding, setIsLanding] = useState(false);
-
-  useEffect(() => {
-    const path = window.location.pathname;
-    setIsLanding(
-      path === "/landing" ||
-      path === "/restaurantes" ||
-      path === "/anunciantes"
-    );
-  }, []);
-
-  // Also listen for route changes
-  useEffect(() => {
-    const handler = () => {
-      const path = window.location.pathname;
-      setIsLanding(
-        path === "/landing" ||
-        path === "/restaurantes" ||
-        path === "/anunciantes"
-      );
-    };
-    window.addEventListener("popstate", handler);
-    return () => window.removeEventListener("popstate", handler);
-  }, []);
-
-  if (isLanding) {
-    return <LandingRouter />;
-  }
-
-  return <AuthenticatedApp />;
-}
-
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster />
-          <AppRouter />
+          <AuthenticatedApp />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
