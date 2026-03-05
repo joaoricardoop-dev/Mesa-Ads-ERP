@@ -180,7 +180,7 @@
   background: var(--muted-foreground);
 }
 
-/* ─── Landing Page Styles ─── */
+/* ─── Landing Page Design System ─── */
 .landing-page {
   --lp-bg: hsl(0 0% 4%);
   --lp-fg: hsl(0 0% 95%);
@@ -189,13 +189,24 @@
   --lp-muted: hsl(0 0% 50%);
   --lp-secondary: hsl(0 0% 11%);
   --lp-brand: hsl(110 97% 43%);
-  --lp-brand-fg: hsl(0 0% 100%);
+  --lp-brand-fg: hsl(0 0% 0%);
   font-family: "Outfit", sans-serif;
   background: var(--lp-bg);
   color: var(--lp-fg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.landing-page .section-label {
+/* ─── Typography ─── */
+.landing-page .lp-heading {
+  font-family: "Outfit", sans-serif;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  color: var(--lp-fg);
+}
+
+.landing-page .lp-label {
   color: var(--lp-brand);
   font-family: "Outfit", sans-serif;
   font-weight: 600;
@@ -204,25 +215,124 @@
   text-transform: uppercase;
 }
 
-.landing-page .section-title {
-  font-family: "Outfit", sans-serif;
-  font-weight: 800;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
+.landing-page .lp-text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-image: linear-gradient(135deg, hsl(110 97% 43%), hsl(130 80% 55%));
 }
 
+/* ─── Cards ─── */
+.landing-page .lp-card {
+  background: var(--lp-card);
+  border: 1px solid var(--lp-border);
+  border-radius: 1rem;
+  transition: border-color 0.3s, background 0.3s;
+}
+
+.landing-page .lp-card:hover {
+  border-color: hsl(0 0% 22%);
+}
+
+.landing-page .lp-card-elevated {
+  background: var(--lp-card);
+  border: 1px solid var(--lp-border);
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px hsl(0 0% 0% / 0.5);
+}
+
+/* Legacy card-glass support */
 .landing-page .card-glass {
   background: hsl(0 0% 11% / 0.8);
   border: 1px solid var(--lp-border);
   border-radius: 1rem;
 }
 
-.landing-page .stat-value {
-  font-family: "Outfit", sans-serif;
-  font-weight: 900;
-  letter-spacing: -0.02em;
+/* ─── Buttons ─── */
+.landing-page .lp-btn-primary {
+  background: var(--lp-brand);
+  color: var(--lp-brand-fg);
+  box-shadow: 0 0 40px -8px hsl(110 97% 43% / 0.35);
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
 }
 
+.landing-page .lp-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 60px -8px hsl(110 97% 43% / 0.45);
+}
+
+.landing-page .lp-btn-primary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.landing-page .lp-btn-outline {
+  border: 1px solid var(--lp-border);
+  background: hsl(0 0% 11% / 0.5);
+  color: var(--lp-fg);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+}
+
+.landing-page .lp-btn-outline:hover {
+  border-color: hsl(0 0% 28%);
+  background: hsl(0 0% 14% / 0.6);
+  transform: translateY(-1px);
+}
+
+.landing-page .lp-btn-outline:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ─── Inputs ─── */
+.landing-page .lp-input {
+  background: var(--lp-secondary);
+  border: 1px solid var(--lp-border);
+  color: var(--lp-fg);
+  transition: border-color 0.2s;
+}
+
+.landing-page .lp-input:focus {
+  border-color: var(--lp-brand);
+}
+
+/* ─── Navigation ─── */
+.lp-nav-scrolled {
+  background: hsl(0 0% 4% / 0.85);
+  backdrop-filter: blur(20px) saturate(1.5);
+  border-bottom: 1px solid hsl(0 0% 14% / 0.5);
+}
+
+/* ─── Sections ─── */
+.landing-page .lp-section-alt {
+  background: hsl(0 0% 6%);
+  border-top: 1px solid var(--lp-border);
+  border-bottom: 1px solid var(--lp-border);
+}
+
+/* ─── Backgrounds ─── */
+.landing-page .lp-hero-overlay {
+  background: linear-gradient(
+    180deg,
+    hsl(0 0% 4% / 0.35) 0%,
+    hsl(0 0% 4% / 0.7) 45%,
+    hsl(0 0% 4% / 0.95) 85%,
+    hsl(0 0% 4% / 1) 100%
+  );
+}
+
+.landing-page .lp-cta-gradient {
+  background:
+    radial-gradient(ellipse at 50% 50%, hsl(110 97% 43% / 0.06) 0%, transparent 70%);
+}
+
+.landing-page .lp-grid-pattern {
+  background-image:
+    linear-gradient(hsl(0 0% 50% / 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(0 0% 50% / 0.1) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* ─── Legacy classes ─── */
 .text-gradient-brand {
   background-clip: text;
   -webkit-background-clip: text;
@@ -249,6 +359,28 @@
 
 .font-display-landing {
   font-family: "Outfit", sans-serif;
+}
+
+.landing-page .section-label {
+  color: var(--lp-brand);
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.landing-page .section-title {
+  font-family: "Outfit", sans-serif;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.landing-page .stat-value {
+  font-family: "Outfit", sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.02em;
 }
 
 /* Tabular numbers for financial data */
