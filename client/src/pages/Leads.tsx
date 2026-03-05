@@ -298,6 +298,13 @@ export default function Leads() {
     { enabled: !!selectedLeadId }
   );
 
+  const leadQuotations = trpc.quotation.list.useQuery(
+    { leadId: selectedLeadId! },
+    { enabled: !!selectedLeadId }
+  );
+
+  const internalUsers = trpc.lead.listUsers.useQuery();
+
   const cnpjClean = cnpjInput.replace(/\D/g, "");
   const { isFetching: isCnpjLoading, error: cnpjError, refetch: fetchCnpj } = trpc.cnpj.lookup.useQuery(
     { cnpj: cnpjClean },
@@ -409,6 +416,7 @@ export default function Leads() {
         },
       });
       utils.quotation.list.invalidate();
+      utils.lead.get.invalidate();
     },
     onError: (err: any) => toast.error(`Erro ao criar cotação: ${err.message}`),
   });
@@ -1041,6 +1049,21 @@ export default function Leads() {
                           </div>
                         )}
 
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          {(lead.assignedToFirstName || lead.createdByFirstName) && (
+                            <div className="flex items-center gap-1" title={`Responsável: ${lead.assignedToFirstName || lead.createdByFirstName} ${lead.assignedToLastName || lead.createdByLastName || ""}`}>
+                              <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
+                                <span className="text-[8px] font-bold text-primary">
+                                  {(lead.assignedToFirstName || lead.createdByFirstName || "?")[0]}
+                                </span>
+                              </div>
+                              <span className="text-[9px] text-muted-foreground truncate max-w-[60px]">
+                                {lead.assignedToFirstName || lead.createdByFirstName}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
                         <div className="flex items-center justify-between mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"
@@ -1241,6 +1264,75 @@ export default function Leads() {
                     ))}
                   </div>
                 </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Responsável</span>
+                  <Select
+                    value={selectedLead.data.assignedTo || "none"}
+                    onValueChange={(v) => {
+                      const val = v === "none" ? null : v;
+                      updateMutation.mutate({ id: selectedLead.data!.id, assignedTo: val });
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Selecionar responsável" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— Sem responsável</SelectItem>
+                      {(internalUsers.data ?? []).map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.firstName} {u.lastName || ""} {u.role ? `(${u.role})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedLead.data.createdByFirstName && (
+                    <p className="text-[10px] text-muted-foreground">
+                      Criado por: {selectedLead.data.createdByFirstName} {selectedLead.data.createdByLastName || ""}
+                    </p>
+                  )}
+                </div>
+
+                {leadQuotations.data && leadQuotations.data.length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Cotações ({leadQuotations.data.length})
+                      </span>
+                      <div className="space-y-2">
+                        {leadQuotations.data.map((q: any) => (
+                          <div
+                            key={q.id}
+                            className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => { setSelectedLeadId(null); navigate(`/comercial/cotacoes/${q.id}`); }}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium">{q.quotationNumber}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">{q.quotationName}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {q.totalValue && (
+                                <span className="text-[10px] font-mono text-muted-foreground">
+                                  R$ {parseFloat(q.totalValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                </span>
+                              )}
+                              <Badge variant="outline" className={`text-[9px] px-1 ${
+                                q.status === "win" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" :
+                                q.status === "perdida" ? "bg-red-500/10 text-red-500 border-red-500/30" :
+                                "bg-muted text-muted-foreground"
+                              }`}>
+                                {q.status}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {selectedLead.data.type === "anunciante" && (
                   <>

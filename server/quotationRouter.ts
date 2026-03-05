@@ -57,12 +57,14 @@ export const quotationRouter = router({
     .input(z.object({
       status: z.enum(["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]).optional(),
       clientId: z.number().optional(),
+      leadId: z.number().optional(),
     }).optional())
     .query(async ({ input }) => {
       const db = await getDatabase();
       const conditions = [];
       if (input?.status) conditions.push(eq(quotations.status, input.status));
       if (input?.clientId) conditions.push(eq(quotations.clientId, input.clientId));
+      if (input?.leadId) conditions.push(eq(quotations.leadId, input.leadId));
 
       const rows = await db
         .select({

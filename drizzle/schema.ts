@@ -422,6 +422,7 @@ export const leads = pgTable("leads", {
   notes: text("notes"),
   opportunityType: varchar("opportunityType", { length: 20 }),
   revenueType: varchar("revenueType", { length: 20 }),
+  createdBy: varchar("createdBy", { length: 255 }),
   convertedToId: integer("convertedToId"),
   convertedToType: varchar("convertedToType", { length: 50 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

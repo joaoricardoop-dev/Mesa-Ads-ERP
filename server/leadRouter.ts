@@ -2,7 +2,8 @@ import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import { leads, leadInteractions } from "../drizzle/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { users } from "../shared/models/auth";
+import { eq, desc, and, ne, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 async function getDatabase() {
@@ -10,8 +11,6 @@ async function getDatabase() {
   if (!d) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
   return d;
 }
-
-const VALID_STAGES = ["novo", "contato", "qualificado", "proposta", "negociacao", "ganho", "perdido"] as const;
 
 export const leadRouter = router({
   list: protectedProcedure
@@ -24,20 +23,42 @@ export const leadRouter = router({
       const conditions = [];
       if (input?.type) conditions.push(eq(leads.type, input.type));
       if (input?.stage) conditions.push(eq(leads.stage, input.stage));
-      return db
-        .select()
-        .from(leads)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(desc(leads.updatedAt));
+
+      const rows = await db.execute(sql`
+        SELECT l.*,
+          "cb"."first_name" AS "createdByFirstName",
+          "cb"."last_name" AS "createdByLastName",
+          "at"."first_name" AS "assignedToFirstName",
+          "at"."last_name" AS "assignedToLastName"
+        FROM leads l
+        LEFT JOIN users "cb" ON l."createdBy" = "cb"."id"
+        LEFT JOIN users "at" ON l."assignedTo" = "at"."id"
+        ${input?.type ? sql`WHERE l."type" = ${input.type}` : sql``}
+        ${input?.type && input?.stage ? sql`AND l."stage" = ${input.stage}` : !input?.type && input?.stage ? sql`WHERE l."stage" = ${input.stage}` : sql``}
+        ORDER BY l."updatedAt" DESC
+      `);
+
+      return rows.rows as any[];
     }),
 
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = await getDatabase();
-      const result = await db.select().from(leads).where(eq(leads.id, input.id)).limit(1);
-      if (!result[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado" });
-      return result[0];
+      const rows = await db.execute(sql`
+        SELECT l.*,
+          "cb"."first_name" AS "createdByFirstName",
+          "cb"."last_name" AS "createdByLastName",
+          "at"."first_name" AS "assignedToFirstName",
+          "at"."last_name" AS "assignedToLastName"
+        FROM leads l
+        LEFT JOIN users "cb" ON l."createdBy" = "cb"."id"
+        LEFT JOIN users "at" ON l."assignedTo" = "at"."id"
+        WHERE l."id" = ${input.id}
+        LIMIT 1
+      `);
+      if (!rows.rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado" });
+      return rows.rows[0] as any;
     }),
 
   create: comercialProcedure
@@ -67,9 +88,13 @@ export const leadRouter = router({
       opportunityType: z.enum(["new", "upsell"]).optional(),
       revenueType: z.enum(["mrr", "oneshot"]).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDatabase();
-      const [created] = await db.insert(leads).values(input).returning();
+      const [created] = await db.insert(leads).values({
+        ...input,
+        createdBy: ctx.user?.id || null,
+        assignedTo: input.assignedTo || ctx.user?.id || null,
+      }).returning();
       return created;
     }),
 
@@ -94,7 +119,7 @@ export const leadRouter = router({
       instagram: z.string().optional(),
       origin: z.string().optional(),
       stage: z.string().optional(),
-      assignedTo: z.string().optional(),
+      assignedTo: z.string().nullable().optional(),
       nextFollowUp: z.string().nullable().optional(),
       tags: z.string().optional(),
       notes: z.string().optional(),
@@ -175,5 +200,24 @@ export const leadRouter = router({
         .where(eq(leads.id, input.leadId));
 
       return created;
+    }),
+
+  listUsers: protectedProcedure
+    .query(async () => {
+      const db = await getDatabase();
+      const result = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          role: users.role,
+          email: users.email,
+        })
+        .from(users)
+        .where(and(
+          eq(users.isActive, true),
+          ne(users.role, "anunciante")
+        ));
+      return result;
     }),
 });
