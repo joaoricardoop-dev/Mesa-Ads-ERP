@@ -2036,7 +2036,11 @@ export default function Leads() {
                     onClick={() => {
                       setQuotationOpen(false);
                       const clientId = selectedLead.data?.convertedToId;
-                      navigate(clientId ? `/comercial/simulador?clientId=${clientId}` : "/comercial/simulador");
+                      const leadId = selectedLead.data?.id;
+                      const params = new URLSearchParams();
+                      if (clientId) params.set("clientId", String(clientId));
+                      if (leadId) params.set("leadId", String(leadId));
+                      navigate(`/comercial/simulador${params.toString() ? `?${params}` : ""}`);
                     }}
                   >
                     Simulador completo →

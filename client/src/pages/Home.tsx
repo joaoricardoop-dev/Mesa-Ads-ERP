@@ -209,8 +209,12 @@ export default function Home() {
             <Button
               onClick={() => {
                 const params = new URLSearchParams(window.location.search);
+                const fwdParams = new URLSearchParams();
                 const clientId = params.get("clientId");
-                navigate(clientId ? `/cotacao/preview?clientId=${clientId}` : "/cotacao/preview");
+                const leadId = params.get("leadId");
+                if (clientId) fwdParams.set("clientId", clientId);
+                if (leadId) fwdParams.set("leadId", leadId);
+                navigate(`/cotacao/preview${fwdParams.toString() ? `?${fwdParams}` : ""}`);
               }}
               className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
               size="sm"

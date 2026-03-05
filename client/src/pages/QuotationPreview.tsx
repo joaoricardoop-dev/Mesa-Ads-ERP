@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useSimulator, type BudgetOption, loadSavedBudgetId } from "@/hooks/useSimulator";
 import { useRestaurantAllocation, type AllocationEntry } from "@/hooks/useRestaurantAllocation";
@@ -109,13 +109,26 @@ function getTierColor(score: number): string {
 
 export default function QuotationPreview() {
   const [, navigate] = useLocation();
-  const urlClientId = new URLSearchParams(window.location.search).get("clientId");
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlClientId = urlParams.get("clientId");
+  const urlLeadId = urlParams.get("leadId");
   const [selectedClientId, setSelectedClientId] = useState<string>(urlClientId || "none");
+  const [selectedLeadId, setSelectedLeadId] = useState<string>(urlLeadId || "none");
 
   const { data: budgetsList = [] } = trpc.budget.listActiveWithItems.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
   const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
+  const { data: leadsList = [] } = trpc.lead.list.useQuery({ type: "anunciante" });
   const utils = trpc.useUtils();
+
+  useEffect(() => {
+    if (selectedLeadId !== "none" && leadsList.length > 0 && selectedClientId === "none") {
+      const lead = leadsList.find((l: any) => l.id === parseInt(selectedLeadId));
+      if (lead?.convertedToId && lead.convertedToType === "anunciante") {
+        setSelectedClientId(String(lead.convertedToId));
+      }
+    }
+  }, [selectedLeadId, leadsList]);
 
   const savedBudgetId = loadSavedBudgetId();
   const selectedBudget = useMemo<BudgetOption | null>(() => {
@@ -236,12 +249,16 @@ export default function QuotationPreview() {
   };
 
   const handleCreate = () => {
-    if (selectedClientId === "none") { toast.error("Selecione um cliente"); return; }
+    if (selectedClientId === "none" && selectedLeadId === "none") {
+      toast.error("Selecione um cliente ou lead");
+      return;
+    }
 
     const totalValueCalc = pr.sellingPrice * n * d;
 
     createQuotationMutation.mutate({
-      clientId: parseInt(selectedClientId),
+      ...(selectedClientId !== "none" ? { clientId: parseInt(selectedClientId) } : {}),
+      ...(selectedLeadId !== "none" ? { leadId: parseInt(selectedLeadId) } : {}),
       campaignType: "bolachas",
       coasterVolume: totalCoasters,
       unitPrice: String(pr.sellingPrice),
@@ -329,6 +346,33 @@ export default function QuotationPreview() {
                         </button>
                       </p>
                     )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Lead (Oportunidade)</Label>
+                    <Select
+                      value={selectedLeadId}
+                      onValueChange={(v) => {
+                        setSelectedLeadId(v);
+                        if (v !== "none") {
+                          const lead = leadsList.find((l: any) => l.id === parseInt(v));
+                          if (lead?.convertedToId && lead.convertedToType === "anunciante") {
+                            setSelectedClientId(String(lead.convertedToId));
+                          }
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="bg-background border-border/30 h-9 text-sm">
+                        <SelectValue placeholder="Selecione um lead" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Nenhum lead</SelectItem>
+                        {leadsList.map((l: any) => (
+                          <SelectItem key={l.id} value={String(l.id)}>
+                            {l.name}{l.company ? ` (${l.company})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <p className="text-[10px] text-muted-foreground">O nome da cotação será gerado automaticamente como: <span className="font-mono text-foreground/70">{`{Mês Ano} | {Anunciante} | {Volume}`}</span></p>
                 </div>
