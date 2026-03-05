@@ -264,3 +264,7 @@
 .animate-count {
   animation: countUp 0.4s ease-out;
 }
+
+.cl-footerAction {
+  display: none !important;
+}

@@ -8,7 +8,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
 import DevToolsPanel from "./components/DevToolsPanel";
 import { useAuth } from "./hooks/use-auth";
-import { SignIn, useClerk } from "@clerk/clerk-react";
+import { SignIn, SignUp, useClerk } from "@clerk/clerk-react";
 import { ShieldX } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
@@ -82,7 +82,30 @@ function Router() {
   );
 }
 
+const clerkAppearance = {
+  elements: {
+    rootBox: "mx-auto",
+    card: "bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] shadow-2xl",
+    headerTitle: "text-[hsl(0,0%,95%)]",
+    headerSubtitle: "text-[hsl(0,0%,50%)]",
+    formFieldLabel: "text-[hsl(0,0%,50%)]",
+    formFieldInput: "bg-[hsl(0,0%,11%)] border-[hsl(0,0%,18%)] text-[hsl(0,0%,95%)]",
+    formButtonPrimary: "bg-[#27d803] hover:bg-[#22c003] text-black",
+    footer: "hidden",
+    footerAction: "hidden",
+    footerActionLink: "hidden",
+    socialButtonsBlockButton: "border-[hsl(0,0%,18%)] text-[hsl(0,0%,70%)]",
+    dividerLine: "bg-[hsl(0,0%,14%)]",
+    dividerText: "text-[hsl(0,0%,40%)]",
+    identityPreview: "bg-[hsl(0,0%,11%)]",
+    identityPreviewText: "text-[hsl(0,0%,95%)]",
+    identityPreviewEditButton: "text-[#27d803]",
+  },
+};
+
 function ClerkLoginPage() {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+
   return (
     <div className="h-screen w-full flex items-center justify-center" style={{ background: "hsl(0 0% 4%)" }}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -93,28 +116,23 @@ function ClerkLoginPage() {
       </div>
       <div className="relative flex flex-col items-center">
         <img src="/logo-white.png" alt="mesa.ads" className="h-10 mb-8" />
-        <SignIn
-          appearance={{
-            elements: {
-              rootBox: "mx-auto",
-              card: "bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] shadow-2xl",
-              headerTitle: "text-[hsl(0,0%,95%)]",
-              headerSubtitle: "text-[hsl(0,0%,50%)]",
-              formFieldLabel: "text-[hsl(0,0%,50%)]",
-              formFieldInput: "bg-[hsl(0,0%,11%)] border-[hsl(0,0%,18%)] text-[hsl(0,0%,95%)]",
-              formButtonPrimary: "bg-[#27d803] hover:bg-[#22c003] text-black",
-              footerActionText: "text-[hsl(0,0%,50%)]",
-              footerActionLink: "text-[#27d803] hover:text-[#22c003]",
-              socialButtonsBlockButton: "border-[hsl(0,0%,18%)] text-[hsl(0,0%,70%)]",
-              dividerLine: "bg-[hsl(0,0%,14%)]",
-              dividerText: "text-[hsl(0,0%,40%)]",
-              identityPreview: "bg-[hsl(0,0%,11%)]",
-              identityPreviewText: "text-[hsl(0,0%,95%)]",
-              identityPreviewEditButton: "text-[#27d803]",
-            },
-          }}
-        />
-        <p className="text-center mt-6 text-[11px]" style={{ color: "hsl(0 0% 30%)" }}>
+        {mode === "signin" ? (
+          <SignIn appearance={clerkAppearance} signUpUrl="#" />
+        ) : (
+          <SignUp appearance={clerkAppearance} signInUrl="#" />
+        )}
+        <button
+          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+          className="mt-4 text-sm"
+          style={{ color: "hsl(0 0% 50%)" }}
+        >
+          {mode === "signin" ? (
+            <>Não tem uma conta? <span className="text-[#27d803] hover:underline cursor-pointer">Criar conta</span></>
+          ) : (
+            <>Já tem uma conta? <span className="text-[#27d803] hover:underline cursor-pointer">Entrar</span></>
+          )}
+        </button>
+        <p className="text-center mt-4 text-[11px]" style={{ color: "hsl(0 0% 30%)" }}>
           mesa.ads &copy; {new Date().getFullYear()} &mdash; Plataforma de gestão
         </p>
       </div>
