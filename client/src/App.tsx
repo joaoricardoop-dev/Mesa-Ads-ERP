@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -124,6 +124,11 @@ function ClerkLoginPage() {
 function AuthenticatedApp() {
   const { user, isLoading, isAuthenticated, isAuthError, isNotRegistered, logout, clerkUser } = useAuth();
   const [devRoleOverride, setDevRoleOverride] = useState<string | null>(null);
+  const [devClientIdOverride, setDevClientIdOverride] = useState<number | null>(null);
+
+  useEffect(() => {
+    (window as any).__DEV_OVERRIDE_CLIENT_ID__ = devRoleOverride === "anunciante" ? devClientIdOverride : null;
+  }, [devClientIdOverride, devRoleOverride]);
 
   if (isLoading) {
     return (
@@ -203,7 +208,7 @@ function AuthenticatedApp() {
   }
 
   const effectiveUser = devRoleOverride && user
-    ? { ...user, role: devRoleOverride }
+    ? { ...user, role: devRoleOverride, ...(devRoleOverride === "anunciante" && devClientIdOverride ? { clientId: devClientIdOverride } : {}) }
     : user;
 
   const isAnunciante = effectiveUser?.role === "anunciante";
@@ -217,7 +222,9 @@ function AuthenticatedApp() {
         <DevToolsPanel
           currentRole={user?.role || "user"}
           overrideRole={devRoleOverride}
+          overrideClientId={devClientIdOverride}
           onSetOverride={setDevRoleOverride}
+          onSetClientId={setDevClientIdOverride}
         />
       </div>
     );
@@ -231,7 +238,9 @@ function AuthenticatedApp() {
       <DevToolsPanel
         currentRole={user?.role || "user"}
         overrideRole={devRoleOverride}
+        overrideClientId={devClientIdOverride}
         onSetOverride={setDevRoleOverride}
+        onSetClientId={setDevClientIdOverride}
       />
     </div>
   );

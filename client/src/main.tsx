@@ -42,9 +42,17 @@ const trpcClient = trpc.createClient({
       url: "/api/trpc",
       transformer: superjson,
       fetch(input, init) {
+        const headers = new Headers((init as any)?.headers);
+        if (import.meta.env.DEV) {
+          const devOverride = (window as any).__DEV_OVERRIDE_CLIENT_ID__;
+          if (devOverride) {
+            headers.set("x-dev-client-id", String(devOverride));
+          }
+        }
         return globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",
+          headers,
         });
       },
     }),
