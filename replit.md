@@ -95,7 +95,7 @@ Financial simulation and management SaaS (ERP) for a Brazilian offline media com
 - `campaign_proofs` — Weekly proof photos per restaurant per campaign
 - `quotations` — Commercial quotations (QOT-YYYY-NNNN numbering, 6 statuses, quotationName auto-generated, clientId optional, leadId optional — can be linked to client OR lead)
 - `quotation_restaurants` — N:N quotation-restaurant allocation with coaster quantities + frozen commissionPercent
-- `leads` — CRM leads (anunciante/restaurante types, kanban stages, CNPJ/address fields, convertedToId/convertedToType for tracking conversions, opportunityType new/upsell, revenueType mrr/oneshot, createdBy userId, assignedTo userId; list/get join users for names)
+- `leads` — CRM leads (anunciante/restaurante types, kanban stages, CNPJ/address fields, convertedToId/convertedToType for tracking conversions, opportunityType new/upsell, revenueType mrr/oneshot, createdBy userId, assignedTo userId, clientId nullable FK to clients for existing-client opportunities; list/get join users for names + join clients for clientName)
 - `lead_interactions` — Interaction history per lead
 - `service_orders` — OS for anunciantes and production (OS-ANT/OS-PROD numbering)
 - `restaurant_terms` — Partnership terms per restaurant (TRM-YYYY-NNNN)

@@ -29,10 +29,12 @@ export const leadRouter = router({
           "cb"."first_name" AS "createdByFirstName",
           "cb"."last_name" AS "createdByLastName",
           "at"."first_name" AS "assignedToFirstName",
-          "at"."last_name" AS "assignedToLastName"
+          "at"."last_name" AS "assignedToLastName",
+          "cl"."name" AS "clientName"
         FROM leads l
         LEFT JOIN users "cb" ON l."createdBy" = "cb"."id"
         LEFT JOIN users "at" ON l."assignedTo" = "at"."id"
+        LEFT JOIN clients "cl" ON l."client_id" = "cl"."id"
         ${input?.type ? sql`WHERE l."type" = ${input.type}` : sql``}
         ${input?.type && input?.stage ? sql`AND l."stage" = ${input.stage}` : !input?.type && input?.stage ? sql`WHERE l."stage" = ${input.stage}` : sql``}
         ORDER BY l."updatedAt" DESC
@@ -50,10 +52,12 @@ export const leadRouter = router({
           "cb"."first_name" AS "createdByFirstName",
           "cb"."last_name" AS "createdByLastName",
           "at"."first_name" AS "assignedToFirstName",
-          "at"."last_name" AS "assignedToLastName"
+          "at"."last_name" AS "assignedToLastName",
+          "cl"."name" AS "clientName"
         FROM leads l
         LEFT JOIN users "cb" ON l."createdBy" = "cb"."id"
         LEFT JOIN users "at" ON l."assignedTo" = "at"."id"
+        LEFT JOIN clients "cl" ON l."client_id" = "cl"."id"
         WHERE l."id" = ${input.id}
         LIMIT 1
       `);
@@ -87,6 +91,7 @@ export const leadRouter = router({
       notes: z.string().optional(),
       opportunityType: z.enum(["new", "upsell"]).optional(),
       revenueType: z.enum(["mrr", "oneshot"]).optional(),
+      clientId: z.number().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDatabase();
@@ -125,6 +130,7 @@ export const leadRouter = router({
       notes: z.string().optional(),
       opportunityType: z.enum(["new", "upsell"]).nullable().optional(),
       revenueType: z.enum(["mrr", "oneshot"]).nullable().optional(),
+      clientId: z.number().nullable().optional(),
       convertedToId: z.number().optional(),
       convertedToType: z.string().optional(),
     }))

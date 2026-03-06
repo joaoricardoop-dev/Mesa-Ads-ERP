@@ -160,6 +160,7 @@ interface LeadFormData {
   origin: string;
   tags: string;
   notes: string;
+  clientId?: number;
 }
 
 const emptyForm: LeadFormData = {
@@ -182,6 +183,7 @@ const emptyForm: LeadFormData = {
   origin: "",
   tags: "",
   notes: "",
+  clientId: undefined,
 };
 
 interface ConvertRestaurantForm {
@@ -304,6 +306,7 @@ export default function Leads() {
   );
 
   const internalUsers = trpc.lead.listUsers.useQuery();
+  const clientsList = trpc.advertiser.list.useQuery();
 
   const cnpjClean = cnpjInput.replace(/\D/g, "");
   const { isFetching: isCnpjLoading, error: cnpjError, refetch: fetchCnpj } = trpc.cnpj.lookup.useQuery(
@@ -483,7 +486,12 @@ export default function Leads() {
       toast.error("Nome é obrigatório");
       return;
     }
-    createMutation.mutate({ ...formData, type: activeTab });
+    const payload: any = { ...formData, type: activeTab };
+    if (formData.clientId) {
+      payload.clientId = formData.clientId;
+      if (!payload.opportunityType) payload.opportunityType = "upsell";
+    }
+    createMutation.mutate(payload);
   }
 
   function handleUpdate() {
@@ -1024,10 +1032,18 @@ export default function Leads() {
                           </div>
                         )}
 
+                        {lead.client_id && !lead.convertedToId && (
+                          <div className="mt-1.5">
+                            <Badge className="text-[9px] h-3.5 px-1 bg-cyan-500/15 text-cyan-500 border-cyan-500/30">
+                              {lead.clientName || "Cliente existente"}
+                            </Badge>
+                          </div>
+                        )}
+
                         {lead.convertedToId && (
                           <div className="mt-1.5">
                             <Badge className="text-[9px] h-3.5 px-1 bg-emerald-500/20 text-emerald-500 border-emerald-500/30">
-                              Convertido
+                              {lead.client_id ? (lead.clientName || "Cliente existente") : "Convertido"}
                             </Badge>
                           </div>
                         )}
@@ -1169,6 +1185,66 @@ export default function Leads() {
                   ← Voltar para busca CNPJ
                 </Button>
               )}
+
+              {activeTab === "anunciante" && (
+                <div className="bg-muted/30 border border-border/30 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-xs font-medium">Vincular a anunciante existente</span>
+                    <span className="text-[10px] text-muted-foreground">(opcional)</span>
+                  </div>
+                  <Select
+                    value={formData.clientId ? String(formData.clientId) : "none"}
+                    onValueChange={(v) => {
+                      if (v === "none") {
+                        setFormData((prev) => ({ ...prev, clientId: undefined }));
+                        return;
+                      }
+                      const client = (clientsList.data ?? []).find((c: any) => c.id === Number(v));
+                      if (client) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          clientId: client.id,
+                          name: client.name || prev.name,
+                          company: client.company || client.name || prev.company,
+                          cnpj: client.cnpj || prev.cnpj,
+                          razaoSocial: client.razaoSocial || prev.razaoSocial,
+                          contactName: client.contactName || prev.contactName,
+                          contactPhone: client.contactPhone || prev.contactPhone,
+                          contactEmail: client.contactEmail || prev.contactEmail,
+                          contactWhatsApp: client.contactWhatsApp || prev.contactWhatsApp,
+                          instagram: client.instagram || prev.instagram,
+                          address: client.address || prev.address,
+                          addressNumber: client.addressNumber || prev.addressNumber,
+                          neighborhood: client.neighborhood || prev.neighborhood,
+                          city: client.city || prev.city,
+                          state: client.state || prev.state,
+                          cep: client.cep || prev.cep,
+                        }));
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Selecione um anunciante" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">-- Novo prospect (sem vínculo)</SelectItem>
+                      {(clientsList.data ?? []).map((c: any) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.name}{c.cnpj ? ` — ${c.cnpj}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.clientId && (
+                    <p className="text-[10px] text-emerald-500 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      Oportunidade vinculada a cliente existente (upsell)
+                    </p>
+                  )}
+                </div>
+              )}
+
               {renderLeadForm(formData, setFormData)}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
@@ -1218,8 +1294,21 @@ export default function Leads() {
                         size="sm"
                         className="gap-1 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
                         onClick={() => {
-                          if (selectedLead.data!.type === "restaurante") handleConvertRestaurant();
-                          else handleConvertAnunciante();
+                          if (selectedLead.data!.client_id) {
+                            markLeadConverted.mutate({
+                              id: selectedLead.data!.id,
+                              stage: "ganho",
+                              convertedToId: selectedLead.data!.client_id,
+                              convertedToType: "anunciante",
+                            });
+                            setShowConfetti(true);
+                            setTimeout(() => setShowConfetti(false), 3000);
+                            toast.success("Oportunidade convertida!");
+                          } else if (selectedLead.data!.type === "restaurante") {
+                            handleConvertRestaurant();
+                          } else {
+                            handleConvertAnunciante();
+                          }
                         }}
                       >
                         <ArrowRightCircle className="w-3 h-3" />
@@ -1294,6 +1383,26 @@ export default function Leads() {
                     </p>
                   )}
                 </div>
+
+                {selectedLead.data.client_id && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Anunciante Vinculado</span>
+                      <div
+                        className="flex items-center gap-2 p-2.5 rounded-lg bg-cyan-500/5 border border-cyan-500/20 cursor-pointer hover:bg-cyan-500/10 transition-colors"
+                        onClick={() => { setSelectedLeadId(null); navigate(`/clientes`); }}
+                      >
+                        <Building2 className="w-4 h-4 text-cyan-500 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-cyan-500">{selectedLead.data.clientName || "Cliente"}</p>
+                          <p className="text-[10px] text-muted-foreground">Clique para ver cadastro</p>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-cyan-500/60 ml-auto shrink-0" />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {leadQuotations.data && leadQuotations.data.length > 0 && (
                   <>
@@ -2035,7 +2144,7 @@ export default function Leads() {
                     className="text-xs text-muted-foreground"
                     onClick={() => {
                       setQuotationOpen(false);
-                      const clientId = selectedLead.data?.convertedToId;
+                      const clientId = selectedLead.data?.client_id || selectedLead.data?.convertedToId;
                       const leadId = selectedLead.data?.id;
                       const params = new URLSearchParams();
                       if (clientId) params.set("clientId", String(clientId));
@@ -2051,8 +2160,9 @@ export default function Leads() {
                       onClick={() => {
                         if (totalVol < 1) { toast.error("Volume deve ser maior que zero"); return; }
                         const lead = selectedLead.data!;
+                        const qClientId = lead.client_id || (isConverted && lead.convertedToId ? lead.convertedToId : undefined);
                         createQuotationMutation.mutate({
-                          ...(isConverted && lead.convertedToId ? { clientId: lead.convertedToId } : {}),
+                          ...(qClientId ? { clientId: qClientId } : {}),
                           leadId: lead.id,
                           coasterVolume: totalVol,
                           unitPrice: unitPrice.toFixed(2),
