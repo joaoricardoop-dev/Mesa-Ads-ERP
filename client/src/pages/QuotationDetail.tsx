@@ -506,7 +506,7 @@ export default function QuotationDetail() {
                               <MapPin className="w-3 h-3 text-muted-foreground" />
                               <span className="text-sm">{r.restaurantName || `#${r.restaurantId}`}</span>
                             </div>
-                            <span className="text-xs font-mono text-muted-foreground">{r.coasterQuantity} un. • {r.commissionPercent}%</span>
+                            <span className="text-xs font-mono text-muted-foreground">{r.coasterQuantity} un. • Com. {r.commissionPercent}%</span>
                           </div>
                         ))}
                       </div>
@@ -520,7 +520,9 @@ export default function QuotationDetail() {
                           {activeRestaurantsList
                             .filter((r) => !allocatedRestaurants.find((a: any) => a.restaurantId === r.id))
                             .map((r) => (
-                              <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
+                              <SelectItem key={r.id} value={String(r.id)}>
+                                {r.name} <span className="text-muted-foreground ml-1">({r.commissionPercent}%)</span>
+                              </SelectItem>
                             ))}
                         </SelectContent>
                       </Select>
