@@ -8,6 +8,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { setupClerkAuth } from "../replit_integrations/auth";
 import { clerkWebhookHandler } from "../clerkWebhook";
+import { setupRestaurantOnboardingRoutes } from "../restaurantOnboardingRouter";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -38,6 +39,9 @@ async function startServer() {
   );
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  setupRestaurantOnboardingRoutes(app);
+
   setupClerkAuth(app);
 
   app.get("/api/auth/user", async (req, res) => {
@@ -61,6 +65,7 @@ async function startServer() {
           const isSelfRegistered = !meta.role;
 
           const clientId = meta.clientId || null;
+          const restaurantId = meta.restaurantId || null;
           user = await authStorage.upsertUser({
             id: clerkUser.id,
             email: clerkUser.emailAddresses?.[0]?.emailAddress || null,
@@ -69,6 +74,7 @@ async function startServer() {
             profileImageUrl: clerkUser.imageUrl || null,
             role,
             clientId: clientId ? Number(clientId) : null,
+            restaurantId: restaurantId ? Number(restaurantId) : null,
             onboardingComplete: !isSelfRegistered,
             selfRegistered: isSelfRegistered,
           });

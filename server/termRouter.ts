@@ -1,9 +1,10 @@
-import { protectedProcedure, router } from "./_core/trpc";
+import { protectedProcedure, internalProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { restaurantTerms, activeRestaurants } from "../drizzle/schema";
+import { restaurantTerms, activeRestaurants, termAcceptances } from "../drizzle/schema";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { randomUUID } from "crypto";
 
 async function getDatabase() {
   const d = await getDb();
@@ -23,7 +24,7 @@ async function generateTermNumber(db: any) {
 }
 
 export const termRouter = router({
-  list: protectedProcedure
+  list: internalProcedure
     .input(z.object({
       restaurantId: z.number().optional(),
       status: z.enum(["rascunho", "enviado", "assinado", "vigente", "encerrado"]).optional(),
@@ -54,7 +55,7 @@ export const termRouter = router({
       }));
     }),
 
-  get: protectedProcedure
+  get: internalProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = await getDatabase();
@@ -63,7 +64,7 @@ export const termRouter = router({
       return result[0];
     }),
 
-  create: protectedProcedure
+  create: internalProcedure
     .input(z.object({
       restaurantId: z.number(),
       conditions: z.string().optional(),
@@ -85,7 +86,7 @@ export const termRouter = router({
       return created;
     }),
 
-  update: protectedProcedure
+  update: internalProcedure
     .input(z.object({
       id: z.number(),
       conditions: z.string().optional(),
@@ -110,7 +111,7 @@ export const termRouter = router({
       return updated;
     }),
 
-  delete: protectedProcedure
+  delete: internalProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -118,7 +119,7 @@ export const termRouter = router({
       return { success: true };
     }),
 
-  updateStatus: protectedProcedure
+  updateStatus: internalProcedure
     .input(z.object({
       id: z.number(),
       status: z.enum(["rascunho", "enviado", "assinado", "vigente", "encerrado"]),
@@ -132,5 +133,51 @@ export const termRouter = router({
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Termo não encontrado" });
       return updated;
+    }),
+
+  generateInvite: internalProcedure
+    .input(z.object({
+      id: z.number(),
+      inviteEmail: z.string().email().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const term = await db.select().from(restaurantTerms).where(eq(restaurantTerms.id, input.id)).limit(1);
+      if (!term[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Termo não encontrado" });
+      if (term[0].status === "assinado" || term[0].status === "vigente") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Termo já foi assinado" });
+      }
+
+      const token = randomUUID();
+      const [updated] = await db
+        .update(restaurantTerms)
+        .set({
+          inviteToken: token,
+          inviteEmail: input.inviteEmail || null,
+          status: "enviado",
+          updatedAt: new Date(),
+        })
+        .where(eq(restaurantTerms.id, input.id))
+        .returning();
+
+      return { ...updated, inviteToken: token };
+    }),
+
+  listAcceptances: internalProcedure
+    .input(z.object({
+      restaurantId: z.number().optional(),
+      termId: z.number().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const conditions = [];
+      if (input?.restaurantId) conditions.push(eq(termAcceptances.restaurantId, input.restaurantId));
+      if (input?.termId) conditions.push(eq(termAcceptances.termId, input.termId));
+
+      return db
+        .select()
+        .from(termAcceptances)
+        .where(conditions.length > 0 ? (conditions.length === 1 ? conditions[0] : sql`${conditions[0]} AND ${conditions[1]}`) : undefined)
+        .orderBy(desc(termAcceptances.acceptedAt));
     }),
 });

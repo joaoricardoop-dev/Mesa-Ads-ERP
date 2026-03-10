@@ -47,6 +47,7 @@ export async function clerkWebhookHandler(req: Request, res: Response) {
       const isSelfRegistered = type === "user.created" && !meta.role;
       const role = meta.role || "anunciante";
       const clientId = meta.clientId || null;
+      const restaurantId = meta.restaurantId || null;
 
       const firstName = userData.first_name || meta.firstName || null;
       const lastName = userData.last_name || meta.lastName || null;
@@ -59,6 +60,7 @@ export async function clerkWebhookHandler(req: Request, res: Response) {
         profileImageUrl: userData.image_url || null,
         role,
         clientId: clientId ? Number(clientId) : null,
+        restaurantId: restaurantId ? Number(restaurantId) : null,
         ...(isSelfRegistered ? { onboardingComplete: false, selfRegistered: true } : {}),
       });
 

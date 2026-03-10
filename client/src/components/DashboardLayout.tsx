@@ -102,6 +102,10 @@ const ANUNCIANTE_NAV_ENTRIES: NavEntry[] = [
   { icon: BarChart3, label: "Meu Portal", path: "/" },
 ];
 
+const RESTAURANTE_NAV_ENTRIES: NavEntry[] = [
+  { icon: UtensilsCrossed, label: "Meu Portal", path: "/" },
+];
+
 const NAV_ENTRIES: NavEntry[] = [
   { icon: BarChart3, label: "Dashboard", path: "/" },
   {
@@ -261,7 +265,7 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0 px-2 py-2">
             <SidebarMenu>
-              {(user.role === "anunciante" ? ANUNCIANTE_NAV_ENTRIES : NAV_ENTRIES).map((entry) => {
+              {(user.role === "anunciante" ? ANUNCIANTE_NAV_ENTRIES : user.role === "restaurante" ? RESTAURANTE_NAV_ENTRIES : NAV_ENTRIES).map((entry) => {
                 const userRole = user.role || "user";
                 const canSee = (item: { adminOnly?: boolean; allowedRoles?: string[] }) => {
                   if (item.adminOnly && userRole !== "admin") return false;
@@ -328,7 +332,7 @@ function DashboardLayoutContent({
                       {user.firstName || user.email || "-"}
                     </p>
                     <p className="text-[10px] text-muted-foreground truncate mt-1">
-                      {{admin: "Administrador", comercial: "Comercial", operacoes: "Operações", financeiro: "Financeiro", manager: "Gerente", viewer: "Visualizador", anunciante: "Anunciante", user: "Usuário"}[user.role || "user"] || "Usuário"}
+                      {{admin: "Administrador", comercial: "Comercial", operacoes: "Operações", financeiro: "Financeiro", manager: "Gerente", viewer: "Visualizador", anunciante: "Anunciante", restaurante: "Restaurante", user: "Usuário"}[user.role || "user"] || "Usuário"}
                     </p>
                   </div>
                 </button>
@@ -504,7 +508,7 @@ function NavGroupItem({
 }
 
 function findActiveLabel(location: string): string {
-  for (const entry of NAV_ENTRIES) {
+  for (const entry of [...NAV_ENTRIES, ...ANUNCIANTE_NAV_ENTRIES, ...RESTAURANTE_NAV_ENTRIES]) {
     if (isGroup(entry)) {
       for (const item of entry.items) {
         if (location === item.path || location.startsWith(item.path + "/")) {

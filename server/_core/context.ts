@@ -26,8 +26,10 @@ export async function createContext(
           secretKey: process.env.CLERK_SECRET_KEY!,
         });
         const clerkUser = await clerkClient.users.getUser(auth.userId);
-        const role = (clerkUser.publicMetadata as any)?.role || "user";
-        const clientId = (clerkUser.publicMetadata as any)?.clientId || null;
+        const meta = (clerkUser.publicMetadata as any) || {};
+        const role = meta.role || "user";
+        const clientId = meta.clientId || null;
+        const restaurantId = meta.restaurantId || null;
 
         const newUser = await authStorage.upsertUser({
           id: clerkUser.id,
@@ -37,6 +39,7 @@ export async function createContext(
           profileImageUrl: clerkUser.imageUrl || null,
           role,
           clientId: clientId ? Number(clientId) : null,
+          restaurantId: restaurantId ? Number(restaurantId) : null,
         });
         user = newUser;
       }

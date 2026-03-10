@@ -1,186 +1,41 @@
 # Mesa Ads ERP
 
-Financial simulation and management SaaS (ERP) for a Brazilian offline media company specializing in advertising on coasters (bolachas de chopp).
+## Overview
+Mesa Ads ERP is a financial simulation and management SaaS for a Brazilian offline media company specializing in advertising on coasters. The project aims to streamline operations, manage campaigns, track finances, and facilitate advertiser and restaurant partner onboarding. Key capabilities include a comprehensive campaign workflow, quotation management, lead tracking, a financial dashboard, and a restaurant rating system.
 
-## Tech Stack
+## User Preferences
+I prefer clear and concise communication. Focus on high-level concepts and architectural decisions. When making changes, prioritize modularity and maintainability. I prefer an iterative development approach, with regular updates on progress and potential roadblocks. Do not make changes to the `shared/rating-config.ts` file.
 
-- **Frontend**: React 19, Vite, Tailwind CSS 4, shadcn/ui, TanStack Query, tRPC, Recharts, wouter
-- **Backend**: Node.js, Express, tRPC, Drizzle ORM
-- **Auth**: Clerk (clerk.com) — supports Google, GitHub, Apple, email login; user management via Clerk Dashboard
-- **Database**: PostgreSQL (Replit built-in, via @neondatabase/serverless + drizzle-orm/neon-serverless)
-- **Package Manager**: pnpm
+## System Architecture
 
-## Project Structure
+### UI/UX Decisions
+The application features a sidebar-based layout using `shadcn/ui` with a collapsible and resizable design for navigation. There is no top navigation bar. The design incorporates a light/dark mode toggle, defaulting to dark, with brand colors (Black: `#0d0d0d`, Green: `#27d803`) and semantic colors for status indicators. Fonts used are DM Sans and JetBrains Mono. Reusable components like `PageContainer` and `Section` ensure consistency.
 
-- `client/` — React frontend
-- `server/` — Backend (Express + tRPC)
-- `server/_core/` — Server entry point, OAuth, Vite config
-- `server/replit_integrations/auth/` — Auth module (Clerk integration)
-- `server/clerkWebhook.ts` — Clerk webhook handler for user sync
-- `server/db.ts` — Database connection and query functions
-- `server/financialRouter.ts` — Financial module tRPC router
-- `server/quotationRouter.ts` — Quotations tRPC router
-- `server/leadRouter.ts` — Leads/CRM tRPC router
-- `server/serviceOrderRouter.ts` — Service Orders tRPC router
-- `server/termRouter.ts` — Restaurant Terms tRPC router
-- `server/libraryRouter.ts` — Library tRPC router
-- `shared/` — Shared types/constants
-- `shared/models/auth.ts` — Auth schema (users, sessions tables)
-- `shared/rating-config.ts` — Rating system configuration
-- `shared/rating.ts` — Rating calculator functions
-- `drizzle/` — Database schema and migrations
+### Technical Implementations
+- **Frontend**: React 19, Vite, Tailwind CSS 4, shadcn/ui, TanStack Query, tRPC, Recharts, wouter.
+- **Backend**: Node.js, Express, tRPC, Drizzle ORM.
+- **Authentication**: Clerk for user identity management, handling logins, sessions, and user roles. User roles are managed via Clerk's `publicMetadata.role` and synced to a local `users` table.
+- **Database**: PostgreSQL (via @neondatabase/serverless + drizzle-orm/neon-serverless) for all data persistence.
+- **Module-based Structure**: The application is organized into distinct modules for Comercial, Financeiro, Campanhas, Restaurantes, and Biblioteca, each with its own tRPC router and dedicated UI sections.
+- **Dev Tools Panel**: A development-only panel allows role simulation and client impersonation for testing various user perspectives.
 
-## Layout & Navigation
+### Feature Specifications
+- **Campaign Workflow**: A 6-step automated workflow (`producao` → `transito` → `executar` → `veiculacao` → `inativa`) covering creation, art upload, material confirmation, restaurant allocation, execution, and archival.
+- **Quotation Workflow**: Manages quotations through statuses (`rascunho` → `enviada` → `ativa` → `os_gerada` → `win` / `perdida` / `expirada`), including auto-generated naming, service order creation, and conversion to campaigns upon signing.
+- **Simulator UI**: A comprehensive simulation tool with collapsible sections for operational parameters, production costs, pricing, and commercial/tax details, providing KPI cards, DRE, and tabbed analysis.
+- **Restaurant Onboarding**: Supports both self-service public registration and invite-based onboarding for restaurant partners, with legal term acceptance tracking.
+- **Roles & Permissions**: Granular access control based on roles (Admin, Comercial, Operações, Financeiro, Anunciante, Restaurante), enforced at both UI and API levels using tRPC procedures.
+- **Pricing Engine**: Cost-based pricing with markup, calculating selling price using grossup formula: `CustoBruto = CustoPD / (1 - totalVarRate)`, then `SellingPrice = CustoBruto × (1 + markup%)`.
+- **Restaurant Rating System**: A multi-dimensional rating system (Bronze, Prata, Ouro, Diamante) based on weighted factors (drinks flow, ticket, location, etc.) for classification.
+- **Campaign Batches**: Divides the year into 13 four-week batches for campaign scheduling and management.
 
-- **Sidebar layout** via `DashboardLayout.tsx` (shadcn Sidebar, collapsible, resizable)
-- **No top navigation bar** — all navigation is in the sidebar
-- **Module-based sidebar** with collapsible groups:
-  - Dashboard (`/`) — operational overview with status cards, pipeline, activity
-  - Comercial (group): Cotações (`/comercial/cotacoes`, detail: `/comercial/cotacoes/:id`), Simulador (`/comercial/simulador`), Leads (`/comercial/leads`)
-  - Anunciantes (`/clientes`) — top-level item
-  - Campanhas (`/campanhas`)
-  - Financeiro (group, admin only): Dashboard (`/financeiro`), Faturamento (`/financeiro/faturamento`), Pagamentos (`/financeiro/pagamentos`), Custos (`/financeiro/custos`), Relatórios (`/financeiro/relatorios`)
-  - Restaurantes (`/restaurantes`) — top-level item
-  - Biblioteca (`/biblioteca`)
-  - Configurações (group): Economics (`/economics`), Produção (`/producao`), Gestão de Usuários (`/configuracoes/usuarios`, admin only)
-- **Reusable layout components**:
-  - `PageContainer` — page wrapper with title, description, actions
-  - `Section` — card section with icon, title, description
-- **Topbar** (inside SidebarInset): breadcrumb label + theme toggle
-- **Landing page** (`LandingPage.tsx`) — shown when not authenticated
-- **Restaurant Terms**: accessed from restaurant profile page (Termos tab), not a separate menu item
+### System Design Choices
+- **Monorepo Structure**: `client/` for frontend, `server/` for backend, and `shared/` for common types and constants.
+- **tRPC**: Utilized for end-to-end type safety between frontend and backend APIs.
+- **Drizzle ORM**: Used for type-safe database interactions and migrations.
 
-## Authentication
-
-- **Clerk** (clerk.com) for identity management — handles login UI, sessions, JWT tokens, password management
-- Frontend: `<ClerkProvider>` wraps app in `main.tsx`, `<SignIn>` component for login page
-- Backend: `@clerk/express` middleware validates JWT on every request
-- User roles stored in Clerk `publicMetadata.role` and synced to local `users` table
-- Anunciante `clientId` stored in Clerk `publicMetadata.clientId`
-- Webhook endpoint `POST /api/webhooks/clerk` syncs user data from Clerk to local DB
-- Local `users` table kept for joins and app-specific data (role, clientId, isActive)
-- `useAuth` hook (`client/src/hooks/use-auth.ts`) uses Clerk's `useUser()` + fetches DB user via `/api/auth/user`
-- Sidebar footer shows user info from DB, logout via `useClerk().signOut()`
-- Self-registration enabled: new users without a role in Clerk metadata are auto-provisioned as `anunciante` with `onboardingComplete: false` and `selfRegistered: true`; after completing the onboarding flow (`Onboarding.tsx`), a client record is created with `selfRegistered: true` and linked to the user
-- Admins can also create users via Gestão de Usuários page
-- `members.list` fetches from Clerk API (source of truth), syncs to local DB
-- Admin mutations: `members.createUser` (creates user in Clerk + syncs to DB), `members.updateRole` (syncs to Clerk metadata), `members.toggleActive` (ban/unban in Clerk)
-- Env vars: `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
-- **Dev Tools Panel** (`client/src/components/DevToolsPanel.tsx`): Floating button (bottom-right, amber bug icon) in dev mode only; allows switching the visible user role to simulate Admin/Comercial/Operações/Financeiro/Anunciante/Usuário views without changing backend data; override applied in `App.tsx` via `effectiveUser`; when Anunciante is selected, a client dropdown appears to simulate a specific anunciante (sends `x-dev-client-id` header to backend, handled in `context.ts` for admin users in dev mode only); hidden in production builds
-
-## Roles & Permissions
-
-- **Admin**: Full access — all modules, user management, configurations
-- **Comercial**: Cotações (create, WIN), Simulador, Leads/CRM, Cadastro Anunciantes, OS Anunciantes, Biblioteca
-- **Operações**: Campanhas (all workflow steps), OS Produção, Biblioteca, Provas de execução
-- **Financeiro**: Dashboard financeiro, Faturamento, Pagamentos, Custos, Relatórios
-- **Anunciante**: Portal (`/portal`, `AnunciantePortal.tsx`) — view own campaigns, cotações, faturas, edit own profile; user linked to client via `users.clientId`
-- **Manager/User/Viewer**: Legacy roles (backward compatibility)
-- Admin-only pages: Gestão de Usuários, Financeiro module
-- **Backend role procedures**: `comercialProcedure`, `operacoesProcedure`, `financeiroProcedure`, `internalProcedure` (admin always allowed)
-- Campaign workflow endpoints (uploadArt, completeProduction, confirmMaterial, startVeiculacao, finalizeCampaign, addProof) use `operacoesProcedure`
-- Quotation endpoints use `comercialProcedure`
-- Financial endpoints use `financeiroProcedure`
-
-## Database Tables
-
-- `users` — Auth users with role, isActive, clientId (links anunciante to client), onboardingComplete, selfRegistered, lastLoginAt
-- `sessions` — Auth sessions (Replit Auth)
-- `restaurants` — Prospecting/leads for partner restaurants
-- `active_restaurants` — Onboarded active restaurants with full operational data
-- `clients` — Advertisers (47 imported with full address/contact/CNPJ data)
-- `campaigns` — Campaigns with CMP-YYYY-NNNN numbering, 6-step workflow statuses, art URLs, veiculação dates
-- `campaign_restaurants` — N:N campaign-restaurant relationship
-- `campaign_history` — Audit trail for campaign status changes
-- `campaign_proofs` — Weekly proof photos per restaurant per campaign
-- `quotations` — Commercial quotations (QOT-YYYY-NNNN numbering, 6 statuses, quotationName auto-generated, clientId optional, leadId optional — can be linked to client OR lead)
-- `quotation_restaurants` — N:N quotation-restaurant allocation with coaster quantities + frozen commissionPercent
-- `leads` — CRM leads (anunciante/restaurante types, kanban stages, CNPJ/address fields, convertedToId/convertedToType for tracking conversions, opportunityType new/upsell, revenueType mrr/oneshot, createdBy userId, assignedTo userId, clientId nullable FK to clients for existing-client opportunities; list/get join users for names + join clients for clientName)
-- `lead_interactions` — Interaction history per lead
-- `service_orders` — OS for anunciantes and production (OS-ANT/OS-PROD numbering)
-- `restaurant_terms` — Partnership terms per restaurant (TRM-YYYY-NNNN)
-- `library_items` — Coaster art archive (auto-populated on campaign finalization)
-- `invoices` — Billing invoices (FAT-YYYY-NNNN)
-- `operational_costs` — Production + freight costs per campaign
-- `restaurant_payments` — Payments to restaurant partners
-- `suppliers` — Production suppliers
-- `budgets` / `budget_items` — Production budgets (with GPC spec fields: material, format, productSize, printType, colors, layoutType, paymentTerms, productionLeadDays; items support numModels/qtyPerModel for multi-model pricing)
-- `campaign_batches` — 4-week veiculação periods (13 per year, auto-generated from first Monday)
-- `campaign_batch_assignments` — N:N campaign-to-batch mapping (campaigns can span multiple batches)
-
-## Campaign Batches
-
-- Year divided into 13 batches of 4 weeks (28 days), starting from the first Monday of the year
-- Auto-generated on first access for a given year; admin can edit dates/labels/status
-- Campaigns can span 1 or more consecutive batches (multi-batch = 8+ weeks)
-- Batch management page: `/configuracoes/batches` (admin only)
-- `server/batchRouter.ts` — CRUD + auto-generation + campaign assignment
-
-## Campaign Workflow (6-Step Automated Flow)
-
-Statuses: `producao` → `transito` → `executar` → `veiculacao` → `inativa`
-
-1. **Cotação WIN** → Creates campaign CMP-YYYY-NNNN with status `producao`
-2. **Produção**: Upload art (PDF + images) → "Concluir Produção"
-3. **Trânsito**: Auto-generates OS-PROD → "Confirmar chegada do material"
-4. **Executar**: Allocate restaurants → "Iniciar Veiculação"
-5. **Em Veiculação**: 4-week period, weekly proof photos → "Finalizar Campanha"
-6. **Inativa**: Auto-archives to Biblioteca, read-only
-
-## Quotation Workflow
-
-Statuses: `rascunho` → `enviada` → `ativa` → `os_gerada` → `win` / `perdida` / `expirada`
-- Quotation naming standard: auto-generated as `{Mês} {Ano} | {Nome Anunciante} | {Volume}` — NOT editable, recalculated on update/duplicate
-- quotationName carries over as campaign name on WIN conversion (no separate campaignName input)
-- Cotação ativa → "Gerar OS" creates OS-ANT service order linked to quotation
-- OS gerada → Allocate restaurants (quotation_restaurants table) → Upload signature URL → Sign OS → auto-converts to WIN + creates campaign CMP-YYYY-NNNN with status `producao`
-- Conversion gate: requires (1) restaurants allocated with coaster volumes, (2) OS signed with signature URL
-- OS Anunciantes is NOT a separate menu item — managed within Cotações flow
-- OS PDF generation: jsPDF + jspdf-autotable (client-side, `client/src/lib/generate-os-pdf.ts`)
-- Supports duplicate, mark lost with reason
-
-## Simulator UI
-
-- Single-page vertical flow (no sidebar) in `client/src/pages/Home.tsx`
-- Collapsible "Parâmetros da Simulação" card with 4 sections:
-  - Operacional (coasters/rest, restaurantes, uso/dia, dias/mês)
-  - Custo de Produção (budget selector, nº artes, batch manual, custo unitário efetivo)
-  - Precificação (markup type, markup/fixo, margem bruta + goal seek, desc. máximo, margem mínima)
-  - Comercial & Tributário (com. agência type/value, com. vendedor, carga tributária, duração contrato)
-- KPI Cards → DRE → Restaurant Allocation → Tabbed Analysis (Gráficos/Cenários/Tabelas)
-- `InputPanel.tsx` — legacy sidebar component (unused, kept for reference)
-
-## Pricing Engine (calcPricing)
-
-- Located in `client/src/hooks/useSimulator.ts`
-- Grossup formula: CustoBruto = CustoPD / (1 - totalVarRate), then SellingPrice = CustoBruto × (1 + markup%)
-- No multiplier — pricing is purely cost-based with markup
-- Restaurant weighted commission applied when allocation is valid
-
-## Restaurant Rating System
-
-- Tiers: Bronze, Prata, Ouro, Diamante (score bands)
-- 6 weighted dimensions (drinks flow, ticket, location, tables, venue type, digital presence)
-- Rating score used for display/classification only, does NOT affect pricing
-- Configuration in `shared/rating-config.ts`
-
-## Theme & Visual Identity
-
-- Brand: mesa.ads (lowercase, with dot)
-- Logo: `/logo-white.png` (dark backgrounds), `/logo-black.png` (light backgrounds)
-- Brand colors: Black (#0d0d0d) + Green (#27d803, hsl 110 97% 43%)
-- Light/dark mode with toggle, defaults to dark
-- DM Sans + JetBrains Mono fonts
-- Semantic colors: emerald (positive), red (negative), amber (warnings)
-
-## Running
-
-- `pnpm run dev` — Development mode (server on port 5000)
-- `pnpm run build` — Production build
-- `pnpm run start` — Production start
-- `pnpm run db:push` — Generate and apply database migrations
-
-## Entry Points
-
-- Server: `server/_core/index.ts`
-- Client: `client/src/main.tsx`
+## External Dependencies
+- **Clerk**: For authentication, user management, and authorization.
+- **Neon Database**: Provides the PostgreSQL database infrastructure.
+- **Recharts**: For data visualization in the UI.
+- **jsPDF + jspdf-autotable**: For client-side PDF generation (e.g., Service Orders).

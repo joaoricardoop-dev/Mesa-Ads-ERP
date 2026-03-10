@@ -69,6 +69,9 @@ import {
   UtensilsCrossed,
   Star,
   Wine,
+  Send,
+  Copy,
+  LinkIcon,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -238,6 +241,19 @@ export default function ActiveRestaurantProfile() {
 
   const updateTermStatusMutation = trpc.term.updateStatus.useMutation({
     onSuccess: () => { utils.term.list.invalidate(); toast.success("Status atualizado!"); },
+  });
+
+  const generateInviteMutation = trpc.term.generateInvite.useMutation({
+    onSuccess: (data) => {
+      utils.term.list.invalidate();
+      const inviteUrl = `${window.location.origin}/parceiro/convite/${data.inviteToken}`;
+      navigator.clipboard.writeText(inviteUrl).then(() => {
+        toast.success("Link de convite copiado para a área de transferência!");
+      }).catch(() => {
+        toast.success("Convite gerado! Link: " + inviteUrl);
+      });
+    },
+    onError: (err) => toast.error(err.message),
   });
 
   const stats = useMemo(() => {
@@ -961,9 +977,49 @@ export default function ActiveRestaurantProfile() {
                           </div>
                         )}
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-2">
-                        Criado em {new Date(term.createdAt).toLocaleDateString("pt-BR")}
-                      </p>
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/20">
+                        <p className="text-[10px] text-muted-foreground">
+                          Criado em {new Date(term.createdAt).toLocaleDateString("pt-BR")}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {term.status === "assinado" || term.status === "vigente" ? (
+                            <Badge variant="outline" className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 gap-1 text-[10px]">
+                              <CheckCircle2 className="w-3 h-3" /> Assinado
+                            </Badge>
+                          ) : term.inviteToken ? (
+                            <>
+                              <Badge variant="outline" className="bg-orange-500/20 text-orange-400 border-orange-500/30 gap-1 text-[10px]">
+                                <Send className="w-3 h-3" /> Convite enviado
+                              </Badge>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5 text-[10px] h-7"
+                                onClick={() => {
+                                  const inviteUrl = `${window.location.origin}/parceiro/convite/${term.inviteToken}`;
+                                  navigator.clipboard.writeText(inviteUrl).then(() => {
+                                    toast.success("Link copiado!");
+                                  }).catch(() => {
+                                    toast.info(inviteUrl);
+                                  });
+                                }}
+                              >
+                                <Copy className="w-3 h-3" /> Copiar Link
+                              </Button>
+                            </>
+                          ) : (term.status === "rascunho" || term.status === "enviado") ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 text-[10px] h-7"
+                              disabled={generateInviteMutation.isPending}
+                              onClick={() => generateInviteMutation.mutate({ id: term.id })}
+                            >
+                              <Send className="w-3 h-3" /> Enviar Convite para Assinatura
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>

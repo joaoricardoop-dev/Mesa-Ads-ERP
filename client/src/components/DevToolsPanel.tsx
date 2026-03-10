@@ -8,6 +8,7 @@ const ROLES = [
   { key: "operacoes", label: "Operações", color: "bg-orange-500" },
   { key: "financeiro", label: "Financeiro", color: "bg-purple-500" },
   { key: "anunciante", label: "Anunciante", color: "bg-emerald-500" },
+  { key: "restaurante", label: "Restaurante", color: "bg-teal-500" },
   { key: "user", label: "Usuário", color: "bg-gray-500" },
 ] as const;
 

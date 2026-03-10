@@ -521,6 +521,8 @@ export const restaurantTerms = pgTable("restaurant_terms", {
   validFrom: date("validFrom"),
   validUntil: date("validUntil"),
   status: termStatusEnum("status").default("rascunho").notNull(),
+  inviteToken: varchar("inviteToken", { length: 100 }),
+  inviteEmail: varchar("inviteEmail", { length: 320 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -530,6 +532,29 @@ export const restaurantTerms = pgTable("restaurant_terms", {
 
 export type RestaurantTerm = typeof restaurantTerms.$inferSelect;
 export type InsertRestaurantTerm = typeof restaurantTerms.$inferInsert;
+
+// ─── Term Acceptances (assinatura eletrônica) ───────────────────────────────
+
+export const termAcceptances = pgTable("term_acceptances", {
+  id: serial("id").primaryKey(),
+  restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  termId: integer("termId").references(() => restaurantTerms.id, { onDelete: "set null" }),
+  termContent: text("termContent").notNull(),
+  termHash: varchar("termHash", { length: 64 }).notNull(),
+  acceptedAt: timestamp("acceptedAt").defaultNow().notNull(),
+  acceptedByName: varchar("acceptedByName", { length: 255 }).notNull(),
+  acceptedByCpf: varchar("acceptedByCpf", { length: 20 }).notNull(),
+  acceptedByEmail: varchar("acceptedByEmail", { length: 320 }).notNull(),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  userAgent: text("userAgent"),
+  inviteToken: varchar("inviteToken", { length: 100 }),
+}, (t) => [
+  index("idx_term_acceptances_restaurant").on(t.restaurantId),
+  index("idx_term_acceptances_term").on(t.termId),
+]);
+
+export type TermAcceptance = typeof termAcceptances.$inferSelect;
+export type InsertTermAcceptance = typeof termAcceptances.$inferInsert;
 
 // ─── Library Items (acervo de artes) ─────────────────────────────────────────
 

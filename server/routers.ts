@@ -6,7 +6,7 @@ import { serviceOrderRouter } from "./serviceOrderRouter";
 import { termRouter } from "./termRouter";
 import { libraryRouter } from "./libraryRouter";
 import { batchRouter } from "./batchRouter";
-import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, anuncianteProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, anuncianteProcedure, restauranteProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { authStorage } from "./replit_integrations/auth";
@@ -1095,6 +1095,45 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteBudget(input.id)),
+  }),
+
+  restaurantePortal: router({
+    myRestaurant: restauranteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.restaurantId) return null;
+      return getActiveRestaurant(user.restaurantId);
+    }),
+
+    myCampaigns: restauranteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.restaurantId) return [];
+      return getRestaurantCampaigns(user.restaurantId);
+    }),
+
+    myTerms: restauranteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.restaurantId) return [];
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return [];
+      const { restaurantTerms } = await import("../drizzle/schema");
+      const { eq, desc } = await import("drizzle-orm");
+      return db.select().from(restaurantTerms).where(eq(restaurantTerms.restaurantId, user.restaurantId)).orderBy(desc(restaurantTerms.createdAt));
+    }),
+
+    updateContact: restauranteProcedure
+      .input(z.object({
+        contactName: z.string().optional(),
+        whatsapp: z.string().optional(),
+        email: z.string().optional(),
+        financialEmail: z.string().optional(),
+        instagram: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const user = ctx.user;
+        if (!user || !user.restaurantId) throw new TRPCError({ code: "FORBIDDEN", message: "Sem restaurante vinculado" });
+        return updateActiveRestaurant(user.restaurantId, input);
+      }),
   }),
 
   portal: router({

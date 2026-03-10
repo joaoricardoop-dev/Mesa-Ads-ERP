@@ -22,6 +22,7 @@ export const users = pgTable("users", {
   passwordHash: varchar("password_hash"),
   mustChangePassword: boolean("must_change_password").default(false),
   clientId: integer("client_id"),
+  restaurantId: integer("restaurant_id"),
   onboardingComplete: boolean("onboarding_complete").default(false),
   selfRegistered: boolean("self_registered").default(false),
   lastLoginAt: timestamp("last_login_at"),

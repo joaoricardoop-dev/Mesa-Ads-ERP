@@ -35,6 +35,9 @@ import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
 import OperationalCosts from "./pages/financial/OperationalCosts";
 import FinancialReport from "./pages/financial/FinancialReport";
 import AnunciantePortal from "./pages/AnunciantePortal";
+import RestaurantePortal from "./pages/RestaurantePortal";
+import RestaurantOnboarding from "./pages/RestaurantOnboarding";
+import RestaurantInviteAccept from "./pages/RestaurantInviteAccept";
 import Onboarding from "./pages/Onboarding";
 
 function AnuncianteRouter() {
@@ -43,6 +46,16 @@ function AnuncianteRouter() {
       <Route path="/" component={AnunciantePortal} />
       <Route path="/portal" component={AnunciantePortal} />
       <Route component={AnunciantePortal} />
+    </Switch>
+  );
+}
+
+function RestauranteRouter() {
+  return (
+    <Switch>
+      <Route path="/" component={RestaurantePortal} />
+      <Route path="/portal" component={RestaurantePortal} />
+      <Route component={RestaurantePortal} />
     </Switch>
   );
 }
@@ -132,6 +145,13 @@ function ClerkLoginPage() {
             <>Já tem uma conta? <span className="text-[#27d803] hover:underline cursor-pointer">Entrar</span></>
           )}
         </button>
+        <a
+          href="/parceiro"
+          className="mt-4 text-sm block"
+          style={{ color: "hsl(0 0% 50%)" }}
+        >
+          É um restaurante parceiro? <span className="text-[#27d803] hover:underline cursor-pointer">Cadastre-se aqui</span>
+        </a>
         <p className="text-center mt-4 text-[11px]" style={{ color: "hsl(0 0% 30%)" }}>
           mesa.ads &copy; {new Date().getFullYear()} &mdash; Plataforma de gestão
         </p>
@@ -231,6 +251,7 @@ function AuthenticatedApp() {
     : user;
 
   const isAnunciante = effectiveUser?.role === "anunciante";
+  const isRestaurante = effectiveUser?.role === "restaurante";
   const needsOnboarding = isAnunciante && effectiveUser?.onboardingComplete === false;
 
   if (needsOnboarding) {
@@ -265,6 +286,23 @@ function AuthenticatedApp() {
     );
   }
 
+  if (isRestaurante) {
+    return (
+      <div className="h-screen flex overflow-hidden">
+        <DashboardLayout user={effectiveUser}>
+          <RestauranteRouter />
+        </DashboardLayout>
+        <DevToolsPanel
+          currentRole={user?.role || "user"}
+          overrideRole={devRoleOverride}
+          overrideClientId={devClientIdOverride}
+          onSetOverride={setDevRoleOverride}
+          onSetClientId={setDevClientIdOverride}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex overflow-hidden">
       <DashboardLayout user={effectiveUser}>
@@ -287,7 +325,11 @@ function App() {
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster />
-          <AuthenticatedApp />
+          <Switch>
+            <Route path="/parceiro/convite/:token" component={RestaurantInviteAccept} />
+            <Route path="/parceiro" component={RestaurantOnboarding} />
+            <Route>{() => <AuthenticatedApp />}</Route>
+          </Switch>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
