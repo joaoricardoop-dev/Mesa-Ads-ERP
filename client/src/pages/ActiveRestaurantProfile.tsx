@@ -59,7 +59,9 @@ import {
   Trash2,
   Link2,
   Unlink,
+  CheckCircle,
   CheckCircle2,
+  Copy,
   AlertTriangle,
   MessageCircle,
   Store,
@@ -256,18 +258,13 @@ export default function ActiveRestaurantProfile() {
 
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [generatedInviteUrl, setGeneratedInviteUrl] = useState("");
 
   const generateAccountInviteMutation = trpc.activeRestaurant.generateAccountInvite.useMutation({
     onSuccess: (data) => {
       utils.term.list.invalidate();
       const inviteUrl = `${window.location.origin}/parceiro/convite/${data.inviteToken}`;
-      navigator.clipboard.writeText(inviteUrl).then(() => {
-        toast.success("Link de convite copiado para a área de transferência!");
-      }).catch(() => {
-        toast.success("Convite gerado! Link: " + inviteUrl);
-      });
-      setIsInviteDialogOpen(false);
-      setInviteEmail("");
+      setGeneratedInviteUrl(inviteUrl);
     },
     onError: (err) => toast.error(err.message),
   });
@@ -1199,35 +1196,88 @@ export default function ActiveRestaurantProfile() {
       </Dialog>
 
       {/* Account Invite Dialog */}
-      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+      <Dialog open={isInviteDialogOpen} onOpenChange={(open) => { setIsInviteDialogOpen(open); if (!open) { setGeneratedInviteUrl(""); setInviteEmail(""); } }}>
         <DialogContent className="sm:max-w-md bg-card border-border/30">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Send className="w-5 h-5 text-primary" /> Convidar Novo Usuário</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div>
-              <Label className="text-xs mb-1.5 block">Email do convidado</Label>
-              <Input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="email@exemplo.com"
-                className="bg-background border-border/30 h-9 text-sm"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1.5">Um link de convite será gerado e copiado para a área de transferência</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" size="sm" className="text-xs" onClick={() => setIsInviteDialogOpen(false)}>Cancelar</Button>
-            <Button
-              size="sm"
-              className="text-xs gap-1.5"
-              disabled={!inviteEmail || generateAccountInviteMutation.isPending}
-              onClick={() => generateAccountInviteMutation.mutate({ restaurantId, email: inviteEmail })}
-            >
-              {generateAccountInviteMutation.isPending ? "Gerando..." : "Gerar Convite"}
-            </Button>
-          </DialogFooter>
+          {!generatedInviteUrl ? (
+            <>
+              <div className="space-y-3 py-2">
+                <div>
+                  <Label className="text-xs mb-1.5 block">Email do convidado</Label>
+                  <Input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="email@exemplo.com"
+                    className="bg-background border-border/30 h-9 text-sm"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1.5">Um link de convite será gerado para você enviar ao parceiro</p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => setIsInviteDialogOpen(false)}>Cancelar</Button>
+                <Button
+                  size="sm"
+                  className="text-xs gap-1.5"
+                  disabled={!inviteEmail || generateAccountInviteMutation.isPending}
+                  onClick={() => generateAccountInviteMutation.mutate({ restaurantId, email: inviteEmail })}
+                >
+                  {generateAccountInviteMutation.isPending ? "Gerando..." : "Gerar Convite"}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="space-y-4 py-2">
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="text-sm font-medium">Convite gerado com sucesso!</span>
+                </div>
+                <div>
+                  <Label className="text-xs mb-1.5 block">Link de convite</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={generatedInviteUrl}
+                      className="bg-background border-border/30 h-9 text-xs font-mono select-all"
+                      onFocus={(e) => e.target.select()}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 px-3 shrink-0 text-xs gap-1.5"
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedInviteUrl).then(() => {
+                          toast.success("Link copiado!");
+                        }).catch(() => {
+                          toast.error("Não foi possível copiar. Selecione e copie manualmente.");
+                        });
+                      }}
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Copiar
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1.5">Envie este link para o parceiro criar a conta</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs gap-1.5 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                  onClick={() => {
+                    const msg = encodeURIComponent(`Olá! Você foi convidado para o portal Mesa Ads. Acesse o link para criar sua conta:\n\n${generatedInviteUrl}`);
+                    window.open(`https://wa.me/?text=${msg}`, "_blank");
+                  }}
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Enviar por WhatsApp
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button size="sm" className="text-xs" onClick={() => { setIsInviteDialogOpen(false); setGeneratedInviteUrl(""); setInviteEmail(""); }}>Fechar</Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
