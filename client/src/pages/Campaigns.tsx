@@ -32,6 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 import {
   Pencil,
   Trash2,
@@ -42,6 +43,7 @@ import {
   Package,
   Users,
   Percent,
+  Gift,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { useLocation } from "wouter";
@@ -66,6 +68,7 @@ interface CampaignForm {
   contractDuration: number;
   batchSize: number;
   batchCost: number;
+  isBonificada: boolean;
 }
 
 const emptyForm: CampaignForm = {
@@ -88,6 +91,7 @@ const emptyForm: CampaignForm = {
   contractDuration: 6,
   batchSize: 10000,
   batchCost: 1200,
+  isBonificada: false,
 };
 
 interface RestaurantSelection {
@@ -308,6 +312,7 @@ export default function Campaigns() {
       contractDuration: selectedBatchIds.length,
       batchSize: form.batchSize,
       batchCost: String(form.batchCost),
+      isBonificada: form.isBonificada,
     };
 
     if (editingId) {
@@ -341,6 +346,7 @@ export default function Campaigns() {
       contractDuration: c.contractDuration,
       batchSize: c.batchSize,
       batchCost: Number(c.batchCost),
+      isBonificada: !!(c as any).isBonificada,
     });
     setSelectedBatchIds([]);
     setIsDialogOpen(true);
@@ -409,6 +415,7 @@ export default function Campaigns() {
     let totalProfit = 0;
     let totalMonthly = 0;
     for (const c of campaignsList) {
+      if ((c as any).isBonificada) continue;
       const p = calcCampaignPricing(c);
       totalContract += p.contractTotal;
       totalProfit += p.contractProfit;
@@ -474,7 +481,8 @@ export default function Campaigns() {
             </div>
           ) : (
             filtered.map((c) => {
-              const pricing = calcCampaignPricing(c);
+              const isBonificada = (c as any).isBonificada;
+              const pricing = isBonificada ? null : calcCampaignPricing(c);
 
               return (
                 <div key={c.id} className="bg-card border border-border/30 rounded-lg overflow-hidden">
@@ -499,20 +507,28 @@ export default function Campaigns() {
                       </div>
 
                       <div className="hidden md:flex items-center gap-6 text-sm">
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Contrato</p>
-                          <p className="font-mono font-semibold">{formatCurrency(pricing.contractTotal)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Lucro</p>
-                          <p className="font-mono font-semibold text-emerald-400">{formatCurrency(pricing.contractProfit)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Margem</p>
-                          <p className={`font-mono font-semibold ${pricing.grossMargin >= 15 ? "text-emerald-400" : "text-red-400"}`}>
-                            {pricing.grossMargin.toFixed(1)}%
-                          </p>
-                        </div>
+                        {isBonificada ? (
+                          <div className="text-right">
+                            <p className="text-xs text-amber-400 font-medium">Bonificada — sem receita</p>
+                          </div>
+                        ) : pricing && (
+                          <>
+                            <div className="text-right">
+                              <p className="text-xs text-muted-foreground">Contrato</p>
+                              <p className="font-mono font-semibold">{formatCurrency(pricing.contractTotal)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-muted-foreground">Lucro</p>
+                              <p className="font-mono font-semibold text-emerald-400">{formatCurrency(pricing.contractProfit)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-muted-foreground">Margem</p>
+                              <p className={`font-mono font-semibold ${pricing.grossMargin >= 15 ? "text-emerald-400" : "text-red-400"}`}>
+                                {pricing.grossMargin.toFixed(1)}%
+                              </p>
+                            </div>
+                          </>
+                        )}
                         <div className="text-center">
                           <p className="text-xs text-muted-foreground">Rest.</p>
                           <p className="font-mono">{c.activeRestaurants}</p>
@@ -520,6 +536,11 @@ export default function Campaigns() {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {(c as any).isBonificada && (
+                          <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/30 gap-1">
+                            <Gift className="w-3 h-3" /> Bonificada
+                          </Badge>
+                        )}
                         <Badge variant="outline" className={STATUS_COLORS[c.status] || ""}>
                           {STATUS_LABELS[c.status] || c.status}
                         </Badge>
@@ -587,6 +608,19 @@ export default function Campaigns() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                    <div className="flex items-center gap-2">
+                      <Gift className="w-4 h-4 text-amber-400" />
+                      <div>
+                        <Label className="text-xs font-medium">Bonificação</Label>
+                        <p className="text-[10px] text-muted-foreground">Campanha sem geração de receita</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={form.isBonificada}
+                      onCheckedChange={(checked) => setForm({ ...form, isBonificada: checked })}
+                    />
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">

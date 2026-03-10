@@ -292,7 +292,12 @@ export default function AnunciantePortal() {
                               </div>
                             </div>
                           </div>
-                          <Badge className={cfg.color}>{cfg.label}</Badge>
+                          <div className="flex items-center gap-2">
+                            {campaign.isBonificada && (
+                              <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30">Bonificada</Badge>
+                            )}
+                            <Badge className={cfg.color}>{cfg.label}</Badge>
+                          </div>
                         </div>
                       );
                     })}
@@ -337,7 +342,12 @@ export default function AnunciantePortal() {
                             <TableCell className="text-right">{formatCurrency(q.totalValue)}</TableCell>
                             <TableCell>{formatDate(q.validUntil)}</TableCell>
                             <TableCell>
-                              <Badge className={cfg.color}>{cfg.label}</Badge>
+                              <div className="flex items-center gap-2">
+                                {q.isBonificada && (
+                                  <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30">Bonificada</Badge>
+                                )}
+                                <Badge className={cfg.color}>{cfg.label}</Badge>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );

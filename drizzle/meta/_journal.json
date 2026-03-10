@@ -15,6 +15,13 @@
       "when": 1772650217965,
       "tag": "0001_special_quentin_quire",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773160238562,
+      "tag": "0002_bouncy_wolfsbane",
+      "breakpoints": true
     }
   ]
 }

@@ -30,7 +30,20 @@ import {
   Layers,
   CheckCircle2,
   XCircle,
+  Trophy,
+  ShoppingBag,
+  Music,
 } from "lucide-react";
+
+const EVENT_INDICATORS = [
+  { pattern: "Black Friday", icon: ShoppingBag, color: "text-amber-400 bg-amber-500/15 border-amber-500/30", label: "Black Friday" },
+  { pattern: "Copa do Mundo", icon: Trophy, color: "text-yellow-400 bg-yellow-500/15 border-yellow-500/30", label: "Copa do Mundo" },
+  { pattern: "Festival de Parintins", icon: Music, color: "text-pink-400 bg-pink-500/15 border-pink-500/30", label: "Parintins" },
+];
+
+function getEventBadges(label: string) {
+  return EVENT_INDICATORS.filter(e => label.includes(e.pattern));
+}
 
 export default function BatchManagement() {
   const currentYear = new Date().getFullYear();
@@ -89,7 +102,7 @@ export default function BatchManagement() {
   return (
     <PageContainer
       title="Batches de Veiculação"
-      description="Períodos de 4 semanas para campanhas — 13 batches por ano"
+      description="Períodos de 4 semanas para campanhas — 13 batches por ciclo (início em 15 de abril)"
       actions={
         <Button
           variant="outline"
@@ -114,7 +127,10 @@ export default function BatchManagement() {
         >
           <ChevronLeft className="w-4 h-4" />
         </Button>
-        <span className="text-lg font-bold font-mono w-16 text-center">{selectedYear}</span>
+        <div className="text-center">
+          <span className="text-lg font-bold font-mono whitespace-nowrap">Ciclo {selectedYear}</span>
+          <p className="text-[10px] text-muted-foreground">Abr {selectedYear} — Abr {selectedYear + 1}</p>
+        </div>
         <Button
           variant="ghost"
           size="icon"
@@ -139,6 +155,7 @@ export default function BatchManagement() {
             const end = new Date(batch.endDate + "T12:00:00");
             const startStr = start.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
             const endStr = end.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+            const events = getEventBadges(batch.label);
 
             return (
               <div
@@ -151,13 +168,22 @@ export default function BatchManagement() {
 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate">{batch.label}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <Calendar className="w-3 h-3 text-muted-foreground" />
                     <p className="text-xs text-muted-foreground">
                       {startStr} — {endStr}
                     </p>
                     <span className="text-xs text-muted-foreground/60">·</span>
                     <p className="text-xs text-muted-foreground">4 semanas</p>
+                    {events.map((event) => {
+                      const Icon = event.icon;
+                      return (
+                        <Badge key={event.pattern} variant="outline" className={`text-[10px] px-1.5 py-0 gap-1 ${event.color}`}>
+                          <Icon className="w-3 h-3" />
+                          {event.label}
+                        </Badge>
+                      );
+                    })}
                   </div>
                 </div>
 

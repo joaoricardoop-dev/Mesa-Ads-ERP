@@ -86,6 +86,7 @@ export const quotationRouter = router({
           status: quotations.status,
           lossReason: quotations.lossReason,
           createdBy: quotations.createdBy,
+          isBonificada: quotations.isBonificada,
           createdAt: quotations.createdAt,
           updatedAt: quotations.updatedAt,
           clientName: clients.name,
@@ -129,6 +130,7 @@ export const quotationRouter = router({
           status: quotations.status,
           lossReason: quotations.lossReason,
           createdBy: quotations.createdBy,
+          isBonificada: quotations.isBonificada,
           createdAt: quotations.createdAt,
           updatedAt: quotations.updatedAt,
           clientName: clients.name,
@@ -163,6 +165,7 @@ export const quotationRouter = router({
       notes: z.string().optional(),
       validUntil: z.string().optional(),
       createdBy: z.string().optional(),
+      isBonificada: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -202,6 +205,7 @@ export const quotationRouter = router({
         notes: input.notes,
         validUntil: input.validUntil,
         createdBy: input.createdBy,
+        isBonificada: input.isBonificada ?? false,
       }).returning();
 
       return created;
@@ -223,6 +227,7 @@ export const quotationRouter = router({
       validUntil: z.string().optional(),
       status: z.enum(["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]).optional(),
       lossReason: z.string().optional(),
+      isBonificada: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -297,6 +302,7 @@ export const quotationRouter = router({
         batchSize: quotation[0].coasterVolume,
         batchCost: "1200.00",
         notes: quotation[0].notes,
+        isBonificada: quotation[0].isBonificada,
       }).returning();
 
       await db.insert(campaignHistory).values({
@@ -357,6 +363,7 @@ export const quotationRouter = router({
         notes: original[0].notes ? `[Cópia] ${original[0].notes}` : `[Cópia de ${original[0].quotationNumber}]`,
         validUntil: original[0].validUntil,
         createdBy: original[0].createdBy,
+        isBonificada: original[0].isBonificada,
         status: "rascunho",
       }).returning();
 
@@ -549,6 +556,7 @@ export const quotationRouter = router({
         batchSize: quotation[0].coasterVolume,
         batchCost: "1200.00",
         notes: quotation[0].notes,
+        isBonificada: quotation[0].isBonificada,
       }).returning();
 
       await db.insert(campaignBatchAssignments).values(

@@ -11,30 +11,107 @@ async function getDatabase() {
   return d;
 }
 
-function getFirstMondayOfYear(year: number): Date {
-  const jan1 = new Date(year, 0, 1);
-  const dayOfWeek = jan1.getDay();
-  const daysToMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
-  const firstMonday = new Date(year, 0, 1 + daysToMonday);
-  return firstMonday;
+function getCycleStart(year: number): Date {
+  return new Date(year, 3, 15);
+}
+
+interface EventWindow {
+  name: string;
+  emoji: string;
+  getDateRange: (year: number) => { start: Date; end: Date } | null;
+}
+
+function getLastFridayOfNovember(year: number): Date {
+  const lastDay = new Date(year, 10, 30);
+  while (lastDay.getDay() !== 5) {
+    lastDay.setDate(lastDay.getDate() - 1);
+  }
+  return lastDay;
+}
+
+const EVENTS: EventWindow[] = [
+  {
+    name: "Black Friday",
+    emoji: "🛍️",
+    getDateRange: (year: number) => {
+      const bf = getLastFridayOfNovember(year);
+      const start = new Date(bf);
+      start.setDate(bf.getDate() - 7);
+      const end = new Date(bf);
+      end.setDate(bf.getDate() + 2);
+      return { start, end };
+    },
+  },
+  {
+    name: "Copa do Mundo",
+    emoji: "🏆",
+    getDateRange: (year: number) => {
+      const copaYears: Record<number, { start: Date; end: Date }> = {
+        2026: { start: new Date(2026, 5, 11), end: new Date(2026, 6, 19) },
+        2030: { start: new Date(2030, 5, 1), end: new Date(2030, 6, 15) },
+        2034: { start: new Date(2034, 5, 1), end: new Date(2034, 6, 15) },
+      };
+      return copaYears[year] || null;
+    },
+  },
+  {
+    name: "Festival de Parintins",
+    emoji: "🎭",
+    getDateRange: (year: number) => {
+      return {
+        start: new Date(year, 5, 24),
+        end: new Date(year, 5, 29),
+      };
+    },
+  },
+];
+
+function dateRangesOverlap(
+  aStart: Date, aEnd: Date,
+  bStart: Date, bEnd: Date
+): boolean {
+  return aStart <= bEnd && bStart <= aEnd;
+}
+
+function getEventLabels(startDate: Date, endDate: Date): string[] {
+  const labels: string[] = [];
+  const yearsToCheck = new Set([startDate.getFullYear(), endDate.getFullYear()]);
+  for (const year of yearsToCheck) {
+    for (const event of EVENTS) {
+      const range = event.getDateRange(year);
+      if (range && dateRangesOverlap(startDate, endDate, range.start, range.end)) {
+        labels.push(`${event.emoji} ${event.name}`);
+      }
+    }
+  }
+  return labels;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function generateBatchesForYear(year: number) {
-  const firstMonday = getFirstMondayOfYear(year);
+  const cycleStart = getCycleStart(year);
   const batches = [];
 
   for (let i = 0; i < 13; i++) {
-    const startDate = new Date(firstMonday);
-    startDate.setDate(firstMonday.getDate() + i * 28);
+    const startDate = new Date(cycleStart);
+    startDate.setDate(cycleStart.getDate() + i * 28);
 
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 27);
 
     const startMonth = startDate.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
     const endMonth = endDate.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
-    const label = startMonth === endMonth
-      ? `Batch ${i + 1} — ${startMonth.charAt(0).toUpperCase() + startMonth.slice(1)}`
-      : `Batch ${i + 1} — ${startMonth.charAt(0).toUpperCase() + startMonth.slice(1)}/${endMonth.charAt(0).toUpperCase() + endMonth.slice(1)}`;
+    let label = startMonth === endMonth
+      ? `Batch ${i + 1} — ${capitalize(startMonth)}`
+      : `Batch ${i + 1} — ${capitalize(startMonth)}/${capitalize(endMonth)}`;
+
+    const eventLabels = getEventLabels(startDate, endDate);
+    if (eventLabels.length > 0) {
+      label += ` | ${eventLabels.join(" | ")}`;
+    }
 
     batches.push({
       year,

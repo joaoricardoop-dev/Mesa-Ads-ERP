@@ -160,6 +160,7 @@ export async function listCampaigns() {
       batchSize: campaigns.batchSize,
       batchCost: campaigns.batchCost,
       budgetId: campaigns.budgetId,
+      isBonificada: campaigns.isBonificada,
       createdAt: campaigns.createdAt,
       updatedAt: campaigns.updatedAt,
       clientName: clients.name,
@@ -322,6 +323,7 @@ export async function getMonthlyEconomics(year: number, month: number) {
       taxRate: campaigns.taxRate,
       batchSize: campaigns.batchSize,
       batchCost: campaigns.batchCost,
+      isBonificada: campaigns.isBonificada,
       clientName: clients.name,
       clientCompany: clients.company,
     })
@@ -338,6 +340,7 @@ export async function getMonthlyEconomics(year: number, month: number) {
   let totalProfit = 0;
 
   for (const campaign of activeCampaigns) {
+    if (campaign.isBonificada) continue;
     const campRestaurants = await db
       .select({
         restaurantId: campaignRestaurants.restaurantId,
@@ -760,6 +763,7 @@ export async function getRestaurantCampaigns(restaurantId: number) {
       batchCost: campaigns.batchCost,
       daysPerMonth: campaigns.daysPerMonth,
       activeRestaurants: campaigns.activeRestaurants,
+      isBonificada: campaigns.isBonificada,
     })
     .from(campaignRestaurants)
     .leftJoin(campaigns, eq(campaigns.id, campaignRestaurants.campaignId))

@@ -1006,6 +1006,7 @@ export const appRouter = router({
           batchSize: z.number().int().default(10000),
           batchCost: z.string().default("1200.00"),
           budgetId: z.number().nullable().optional(),
+          isBonificada: z.boolean().optional(),
         })
       )
       .mutation(({ input }) => createCampaign(input)),
@@ -1036,6 +1037,7 @@ export const appRouter = router({
           batchSize: z.number().int().optional(),
           batchCost: z.string().optional(),
           budgetId: z.number().nullable().optional(),
+          isBonificada: z.boolean().optional(),
         })
       )
       .mutation(({ input }) => {
@@ -1661,6 +1663,7 @@ export const appRouter = router({
         totalValue: quotations.totalValue,
         status: quotations.status,
         validUntil: quotations.validUntil,
+        isBonificada: quotations.isBonificada,
         createdAt: quotations.createdAt,
       }).from(quotations).where(eq(quotations.clientId, user.clientId)).orderBy(desc(quotations.createdAt));
       return results;

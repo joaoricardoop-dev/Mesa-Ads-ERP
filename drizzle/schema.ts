@@ -138,6 +138,7 @@ export const campaigns = pgTable("campaigns", {
   budgetId: integer("budgetId").references(() => budgets.id, { onDelete: "set null" }),
   productionCost: decimal("productionCost", { precision: 12, scale: 2 }),
   freightCost: decimal("freightCost", { precision: 12, scale: 2 }),
+  isBonificada: boolean("isBonificada").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -384,6 +385,7 @@ export const quotations = pgTable("quotations", {
   signedAt: timestamp("signedAt"),
   signedBy: varchar("signedBy", { length: 255 }),
   signatureData: text("signatureData"),
+  isBonificada: boolean("isBonificada").default(false).notNull(),
   createdBy: varchar("createdBy", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

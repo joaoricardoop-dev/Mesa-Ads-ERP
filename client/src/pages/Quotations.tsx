@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -153,6 +154,7 @@ interface QuotationForm {
   includesProduction: boolean;
   notes: string;
   validUntil: string;
+  isBonificada: boolean;
 }
 
 const emptyForm: QuotationForm = {
@@ -167,6 +169,7 @@ const emptyForm: QuotationForm = {
   includesProduction: true,
   notes: "",
   validUntil: "",
+  isBonificada: false,
 };
 
 const STATUS_CONFIG: Record<QuotationStatus, { label: string; className: string }> = {
@@ -295,11 +298,12 @@ export default function Quotations() {
       networkProfile: form.networkProfile || undefined,
       regions: form.regions || undefined,
       cycles: form.cycles || undefined,
-      unitPrice: form.unitPrice || undefined,
-      totalValue: form.totalValue || undefined,
+      unitPrice: form.isBonificada ? "0.0000" : (form.unitPrice || undefined),
+      totalValue: form.isBonificada ? "0.00" : (form.totalValue || undefined),
       includesProduction: form.includesProduction,
       notes: form.notes || undefined,
       validUntil: form.validUntil || undefined,
+      isBonificada: form.isBonificada,
     };
 
     if (editingId) {
@@ -321,6 +325,7 @@ export default function Quotations() {
       includesProduction: q.includesProduction ?? true,
       notes: q.notes || "",
       validUntil: q.validUntil || "",
+      isBonificada: q.isBonificada ?? false,
     });
     setIsDialogOpen(true);
   };
@@ -514,9 +519,16 @@ export default function Quotations() {
                     )}
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant="outline" className={STATUS_CONFIG[q.status as QuotationStatus]?.className || ""}>
-                      {STATUS_CONFIG[q.status as QuotationStatus]?.label || q.status}
-                    </Badge>
+                    <div className="flex flex-col items-center gap-1">
+                      <Badge variant="outline" className={STATUS_CONFIG[q.status as QuotationStatus]?.className || ""}>
+                        {STATUS_CONFIG[q.status as QuotationStatus]?.label || q.status}
+                      </Badge>
+                      {q.isBonificada && (
+                        <Badge variant="outline" className="bg-amber-500/20 text-amber-500 border-amber-500/30 text-[9px]">
+                          Bonificada
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -732,23 +744,46 @@ export default function Quotations() {
             </div>
 
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Valores</p>
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+              <Switch
+                id="bonificada-toggle"
+                checked={form.isBonificada}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setForm({ ...form, isBonificada: true, unitPrice: "0.0000", totalValue: "0.00" });
+                  } else {
+                    setForm({ ...form, isBonificada: false });
+                  }
+                }}
+              />
+              <Label htmlFor="bonificada-toggle" className="cursor-pointer text-sm font-medium text-amber-500">
+                Bonificação
+              </Label>
+              {form.isBonificada && (
+                <Badge variant="outline" className="bg-amber-500/20 text-amber-500 border-amber-500/30 text-[10px] ml-auto">
+                  Bonificada
+                </Badge>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Preço Unitário (R$)</Label>
                 <Input
-                  value={form.unitPrice}
+                  value={form.isBonificada ? "0.0000" : form.unitPrice}
                   onChange={(e) => setForm({ ...form, unitPrice: e.target.value })}
                   placeholder="0.0000"
                   className="bg-background border-border/30"
+                  disabled={form.isBonificada}
                 />
               </div>
               <div className="grid gap-2">
                 <Label>Valor Total (R$)</Label>
                 <Input
-                  value={form.totalValue}
+                  value={form.isBonificada ? "0.00" : form.totalValue}
                   onChange={(e) => setForm({ ...form, totalValue: e.target.value })}
                   placeholder="0.00"
                   className="bg-background border-border/30"
+                  disabled={form.isBonificada}
                 />
               </div>
             </div>

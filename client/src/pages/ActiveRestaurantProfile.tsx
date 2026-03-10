@@ -550,6 +550,9 @@ export default function ActiveRestaurantProfile() {
                             <p className="text-[10px] text-muted-foreground">{c.clientName}</p>
                           </div>
                           <div className="flex items-center gap-3">
+                            {(c as any).isBonificada && (
+                              <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-[10px]">Bonificada</Badge>
+                            )}
                             <span className="text-xs font-mono text-primary">{formatCurrency(rev.restComm)}/mês</span>
                             <Badge variant="outline" className={STATUS_COLORS[c.status || ""] || ""}>{STATUS_LABELS[c.status || ""] || c.status}</Badge>
                           </div>
@@ -741,6 +744,9 @@ export default function ActiveRestaurantProfile() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <h3 className="font-semibold text-sm truncate">{c.campaignName}</h3>
+                              {(c as any).isBonificada && (
+                                <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30">Bonificada</Badge>
+                              )}
                               <Badge variant="outline" className={STATUS_COLORS[c.status || ""] || ""}>{STATUS_LABELS[c.status || ""] || c.status}</Badge>
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">

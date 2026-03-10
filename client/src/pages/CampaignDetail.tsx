@@ -62,6 +62,7 @@ import {
   Camera,
   Image,
   ArrowRight,
+  Gift,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -518,6 +519,11 @@ export default function CampaignDetail() {
                   {(campaign as any).campaignNumber && (
                     <Badge variant="outline" className="font-mono text-[10px]">{(campaign as any).campaignNumber}</Badge>
                   )}
+                  {(campaign as any).isBonificada && (
+                    <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/30 gap-1">
+                      <Gift className="w-3 h-3" /> Bonificada
+                    </Badge>
+                  )}
                   <Badge variant="outline" className={STATUS_COLORS[campaign.status] || ""}>
                     {STATUS_LABELS[campaign.status] || campaign.status}
                   </Badge>
@@ -827,6 +833,12 @@ export default function CampaignDetail() {
 
             {/* ─── PAINEL (Dashboard) ─── */}
             <TabsContent value="resumo" className="space-y-4">
+              {(campaign as any).isBonificada && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
+                  <Gift className="w-4 h-4 shrink-0" />
+                  <span className="font-medium">Campanha Bonificada — sem geração de receita</span>
+                </div>
+              )}
               {restaurantsMissing > 0 && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-xs">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -958,6 +970,15 @@ export default function CampaignDetail() {
 
             {/* ─── FINANCEIRO ─── */}
             <TabsContent value="financeiro" className="space-y-4">
+              {(campaign as any).isBonificada && (
+                <div className="flex items-center gap-2 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm">
+                  <Gift className="w-5 h-5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Campanha Bonificada</p>
+                    <p className="text-xs text-amber-400/70">Esta campanha é oferecida como bonificação. Valores financeiros não geram receita.</p>
+                  </div>
+                </div>
+              )}
               <div className="bg-card border border-border/30 rounded-lg p-5">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Parâmetros Financeiros da Campanha</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">

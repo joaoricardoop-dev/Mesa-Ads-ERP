@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -100,6 +101,7 @@ export default function QuotationDetail() {
     includesProduction: true,
     notes: "",
     validUntil: "",
+    isBonificada: false,
   });
 
   const utils = trpc.useUtils();
@@ -164,6 +166,7 @@ export default function QuotationDetail() {
       includesProduction: quotation.includesProduction ?? true,
       notes: quotation.notes || "",
       validUntil: quotation.validUntil || "",
+      isBonificada: quotation.isBonificada ?? false,
     });
     setEditOpen(true);
   };
@@ -178,11 +181,12 @@ export default function QuotationDetail() {
       networkProfile: editForm.networkProfile || undefined,
       regions: editForm.regions || undefined,
       cycles: editForm.cycles || undefined,
-      unitPrice: editForm.unitPrice || undefined,
-      totalValue: editForm.totalValue || undefined,
+      unitPrice: editForm.isBonificada ? "0.0000" : (editForm.unitPrice || undefined),
+      totalValue: editForm.isBonificada ? "0.00" : (editForm.totalValue || undefined),
       includesProduction: editForm.includesProduction,
       notes: editForm.notes || undefined,
       validUntil: editForm.validUntil || undefined,
+      isBonificada: editForm.isBonificada,
     });
   };
 
@@ -227,6 +231,11 @@ export default function QuotationDetail() {
                   <Badge variant="outline" className={STATUS_CONFIG[status]?.className || ""}>
                     {STATUS_CONFIG[status]?.label || status}
                   </Badge>
+                  {quotation.isBonificada && (
+                    <Badge variant="outline" className="bg-amber-500/20 text-amber-500 border-amber-500/30">
+                      Bonificada
+                    </Badge>
+                  )}
                 </div>
                 {quotation.quotationName && (
                   <p className="text-xs text-muted-foreground mt-0.5">{quotation.quotationName}</p>
@@ -652,14 +661,35 @@ export default function QuotationDetail() {
                 <Input value={editForm.networkProfile} onChange={(e) => setEditForm({ ...editForm, networkProfile: e.target.value })} placeholder="Ex: Top 50" className="bg-background border-border/30" />
               </div>
             </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+              <Switch
+                id="detail-bonificada-toggle"
+                checked={editForm.isBonificada}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setEditForm({ ...editForm, isBonificada: true, unitPrice: "0.0000", totalValue: "0.00" });
+                  } else {
+                    setEditForm({ ...editForm, isBonificada: false });
+                  }
+                }}
+              />
+              <Label htmlFor="detail-bonificada-toggle" className="cursor-pointer text-sm font-medium text-amber-500">
+                Bonificação
+              </Label>
+              {editForm.isBonificada && (
+                <Badge variant="outline" className="bg-amber-500/20 text-amber-500 border-amber-500/30 text-[10px] ml-auto">
+                  Bonificada
+                </Badge>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Preço Unitário (R$)</Label>
-                <Input value={editForm.unitPrice} onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })} placeholder="0.0000" className="bg-background border-border/30" />
+                <Input value={editForm.isBonificada ? "0.0000" : editForm.unitPrice} onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })} placeholder="0.0000" className="bg-background border-border/30" disabled={editForm.isBonificada} />
               </div>
               <div className="grid gap-2">
                 <Label>Valor Total (R$)</Label>
-                <Input value={editForm.totalValue} onChange={(e) => setEditForm({ ...editForm, totalValue: e.target.value })} placeholder="0.00" className="bg-background border-border/30" />
+                <Input value={editForm.isBonificada ? "0.00" : editForm.totalValue} onChange={(e) => setEditForm({ ...editForm, totalValue: e.target.value })} placeholder="0.00" className="bg-background border-border/30" disabled={editForm.isBonificada} />
               </div>
             </div>
             <div className="grid gap-2">

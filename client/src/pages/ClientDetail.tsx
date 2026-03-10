@@ -160,6 +160,11 @@ export default function ClientDetail() {
     [invoicesData]
   );
 
+  const bonificadaCampaignIds = useMemo(() =>
+    new Set(campaigns.filter((c: any) => c.isBonificada).map((c: any) => c.id)),
+    [campaigns]
+  );
+
   const pendingInvoices = useMemo(() =>
     invoicesData.filter((i: any) => i.status === "pending" || i.status === "overdue"),
     [invoicesData]
@@ -279,6 +284,10 @@ export default function ClientDetail() {
                   <span className="text-xs text-muted-foreground">Ordens de Serviço</span>
                   <span className="font-semibold">{serviceOrdersData.length}</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">Campanhas Bonificadas</span>
+                  <span className="font-semibold text-amber-400">{campaigns.filter((c: any) => c.isBonificada).length}</span>
+                </div>
               </div>
             </div>
 
@@ -338,7 +347,12 @@ export default function ClientDetail() {
                           <p className="text-xs text-muted-foreground">{c.campaignNumber}</p>
                         </div>
                       </div>
-                      <Badge className={cfg.color}>{cfg.label}</Badge>
+                      <div className="flex items-center gap-2">
+                        {c.isBonificada && (
+                          <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30">Bonificada</Badge>
+                        )}
+                        <Badge className={cfg.color}>{cfg.label}</Badge>
+                      </div>
                     </div>
                   );
                 })}
@@ -418,6 +432,9 @@ export default function ClientDetail() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
+                        {c.isBonificada && (
+                          <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30">Bonificada</Badge>
+                        )}
                         {c.totalValue && (
                           <span className="text-sm font-semibold">{formatCurrency(Number(c.totalValue))}</span>
                         )}
@@ -463,6 +480,9 @@ export default function ClientDetail() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
+                        {q.isBonificada && (
+                          <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30">Bonificada</Badge>
+                        )}
                         {q.totalValue && (
                           <span className="text-sm font-semibold">{formatCurrency(Number(q.totalValue))}</span>
                         )}
