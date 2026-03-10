@@ -1664,9 +1664,55 @@ export const appRouter = router({
         status: quotations.status,
         validUntil: quotations.validUntil,
         isBonificada: quotations.isBonificada,
+        publicToken: quotations.publicToken,
+        signedAt: quotations.signedAt,
         createdAt: quotations.createdAt,
       }).from(quotations).where(eq(quotations.clientId, user.clientId)).orderBy(desc(quotations.createdAt));
       return results;
+    }),
+
+    myServiceOrders: anuncianteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.clientId) return [];
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return [];
+      const { serviceOrders, quotations, quotationRestaurants, restaurants } = await import("../drizzle/schema");
+      const { eq, desc } = await import("drizzle-orm");
+      const results = await db.select({
+        id: serviceOrders.id,
+        orderNumber: serviceOrders.orderNumber,
+        description: serviceOrders.description,
+        periodStart: serviceOrders.periodStart,
+        periodEnd: serviceOrders.periodEnd,
+        totalValue: serviceOrders.totalValue,
+        status: serviceOrders.status,
+        signedByName: serviceOrders.signedByName,
+        signedByCpf: serviceOrders.signedByCpf,
+        signedAt: serviceOrders.signedAt,
+        signatureHash: serviceOrders.signatureHash,
+        quotationId: serviceOrders.quotationId,
+        coasterVolume: serviceOrders.coasterVolume,
+        batchSelectionJson: serviceOrders.batchSelectionJson,
+        quotationPublicToken: quotations.publicToken,
+        quotationNumber: quotations.quotationNumber,
+        quotationName: quotations.quotationName,
+      }).from(serviceOrders)
+        .leftJoin(quotations, eq(serviceOrders.quotationId, quotations.id))
+        .where(eq(serviceOrders.clientId, user.clientId))
+        .orderBy(desc(serviceOrders.createdAt));
+
+      const enriched = await Promise.all(results.map(async (os) => {
+        if (!os.quotationId) return { ...os, restaurantNames: [] as string[] };
+        const allocs = await db.select({
+          name: restaurants.name,
+        }).from(quotationRestaurants)
+          .innerJoin(restaurants, eq(quotationRestaurants.restaurantId, restaurants.id))
+          .where(eq(quotationRestaurants.quotationId, os.quotationId));
+        return { ...os, restaurantNames: allocs.map(a => a.name) };
+      }));
+
+      return enriched;
     }),
 
     myInvoices: anuncianteProcedure.query(async ({ ctx }) => {

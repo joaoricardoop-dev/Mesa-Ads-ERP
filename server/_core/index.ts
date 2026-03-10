@@ -9,6 +9,7 @@ import { serveStatic, setupVite } from "./vite";
 import { setupClerkAuth } from "../replit_integrations/auth";
 import { clerkWebhookHandler } from "../clerkWebhook";
 import { setupRestaurantOnboardingRoutes } from "../restaurantOnboardingRouter";
+import { setupPublicSigningRoutes } from "../publicSigningRouter";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -41,6 +42,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   setupRestaurantOnboardingRoutes(app);
+  setupPublicSigningRoutes(app);
 
   setupClerkAuth(app);
 

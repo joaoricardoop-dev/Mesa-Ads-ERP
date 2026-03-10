@@ -41,6 +41,7 @@ import RestaurantOnboarding from "./pages/RestaurantOnboarding";
 import RestaurantInviteAccept from "./pages/RestaurantInviteAccept";
 import Onboarding from "./pages/Onboarding";
 import TermTemplates from "./pages/TermTemplates";
+import QuotationSign from "./pages/QuotationSign";
 
 function AnuncianteRouter() {
   return (
@@ -351,6 +352,7 @@ function App() {
           <Switch>
             <Route path="/parceiro/convite/:token" component={RestaurantInviteAccept} />
             <Route path="/parceiro" component={RestaurantOnboarding} />
+            <Route path="/cotacao/assinar/:token" component={QuotationSign} />
             <Route>{() => <AuthenticatedApp />}</Route>
           </Switch>
         </TooltipProvider>

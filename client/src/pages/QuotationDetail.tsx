@@ -56,6 +56,7 @@ import {
   Package,
   DollarSign,
   Clock,
+  Link2,
 } from "lucide-react";
 
 type QuotationStatus = "rascunho" | "enviada" | "ativa" | "os_gerada" | "win" | "perdida" | "expirada";
@@ -86,6 +87,9 @@ export default function QuotationDetail() {
   const [osBatchIds, setOsBatchIds] = useState<number[]>([]);
   const [signDialogOpen, setSignDialogOpen] = useState(false);
   const [signForm, setSignForm] = useState({ batchIds: [] as number[], signatureUrl: "" });
+  const [signingLinkDialogOpen, setSigningLinkDialogOpen] = useState(false);
+  const [signingLinkBatchIds, setSigningLinkBatchIds] = useState<number[]>([]);
+  const [generatedSigningUrl, setGeneratedSigningUrl] = useState("");
   const [restaurantAllocations, setRestaurantAllocations] = useState<Array<{ restaurantId: number; coasterQuantity: number }>>([]);
   const [addRestaurantId, setAddRestaurantId] = useState<string>("");
 
@@ -144,6 +148,11 @@ export default function QuotationDetail() {
 
   const signOSMutation = trpc.quotation.signOS.useMutation({
     onSuccess: (data) => { utils.quotation.get.invalidate({ id: quotationId }); utils.quotation.list.invalidate(); setSignDialogOpen(false); toast.success(`OS assinada! Campanha ${data.campaignNumber} criada.`); },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const generateSigningLinkMutation = trpc.quotation.generateSigningLink.useMutation({
+    onSuccess: (data) => { utils.quotation.get.invalidate({ id: quotationId }); setGeneratedSigningUrl(data.signingUrl); toast.success("Link de assinatura gerado!"); },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
@@ -558,7 +567,36 @@ export default function QuotationDetail() {
                     </div>
                   </div>
 
+                  {quotation.publicToken && (
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+                      <Link2 className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-medium text-emerald-400 flex-1">Link de assinatura ativo</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1 text-xs"
+                        onClick={() => {
+                          const baseUrl = window.location.origin;
+                          const url = `${baseUrl}/cotacao/assinar/${quotation.publicToken}`;
+                          navigator.clipboard.writeText(url);
+                          toast.success("Link copiado!");
+                        }}
+                      >
+                        <Copy className="w-3 h-3" /> Copiar Link
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="flex justify-end gap-2 pt-2 border-t border-border/20">
+                    <Button
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => { setSigningLinkBatchIds([]); setGeneratedSigningUrl(""); setSigningLinkDialogOpen(true); }}
+                      disabled={allocatedRestaurants.length === 0}
+                    >
+                      <Send className="w-4 h-4" />
+                      Enviar para Assinatura
+                    </Button>
                     <Button
                       className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
                       onClick={() => { setSignForm({ batchIds: [], signatureUrl: "" }); setSignDialogOpen(true); }}
@@ -851,6 +889,86 @@ export default function QuotationDetail() {
             >
               {signOSMutation.isPending ? "Assinando..." : "Assinar e Criar Campanha"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={signingLinkDialogOpen} onOpenChange={setSigningLinkDialogOpen}>
+        <DialogContent className="sm:max-w-lg bg-card border-border/30">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="w-4 h-4" /> Enviar para Assinatura
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Selecione os Batches *</Label>
+              <div className="border border-border/30 rounded-lg max-h-48 overflow-y-auto bg-background">
+                {batchesList.map((batch: any) => (
+                  <label
+                    key={batch.id}
+                    className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30 cursor-pointer border-b border-border/10 last:border-b-0"
+                  >
+                    <Checkbox
+                      checked={signingLinkBatchIds.includes(batch.id)}
+                      onCheckedChange={(checked) => {
+                        setSigningLinkBatchIds(prev =>
+                          checked
+                            ? [...prev, batch.id].sort((a, b) => a - b)
+                            : prev.filter(id => id !== batch.id)
+                        );
+                      }}
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium">{batch.label}</span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {new Date(batch.startDate + "T00:00:00").toLocaleDateString("pt-BR")} — {new Date(batch.endDate + "T00:00:00").toLocaleDateString("pt-BR")}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {signingLinkBatchIds.length > 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  {signingLinkBatchIds.length} batch(es) selecionado(s)
+                </p>
+              )}
+            </div>
+            {generatedSigningUrl && (
+              <div className="grid gap-2">
+                <Label>Link de Assinatura</Label>
+                <div className="flex items-center gap-2">
+                  <Input value={generatedSigningUrl} readOnly className="bg-background border-border/30 text-xs" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedSigningUrl);
+                      toast.success("Link copiado!");
+                    }}
+                  >
+                    <Copy className="w-3.5 h-3.5" /> Copiar Link
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSigningLinkDialogOpen(false)}>Fechar</Button>
+            {!generatedSigningUrl && (
+              <Button
+                onClick={() => {
+                  if (signingLinkBatchIds.length === 0) { toast.error("Selecione pelo menos um batch"); return; }
+                  generateSigningLinkMutation.mutate({ quotationId, batchIds: signingLinkBatchIds });
+                }}
+                disabled={generateSigningLinkMutation.isPending || signingLinkBatchIds.length === 0}
+                className="gap-1.5"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                {generateSigningLinkMutation.isPending ? "Gerando..." : "Gerar Link"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments } from "../drizzle/schema";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import crypto from "crypto";
 
 const MONTH_NAMES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -133,6 +134,8 @@ export const quotationRouter = router({
           isBonificada: quotations.isBonificada,
           createdAt: quotations.createdAt,
           updatedAt: quotations.updatedAt,
+          publicToken: quotations.publicToken,
+          signedAt: quotations.signedAt,
           clientName: clients.name,
           clientCompany: clients.company,
           clientCnpj: clients.cnpj,
@@ -473,6 +476,47 @@ export const quotationRouter = router({
         );
       }
       return { success: true, count: input.restaurants.length };
+    }),
+
+  generateSigningLink: comercialProcedure
+    .input(z.object({
+      quotationId: z.number(),
+      batchIds: z.array(z.number()).min(1),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const quotation = await db.select().from(quotations).where(eq(quotations.id, input.quotationId)).limit(1);
+      if (!quotation[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
+      if (quotation[0].status !== "os_gerada") throw new TRPCError({ code: "BAD_REQUEST", message: "Cotação precisa estar com OS gerada" });
+
+      const allocatedRestaurants = await db.select().from(quotationRestaurants).where(eq(quotationRestaurants.quotationId, input.quotationId));
+      if (allocatedRestaurants.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "É necessário alocar restaurantes antes de enviar para assinatura" });
+
+      const batchRecords = await db.select().from(campaignBatches).where(inArray(campaignBatches.id, input.batchIds)).orderBy(asc(campaignBatches.startDate));
+      if (batchRecords.length !== input.batchIds.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Um ou mais batches não encontrados" });
+
+      const token = crypto.randomBytes(32).toString("hex");
+      await db.update(quotations).set({ publicToken: token, updatedAt: new Date() }).where(eq(quotations.id, input.quotationId));
+
+      const os = await db.select().from(serviceOrders).where(eq(serviceOrders.quotationId, input.quotationId)).limit(1);
+      if (os[0]) {
+        await db.update(serviceOrders).set({
+          batchSelectionJson: JSON.stringify(input.batchIds),
+          periodStart: batchRecords[0].startDate,
+          periodEnd: batchRecords[batchRecords.length - 1].endDate,
+          status: "enviada",
+          updatedAt: new Date(),
+        }).where(eq(serviceOrders.id, os[0].id));
+      }
+
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DOMAINS
+          ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+          : "";
+      const signingUrl = `${baseUrl}/cotacao/assinar/${token}`;
+
+      return { token, signingUrl, quotationId: input.quotationId };
     }),
 
   signOS: comercialProcedure

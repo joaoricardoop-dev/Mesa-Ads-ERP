@@ -44,7 +44,10 @@ import {
   Play,
   Radio,
   Archive,
+  FileSignature,
+  Download,
 } from "lucide-react";
+import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
 
 const campaignStatusConfig: Record<string, { label: string; color: string; icon: typeof CircleDot }> = {
   draft: { label: "Rascunho", color: "bg-gray-500/10 text-gray-500", icon: CircleDot },
@@ -67,6 +70,14 @@ const quotationStatusConfig: Record<string, { label: string; color: string }> = 
   win: { label: "Aprovada", color: "bg-emerald-500/10 text-emerald-700" },
   perdida: { label: "Perdida", color: "bg-red-500/10 text-red-500" },
   expirada: { label: "Expirada", color: "bg-gray-500/10 text-gray-400" },
+};
+
+const osStatusConfig: Record<string, { label: string; color: string }> = {
+  rascunho: { label: "Rascunho", color: "bg-gray-500/10 text-gray-500" },
+  enviada: { label: "Aguardando Assinatura", color: "bg-blue-500/10 text-blue-500" },
+  assinada: { label: "Assinada", color: "bg-emerald-500/10 text-emerald-500" },
+  execucao: { label: "Em Execução", color: "bg-orange-500/10 text-orange-500" },
+  concluida: { label: "Concluída", color: "bg-emerald-500/10 text-emerald-700" },
 };
 
 const invoiceStatusConfig: Record<string, { label: string; color: string }> = {
@@ -92,6 +103,7 @@ export default function AnunciantePortal() {
   const { data: profile, isLoading: profileLoading } = trpc.portal.myProfile.useQuery();
   const { data: campaigns = [] } = trpc.portal.myCampaigns.useQuery();
   const { data: quotations = [] } = trpc.portal.myQuotations.useQuery();
+  const { data: serviceOrders = [] } = trpc.portal.myServiceOrders.useQuery();
   const { data: invoices = [] } = trpc.portal.myInvoices.useQuery();
 
   const [editOpen, setEditOpen] = useState(false);
@@ -135,6 +147,7 @@ export default function AnunciantePortal() {
   };
 
   const activeCampaigns = campaigns.filter((c: any) => ["veiculacao", "active", "executar", "producao", "transito"].includes(c.status));
+  const signedOsCount = serviceOrders.filter((os: any) => ["assinada", "execucao", "concluida"].includes(os.status)).length;
   const totalInvoiced = invoices
     .filter((i: any) => i.status !== "cancelada")
     .reduce((sum: number, i: any) => sum + (parseFloat(i.amount) || 0), 0);
@@ -180,7 +193,7 @@ export default function AnunciantePortal() {
           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
@@ -226,6 +239,20 @@ export default function AnunciantePortal() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  <FileSignature className="w-5 h-5 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{serviceOrders.length}</p>
+                  <p className="text-xs text-muted-foreground">OS ({signedOsCount} assinadas)</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-amber-500/10">
                   <Receipt className="w-5 h-5 text-amber-500" />
                 </div>
@@ -239,7 +266,7 @@ export default function AnunciantePortal() {
         </div>
 
         <Tabs defaultValue="campaigns" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="campaigns" className="gap-1.5">
               <Megaphone className="w-4 h-4" />
               Campanhas
@@ -247,6 +274,10 @@ export default function AnunciantePortal() {
             <TabsTrigger value="quotations" className="gap-1.5">
               <FileText className="w-4 h-4" />
               Cotações
+            </TabsTrigger>
+            <TabsTrigger value="os" className="gap-1.5">
+              <FileSignature className="w-4 h-4" />
+              Ordens de Serviço
             </TabsTrigger>
             <TabsTrigger value="invoices" className="gap-1.5">
               <Receipt className="w-4 h-4" />
@@ -347,6 +378,102 @@ export default function AnunciantePortal() {
                                   <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30">Bonificada</Badge>
                                 )}
                                 <Badge className={cfg.color}>{cfg.label}</Badge>
+                                {q.signedAt && (
+                                  <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30">Assinada</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="os" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Ordens de Serviço</CardTitle>
+                <CardDescription>Acompanhe suas ordens de serviço e assinaturas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {serviceOrders.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <FileSignature className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                    <p>Nenhuma ordem de serviço encontrada</p>
+                    <p className="text-sm mt-1">Suas OS aparecerão aqui assim que forem criadas</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nº OS</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Período</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {serviceOrders.map((os: any) => {
+                        const cfg = osStatusConfig[os.status] || osStatusConfig.rascunho;
+                        return (
+                          <TableRow key={os.id}>
+                            <TableCell className="font-mono text-sm">{os.orderNumber}</TableCell>
+                            <TableCell>{os.description || "—"}</TableCell>
+                            <TableCell>
+                              {formatDate(os.periodStart)} — {formatDate(os.periodEnd)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(os.totalValue)}</TableCell>
+                            <TableCell>
+                              <Badge className={cfg.color}>{cfg.label}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {os.status === "enviada" && os.quotationPublicToken && (
+                                  <a href={`/cotacao/assinar/${os.quotationPublicToken}`}>
+                                    <Button size="sm" variant="default" className="gap-1.5">
+                                      <FileSignature className="w-3.5 h-3.5" />
+                                      Assinar
+                                    </Button>
+                                  </a>
+                                )}
+                                {os.signedAt && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">
+                                      Assinada em {formatDate(os.signedAt)}
+                                    </span>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="gap-1.5"
+                                      onClick={() => {
+                                        generateQuotationSignPdf({
+                                          orderNumber: os.orderNumber,
+                                          quotationNumber: os.quotationNumber || "",
+                                          quotationName: os.quotationName || os.description || "",
+                                          description: os.description || undefined,
+                                          totalValue: parseFloat(os.totalValue) || 0,
+                                          coasterVolume: os.coasterVolume || 0,
+                                          periodStart: os.periodStart || "",
+                                          periodEnd: os.periodEnd || "",
+                                          restaurants: (os as any).restaurantNames || [],
+                                          signerName: os.signedByName || "",
+                                          signerCpf: os.signedByCpf || "",
+                                          signedAt: new Date(os.signedAt).toISOString(),
+                                          signatureHash: os.signatureHash || undefined,
+                                        });
+                                      }}
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                      Baixar Contrato
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>

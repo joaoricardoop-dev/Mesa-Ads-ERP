@@ -478,6 +478,11 @@ export const serviceOrders = pgTable("service_orders", {
   artPdfUrl: text("artPdfUrl"),
   artImageUrls: text("artImageUrls"),
   signatureUrl: text("signatureUrl"),
+  batchSelectionJson: text("batchSelectionJson"),
+  signedByName: varchar("signedByName", { length: 255 }),
+  signedByCpf: varchar("signedByCpf", { length: 20 }),
+  signedAt: timestamp("signedAt"),
+  signatureHash: varchar("signatureHash", { length: 128 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
