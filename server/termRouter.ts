@@ -180,4 +180,38 @@ export const termRouter = router({
         .where(conditions.length > 0 ? (conditions.length === 1 ? conditions[0] : sql`${conditions[0]} AND ${conditions[1]}`) : undefined)
         .orderBy(desc(termAcceptances.acceptedAt));
     }),
+
+  fixOrphanedAcceptances: internalProcedure
+    .mutation(async () => {
+      const db = await getDatabase();
+      const { isNull } = await import("drizzle-orm");
+
+      const orphaned = await db
+        .select()
+        .from(termAcceptances)
+        .where(isNull(termAcceptances.termId));
+
+      if (orphaned.length === 0) return { fixed: 0 };
+
+      let fixed = 0;
+      for (const acc of orphaned) {
+        const termNumber = await generateTermNumber(db);
+        const [term] = await db.insert(restaurantTerms).values({
+          termNumber,
+          restaurantId: acc.restaurantId,
+          conditions: acc.termContent || "",
+          status: "assinado",
+          inviteEmail: acc.acceptedByEmail || undefined,
+        }).returning();
+
+        await db
+          .update(termAcceptances)
+          .set({ termId: term.id })
+          .where(eq(termAcceptances.id, acc.id));
+
+        fixed++;
+      }
+
+      return { fixed };
+    }),
 });

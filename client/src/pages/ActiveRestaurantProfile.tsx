@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
+import DOMPurify from "dompurify";
 
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -171,6 +172,7 @@ export default function ActiveRestaurantProfile() {
   const { data: payments = [] } = trpc.activeRestaurant.getPayments.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
   const { data: allRestaurants = [] } = trpc.activeRestaurant.list.useQuery();
   const { data: terms = [] } = trpc.term.list.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
+  const { data: termAcceptances = [] } = trpc.term.listAcceptances.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
   const { data: linkedUsers = [] } = trpc.activeRestaurant.getLinkedUsers.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
   const { data: availableUsers = [] } = trpc.activeRestaurant.listAvailableUsers.useQuery(undefined, { enabled: isLinkUserDialogOpen });
 
@@ -1011,6 +1013,54 @@ export default function ActiveRestaurantProfile() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {termAcceptances.length > 0 && (
+                <div className="mt-6">
+                  <div className="mb-3">
+                    <h3 className="text-sm font-semibold">Termos Aceitos</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Registros de aceitação de termos pelo parceiro</p>
+                  </div>
+                  <div className="space-y-2">
+                    {termAcceptances.map((acc: any) => (
+                      <details key={acc.id} className="bg-card border border-border/30 rounded-lg group">
+                        <summary className="p-4 cursor-pointer list-none flex items-center justify-between">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{acc.acceptedByName || "—"}</p>
+                              <p className="text-xs text-muted-foreground">{acc.acceptedByEmail || "—"}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant="outline" className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">Aceito</Badge>
+                            <span className="text-[10px] text-muted-foreground">
+                              {new Date(acc.acceptedAt).toLocaleDateString("pt-BR")} {new Date(acc.acceptedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                        </summary>
+                        <div className="px-4 pb-4 border-t border-border/20 pt-3">
+                          <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">CPF</p>
+                              <p>{acc.acceptedByCpf ? `***.***.${acc.acceptedByCpf.substring(6, 9)}-${acc.acceptedByCpf.substring(9)}` : "—"}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">IP</p>
+                              <p className="font-mono">{acc.ipAddress || "—"}</p>
+                            </div>
+                          </div>
+                          {acc.termContent && (
+                            <details className="mt-2">
+                              <summary className="text-xs text-primary cursor-pointer hover:underline">Ver conteúdo do termo</summary>
+                              <div className="mt-2 p-3 bg-background rounded border border-border/20 text-xs max-h-60 overflow-y-auto prose prose-invert prose-xs" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(acc.termContent) }} />
+                            </details>
+                          )}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
                 </div>
               )}
             </TabsContent>

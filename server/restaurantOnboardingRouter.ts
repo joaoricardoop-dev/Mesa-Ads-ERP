@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getDb } from "./db";
 import { activeRestaurants, restaurantTerms, termAcceptances, termTemplates } from "../drizzle/schema";
 import { users } from "../shared/models/auth";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "crypto";
 
 const DEFAULT_TERMS = `TERMOS DE PARCERIA — mesa.ads
@@ -365,6 +365,17 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
         } catch { return false; }
       });
 
+      const generateTermNum = async () => {
+        const year = new Date().getFullYear();
+        const pattern = `TRM-${year}-%`;
+        const countResult = await db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(restaurantTerms)
+          .where(sql`${restaurantTerms.termNumber} LIKE ${pattern}`);
+        const seqNum = Number(countResult[0]?.count || 0) + 1;
+        return `TRM-${year}-${String(seqNum).padStart(4, "0")}`;
+      };
+
       if (requiredTemplates.length > 0) {
         const providedIds = input.termTemplateIds || [];
         const missingIds = requiredTemplates.filter((t) => !providedIds.includes(t.id));
@@ -375,8 +386,18 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
         }
 
         for (const tmpl of requiredTemplates) {
+          const termNumber = await generateTermNum();
+          const [term] = await db.insert(restaurantTerms).values({
+            termNumber,
+            restaurantId: restaurant.id,
+            conditions: tmpl.content,
+            status: "assinado",
+            inviteEmail: input.accountEmail,
+          }).returning();
+
           await db.insert(termAcceptances).values({
             restaurantId: restaurant.id,
+            termId: term.id,
             templateId: tmpl.id,
             termContent: tmpl.content,
             termHash: hashContent(tmpl.content),
@@ -388,8 +409,18 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
           });
         }
       } else {
+        const termNumber = await generateTermNum();
+        const [term] = await db.insert(restaurantTerms).values({
+          termNumber,
+          restaurantId: restaurant.id,
+          conditions: DEFAULT_TERMS,
+          status: "assinado",
+          inviteEmail: input.accountEmail,
+        }).returning();
+
         await db.insert(termAcceptances).values({
           restaurantId: restaurant.id,
+          termId: term.id,
           termContent: DEFAULT_TERMS,
           termHash: hashContent(DEFAULT_TERMS),
           acceptedByName: input.acceptedByName,
