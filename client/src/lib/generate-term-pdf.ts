@@ -11,8 +11,8 @@ interface TermPDFData {
 }
 
 function stripHtml(html: string): string {
-  const div = document.createElement("div");
-  div.innerHTML = html;
+  const parsed = new DOMParser().parseFromString(html, "text/html");
+  const div = parsed.body;
 
   const blocks = div.querySelectorAll("h1, h2, h3, p, li, hr");
   if (blocks.length === 0) {
