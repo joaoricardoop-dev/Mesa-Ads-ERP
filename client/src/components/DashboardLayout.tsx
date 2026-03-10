@@ -371,6 +371,9 @@ function DashboardLayoutContent({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <p className="text-[10px] text-muted-foreground/50 text-center mt-1 group-data-[collapsible=icon]:hidden">
+              v{__APP_VERSION__} · {__APP_ENV__}
+            </p>
           </SidebarFooter>
 
           <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
