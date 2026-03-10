@@ -509,10 +509,10 @@ export const quotationRouter = router({
         }).where(eq(serviceOrders.id, os[0].id));
       }
 
-      const baseUrl = process.env.REPLIT_DEV_DOMAIN
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : process.env.REPLIT_DOMAINS
-          ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+      const baseUrl = process.env.NODE_ENV === "production"
+        ? "https://app.mesaads.com.br"
+        : process.env.REPLIT_DEV_DOMAIN
+          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
           : "";
       const signingUrl = `${baseUrl}/cotacao/assinar/${token}`;
 
