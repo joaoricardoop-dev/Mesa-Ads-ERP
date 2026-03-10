@@ -589,6 +589,7 @@ export const quotationRouter = router({
 
       const campaignNumber = await generateCampaignNumber(db);
       const campaignName = quotation[0].quotationName || quotation[0].quotationNumber;
+      const isBonificada = !!quotation[0].isBonificada;
 
       const [campaign] = await db.insert(campaigns).values({
         campaignNumber,
@@ -604,18 +605,18 @@ export const quotationRouter = router({
         daysPerMonth: 26,
         activeRestaurants: allocatedRestaurants.length,
         pricingType: "variable",
-        markupPercent: "30.00",
+        markupPercent: isBonificada ? "0.00" : "30.00",
         fixedPrice: "0.00",
         commissionType: "variable",
-        restaurantCommission: avgCommission,
-        fixedCommission: "0.0500",
-        sellerCommission: "10.00",
-        taxRate: "15.00",
+        restaurantCommission: isBonificada ? "0.00" : avgCommission,
+        fixedCommission: isBonificada ? "0.00" : "0.0500",
+        sellerCommission: isBonificada ? "0.00" : "10.00",
+        taxRate: isBonificada ? "0.00" : "15.00",
         contractDuration: input.batchIds.length,
         batchSize: quotation[0].coasterVolume,
         batchCost: "1200.00",
         notes: quotation[0].notes,
-        isBonificada: quotation[0].isBonificada,
+        isBonificada,
       }).returning();
 
       await db.insert(campaignBatchAssignments).values(

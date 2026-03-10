@@ -159,8 +159,8 @@ export function setupPublicSigningRoutes(app: express.Express) {
         .where(inArray(campaignBatches.id, batchIds))
         .orderBy(asc(campaignBatches.startDate));
 
-      if (batchRecords.length === 0) {
-        return res.status(400).json({ error: "Batches não encontrados" });
+      if (batchRecords.length === 0 || batchRecords.length !== batchIds.length) {
+        return res.status(400).json({ error: "Um ou mais batches não encontrados" });
       }
 
       const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
@@ -202,6 +202,9 @@ export function setupPublicSigningRoutes(app: express.Express) {
       const campaignNumber = await generateCampaignNumber(db);
       const campaignName = quotation[0].quotationName || quotation[0].quotationNumber;
       const maskedCpf = `***.***.${cpfClean.substring(6, 9)}-${cpfClean.substring(9)}`;
+      const isBonificada = !!quotation[0].isBonificada;
+
+      let campaignId: number = 0;
 
       await db.transaction(async (tx) => {
         await tx.update(quotations).set({
@@ -236,19 +239,21 @@ export function setupPublicSigningRoutes(app: express.Express) {
           daysPerMonth: 26,
           activeRestaurants: allocatedRestaurants.length,
           pricingType: "variable",
-          markupPercent: "30.00",
+          markupPercent: isBonificada ? "0.00" : "30.00",
           fixedPrice: "0.00",
           commissionType: "variable",
-          restaurantCommission: avgCommission,
-          fixedCommission: "0.0500",
-          sellerCommission: "10.00",
-          taxRate: "15.00",
+          restaurantCommission: isBonificada ? "0.00" : avgCommission,
+          fixedCommission: isBonificada ? "0.00" : "0.0500",
+          sellerCommission: isBonificada ? "0.00" : "10.00",
+          taxRate: isBonificada ? "0.00" : "15.00",
           contractDuration: batchIds.length,
           batchSize: quotation[0].coasterVolume,
           batchCost: "1200.00",
           notes: quotation[0].notes,
-          isBonificada: quotation[0].isBonificada,
+          isBonificada,
         }).returning();
+
+        campaignId = campaign.id;
 
         await tx.insert(campaignBatchAssignments).values(
           batchIds.map(batchId => ({ campaignId: campaign.id, batchId }))
@@ -278,7 +283,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
 
       res.json({
         success: true,
-        campaignId: campaign.id,
+        campaignId,
         campaignNumber,
         signatureHash,
         signedAt: signedAt.toISOString(),
