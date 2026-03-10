@@ -599,9 +599,10 @@ export default function Quotations() {
                           coasterVolume={q.coasterVolume}
                           totalValue={q.totalValue || undefined}
                           onSign={(savedBatchIds) => {
+                          const validBatchIds = new Set(batchesList.map((b: any) => b.id));
                           setSignOsDialogId(q.id);
                           setSignForm({
-                            batchIds: savedBatchIds,
+                            batchIds: savedBatchIds.filter(id => validBatchIds.has(id)),
                             signatureUrl: "",
                           });
                           setRestaurantAllocations([]);
