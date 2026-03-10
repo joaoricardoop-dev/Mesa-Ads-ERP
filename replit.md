@@ -46,3 +46,4 @@ The application features a sidebar-based layout using `shadcn/ui` with a collaps
 - **jsPDF + jspdf-autotable**: For client-side PDF generation (e.g., Service Orders, Term acceptance PDFs).
 - **TipTap**: Rich text (WYSIWYG) editor for term template content (`@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-underline`).
 - **DOMPurify**: HTML sanitization for rendering rich text content safely.
+- **Anthropic AI SDK**: `@anthropic-ai/sdk` for AI-powered features. Client configured in `server/anthropic.ts` using `ANTHROPIC_API_KEY` secret. Default model: `claude-sonnet-4-20250514`.
