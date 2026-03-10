@@ -1,0 +1,79 @@
+2026-03-10T18:23:22Z info: Deployment: d527ca99-d6f4-4236-8fd5-909222745b3d
+2026-03-10T18:23:22Z info: Running Security Scan
+2026-03-10T18:23:45Z info: Security Scan Complete
+2026-03-10T18:23:45Z info: Connecting to builder
+2026-03-10T18:23:45Z info: Builder connected
+2026-03-10T18:23:46Z info: Installing packages
+2026-03-10T18:23:46Z info: Starting Build
+
+> mesa-ads-simulator@1.0.0 build /home/runner/workspace
+> vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+
+vite v7.3.1 building client environment for production...
+
+transforming...
+
+✓ 4043 modules transformed.
+
+rendering chunks...
+
+computing gzip size...
+
+../dist/public/index.html                            367.76 kB │ gzip: 105.18 kB
+
+../dist/public/assets/index-CeB5zkKY.css             166.66 kB │ gzip:  25.25 kB
+../dist/public/assets/index.es-Hhs9mqNa.js           158.58 kB │ gzip:  52.81 kB
+../dist/public/assets/html2canvas.esm-DXEQVQnt.js    201.04 kB │ gzip:  47.07 kB
+../dist/public/assets/index-ISeruN9P.js            3,134.29 kB │ gzip: 805.01 kB
+
+✓ built in 16.38s
+
+
+  dist/index.js  264.9kb
+
+⚡ Done in 170ms
+
+2026-03-10T18:24:07Z info: Pushing pid1 binary layer...
+2026-03-10T18:24:08Z info: Pushing Repl layer...
+2026-03-10T18:24:08Z info: Retrieved cached nix layer
+2026-03-10T18:24:09Z info: Created hosting layer
+2026-03-10T18:24:09Z info: Created pid1 binary layer
+2026-03-10T18:25:31Z info: Created Repl layer
+2026-03-10T18:25:35Z info: Creating Autoscale service
+    at Object.readFileSync (node:fs:448:20)
+}
+metasidecar: loaded enterprise status from environment is_enterprise=false
+  code: 'ENOENT',
+starting up user application
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+
+    at file:///home/runner/workspace/dist/index.js:4942:25
+
+Node.js v20.20.0
+Error: ENOENT: no such file or directory, open '/home/runner/workspace/dist/package.json'
+    at Object.readFileSync (node:fs:448:20)
+}
+command finished with error [pnpm run start]: exit status 1
+ ELIFECYCLE  Command failed with exit code 1.
+command finished with error [pnpm run start]: exit status 1
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+  path: '/home/runner/workspace/dist/package.json'
+ ELIFECYCLE  Command failed with exit code 1.
+> mesa-ads-simulator@1.0.0 start /home/runner/workspace
+    at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+
+
+> NODE_ENV=production node dist/index.js
+> mesa-ads-simulator@1.0.0 start /home/runner/workspace
+    at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+    at file:///home/runner/workspace/dist/index.js:4942:25
+    at Object.readFileSync (node:fs:448:20)
+
+
+Node.js v20.20.0
+                   ^
+> mesa-ads-simulator@1.0.0 start /home/runner/workspace
+crash loop detected
+2026-03-10T18:27:57Z error: The deployment is crash looping. This can happen if the run command fails or exits immediately after starting. Check the logs for more information.
