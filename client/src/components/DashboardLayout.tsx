@@ -45,6 +45,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useClerk } from "@clerk/clerk-react";
 import type { User } from "@shared/models/auth";
+import type { Impersonation } from "../App";
 import {
   BarChart3,
   Building2,
@@ -70,6 +71,7 @@ import {
   Wallet,
   ClipboardList,
   Layers,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -140,6 +142,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: DollarSign, label: "Economics", path: "/economics" },
       { icon: Factory, label: "Produção", path: "/producao" },
       { icon: Layers, label: "Batches", path: "/configuracoes/batches", adminOnly: true },
+      { icon: FileText, label: "Termos Padrão", path: "/configuracoes/termos", adminOnly: true },
       { icon: Users, label: "Gestão de Usuários", path: "/configuracoes/usuarios", adminOnly: true },
     ],
   },
@@ -153,9 +156,12 @@ const MAX_WIDTH = 400;
 interface DashboardLayoutProps {
   children: React.ReactNode;
   user?: User | null;
+  impersonation?: Impersonation;
+  onExitImpersonation?: () => void;
+  onImpersonate?: (imp: Impersonation) => void;
 }
 
-export default function DashboardLayout({ children, user }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, user, impersonation, onExitImpersonation, onImpersonate }: DashboardLayoutProps) {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
@@ -173,7 +179,7 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
     <SidebarProvider
       style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
     >
-      <DashboardLayoutContent user={user} setSidebarWidth={setSidebarWidth}>
+      <DashboardLayoutContent user={user} setSidebarWidth={setSidebarWidth} impersonation={impersonation} onExitImpersonation={onExitImpersonation}>
         {children}
       </DashboardLayoutContent>
     </SidebarProvider>
@@ -184,10 +190,14 @@ function DashboardLayoutContent({
   children,
   user,
   setSidebarWidth,
+  impersonation,
+  onExitImpersonation,
 }: {
   children: React.ReactNode;
   user: User;
   setSidebarWidth: (w: number) => void;
+  impersonation?: Impersonation;
+  onExitImpersonation?: () => void;
 }) {
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
@@ -266,7 +276,7 @@ function DashboardLayoutContent({
           <SidebarContent className="gap-0 px-2 py-2">
             <SidebarMenu>
               {(user.role === "anunciante" ? ANUNCIANTE_NAV_ENTRIES : user.role === "restaurante" ? RESTAURANTE_NAV_ENTRIES : NAV_ENTRIES).map((entry) => {
-                const userRole = user.role || "user";
+                const userRole = user.role || "";
                 const canSee = (item: { adminOnly?: boolean; allowedRoles?: string[] }) => {
                   if (item.adminOnly && userRole !== "admin") return false;
                   if (item.allowedRoles && !item.allowedRoles.includes(userRole)) return false;
@@ -332,7 +342,7 @@ function DashboardLayoutContent({
                       {user.firstName || user.email || "-"}
                     </p>
                     <p className="text-[10px] text-muted-foreground truncate mt-1">
-                      {{admin: "Administrador", comercial: "Comercial", operacoes: "Operações", financeiro: "Financeiro", manager: "Gerente", viewer: "Visualizador", anunciante: "Anunciante", restaurante: "Restaurante", user: "Usuário"}[user.role || "user"] || "Usuário"}
+                      {{admin: "Administrador", comercial: "Comercial", operacoes: "Operações", financeiro: "Financeiro", manager: "Gerente", anunciante: "Anunciante", restaurante: "Restaurante"}[user.role || ""] || user.role || "—"}
                     </p>
                   </div>
                 </button>
@@ -439,6 +449,22 @@ function DashboardLayoutContent({
       </div>
 
       <SidebarInset>
+        {impersonation && (
+          <div className="flex items-center justify-between px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <Eye className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-medium text-amber-400">
+                Visualizando como <span className="font-bold">{impersonation.name}</span> — {impersonation.role === "restaurante" ? "Restaurante" : "Anunciante"}
+              </span>
+            </div>
+            <button
+              onClick={onExitImpersonation}
+              className="text-xs px-3 py-1 rounded-md bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors font-medium"
+            >
+              Voltar para minha visão
+            </button>
+          </div>
+        )}
         <div className="flex border-b border-border/30 h-12 items-center justify-between bg-card/30 backdrop-blur px-3 sticky top-0 z-40 flex-shrink-0">
           <div className="flex items-center gap-2">
             {isMobile && <SidebarTrigger className="h-8 w-8 rounded-lg" />}

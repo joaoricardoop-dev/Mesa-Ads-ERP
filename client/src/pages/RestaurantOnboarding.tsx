@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -49,6 +49,13 @@ const BUSY_DAYS_OPTIONS = [
   "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo",
 ];
 
+interface TermTemplateItem {
+  id: number | null;
+  title: string;
+  content: string;
+  version: number;
+}
+
 interface FormData {
   name: string;
   cnpj: string;
@@ -91,8 +98,9 @@ export default function RestaurantOnboarding() {
   const [loading, setLoading] = useState(false);
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [terms, setTerms] = useState("");
+  const [termTemplates, setTermTemplates] = useState<TermTemplateItem[]>([]);
   const [termsLoaded, setTermsLoaded] = useState(false);
+  const [acceptedTemplateIds, setAcceptedTemplateIds] = useState<Set<number | null>>(new Set());
   const [form, setForm] = useState<FormData>({
     name: "",
     cnpj: "",
@@ -138,7 +146,9 @@ export default function RestaurantOnboarding() {
     try {
       const res = await fetch("/api/restaurant-onboarding/terms");
       const data = await res.json();
-      setTerms(data.terms || "");
+      if (data.templates && Array.isArray(data.templates)) {
+        setTermTemplates(data.templates);
+      }
       setTermsLoaded(true);
     } catch {
       toast.error("Erro ao carregar termos");
@@ -211,7 +221,8 @@ export default function RestaurantOnboarding() {
     }
     if (step === 2) return true;
     if (step === 3) {
-      return form.acceptTerms && form.acceptedByName.trim().length > 0 && form.acceptedByCpf.replace(/\D/g, "").length >= 11;
+      const allTemplatesAccepted = termTemplates.length > 0 && termTemplates.every((t) => acceptedTemplateIds.has(t.id));
+      return allTemplatesAccepted && form.acceptedByName.trim().length > 0 && form.acceptedByCpf.replace(/\D/g, "").length >= 11;
     }
     if (step === 4) {
       return form.accountEmail.trim().length > 0 && form.accountPassword.length >= 6 && form.accountPassword === form.accountPasswordConfirm;
@@ -255,6 +266,7 @@ export default function RestaurantOnboarding() {
         acceptedByCpf: form.acceptedByCpf.replace(/\D/g, ""),
         accountEmail: form.accountEmail.trim(),
         accountPassword: form.accountPassword,
+        termTemplateIds: termTemplates.filter((t) => t.id !== null).map((t) => t.id),
       };
 
       const res = await fetch("/api/restaurant-onboarding/submit", {
@@ -611,21 +623,46 @@ export default function RestaurantOnboarding() {
 
           {step === 3 && (
             <div className="space-y-4">
-              <div className="bg-[hsl(0,0%,11%)] border border-[hsl(0,0%,18%)] rounded-lg p-4 max-h-[300px] overflow-y-auto">
-                <pre className="text-xs text-[hsl(0,0%,60%)] whitespace-pre-wrap font-sans leading-relaxed">
-                  {terms || "Carregando termos..."}
-                </pre>
-              </div>
-              <label className="flex items-start gap-3 p-3 rounded-lg bg-[hsl(0,0%,11%)] border border-[hsl(0,0%,18%)] cursor-pointer">
-                <Checkbox
-                  checked={form.acceptTerms}
-                  onCheckedChange={(checked) => update("acceptTerms", !!checked)}
-                  className="mt-0.5"
-                />
-                <span className="text-sm text-[hsl(0,0%,70%)]">
-                  Li e aceito os <span className="text-[#27d803] font-medium">Termos de Parceria</span> acima
-                </span>
-              </label>
+              {termTemplates.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-[hsl(0,0%,40%)]" />
+                  <span className="ml-2 text-sm text-[hsl(0,0%,50%)]">Carregando termos...</span>
+                </div>
+              ) : (
+                termTemplates.map((tmpl) => (
+                  <div key={tmpl.id ?? "default"} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-white">{tmpl.title}</h3>
+                      <span className="text-[10px] text-[hsl(0,0%,40%)] bg-[hsl(0,0%,11%)] px-2 py-0.5 rounded">v{tmpl.version}</span>
+                    </div>
+                    <div className="bg-[hsl(0,0%,11%)] border border-[hsl(0,0%,18%)] rounded-lg p-4 max-h-[200px] overflow-y-auto">
+                      <pre className="text-xs text-[hsl(0,0%,60%)] whitespace-pre-wrap font-sans leading-relaxed">
+                        {tmpl.content}
+                      </pre>
+                    </div>
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-[hsl(0,0%,11%)] border border-[hsl(0,0%,18%)] cursor-pointer">
+                      <Checkbox
+                        checked={acceptedTemplateIds.has(tmpl.id)}
+                        onCheckedChange={(checked) => {
+                          setAcceptedTemplateIds((prev) => {
+                            const next = new Set(prev);
+                            if (checked) {
+                              next.add(tmpl.id);
+                            } else {
+                              next.delete(tmpl.id);
+                            }
+                            return next;
+                          });
+                        }}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm text-[hsl(0,0%,70%)]">
+                        Li e aceito <span className="text-[#27d803] font-medium">{tmpl.title}</span>
+                      </span>
+                    </label>
+                  </div>
+                ))
+              )}
               <div>
                 <Label className={labelClass}>Nome Completo do Responsável Legal *</Label>
                 <Input value={form.acceptedByName} onChange={(e) => update("acceptedByName", e.target.value)} placeholder="Nome completo" className={inputClass} />

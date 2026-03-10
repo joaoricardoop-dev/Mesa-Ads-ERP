@@ -539,6 +539,7 @@ export const termAcceptances = pgTable("term_acceptances", {
   id: serial("id").primaryKey(),
   restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
   termId: integer("termId").references(() => restaurantTerms.id, { onDelete: "set null" }),
+  templateId: integer("templateId").references(() => termTemplates.id, { onDelete: "set null" }),
   termContent: text("termContent").notNull(),
   termHash: varchar("termHash", { length: 64 }).notNull(),
   acceptedAt: timestamp("acceptedAt").defaultNow().notNull(),
@@ -551,10 +552,27 @@ export const termAcceptances = pgTable("term_acceptances", {
 }, (t) => [
   index("idx_term_acceptances_restaurant").on(t.restaurantId),
   index("idx_term_acceptances_term").on(t.termId),
+  index("idx_term_acceptances_template").on(t.templateId),
 ]);
 
 export type TermAcceptance = typeof termAcceptances.$inferSelect;
 export type InsertTermAcceptance = typeof termAcceptances.$inferInsert;
+
+// ─── Term Templates (templates de termos) ────────────────────────────────────
+
+export const termTemplates = pgTable("term_templates", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  requiredFor: text("requiredFor").notNull().default("[]"),
+  isActive: boolean("isActive").default(true).notNull(),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type TermTemplate = typeof termTemplates.$inferSelect;
+export type InsertTermTemplate = typeof termTemplates.$inferInsert;
 
 // ─── Library Items (acervo de artes) ─────────────────────────────────────────
 

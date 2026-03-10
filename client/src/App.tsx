@@ -39,6 +39,7 @@ import RestaurantePortal from "./pages/RestaurantePortal";
 import RestaurantOnboarding from "./pages/RestaurantOnboarding";
 import RestaurantInviteAccept from "./pages/RestaurantInviteAccept";
 import Onboarding from "./pages/Onboarding";
+import TermTemplates from "./pages/TermTemplates";
 
 function AnuncianteRouter() {
   return (
@@ -86,6 +87,7 @@ function Router() {
       <Route path="/economics" component={Economics} />
       <Route path="/producao" component={Production} />
       <Route path="/configuracoes/batches" component={BatchManagement} />
+      <Route path="/configuracoes/termos" component={TermTemplates} />
       <Route path="/membros" component={Members} />
       <Route path="/configuracoes/usuarios" component={Members} />
       <Route path="/biblioteca" component={Library} />
@@ -160,14 +162,35 @@ function ClerkLoginPage() {
   );
 }
 
+export type Impersonation = {
+  role: string;
+  clientId?: number;
+  restaurantId?: number;
+  name: string;
+} | null;
+
 function AuthenticatedApp() {
   const { user, isLoading, isAuthenticated, isAuthError, isNotRegistered, logout, clerkUser } = useAuth();
   const [devRoleOverride, setDevRoleOverride] = useState<string | null>(null);
   const [devClientIdOverride, setDevClientIdOverride] = useState<number | null>(null);
+  const [impersonation, setImpersonation] = useState<Impersonation>(null);
 
   useEffect(() => {
     (window as any).__DEV_OVERRIDE_CLIENT_ID__ = devRoleOverride === "anunciante" ? devClientIdOverride : null;
   }, [devClientIdOverride, devRoleOverride]);
+
+  useEffect(() => {
+    (window as any).__IMPERSONATION__ = impersonation;
+  }, [impersonation]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setImpersonation(detail);
+    };
+    window.addEventListener("impersonation-change", handler);
+    return () => window.removeEventListener("impersonation-change", handler);
+  }, []);
 
   if (isLoading) {
     return (
@@ -246,25 +269,41 @@ function AuthenticatedApp() {
     return <ClerkLoginPage />;
   }
 
-  const effectiveUser = devRoleOverride && user
+  const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
+
+  let effectiveUser = devRoleOverride && user
     ? { ...user, role: devRoleOverride, ...(devRoleOverride === "anunciante" && devClientIdOverride ? { clientId: devClientIdOverride } : {}) }
     : user;
 
+  if (impersonation && user && INTERNAL_ROLES.includes(user.role || "")) {
+    effectiveUser = {
+      ...user,
+      role: impersonation.role,
+      ...(impersonation.clientId ? { clientId: impersonation.clientId } : {}),
+      ...(impersonation.restaurantId ? { restaurantId: impersonation.restaurantId } : {}),
+    };
+  }
+
+  const isImpersonating = impersonation !== null && user && INTERNAL_ROLES.includes(user.role || "");
   const isAnunciante = effectiveUser?.role === "anunciante";
   const isRestaurante = effectiveUser?.role === "restaurante";
-  const needsOnboarding = isAnunciante && effectiveUser?.onboardingComplete === false;
+  const needsOnboarding = isAnunciante && effectiveUser?.onboardingComplete === false && !isImpersonating;
+
+  const devToolsPanel = (
+    <DevToolsPanel
+      currentRole={user?.role || ""}
+      overrideRole={devRoleOverride}
+      overrideClientId={devClientIdOverride}
+      onSetOverride={setDevRoleOverride}
+      onSetClientId={setDevClientIdOverride}
+    />
+  );
 
   if (needsOnboarding) {
     return (
       <>
         <Onboarding userName={effectiveUser?.firstName || null} />
-        <DevToolsPanel
-          currentRole={user?.role || "user"}
-          overrideRole={devRoleOverride}
-          overrideClientId={devClientIdOverride}
-          onSetOverride={setDevRoleOverride}
-          onSetClientId={setDevClientIdOverride}
-        />
+        {devToolsPanel}
       </>
     );
   }
@@ -272,16 +311,10 @@ function AuthenticatedApp() {
   if (isAnunciante) {
     return (
       <div className="h-screen flex overflow-hidden">
-        <DashboardLayout user={effectiveUser}>
+        <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)}>
           <AnuncianteRouter />
         </DashboardLayout>
-        <DevToolsPanel
-          currentRole={user?.role || "user"}
-          overrideRole={devRoleOverride}
-          overrideClientId={devClientIdOverride}
-          onSetOverride={setDevRoleOverride}
-          onSetClientId={setDevClientIdOverride}
-        />
+        {devToolsPanel}
       </div>
     );
   }
@@ -289,32 +322,20 @@ function AuthenticatedApp() {
   if (isRestaurante) {
     return (
       <div className="h-screen flex overflow-hidden">
-        <DashboardLayout user={effectiveUser}>
+        <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)}>
           <RestauranteRouter />
         </DashboardLayout>
-        <DevToolsPanel
-          currentRole={user?.role || "user"}
-          overrideRole={devRoleOverride}
-          overrideClientId={devClientIdOverride}
-          onSetOverride={setDevRoleOverride}
-          onSetClientId={setDevClientIdOverride}
-        />
+        {devToolsPanel}
       </div>
     );
   }
 
   return (
     <div className="h-screen flex overflow-hidden">
-      <DashboardLayout user={effectiveUser}>
+      <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)} onImpersonate={setImpersonation}>
         <Router />
       </DashboardLayout>
-      <DevToolsPanel
-        currentRole={user?.role || "user"}
-        overrideRole={devRoleOverride}
-        overrideClientId={devClientIdOverride}
-        onSetOverride={setDevRoleOverride}
-        onSetClientId={setDevClientIdOverride}
-      />
+      {devToolsPanel}
     </div>
   );
 }

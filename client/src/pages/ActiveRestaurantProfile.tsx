@@ -70,8 +70,6 @@ import {
   Star,
   Wine,
   Send,
-  Copy,
-  LinkIcon,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -256,7 +254,10 @@ export default function ActiveRestaurantProfile() {
     onError: (err) => toast.error(err.message),
   });
 
-  const generateInviteMutation = trpc.term.generateInvite.useMutation({
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+
+  const generateAccountInviteMutation = trpc.activeRestaurant.generateAccountInvite.useMutation({
     onSuccess: (data) => {
       utils.term.list.invalidate();
       const inviteUrl = `${window.location.origin}/parceiro/convite/${data.inviteToken}`;
@@ -265,6 +266,8 @@ export default function ActiveRestaurantProfile() {
       }).catch(() => {
         toast.success("Convite gerado! Link: " + inviteUrl);
       });
+      setIsInviteDialogOpen(false);
+      setInviteEmail("");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -996,42 +999,11 @@ export default function ActiveRestaurantProfile() {
                           Criado em {new Date(term.createdAt).toLocaleDateString("pt-BR")}
                         </p>
                         <div className="flex items-center gap-2">
-                          {term.status === "assinado" || term.status === "vigente" ? (
+                          {(term.status === "assinado" || term.status === "vigente") && (
                             <Badge variant="outline" className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 gap-1 text-[10px]">
                               <CheckCircle2 className="w-3 h-3" /> Assinado
                             </Badge>
-                          ) : term.inviteToken ? (
-                            <>
-                              <Badge variant="outline" className="bg-orange-500/20 text-orange-400 border-orange-500/30 gap-1 text-[10px]">
-                                <Send className="w-3 h-3" /> Convite enviado
-                              </Badge>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="gap-1.5 text-[10px] h-7"
-                                onClick={() => {
-                                  const inviteUrl = `${window.location.origin}/parceiro/convite/${term.inviteToken}`;
-                                  navigator.clipboard.writeText(inviteUrl).then(() => {
-                                    toast.success("Link copiado!");
-                                  }).catch(() => {
-                                    toast.info(inviteUrl);
-                                  });
-                                }}
-                              >
-                                <Copy className="w-3 h-3" /> Copiar Link
-                              </Button>
-                            </>
-                          ) : (term.status === "rascunho" || term.status === "enviado") ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1.5 text-[10px] h-7"
-                              disabled={generateInviteMutation.isPending}
-                              onClick={() => generateInviteMutation.mutate({ id: term.id })}
-                            >
-                              <Send className="w-3 h-3" /> Enviar Convite para Assinatura
-                            </Button>
-                          ) : null}
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1101,16 +1073,37 @@ export default function ActiveRestaurantProfile() {
                   <h3 className="text-sm font-semibold">Contas Associadas</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">Usuários com acesso ao portal deste restaurante</p>
                 </div>
-                <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => { setSelectedUserId(""); setIsLinkUserDialogOpen(true); }}>
-                  <Plus className="w-3.5 h-3.5" /> Vincular Conta
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs h-8 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                    onClick={() => {
+                      const imp = {
+                        role: "restaurante" as const,
+                        restaurantId,
+                        name: restaurant?.name || `Restaurante #${restaurantId}`,
+                      };
+                      (window as any).__IMPERSONATION__ = imp;
+                      window.dispatchEvent(new CustomEvent("impersonation-change", { detail: imp }));
+                    }}
+                  >
+                    <Eye className="w-3.5 h-3.5" /> Entrar como Restaurante
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => { setInviteEmail(""); setIsInviteDialogOpen(true); }}>
+                    <Send className="w-3.5 h-3.5" /> Convidar Novo Usuário
+                  </Button>
+                  <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => { setSelectedUserId(""); setIsLinkUserDialogOpen(true); }}>
+                    <Plus className="w-3.5 h-3.5" /> Vincular Conta
+                  </Button>
+                </div>
               </div>
 
               {linkedUsers.length === 0 ? (
                 <div className="bg-card border border-border/30 rounded-lg p-8 text-center text-muted-foreground text-sm">
                   <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
                   <p>Nenhuma conta associada a este restaurante</p>
-                  <p className="text-xs mt-1">Vincule uma conta existente ou envie um convite pela aba Termos</p>
+                  <p className="text-xs mt-1">Vincule uma conta existente ou convide um novo usuário</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1194,6 +1187,39 @@ export default function ActiveRestaurantProfile() {
               onClick={() => linkUserMutation.mutate({ userId: selectedUserId, restaurantId })}
             >
               {linkUserMutation.isPending ? "Vinculando..." : "Vincular"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Account Invite Dialog */}
+      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border/30">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Send className="w-5 h-5 text-primary" /> Convidar Novo Usuário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs mb-1.5 block">Email do convidado</Label>
+              <Input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="email@exemplo.com"
+                className="bg-background border-border/30 h-9 text-sm"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1.5">Um link de convite será gerado e copiado para a área de transferência</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" className="text-xs" onClick={() => setIsInviteDialogOpen(false)}>Cancelar</Button>
+            <Button
+              size="sm"
+              className="text-xs gap-1.5"
+              disabled={!inviteEmail || generateAccountInviteMutation.isPending}
+              onClick={() => generateAccountInviteMutation.mutate({ restaurantId, email: inviteEmail })}
+            >
+              {generateAccountInviteMutation.isPending ? "Gerando..." : "Gerar Convite"}
             </Button>
           </DialogFooter>
         </DialogContent>

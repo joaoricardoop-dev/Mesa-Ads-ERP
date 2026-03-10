@@ -28,6 +28,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -49,6 +50,8 @@ import {
   CheckCircle2,
   Hourglass,
   Ban,
+  Building2,
+  Store,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -79,14 +82,9 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof S
     color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
     icon: ShieldCheck,
   },
-  user: {
-    label: "Usuário",
-    color: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-    icon: Shield,
-  },
-  viewer: {
-    label: "Visualizador",
-    color: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  restaurante: {
+    label: "Restaurante",
+    color: "bg-teal-500/20 text-teal-400 border-teal-500/30",
     icon: Shield,
   },
   anunciante: {
@@ -105,6 +103,7 @@ export default function Members() {
   } | null>(null);
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [segment, setSegment] = useState<"internos" | "externos">("internos");
   const [createForm, setCreateForm] = useState<{
     email: string;
     firstName: string;
@@ -115,7 +114,7 @@ export default function Members() {
     email: "",
     firstName: "",
     lastName: "",
-    role: "user",
+    role: "comercial",
     clientId: null,
   });
 
@@ -149,7 +148,7 @@ export default function Members() {
       utils.members.list.invalidate();
       utils.members.listInvitations.invalidate();
       setCreateDialogOpen(false);
-      setCreateForm({ email: "", firstName: "", lastName: "", role: "user", clientId: null });
+      setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null });
       toast.success(`Convite enviado para ${data.email}! O usuário receberá um e-mail para criar sua conta.`);
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -166,13 +165,22 @@ export default function Members() {
 
 
 
-  const filtered = membersList.filter(
+  const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
+  const EXTERNAL_ROLES = ["anunciante", "restaurante"];
+
+  const searchFiltered = membersList.filter(
     (m) =>
       (m.firstName || "").toLowerCase().includes(search.toLowerCase()) ||
       (m.lastName || "").toLowerCase().includes(search.toLowerCase()) ||
       (m.email || "").toLowerCase().includes(search.toLowerCase())
   );
 
+  const internos = searchFiltered.filter((m) => INTERNAL_ROLES.includes(m.role || ""));
+  const externos = searchFiltered.filter((m) => EXTERNAL_ROLES.includes(m.role || ""));
+  const filtered = segment === "internos" ? internos : externos;
+
+  const internosTotal = membersList.filter((m) => INTERNAL_ROLES.includes(m.role || "")).length;
+  const externosTotal = membersList.filter((m) => EXTERNAL_ROLES.includes(m.role || "")).length;
   const adminCount = membersList.filter((m) => m.role === "admin").length;
   const activeCount = membersList.filter((m) => m.isActive !== false).length;
   const inactiveCount = membersList.filter((m) => m.isActive === false).length;
@@ -183,7 +191,7 @@ export default function Members() {
       description="Cadastrar, gerenciar papéis e permissões dos usuários da plataforma"
       actions={
         <Button onClick={() => {
-          setCreateForm({ email: "", firstName: "", lastName: "", role: "user", clientId: null });
+          setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null });
           setCreateDialogOpen(true);
         }}>
           <Send className="w-4 h-4 mr-2" />
@@ -223,14 +231,34 @@ export default function Members() {
           </div>
         </div>
 
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar membro..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-card border-border/30"
-          />
+        <div className="flex items-center gap-4">
+          <div className="flex bg-card border border-border/30 rounded-lg p-1">
+            <button
+              onClick={() => setSegment("internos")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${segment === "internos" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Building2 className="w-4 h-4" />
+              Internos
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{internosTotal}</Badge>
+            </button>
+            <button
+              onClick={() => setSegment("externos")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${segment === "externos" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Store className="w-4 h-4" />
+              Externos
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">{externosTotal}</Badge>
+            </button>
+          </div>
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar membro..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 bg-card border-border/30"
+            />
+          </div>
         </div>
 
         <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
@@ -250,7 +278,7 @@ export default function Members() {
             </div>
           ) : (
             filtered.map((member) => {
-              const roleConfig = ROLE_CONFIG[member.role || "user"] || ROLE_CONFIG.user;
+              const roleConfig = ROLE_CONFIG[member.role || "comercial"] || ROLE_CONFIG.comercial;
               const isActive = member.isActive !== false;
               const RoleIcon = roleConfig.icon;
 
@@ -297,7 +325,7 @@ export default function Members() {
 
                   <div>
                     <Select
-                      value={member.role || "user"}
+                      value={member.role || "comercial"}
                       onValueChange={(role) => {
                         updateRoleMutation.mutate({ userId: member.id, role });
                       }}
@@ -384,12 +412,13 @@ export default function Members() {
             </div>
 
             {invitationsList.map((inv) => {
-              const roleConfig = ROLE_CONFIG[inv.role || "user"] || ROLE_CONFIG.user;
-              const statusConfig = {
+              const roleConfig = ROLE_CONFIG[inv.role || "comercial"] || ROLE_CONFIG.comercial;
+              const statusMap: Record<string, { label: string; icon: typeof Clock; color: string }> = {
                 pending: { label: "Pendente", icon: Hourglass, color: "text-amber-400" },
                 accepted: { label: "Aceito", icon: CheckCircle2, color: "text-green-400" },
                 revoked: { label: "Revogado", icon: Ban, color: "text-red-400" },
-              }[inv.status] || { label: inv.status, icon: Clock, color: "text-muted-foreground" };
+              };
+              const statusConfig = statusMap[inv.status] || { label: inv.status, icon: Clock, color: "text-muted-foreground" };
 
               return (
                 <div
@@ -519,30 +548,17 @@ export default function Members() {
                 <li className="text-red-400/60">✗ Gestão de usuários</li>
               </ul>
             </div>
-            <div className="bg-background/50 border border-gray-500/20 rounded-lg p-4">
+            <div className="bg-background/50 border border-teal-500/20 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Shield className="w-4 h-4 text-gray-400" />
-                <h4 className="text-sm font-semibold text-gray-400">Usuário</h4>
+                <Shield className="w-4 h-4 text-teal-400" />
+                <h4 className="text-sm font-semibold text-teal-400">Restaurante</h4>
               </div>
               <ul className="text-xs text-muted-foreground space-y-1.5">
-                <li>✓ Visualizar dashboard</li>
-                <li>✓ Simulador de preços</li>
-                <li>✓ Visualizar campanhas</li>
-                <li className="text-red-400/60">✗ Criar/editar registros</li>
-                <li className="text-red-400/60">✗ Módulos financeiros</li>
-              </ul>
-            </div>
-            <div className="bg-background/50 border border-purple-500/20 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Shield className="w-4 h-4 text-purple-400" />
-                <h4 className="text-sm font-semibold text-purple-400">Visualizador</h4>
-              </div>
-              <ul className="text-xs text-muted-foreground space-y-1.5">
-                <li>✓ Visualizar campanhas</li>
-                <li>✓ Visualizar restaurantes</li>
-                <li>✓ Visualizar clientes</li>
-                <li className="text-red-400/60">✗ Criar ou editar</li>
-                <li className="text-red-400/60">✗ Módulos financeiros</li>
+                <li>✓ Portal do restaurante</li>
+                <li>✓ Ver campanhas vinculadas</li>
+                <li>✓ Aceitar termos</li>
+                <li>✓ Editar contato</li>
+                <li className="text-red-400/60">✗ Acesso interno</li>
               </ul>
             </div>
             <div className="bg-background/50 border border-orange-500/20 rounded-lg p-4">

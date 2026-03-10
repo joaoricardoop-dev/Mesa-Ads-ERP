@@ -27,7 +27,7 @@ export async function createContext(
         });
         const clerkUser = await clerkClient.users.getUser(auth.userId);
         const meta = (clerkUser.publicMetadata as any) || {};
-        const role = meta.role || "user";
+        const role = meta.role || "anunciante";
         const clientId = meta.clientId || null;
         const restaurantId = meta.restaurantId || null;
 
@@ -53,6 +53,18 @@ export async function createContext(
     const devClientId = opts.req.headers["x-dev-client-id"];
     if (devClientId) {
       user = { ...user, clientId: parseInt(String(devClientId), 10) };
+    }
+  }
+
+  const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
+  if (user && INTERNAL_ROLES.includes(user.role || "")) {
+    const impClientId = opts.req.headers["x-impersonate-client-id"];
+    const impRestaurantId = opts.req.headers["x-impersonate-restaurant-id"];
+    if (impClientId) {
+      user = { ...user, role: "anunciante", clientId: parseInt(String(impClientId), 10) };
+    }
+    if (impRestaurantId) {
+      user = { ...user, role: "restaurante", restaurantId: parseInt(String(impRestaurantId), 10) };
     }
   }
 

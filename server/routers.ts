@@ -145,7 +145,7 @@ export const appRouter = router({
             firstName: cu.firstName || null,
             lastName: cu.lastName || null,
             profileImageUrl: cu.imageUrl || null,
-            role: meta?.role || "user",
+            role: meta?.role || "anunciante",
             isActive: !cu.banned,
             clientId: meta?.clientId ? Number(meta.clientId) : null,
             lastLoginAt: cu.lastSignInAt ? new Date(cu.lastSignInAt).toISOString() : null,
@@ -242,7 +242,7 @@ export const appRouter = router({
             id: inv.id,
             email: inv.emailAddress,
             status: inv.status,
-            role: meta?.role || "user",
+            role: meta?.role || "anunciante",
             firstName: meta?.firstName || null,
             lastName: meta?.lastName || null,
             createdAt: inv.createdAt ? new Date(inv.createdAt).toISOString() : null,
@@ -275,7 +275,7 @@ export const appRouter = router({
         email: z.string().email(),
         firstName: z.string().min(1),
         lastName: z.string().optional(),
-        role: z.string().default("user"),
+        role: z.string().default("comercial"),
         clientId: z.number().nullable().optional(),
       }))
       .mutation(async ({ input }) => {
@@ -668,9 +668,9 @@ export const appRouter = router({
           lastName: users.lastName,
           role: users.role,
         }).from(users).where(
-          or(isNull(users.restaurantId), eq(users.role, "user"))
+          isNull(users.restaurantId)
         );
-        return rows.filter(u => u.role !== "admin" && u.role !== "comercial" && u.role !== "operacoes" && u.role !== "financeiro" && u.role !== "anunciante");
+        return rows.filter(u => !["admin", "comercial", "operacoes", "financeiro", "manager"].includes(u.role || ""));
       }),
 
     unlinkUser: internalProcedure
@@ -690,7 +690,7 @@ export const appRouter = router({
 
         const [updated] = await db.update(users).set({
           restaurantId: null,
-          role: "user",
+          role: "restaurante",
           updatedAt: new Date(),
         }).where(and(eq(users.id, input.userId), eq(users.restaurantId, input.restaurantId))).returning();
 
@@ -700,7 +700,7 @@ export const appRouter = router({
           const clerkUser = await clerkClient.users.getUser(input.userId);
           const meta = { ...clerkUser.publicMetadata } as any;
           delete meta.restaurantId;
-          meta.role = "user";
+          meta.role = "restaurante";
           await clerkClient.users.updateUserMetadata(input.userId, { publicMetadata: meta });
         } catch (err) {
           console.error("Failed to update Clerk metadata:", err);
@@ -754,6 +754,45 @@ export const appRouter = router({
     deletePayment: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteRestaurantPayment(input.id)),
+
+    generateAccountInvite: internalProcedure
+      .input(z.object({
+        restaurantId: z.number(),
+        email: z.string().email(),
+      }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const { restaurantTerms, activeRestaurants } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const { randomUUID } = await import("crypto");
+
+        const [restaurant] = await db.select({ id: activeRestaurants.id, name: activeRestaurants.name }).from(activeRestaurants).where(eq(activeRestaurants.id, input.restaurantId));
+        if (!restaurant) throw new TRPCError({ code: "NOT_FOUND", message: "Restaurante não encontrado" });
+
+        const token = randomUUID();
+        const year = new Date().getFullYear();
+        const { sql: sqlFn } = await import("drizzle-orm");
+        const pattern = `TRM-${year}-%`;
+        const countResult = await db
+          .select({ count: sqlFn<number>`COUNT(*)` })
+          .from(restaurantTerms)
+          .where(sqlFn`${restaurantTerms.termNumber} LIKE ${pattern}`);
+        const seqNum = Number(countResult[0]?.count || 0) + 1;
+        const termNumber = `TRM-${year}-${String(seqNum).padStart(4, "0")}`;
+
+        const [created] = await db.insert(restaurantTerms).values({
+          termNumber,
+          restaurantId: input.restaurantId,
+          inviteToken: token,
+          inviteEmail: input.email,
+          status: "enviado",
+        }).returning();
+
+        const inviteUrl = `/parceiro/convite/${token}`;
+        return { ...created, inviteToken: token, inviteUrl };
+      }),
 
     recalculateRatings: adminProcedure
       .mutation(() => recalculateAllRatings()),
@@ -1213,6 +1252,100 @@ export const appRouter = router({
       .mutation(({ input }) => deleteBudget(input.id)),
   }),
 
+  termTemplate: router({
+    list: adminProcedure.query(async () => {
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return [];
+      const { termTemplates } = await import("../drizzle/schema");
+      const { desc } = await import("drizzle-orm");
+      return db.select().from(termTemplates).orderBy(desc(termTemplates.createdAt));
+    }),
+
+    listActive: publicProcedure
+      .input(z.object({ role: z.string().optional() }).optional())
+      .query(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { termTemplates } = await import("../drizzle/schema");
+        const { eq, desc } = await import("drizzle-orm");
+        const all = await db.select().from(termTemplates).where(eq(termTemplates.isActive, true)).orderBy(desc(termTemplates.createdAt));
+        if (input?.role) {
+          return all.filter((t) => {
+            try {
+              const roles = JSON.parse(t.requiredFor);
+              return Array.isArray(roles) && roles.includes(input.role);
+            } catch { return false; }
+          });
+        }
+        return all;
+      }),
+
+    create: adminProcedure
+      .input(z.object({
+        title: z.string().min(1),
+        content: z.string().min(1),
+        requiredFor: z.array(z.string()),
+        isActive: z.boolean().default(true),
+      }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { termTemplates } = await import("../drizzle/schema");
+        const [created] = await db.insert(termTemplates).values({
+          title: input.title,
+          content: input.content,
+          requiredFor: JSON.stringify(input.requiredFor),
+          isActive: input.isActive,
+        }).returning();
+        return created;
+      }),
+
+    update: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().min(1).optional(),
+        content: z.string().min(1).optional(),
+        requiredFor: z.array(z.string()).optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { termTemplates } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const existing = await db.select().from(termTemplates).where(eq(termTemplates.id, input.id));
+        if (!existing[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Template não encontrado" });
+
+        const updates: Record<string, any> = { updatedAt: new Date() };
+        if (input.title !== undefined) updates.title = input.title;
+        if (input.requiredFor !== undefined) updates.requiredFor = JSON.stringify(input.requiredFor);
+        if (input.isActive !== undefined) updates.isActive = input.isActive;
+        if (input.content !== undefined && input.content !== existing[0].content) {
+          updates.content = input.content;
+          updates.version = existing[0].version + 1;
+        }
+
+        const [updated] = await db.update(termTemplates).set(updates).where(eq(termTemplates.id, input.id)).returning();
+        return updated;
+      }),
+
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { termTemplates } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        await db.delete(termTemplates).where(eq(termTemplates.id, input.id));
+        return { success: true };
+      }),
+  }),
+
   restaurantePortal: router({
     myRestaurant: restauranteProcedure.query(async ({ ctx }) => {
       const user = ctx.user;
@@ -1250,6 +1383,138 @@ export const appRouter = router({
         if (!user || !user.restaurantId) throw new TRPCError({ code: "FORBIDDEN", message: "Sem restaurante vinculado" });
         return updateActiveRestaurant(user.restaurantId, input);
       }),
+
+    pendingTerms: restauranteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.restaurantId) return { templates: [], terms: [] };
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return { templates: [], terms: [] };
+      const { termTemplates, termAcceptances, restaurantTerms } = await import("../drizzle/schema");
+      const { eq, desc } = await import("drizzle-orm");
+
+      const allActive = await db.select().from(termTemplates).where(eq(termTemplates.isActive, true));
+      const restaurantTemplates = allActive.filter((t) => {
+        try {
+          const roles = JSON.parse(t.requiredFor);
+          return Array.isArray(roles) && roles.includes("restaurante");
+        } catch { return false; }
+      });
+
+      const acceptedTemplates = await db.select({ templateId: termAcceptances.templateId })
+        .from(termAcceptances)
+        .where(eq(termAcceptances.restaurantId, user.restaurantId));
+      const acceptedTemplateIds = new Set(acceptedTemplates.map(a => a.templateId).filter(Boolean));
+
+      const pendingTemplates = restaurantTemplates.filter(t => !acceptedTemplateIds.has(t.id));
+
+      const pendingTerms = await db.select().from(restaurantTerms)
+        .where(eq(restaurantTerms.restaurantId, user.restaurantId))
+        .orderBy(desc(restaurantTerms.createdAt));
+      const sentTerms = pendingTerms.filter(t => t.status === "enviado");
+
+      return { templates: pendingTemplates, terms: sentTerms };
+    }),
+
+    acceptTerm: restauranteProcedure
+      .input(z.object({
+        termId: z.number().optional(),
+        templateId: z.number().optional(),
+        acceptedByName: z.string().min(1),
+        acceptedByCpf: z.string().min(11),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const user = ctx.user;
+        if (!user || !user.restaurantId) throw new TRPCError({ code: "FORBIDDEN", message: "Sem restaurante vinculado" });
+        if (!input.termId && !input.templateId) throw new TRPCError({ code: "BAD_REQUEST", message: "termId ou templateId é obrigatório" });
+
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { termAcceptances, restaurantTerms, termTemplates } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const { createHash } = await import("crypto");
+
+        let termContent = "";
+        let termId: number | null = null;
+        let templateId: number | null = null;
+
+        if (input.termId) {
+          const term = await db.select().from(restaurantTerms).where(eq(restaurantTerms.id, input.termId)).limit(1);
+          if (!term[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Termo não encontrado" });
+          if (term[0].restaurantId !== user.restaurantId) throw new TRPCError({ code: "FORBIDDEN", message: "Termo não pertence ao seu restaurante" });
+          termContent = JSON.stringify({
+            conditions: term[0].conditions,
+            remunerationRule: term[0].remunerationRule,
+            allowedCategories: term[0].allowedCategories,
+            blockedCategories: term[0].blockedCategories,
+            restaurantObligations: term[0].restaurantObligations,
+            mesaObligations: term[0].mesaObligations,
+          });
+          termId = input.termId;
+        } else if (input.templateId) {
+          const template = await db.select().from(termTemplates).where(eq(termTemplates.id, input.templateId)).limit(1);
+          if (!template[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Template não encontrado" });
+          termContent = template[0].content;
+          templateId = input.templateId;
+        }
+
+        const termHash = createHash("sha256").update(termContent).digest("hex");
+
+        const ipAddress = (ctx as any).req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim()
+          || (ctx as any).req?.headers?.["x-real-ip"]
+          || (ctx as any).req?.socket?.remoteAddress
+          || null;
+        const userAgent = (ctx as any).req?.headers?.["user-agent"] || null;
+
+        const [acceptance] = await db.insert(termAcceptances).values({
+          restaurantId: user.restaurantId,
+          termId,
+          templateId,
+          termContent,
+          termHash,
+          acceptedByName: input.acceptedByName,
+          acceptedByCpf: input.acceptedByCpf,
+          acceptedByEmail: user.email || "",
+          ipAddress,
+          userAgent,
+        }).returning();
+
+        if (input.termId) {
+          await db.update(restaurantTerms)
+            .set({ status: "assinado", updatedAt: new Date() })
+            .where(eq(restaurantTerms.id, input.termId));
+        }
+
+        return acceptance;
+      }),
+
+    myAcceptances: restauranteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.restaurantId) return [];
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return [];
+      const { termAcceptances, termTemplates, restaurantTerms } = await import("../drizzle/schema");
+      const { eq, desc } = await import("drizzle-orm");
+      const acceptances = await db.select().from(termAcceptances)
+        .where(eq(termAcceptances.restaurantId, user.restaurantId))
+        .orderBy(desc(termAcceptances.acceptedAt));
+
+      const enriched = [];
+      for (const a of acceptances) {
+        let title = "Termo de Parceria";
+        if (a.templateId) {
+          const tmpl = await db.select({ title: termTemplates.title }).from(termTemplates).where(eq(termTemplates.id, a.templateId)).limit(1);
+          if (tmpl[0]) title = tmpl[0].title;
+        } else if (a.termId) {
+          const term = await db.select({ termNumber: restaurantTerms.termNumber }).from(restaurantTerms).where(eq(restaurantTerms.id, a.termId)).limit(1);
+          if (term[0]) title = `Termo ${term[0].termNumber}`;
+        }
+        enriched.push({ ...a, title });
+      }
+      return enriched;
+    }),
   }),
 
   portal: router({

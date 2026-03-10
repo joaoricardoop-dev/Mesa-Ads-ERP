@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +34,8 @@ import {
   Truck,
   Play,
   CircleDot,
+  AlertCircle,
+  ShieldCheck,
 } from "lucide-react";
 
 const campaignStatusConfig: Record<string, { label: string; color: string; icon: typeof CircleDot }> = {
@@ -61,11 +65,18 @@ function formatDate(d: string | Date | null | undefined) {
   return new Date(d).toLocaleDateString("pt-BR");
 }
 
+function formatDateTime(d: string | Date | null | undefined) {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("pt-BR");
+}
+
 export default function RestaurantePortal() {
   const { user } = useAuth();
   const { data: restaurant, isLoading } = trpc.restaurantePortal.myRestaurant.useQuery();
   const { data: campaigns = [] } = trpc.restaurantePortal.myCampaigns.useQuery();
   const { data: terms = [] } = trpc.restaurantePortal.myTerms.useQuery();
+  const { data: pendingData } = trpc.restaurantePortal.pendingTerms.useQuery();
+  const { data: acceptances = [] } = trpc.restaurantePortal.myAcceptances.useQuery();
 
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -76,12 +87,38 @@ export default function RestaurantePortal() {
     instagram: "",
   });
 
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const [acceptingItem, setAcceptingItem] = useState<{
+    type: "template" | "term";
+    id: number;
+    title: string;
+    content: string;
+  } | null>(null);
+  const [acceptForm, setAcceptForm] = useState({
+    name: "",
+    cpf: "",
+    accepted: false,
+  });
+
   const utils = trpc.useUtils();
   const updateContactMutation = trpc.restaurantePortal.updateContact.useMutation({
     onSuccess: () => {
       utils.restaurantePortal.myRestaurant.invalidate();
       setEditOpen(false);
       toast.success("Dados de contato atualizados!");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const acceptTermMutation = trpc.restaurantePortal.acceptTerm.useMutation({
+    onSuccess: () => {
+      utils.restaurantePortal.pendingTerms.invalidate();
+      utils.restaurantePortal.myAcceptances.invalidate();
+      utils.restaurantePortal.myTerms.invalidate();
+      setAcceptDialogOpen(false);
+      setAcceptingItem(null);
+      setAcceptForm({ name: "", cpf: "", accepted: false });
+      toast.success("Termo aceito com sucesso!");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -99,10 +136,29 @@ export default function RestaurantePortal() {
     setEditOpen(true);
   };
 
+  const openAcceptDialog = (type: "template" | "term", id: number, title: string, content: string) => {
+    setAcceptingItem({ type, id, title, content });
+    setAcceptForm({ name: "", cpf: "", accepted: false });
+    setAcceptDialogOpen(true);
+  };
+
+  const handleAcceptTerm = () => {
+    if (!acceptingItem || !acceptForm.accepted || !acceptForm.name || !acceptForm.cpf) return;
+    acceptTermMutation.mutate({
+      ...(acceptingItem.type === "term" ? { termId: acceptingItem.id } : { templateId: acceptingItem.id }),
+      acceptedByName: acceptForm.name,
+      acceptedByCpf: acceptForm.cpf,
+    });
+  };
+
   const activeCampaigns = campaigns.filter((c: any) =>
     ["veiculacao", "active", "executar", "producao", "transito"].includes(c.status)
   );
   const signedTerms = terms.filter((t: any) => t.status === "assinado" || t.status === "vigente");
+
+  const pendingTemplates = pendingData?.templates || [];
+  const pendingTermsList = pendingData?.terms || [];
+  const totalPending = pendingTemplates.length + pendingTermsList.length;
 
   if (isLoading) {
     return (
@@ -180,8 +236,8 @@ export default function RestaurantePortal() {
                   <FileText className="w-5 h-5 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{signedTerms.length}</p>
-                  <p className="text-xs text-muted-foreground">Termos assinados</p>
+                  <p className="text-2xl font-bold">{signedTerms.length + acceptances.length}</p>
+                  <p className="text-xs text-muted-foreground">Termos aceitos</p>
                 </div>
               </div>
             </CardContent>
@@ -197,6 +253,11 @@ export default function RestaurantePortal() {
             <TabsTrigger value="terms" className="gap-1.5">
               <FileText className="w-4 h-4" />
               Termos
+              {totalPending > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+                  {totalPending}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="profile" className="gap-1.5">
               <UtensilsCrossed className="w-4 h-4" />
@@ -248,34 +309,108 @@ export default function RestaurantePortal() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="terms" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Termos de Parceria</CardTitle>
-                <CardDescription>Termos aceitos e status da parceria</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {terms.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <FileText className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                    <p>Nenhum termo encontrado</p>
-                  </div>
-                ) : (
+          <TabsContent value="terms" className="mt-4 space-y-4">
+            {totalPending > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-amber-500" />
+                    Pendentes
+                  </CardTitle>
+                  <CardDescription>Termos que aguardam seu aceite</CardDescription>
+                </CardHeader>
+                <CardContent>
                   <div className="space-y-3">
-                    {terms.map((term: any) => {
-                      const cfg = termStatusConfig[term.status] || termStatusConfig.rascunho;
-                      return (
-                        <div key={term.id} className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                    {pendingTemplates.map((template: any) => (
+                      <div key={`tpl-${template.id}`} className="flex items-center justify-between p-4 rounded-lg border bg-amber-500/5 border-amber-500/20">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-amber-500/10">
+                            <FileText className="w-5 h-5 text-amber-500" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{template.title}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Versão {template.version}</p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => openAcceptDialog("template", template.id, template.title, template.content)}
+                        >
+                          Aceitar
+                        </Button>
+                      </div>
+                    ))}
+                    {pendingTermsList.map((term: any) => (
+                      <div key={`term-${term.id}`} className="flex items-center justify-between p-4 rounded-lg border bg-blue-500/5 border-blue-500/20">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-blue-500/10">
+                            <FileText className="w-5 h-5 text-blue-500" />
+                          </div>
                           <div>
                             <p className="font-medium font-mono text-sm">{term.termNumber}</p>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                               <span>Vigência: {formatDate(term.validFrom)} — {formatDate(term.validUntil)}</span>
                             </div>
                           </div>
-                          <Badge className={cfg.color}>{cfg.label}</Badge>
                         </div>
-                      );
-                    })}
+                        <Button
+                          size="sm"
+                          onClick={() => openAcceptDialog(
+                            "term",
+                            term.id,
+                            `Termo ${term.termNumber}`,
+                            JSON.stringify({
+                              conditions: term.conditions,
+                              remunerationRule: term.remunerationRule,
+                              allowedCategories: term.allowedCategories,
+                              blockedCategories: term.blockedCategories,
+                              restaurantObligations: term.restaurantObligations,
+                              mesaObligations: term.mesaObligations,
+                            }, null, 2)
+                          )}
+                        >
+                          Aceitar
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                  Aceitos
+                </CardTitle>
+                <CardDescription>Registros de termos aceitos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {acceptances.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <FileText className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                    <p>Nenhum termo aceito ainda</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {acceptances.map((acceptance: any) => (
+                      <div key={acceptance.id} className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-emerald-500/10">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{acceptance.title}</p>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                              <span>Aceito por {acceptance.acceptedByName}</span>
+                              <span>em {formatDateTime(acceptance.acceptedAt)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <Badge className="bg-emerald-500/10 text-emerald-500">Aceito</Badge>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -422,6 +557,73 @@ export default function RestaurantePortal() {
                 disabled={updateContactMutation.isPending}
               >
                 {updateContactMutation.isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={acceptDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            setAcceptDialogOpen(false);
+            setAcceptingItem(null);
+            setAcceptForm({ name: "", cpf: "", accepted: false });
+          }
+        }}>
+          <DialogContent className="max-w-2xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>{acceptingItem?.title || "Aceitar Termo"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm text-muted-foreground">Conteúdo do Termo</Label>
+                <ScrollArea className="h-[300px] mt-2 rounded-md border p-4 bg-muted/30">
+                  <div className="whitespace-pre-wrap text-sm">
+                    {acceptingItem?.content || ""}
+                  </div>
+                </ScrollArea>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nome Completo</Label>
+                  <Input
+                    value={acceptForm.name}
+                    onChange={(e) => setAcceptForm({ ...acceptForm, name: e.target.value })}
+                    placeholder="Seu nome completo"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>CPF</Label>
+                  <Input
+                    value={acceptForm.cpf}
+                    onChange={(e) => setAcceptForm({ ...acceptForm, cpf: e.target.value })}
+                    placeholder="000.000.000-00"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="accept-terms"
+                  checked={acceptForm.accepted}
+                  onCheckedChange={(checked) => setAcceptForm({ ...acceptForm, accepted: checked === true })}
+                />
+                <Label htmlFor="accept-terms" className="text-sm cursor-pointer">
+                  Li e concordo com os termos acima
+                </Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setAcceptDialogOpen(false);
+                setAcceptingItem(null);
+                setAcceptForm({ name: "", cpf: "", accepted: false });
+              }}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleAcceptTerm}
+                disabled={!acceptForm.accepted || !acceptForm.name || !acceptForm.cpf || acceptTermMutation.isPending}
+              >
+                {acceptTermMutation.isPending ? "Processando..." : "Confirmar Aceite"}
               </Button>
             </DialogFooter>
           </DialogContent>

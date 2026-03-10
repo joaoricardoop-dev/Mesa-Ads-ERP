@@ -1,9 +1,9 @@
 import express from "express";
 import { z } from "zod";
 import { getDb } from "./db";
-import { activeRestaurants, restaurantTerms, termAcceptances } from "../drizzle/schema";
+import { activeRestaurants, restaurantTerms, termAcceptances, termTemplates } from "../drizzle/schema";
 import { users } from "../shared/models/auth";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { createHash, randomUUID } from "crypto";
 
 const DEFAULT_TERMS = `TERMOS DE PARCERIA — mesa.ads
@@ -49,8 +49,43 @@ async function getDatabase() {
 export function setupRestaurantOnboardingRoutes(app: express.Express) {
   const router = express.Router();
 
-  router.get("/terms", (_req, res) => {
-    res.json({ terms: DEFAULT_TERMS });
+  router.get("/terms", async (_req, res) => {
+    try {
+      const db = await getDatabase();
+      const templates = await db
+        .select()
+        .from(termTemplates)
+        .where(and(eq(termTemplates.isActive, true)));
+
+      const restaurantTemplates = templates.filter((t) => {
+        try {
+          const roles = JSON.parse(t.requiredFor);
+          return Array.isArray(roles) && roles.includes("restaurante");
+        } catch {
+          return false;
+        }
+      });
+
+      if (restaurantTemplates.length > 0) {
+        res.json({
+          templates: restaurantTemplates.map((t) => ({
+            id: t.id,
+            title: t.title,
+            content: t.content,
+            version: t.version,
+          })),
+        });
+      } else {
+        res.json({
+          templates: [{ id: null, title: "Termos de Parceria", content: DEFAULT_TERMS, version: 1 }],
+        });
+      }
+    } catch (err) {
+      console.error("Get terms error:", err);
+      res.json({
+        templates: [{ id: null, title: "Termos de Parceria", content: DEFAULT_TERMS, version: 1 }],
+      });
+    }
   });
 
   router.get("/invite/:token", async (req, res) => {
@@ -252,6 +287,7 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
         acceptedByCpf: z.string().min(11),
         accountEmail: z.string().email(),
         accountPassword: z.string().min(6),
+        termTemplateIds: z.array(z.number()).optional(),
       });
 
       const input = schema.parse(req.body);
@@ -314,16 +350,55 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
         selfRegistered: true,
       });
 
-      await db.insert(termAcceptances).values({
-        restaurantId: restaurant.id,
-        termContent: DEFAULT_TERMS,
-        termHash: hashContent(DEFAULT_TERMS),
-        acceptedByName: input.acceptedByName,
-        acceptedByCpf: input.acceptedByCpf,
-        acceptedByEmail: input.accountEmail,
-        ipAddress: (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "").split(",")[0].trim(),
-        userAgent: req.headers["user-agent"] || null,
+      const ipAddress = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "").split(",")[0].trim();
+      const userAgent = req.headers["user-agent"] || null;
+
+      const allActiveTemplates = await db
+        .select()
+        .from(termTemplates)
+        .where(eq(termTemplates.isActive, true));
+
+      const requiredTemplates = allActiveTemplates.filter((t) => {
+        try {
+          const roles = JSON.parse(t.requiredFor || "[]");
+          return Array.isArray(roles) && roles.includes("restaurante");
+        } catch { return false; }
       });
+
+      if (requiredTemplates.length > 0) {
+        const providedIds = input.termTemplateIds || [];
+        const missingIds = requiredTemplates.filter((t) => !providedIds.includes(t.id));
+        if (missingIds.length > 0) {
+          return res.status(400).json({
+            error: `É obrigatório aceitar todos os termos: ${missingIds.map(t => t.title).join(", ")}`,
+          });
+        }
+
+        for (const tmpl of requiredTemplates) {
+          await db.insert(termAcceptances).values({
+            restaurantId: restaurant.id,
+            templateId: tmpl.id,
+            termContent: tmpl.content,
+            termHash: hashContent(tmpl.content),
+            acceptedByName: input.acceptedByName,
+            acceptedByCpf: input.acceptedByCpf,
+            acceptedByEmail: input.accountEmail,
+            ipAddress,
+            userAgent,
+          });
+        }
+      } else {
+        await db.insert(termAcceptances).values({
+          restaurantId: restaurant.id,
+          termContent: DEFAULT_TERMS,
+          termHash: hashContent(DEFAULT_TERMS),
+          acceptedByName: input.acceptedByName,
+          acceptedByCpf: input.acceptedByCpf,
+          acceptedByEmail: input.accountEmail,
+          ipAddress,
+          userAgent,
+        });
+      }
 
       res.json({ success: true, message: "Restaurante cadastrado com sucesso!" });
     } catch (err: any) {

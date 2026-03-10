@@ -9,7 +9,6 @@ const ROLES = [
   { key: "financeiro", label: "Financeiro", color: "bg-purple-500" },
   { key: "anunciante", label: "Anunciante", color: "bg-emerald-500" },
   { key: "restaurante", label: "Restaurante", color: "bg-teal-500" },
-  { key: "user", label: "Usuário", color: "bg-gray-500" },
 ] as const;
 
 interface DevToolsPanelProps {
