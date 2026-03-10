@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import DOMPurify from "dompurify";
 import {
   Building2,
   MapPin,
@@ -636,9 +637,10 @@ export default function RestaurantOnboarding() {
                       <span className="text-[10px] text-[hsl(0,0%,40%)] bg-[hsl(0,0%,11%)] px-2 py-0.5 rounded">v{tmpl.version}</span>
                     </div>
                     <div className="bg-[hsl(0,0%,11%)] border border-[hsl(0,0%,18%)] rounded-lg p-4 max-h-[200px] overflow-y-auto">
-                      <pre className="text-xs text-[hsl(0,0%,60%)] whitespace-pre-wrap font-sans leading-relaxed">
-                        {tmpl.content}
-                      </pre>
+                      <div
+                        className="text-xs text-[hsl(0,0%,60%)] font-sans leading-relaxed prose prose-sm prose-invert max-w-none [&_h1]:text-sm [&_h1]:font-bold [&_h1]:mb-1 [&_h2]:text-xs [&_h2]:font-bold [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-1 [&_li]:mb-0.5"
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(tmpl.content) }}
+                      />
                     </div>
                     <label className="flex items-start gap-3 p-3 rounded-lg bg-[hsl(0,0%,11%)] border border-[hsl(0,0%,18%)] cursor-pointer">
                       <Checkbox

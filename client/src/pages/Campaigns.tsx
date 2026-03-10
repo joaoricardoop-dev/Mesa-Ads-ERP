@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 import { trpc } from "@/lib/trpc";
 import PageContainer from "@/components/PageContainer";
@@ -49,8 +49,6 @@ import { useLocation } from "wouter";
 interface CampaignForm {
   clientId: number | null;
   name: string;
-  startDate: string;
-  endDate: string;
   status: "draft" | "active" | "paused" | "completed" | "quotation" | "archived" | "producao" | "transito" | "executar" | "veiculacao" | "inativa";
   notes: string;
   coastersPerRestaurant: number;
@@ -73,8 +71,6 @@ interface CampaignForm {
 const emptyForm: CampaignForm = {
   clientId: null,
   name: "",
-  startDate: "",
-  endDate: "",
   status: "draft",
   notes: "",
   coastersPerRestaurant: 500,
@@ -213,11 +209,18 @@ export default function Campaigns() {
   const [managingCampaignId, setManagingCampaignId] = useState<number | null>(null);
   const [, setLocation] = useLocation();
   const [restaurantSelections, setRestaurantSelections] = useState<RestaurantSelection[]>([]);
+  const [selectedBatchIds, setSelectedBatchIds] = useState<number[]>([]);
+  const [batchYear, setBatchYear] = useState(new Date().getFullYear());
 
   const utils = trpc.useUtils();
   const { data: campaignsList = [], isLoading } = trpc.campaign.list.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
   const { data: restaurantsList = [] } = trpc.restaurant.list.useQuery();
+  const { data: batchesList = [] } = trpc.batch.list.useQuery({ year: batchYear });
+  const { data: campaignBatchesData = [] } = trpc.batch.getCampaignBatches.useQuery(
+    { campaignId: editingId! },
+    { enabled: editingId !== null }
+  );
 
   const { data: campaignRestaurants = [] } = trpc.campaign.getRestaurants.useQuery(
     { campaignId: managingCampaignId! },
@@ -230,6 +233,7 @@ export default function Campaigns() {
       setIsDialogOpen(false);
       setEditingId(null);
       setForm(emptyForm);
+      setSelectedBatchIds([]);
       toast.success("Campanha atualizada!");
     },
     onError: (err: any) => toast.error(`Erro: ${err.message}`),
@@ -254,16 +258,39 @@ export default function Campaigns() {
     onError: (err: any) => toast.error(`Erro: ${err.message}`),
   });
 
+  const assignBatchesMutation = trpc.batch.assignCampaign.useMutation({
+    onSuccess: () => {
+      utils.batch.getCampaignBatches.invalidate();
+      utils.campaign.list.invalidate();
+    },
+    onError: (err: any) => toast.error(`Erro ao atribuir batches: ${err.message}`),
+  });
+
+  const selectedBatches = useMemo(() => {
+    return batchesList
+      .filter((b: any) => selectedBatchIds.includes(b.id))
+      .sort((a: any, b: any) => a.batchNumber - b.batchNumber);
+  }, [batchesList, selectedBatchIds]);
+
+  const derivedStartDate = selectedBatches.length > 0 ? selectedBatches[0].startDate : "";
+  const derivedEndDate = selectedBatches.length > 0 ? selectedBatches[selectedBatches.length - 1].endDate : "";
+
+  useEffect(() => {
+    if (selectedBatches.length > 0) {
+      setForm(prev => ({ ...prev, contractDuration: selectedBatches.length }));
+    }
+  }, [selectedBatches.length]);
+
   const handleSubmit = () => {
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
     if (!form.clientId) { toast.error("Selecione um cliente"); return; }
-    if (!form.startDate || !form.endDate) { toast.error("Datas são obrigatórias"); return; }
+    if (selectedBatchIds.length === 0) { toast.error("Selecione pelo menos um batch"); return; }
 
     const payload = {
       clientId: form.clientId!,
       name: form.name,
-      startDate: form.startDate,
-      endDate: form.endDate,
+      startDate: derivedStartDate,
+      endDate: derivedEndDate,
       status: form.status,
       notes: form.notes,
       coastersPerRestaurant: form.coastersPerRestaurant,
@@ -278,13 +305,17 @@ export default function Campaigns() {
       fixedCommission: String(form.fixedCommission),
       sellerCommission: String(form.sellerCommission),
       taxRate: String(form.taxRate),
-      contractDuration: form.contractDuration,
+      contractDuration: selectedBatchIds.length,
       batchSize: form.batchSize,
       batchCost: String(form.batchCost),
     };
 
     if (editingId) {
-      updateMutation.mutate({ id: editingId, ...payload });
+      updateMutation.mutate({ id: editingId, ...payload }, {
+        onSuccess: () => {
+          assignBatchesMutation.mutate({ campaignId: editingId, batchIds: selectedBatchIds });
+        },
+      });
     }
   };
 
@@ -293,8 +324,6 @@ export default function Campaigns() {
     setForm({
       clientId: c.clientId,
       name: c.name,
-      startDate: c.startDate ? new Date(c.startDate).toISOString().split("T")[0] : "",
-      endDate: c.endDate ? new Date(c.endDate).toISOString().split("T")[0] : "",
       status: c.status,
       notes: c.notes || "",
       coastersPerRestaurant: c.coastersPerRestaurant,
@@ -313,8 +342,15 @@ export default function Campaigns() {
       batchSize: c.batchSize,
       batchCost: Number(c.batchCost),
     });
+    setSelectedBatchIds([]);
     setIsDialogOpen(true);
   };
+
+  useEffect(() => {
+    if (editingId && campaignBatchesData.length > 0) {
+      setSelectedBatchIds(campaignBatchesData.map((b: any) => b.batchId));
+    }
+  }, [editingId, campaignBatchesData]);
 
 
 
@@ -552,19 +588,50 @@ export default function Campaigns() {
                       </Select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="grid gap-1.5">
-                      <Label className="text-xs">Data Início *</Label>
-                      <Input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="bg-background border-border/30 h-9 text-sm" />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Batches (Período) *</Label>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setBatchYear(batchYear - 1)}>&lt;</Button>
+                        <span className="text-xs font-mono font-semibold">{batchYear}</span>
+                        <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setBatchYear(batchYear + 1)}>&gt;</Button>
+                      </div>
                     </div>
-                    <div className="grid gap-1.5">
-                      <Label className="text-xs">Data Fim *</Label>
-                      <Input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="bg-background border-border/30 h-9 text-sm" />
+                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-border/20 rounded-lg p-2 bg-background/50">
+                      {batchesList.map((batch: any) => {
+                        const isSelected = selectedBatchIds.includes(batch.id);
+                        return (
+                          <div
+                            key={batch.id}
+                            className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${isSelected ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50 border border-transparent"}`}
+                            onClick={() => {
+                              setSelectedBatchIds(prev =>
+                                isSelected ? prev.filter(id => id !== batch.id) : [...prev, batch.id]
+                              );
+                            }}
+                          >
+                            <Checkbox checked={isSelected} />
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate">{batch.label}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {new Date(batch.startDate + "T12:00:00").toLocaleDateString("pt-BR")} — {new Date(batch.endDate + "T12:00:00").toLocaleDateString("pt-BR")}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="grid gap-1.5">
-                      <Label className="text-xs">Duração (meses)</Label>
-                      <Input type="number" value={form.contractDuration} onChange={(e) => setForm({ ...form, contractDuration: Number(e.target.value) })} className="bg-background border-border/30 h-9 text-sm font-mono" min={1} max={36} />
-                    </div>
+                    {selectedBatchIds.length > 0 && (
+                      <div className="text-xs text-muted-foreground bg-muted/30 rounded-md px-3 py-2">
+                        <span className="font-medium text-foreground">{selectedBatchIds.length} batch(es)</span>
+                        {" · "}
+                        {derivedStartDate && new Date(derivedStartDate + "T12:00:00").toLocaleDateString("pt-BR")}
+                        {" → "}
+                        {derivedEndDate && new Date(derivedEndDate + "T12:00:00").toLocaleDateString("pt-BR")}
+                        {" · "}
+                        Duração: {selectedBatchIds.length} ciclo(s) de 4 semanas
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -646,7 +713,7 @@ export default function Campaigns() {
                 <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Notas sobre a campanha..." className="bg-background border-border/30 h-9 text-sm" />
               </div>
 
-              {form.clientId && form.startDate && (
+              {form.clientId && selectedBatchIds.length > 0 && (
                 <CampaignPreview form={form} />
               )}
             </div>

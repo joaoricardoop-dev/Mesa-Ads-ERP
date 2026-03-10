@@ -146,7 +146,7 @@ export const batchRouter = router({
       return assignments;
     }),
 
-  assignCampaign: adminProcedure
+  assignCampaign: protectedProcedure
     .input(z.object({
       campaignId: z.number(),
       batchIds: z.array(z.number()).min(1),

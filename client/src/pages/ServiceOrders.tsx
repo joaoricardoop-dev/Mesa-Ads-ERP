@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -118,11 +119,17 @@ export default function ServiceOrders() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [selectedBatchIds, setSelectedBatchIds] = useState<number[]>([]);
 
   const utils = trpc.useUtils();
   const { data: ordersList = [], isLoading } = trpc.serviceOrder.list.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
   const { data: campaignsList = [] } = trpc.campaign.list.useQuery();
+  const { data: batchesList = [] } = trpc.batch.list.useQuery({ year: new Date().getFullYear() });
+  const { data: campaignBatches = [] } = trpc.batch.getCampaignBatches.useQuery(
+    { campaignId: form.campaignId! },
+    { enabled: !!form.campaignId }
+  );
 
   const createMutation = trpc.serviceOrder.create.useMutation({
     onSuccess: () => {
@@ -168,12 +175,28 @@ export default function ServiceOrders() {
       return;
     }
 
+    let periodStart = form.periodStart || undefined;
+    let periodEnd = form.periodEnd || undefined;
+    if (form.campaignId && campaignBatches.length > 0) {
+      const sorted = [...campaignBatches].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+      periodStart = sorted[0].startDate;
+      periodEnd = sorted[sorted.length - 1].endDate;
+    } else if (selectedBatchIds.length > 0) {
+      const selected = batchesList
+        .filter((b: any) => selectedBatchIds.includes(b.id))
+        .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+      if (selected.length > 0) {
+        periodStart = selected[0].startDate;
+        periodEnd = selected[selected.length - 1].endDate;
+      }
+    }
+
     const payload: any = {
       type: form.type,
       description: form.description || undefined,
       networkAllocation: form.networkAllocation || undefined,
-      periodStart: form.periodStart || undefined,
-      periodEnd: form.periodEnd || undefined,
+      periodStart,
+      periodEnd,
       totalValue: form.totalValue || undefined,
       paymentTerms: form.paymentTerms || undefined,
       specs: form.specs || undefined,
@@ -213,12 +236,14 @@ export default function ServiceOrders() {
       artPdfUrl: order.artPdfUrl || "",
       artImageUrls: order.artImageUrls || "",
     });
+    setSelectedBatchIds([]);
     setIsDialogOpen(true);
   };
 
   const handleNew = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setSelectedBatchIds([]);
     setIsDialogOpen(true);
   };
 
@@ -497,37 +522,70 @@ export default function ServiceOrders() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <div className="grid gap-1.5">
-                <Label className="text-xs">Volume de Coasters</Label>
-                <Input
-                  type="number"
-                  value={form.coasterVolume || ""}
-                  onChange={(e) =>
-                    setForm({ ...form, coasterVolume: e.target.value ? Number(e.target.value) : undefined })
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Volume de Coasters</Label>
+              <Input
+                type="number"
+                value={form.coasterVolume || ""}
+                onChange={(e) =>
+                  setForm({ ...form, coasterVolume: e.target.value ? Number(e.target.value) : undefined })
+                }
+                placeholder="10000"
+                className="bg-background border-border/30 h-9 text-sm font-mono"
+              />
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Período (Batches)</Label>
+              {form.campaignId && campaignBatches.length > 0 ? (
+                <div className="bg-muted/50 border border-border/20 rounded-lg p-3 space-y-1">
+                  <p className="text-xs text-muted-foreground">Período da campanha vinculada:</p>
+                  <p className="text-sm font-medium">
+                    {campaignBatches.map((b: any) => b.label).join(", ")}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {campaignBatches[0]?.startDate} — {campaignBatches[campaignBatches.length - 1]?.endDate}
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-background border border-border/30 rounded-lg p-3 max-h-[180px] overflow-y-auto space-y-1">
+                  {batchesList.map((batch: any) => (
+                    <label key={batch.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/30 cursor-pointer">
+                      <Checkbox
+                        checked={selectedBatchIds.includes(batch.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedBatchIds(prev =>
+                            checked
+                              ? [...prev, batch.id].sort((a, b) => a - b)
+                              : prev.filter(id => id !== batch.id)
+                          );
+                        }}
+                      />
+                      <span className="text-xs flex-1">{batch.label}</span>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {batch.startDate} — {batch.endDate}
+                      </span>
+                    </label>
+                  ))}
+                  {batchesList.length === 0 && (
+                    <p className="text-xs text-muted-foreground py-2 text-center">Nenhum batch disponível</p>
+                  )}
+                </div>
+              )}
+              {selectedBatchIds.length > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  {selectedBatchIds.length} batch(es) selecionado(s) — Período: {
+                    (() => {
+                      const selected = batchesList
+                        .filter((b: any) => selectedBatchIds.includes(b.id))
+                        .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+                      return selected.length > 0
+                        ? `${selected[0].startDate} a ${selected[selected.length - 1].endDate}`
+                        : "";
+                    })()
                   }
-                  placeholder="10000"
-                  className="bg-background border-border/30 h-9 text-sm font-mono"
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label className="text-xs">Período Início</Label>
-                <Input
-                  type="date"
-                  value={form.periodStart}
-                  onChange={(e) => setForm({ ...form, periodStart: e.target.value })}
-                  className="bg-background border-border/30 h-9 text-sm"
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label className="text-xs">Período Fim</Label>
-                <Input
-                  type="date"
-                  value={form.periodEnd}
-                  onChange={(e) => setForm({ ...form, periodEnd: e.target.value })}
-                  className="bg-background border-border/30 h-9 text-sm"
-                />
-              </div>
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

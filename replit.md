@@ -24,12 +24,13 @@ The application features a sidebar-based layout using `shadcn/ui` with a collaps
 - **Quotation Workflow**: Manages quotations through statuses (`rascunho` → `enviada` → `ativa` → `os_gerada` → `win` / `perdida` / `expirada`), including auto-generated naming, service order creation, and conversion to campaigns upon signing.
 - **Simulator UI**: A comprehensive simulation tool with collapsible sections for operational parameters, production costs, pricing, and commercial/tax details, providing KPI cards, DRE, and tabbed analysis.
 - **Restaurant Onboarding**: Supports both self-service public registration and invite-based onboarding for restaurant partners, with legal term acceptance tracking. Self-service onboarding fetches active term templates from `term_templates` table and requires individual acceptance of each.
-- **Term Templates**: Admin-managed templates (`term_templates` table) with title, content, version tracking, and `requiredFor` role targeting. Managed at `/configuracoes/termos`. Used by onboarding and restaurant portal for dynamic term acceptance.
+- **Term Templates**: Admin-managed templates (`term_templates` table) with title, rich HTML content (via TipTap WYSIWYG editor), version tracking, and `requiredFor` role targeting. Managed at `/configuracoes/termos`. Used by onboarding and restaurant portal for dynamic term acceptance. HTML content is sanitized with DOMPurify before rendering.
 - **Impersonation**: Internal users (admin, comercial, operacoes, financeiro, manager) can impersonate external accounts (anunciante, restaurante) via "Entrar como" buttons. Uses `window.__IMPERSONATION__` + custom event pattern, sends `x-impersonate-client-id`/`x-impersonate-restaurant-id` headers to backend. Banner in DashboardLayout shows active impersonation with exit button.
 - **Roles & Permissions**: Granular access control based on roles (Admin, Comercial, Operações, Financeiro, Anunciante, Restaurante), enforced at both UI and API levels using tRPC procedures. No "user" role — all users must have an explicit role. Members page segments users into Internos/Externos tabs.
 - **Pricing Engine**: Cost-based pricing with markup, calculating selling price using grossup formula: `CustoBruto = CustoPD / (1 - totalVarRate)`, then `SellingPrice = CustoBruto × (1 + markup%)`.
 - **Restaurant Rating System**: A multi-dimensional rating system (Bronze, Prata, Ouro, Diamante) based on weighted factors (drinks flow, ticket, location, etc.) for classification.
-- **Campaign Batches**: Divides the year into 13 four-week batches for campaign scheduling and management.
+- **Campaign Batches**: Divides the year into 13 four-week batches for campaign scheduling and management. All campaign/quotation/OS periods are derived from batch selections — no free-form date inputs. Campaign creation, quotation signing (signOS), and service order generation all use batch pickers.
+- **Term PDF Generation**: Branded mesa.ads PDF auto-downloads after term acceptance and can be re-downloaded from accepted terms list. Uses jsPDF with black header bar, green accent, signer details, and document hash.
 
 ### System Design Choices
 - **Monorepo Structure**: `client/` for frontend, `server/` for backend, and `shared/` for common types and constants.
@@ -40,4 +41,6 @@ The application features a sidebar-based layout using `shadcn/ui` with a collaps
 - **Clerk**: For authentication, user management, and authorization.
 - **Neon Database**: Provides the PostgreSQL database infrastructure.
 - **Recharts**: For data visualization in the UI.
-- **jsPDF + jspdf-autotable**: For client-side PDF generation (e.g., Service Orders).
+- **jsPDF + jspdf-autotable**: For client-side PDF generation (e.g., Service Orders, Term acceptance PDFs).
+- **TipTap**: Rich text (WYSIWYG) editor for term template content (`@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-underline`).
+- **DOMPurify**: HTML sanitization for rendering rich text content safely.

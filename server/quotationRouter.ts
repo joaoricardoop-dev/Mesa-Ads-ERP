@@ -1,8 +1,8 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads } from "../drizzle/schema";
-import { eq, desc, sql, and, inArray } from "drizzle-orm";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments } from "../drizzle/schema";
+import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 const MONTH_NAMES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -472,8 +472,7 @@ export const quotationRouter = router({
     .input(z.object({
       quotationId: z.number(),
       signatureUrl: z.string().min(1),
-      startDate: z.string(),
-      endDate: z.string(),
+      batchIds: z.array(z.number()).min(1),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -489,6 +488,21 @@ export const quotationRouter = router({
       if (allocatedRestaurants.length === 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "É necessário alocar restaurantes antes de assinar a OS" });
       }
+
+      const batchRecords = await db
+        .select()
+        .from(campaignBatches)
+        .where(inArray(campaignBatches.id, input.batchIds))
+        .orderBy(asc(campaignBatches.startDate));
+
+      if (batchRecords.length !== input.batchIds.length) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Um ou mais batches não encontrados" });
+      }
+
+      const firstBatch = batchRecords[0];
+      const lastBatch = batchRecords[batchRecords.length - 1];
+      const derivedStartDate = firstBatch.startDate;
+      const derivedEndDate = lastBatch.endDate;
 
       const os = await db.select().from(serviceOrders).where(eq(serviceOrders.quotationId, input.quotationId)).limit(1);
       if (!os[0]) throw new TRPCError({ code: "NOT_FOUND", message: "OS não encontrada" });
@@ -514,8 +528,8 @@ export const quotationRouter = router({
         campaignNumber,
         clientId: quotation[0].clientId,
         name: campaignName,
-        startDate: input.startDate,
-        endDate: input.endDate,
+        startDate: derivedStartDate,
+        endDate: derivedEndDate,
         status: "producao",
         quotationId: quotation[0].id,
         campaignType: quotation[0].campaignType,
@@ -531,16 +545,23 @@ export const quotationRouter = router({
         fixedCommission: "0.0500",
         sellerCommission: "10.00",
         taxRate: "15.00",
-        contractDuration: quotation[0].cycles || 6,
+        contractDuration: input.batchIds.length,
         batchSize: quotation[0].coasterVolume,
         batchCost: "1200.00",
         notes: quotation[0].notes,
       }).returning();
 
+      await db.insert(campaignBatchAssignments).values(
+        input.batchIds.map(batchId => ({
+          campaignId: campaign.id,
+          batchId,
+        }))
+      );
+
       await db.insert(campaignHistory).values({
         campaignId: campaign.id,
         action: "created_from_quotation",
-        details: `Campanha criada a partir da cotação ${quotation[0].quotationNumber} (OS assinada)`,
+        details: `Campanha criada a partir da cotação ${quotation[0].quotationNumber} (OS assinada) — ${batchRecords.length} batch(es)`,
       });
 
       if (allocatedRestaurants.length > 0) {

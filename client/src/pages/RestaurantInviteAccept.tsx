@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { toast } from "sonner";
+import DOMPurify from "dompurify";
 import {
   Eye,
   EyeOff,
@@ -276,15 +277,14 @@ export default function RestaurantInviteAccept() {
           </div>
 
           <div
-            className="rounded-lg p-5 max-h-80 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap"
+            className="rounded-lg p-5 max-h-80 overflow-y-auto text-sm leading-relaxed prose prose-sm prose-invert max-w-none [&_h1]:text-sm [&_h1]:font-bold [&_h1]:mb-1 [&_h2]:text-xs [&_h2]:font-bold [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-1 [&_li]:mb-0.5"
             style={{
               background: "hsl(0 0% 4%)",
               border: "1px solid hsl(0 0% 11%)",
               color: "hsl(0 0% 70%)",
             }}
-          >
-            {termContent}
-          </div>
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(termContent) }}
+          />
 
           <label className="flex items-start gap-3 mt-5 cursor-pointer select-none">
             <input

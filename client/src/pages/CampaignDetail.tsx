@@ -50,7 +50,6 @@ import {
   Mail,
   Instagram,
   Hash,
-  Pencil,
   AlertTriangle,
   Eye,
   Banknote,
@@ -229,11 +228,8 @@ export default function CampaignDetail() {
   const campaignId = match ? parseInt(params!.id) : 0;
 
   const [isRestaurantsDialogOpen, setIsRestaurantsDialogOpen] = useState(false);
-  const [isEditPeriodOpen, setIsEditPeriodOpen] = useState(false);
   const [restaurantSelections, setRestaurantSelections] = useState<RestaurantSelection[]>([]);
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
-  const [editStart, setEditStart] = useState("");
-  const [editEnd, setEditEnd] = useState("");
   const [artPdfUrl, setArtPdfUrl] = useState("");
   const [artImageUrls, setArtImageUrls] = useState("");
   const [veiculacaoStart, setVeiculacaoStart] = useState("");
@@ -249,6 +245,7 @@ export default function CampaignDetail() {
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
   const { data: restaurantsList = [] } = trpc.restaurant.list.useQuery();
   const { data: proofsList = [] } = trpc.campaign.getProofs.useQuery({ campaignId }, { enabled: campaignId > 0 });
+  const { data: campaignBatchList = [] } = trpc.batch.getCampaignBatches.useQuery({ campaignId }, { enabled: campaignId > 0 });
 
   const uploadArtMutation = trpc.campaign.uploadArt.useMutation({
     onSuccess: () => {
@@ -444,34 +441,6 @@ export default function CampaignDetail() {
     setRestaurantsMutation.mutate({ campaignId, restaurants: selected });
   };
 
-  const handleOpenEditPeriod = () => {
-    if (!campaign) return;
-    setEditStart(campaign.startDate || "");
-    setEditEnd(campaign.endDate || "");
-    setIsEditPeriodOpen(true);
-  };
-
-  const handleSavePeriod = () => {
-    if (!editStart || !editEnd) return;
-    const start = new Date(editStart);
-    const end = new Date(editEnd);
-    const diffMonths = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
-    updateMutation.mutate(
-      { id: campaignId, startDate: editStart, endDate: editEnd, contractDuration: diffMonths },
-      {
-        onSuccess: () => {
-          setIsEditPeriodOpen(false);
-          addHistoryMutation.mutate({
-            campaignId,
-            action: "updated",
-            details: `Período atualizado: ${new Date(editStart).toLocaleDateString("pt-BR")} → ${new Date(editEnd).toLocaleDateString("pt-BR")} (${diffMonths} meses)`,
-          });
-          toast.success("Período atualizado!");
-        },
-      }
-    );
-  };
-
   const selectedCount = restaurantSelections.filter(r => r.selected).length;
   const totalCoastersAllocated = restaurantSelections.filter(r => r.selected).reduce((s, r) => s + r.coastersCount, 0);
 
@@ -518,10 +487,20 @@ export default function CampaignDetail() {
     { name: "Lucro", custo: p.profitPerRest },
   ];
 
+  const batchStartDate = campaignBatchList.length > 0 ? campaignBatchList[0].startDate : campaign.startDate;
+  const batchEndDate = campaignBatchList.length > 0 ? campaignBatchList[campaignBatchList.length - 1].endDate : campaign.endDate;
+  const batchCount = campaignBatchList.length;
+  const batchWeeks = batchCount * 4;
+  const batchLabel = batchCount > 0
+    ? batchCount === 1
+      ? `Batch ${campaignBatchList[0].batchNumber}`
+      : `Batches ${campaignBatchList[0].batchNumber}–${campaignBatchList[campaignBatchList.length - 1].batchNumber}`
+    : null;
+
   const daysElapsed = campaign.status === "active" || campaign.status === "paused"
-    ? Math.max(0, Math.floor((Date.now() - new Date(campaign.startDate).getTime()) / (1000 * 60 * 60 * 24)))
+    ? Math.max(0, Math.floor((Date.now() - new Date(batchStartDate).getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
-  const totalDays = Math.max(1, Math.floor((new Date(campaign.endDate).getTime() - new Date(campaign.startDate).getTime()) / (1000 * 60 * 60 * 24)));
+  const totalDays = Math.max(1, Math.floor((new Date(batchEndDate).getTime() - new Date(batchStartDate).getTime()) / (1000 * 60 * 60 * 24)));
   const progressPct = Math.min(100, (daysElapsed / totalDays) * 100);
 
   return (
@@ -866,30 +845,41 @@ export default function CampaignDetail() {
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Período & Progresso</h3>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleOpenEditPeriod}>
-                      <Pencil className="w-3 h-3" />
-                    </Button>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span>{campaign.startDate ? new Date(campaign.startDate).toLocaleDateString("pt-BR") : "—"}</span>
-                    <span className="text-muted-foreground">→</span>
-                    <span>{campaign.endDate ? new Date(campaign.endDate).toLocaleDateString("pt-BR") : "—"}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>{daysElapsed} dias</span>
-                      <span>{totalDays} dias total</span>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Período & Progresso</h3>
+                  {batchCount > 0 ? (
+                    <>
+                      <div className="flex items-center justify-between text-sm">
+                        <span>{new Date(batchStartDate).toLocaleDateString("pt-BR")}</span>
+                        <span className="text-muted-foreground">→</span>
+                        <span>{new Date(batchEndDate).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                      {batchLabel && (
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="outline" className="text-[10px]">{batchLabel}</Badge>
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-muted-foreground">
+                          <span>{daysElapsed} dias</span>
+                          <span>{totalDays} dias total</span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progressPct}%` }} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <MiniStat label="Duração" value={`${batchCount} batch${batchCount > 1 ? "es" : ""} (${batchWeeks} semanas)`} />
+                        <MiniStat label="Dias restantes" value={`${Math.max(0, totalDays - daysElapsed)}`} />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 py-3 text-center">
+                      <p className="text-xs text-muted-foreground">Sem batches atribuídos</p>
+                      <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => navigate("/batches")}>
+                        <Calendar className="w-3.5 h-3.5" /> Gerenciar Batches
+                      </Button>
                     </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progressPct}%` }} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <MiniStat label="Duração" value={`${campaign.contractDuration} meses`} />
-                    <MiniStat label="Dias restantes" value={`${Math.max(0, totalDays - daysElapsed)}`} />
-                  </div>
+                  )}
                 </div>
 
                 <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
@@ -959,7 +949,7 @@ export default function CampaignDetail() {
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <ContractCard label="Contrato Total" value={formatCurrency(p.contractRevenue)} sub={`${campaign.contractDuration} meses`} />
+                <ContractCard label="Contrato Total" value={formatCurrency(p.contractRevenue)} sub={batchCount > 0 ? `${batchCount} batch${batchCount > 1 ? "es" : ""} (${batchWeeks} semanas)` : `${campaign.contractDuration} meses`} />
                 <ContractCard label="Custos do Contrato" value={formatCurrency(p.contractCosts)} />
                 <ContractCard label="Lucro do Contrato" value={formatCurrency(p.contractProfit)} accent />
                 <ContractCard label="Coasters Total Contrato" value={(p.totalCoasters * campaign.contractDuration).toLocaleString("pt-BR")} sub="unidades" />
@@ -1266,35 +1256,6 @@ export default function CampaignDetail() {
               <Button size="sm" onClick={handleSaveRestaurants} disabled={setRestaurantsMutation.isPending}>
                 Salvar ({selectedCount} restaurantes)
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={isEditPeriodOpen} onOpenChange={setIsEditPeriodOpen}>
-          <DialogContent className="sm:max-w-md bg-card border-border/30">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-primary" /> Editar Período
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label className="text-xs">Data Início</Label>
-                <Input type="date" value={editStart} onChange={(e) => setEditStart(e.target.value)} className="bg-background border-border/30" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Data Fim</Label>
-                <Input type="date" value={editEnd} onChange={(e) => setEditEnd(e.target.value)} className="bg-background border-border/30" />
-              </div>
-              {editStart && editEnd && (
-                <p className="text-xs text-muted-foreground">
-                  Duração: {Math.max(1, Math.round((new Date(editEnd).getTime() - new Date(editStart).getTime()) / (1000 * 60 * 60 * 24 * 30)))} meses
-                </p>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" size="sm" onClick={() => setIsEditPeriodOpen(false)}>Cancelar</Button>
-              <Button size="sm" onClick={handleSavePeriod} disabled={updateMutation.isPending || !editStart || !editEnd}>Salvar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

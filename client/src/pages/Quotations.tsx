@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -196,9 +197,10 @@ export default function Quotations() {
   const [lossDialogId, setLossDialogId] = useState<number | null>(null);
   const [lossReason, setLossReason] = useState("");
   const [osDialogId, setOsDialogId] = useState<number | null>(null);
-  const [osForm, setOsForm] = useState({ description: "", periodStart: "", periodEnd: "", paymentTerms: "" });
+  const [osForm, setOsForm] = useState({ description: "", paymentTerms: "" });
+  const [osBatchIds, setOsBatchIds] = useState<number[]>([]);
   const [signOsDialogId, setSignOsDialogId] = useState<number | null>(null);
-  const [signForm, setSignForm] = useState({ startDate: "", endDate: "", signatureUrl: "" });
+  const [signForm, setSignForm] = useState({ batchIds: [] as number[], signatureUrl: "" });
   const [restaurantAllocations, setRestaurantAllocations] = useState<Array<{ restaurantId: number; coasterQuantity: number }>>([]);
   const [addRestaurantId, setAddRestaurantId] = useState<string>("");
 
@@ -206,6 +208,7 @@ export default function Quotations() {
   const { data: quotationsList = [], isLoading } = trpc.quotation.list.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
   const { data: activeRestaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
+  const { data: batchesList = [] } = trpc.batch.list.useQuery();
   const { data: allocatedRestaurants = [] } = trpc.quotation.getRestaurants.useQuery(
     { quotationId: signOsDialogId! },
     { enabled: !!signOsDialogId }
@@ -567,7 +570,8 @@ export default function Quotations() {
                           className="h-8 w-8 text-amber-400 hover:text-amber-300"
                           onClick={() => {
                             setOsDialogId(q.id);
-                            setOsForm({ description: "", periodStart: "", periodEnd: "", paymentTerms: "" });
+                            setOsForm({ description: "", paymentTerms: "" });
+                            setOsBatchIds([]);
                           }}
                           title="Gerar OS"
                         >
@@ -585,8 +589,7 @@ export default function Quotations() {
                           onSign={() => {
                           setSignOsDialogId(q.id);
                           setSignForm({
-                            startDate: "",
-                            endDate: "",
+                            batchIds: [],
                             signatureUrl: "",
                           });
                           setRestaurantAllocations([]);
@@ -818,25 +821,42 @@ export default function Quotations() {
                 rows={2}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Período Início</Label>
-                <Input
-                  type="date"
-                  value={osForm.periodStart}
-                  onChange={(e) => setOsForm({ ...osForm, periodStart: e.target.value })}
-                  className="bg-background border-border/30"
-                />
+            <div className="grid gap-2">
+              <Label>Período (Batches)</Label>
+              <div className="bg-background border border-border/30 rounded-lg p-3 max-h-[180px] overflow-y-auto space-y-1">
+                {batchesList.map((batch: any) => (
+                  <label key={batch.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/30 cursor-pointer">
+                    <Checkbox
+                      checked={osBatchIds.includes(batch.id)}
+                      onCheckedChange={(checked) => {
+                        setOsBatchIds(prev =>
+                          checked
+                            ? [...prev, batch.id].sort((a, b) => a - b)
+                            : prev.filter(id => id !== batch.id)
+                        );
+                      }}
+                    />
+                    <span className="text-xs flex-1">{batch.label}</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      {batch.startDate} — {batch.endDate}
+                    </span>
+                  </label>
+                ))}
               </div>
-              <div className="grid gap-2">
-                <Label>Período Fim</Label>
-                <Input
-                  type="date"
-                  value={osForm.periodEnd}
-                  onChange={(e) => setOsForm({ ...osForm, periodEnd: e.target.value })}
-                  className="bg-background border-border/30"
-                />
-              </div>
+              {osBatchIds.length > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  {osBatchIds.length} batch(es) — Período: {
+                    (() => {
+                      const selected = batchesList
+                        .filter((b: any) => osBatchIds.includes(b.id))
+                        .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+                      return selected.length > 0
+                        ? `${selected[0].startDate} a ${selected[selected.length - 1].endDate}`
+                        : "";
+                    })()
+                  }
+                </p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label>Condições de Pagamento</Label>
@@ -855,11 +875,16 @@ export default function Quotations() {
             <Button
               onClick={() => {
                 if (!osDialogId) return;
+                const selectedBatches = batchesList
+                  .filter((b: any) => osBatchIds.includes(b.id))
+                  .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+                const periodStart = selectedBatches.length > 0 ? selectedBatches[0].startDate : undefined;
+                const periodEnd = selectedBatches.length > 0 ? selectedBatches[selectedBatches.length - 1].endDate : undefined;
                 generateOSMutation.mutate({
                   id: osDialogId,
                   description: osForm.description || undefined,
-                  periodStart: osForm.periodStart || undefined,
-                  periodEnd: osForm.periodEnd || undefined,
+                  periodStart,
+                  periodEnd,
                   paymentTerms: osForm.paymentTerms || undefined,
                 });
               }}
@@ -1011,25 +1036,47 @@ export default function Quotations() {
                 </div>
                 <p className="text-[11px] text-muted-foreground">Gerado automaticamente a partir da cotação.</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Data Início *</Label>
-                  <Input
-                    type="date"
-                    value={signForm.startDate}
-                    onChange={(e) => setSignForm({ ...signForm, startDate: e.target.value })}
-                    className="bg-background border-border/30"
-                  />
+              <div className="grid gap-2">
+                <Label>Batches (períodos de 4 semanas) *</Label>
+                <div className="border border-border/30 rounded-lg max-h-48 overflow-y-auto bg-background">
+                  {batchesList.map((batch: any) => (
+                    <label
+                      key={batch.id}
+                      className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30 cursor-pointer border-b border-border/10 last:border-b-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={signForm.batchIds.includes(batch.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSignForm({ ...signForm, batchIds: [...signForm.batchIds, batch.id] });
+                          } else {
+                            setSignForm({ ...signForm, batchIds: signForm.batchIds.filter((id: number) => id !== batch.id) });
+                          }
+                        }}
+                        className="rounded border-border"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium">{batch.label}</span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          {new Date(batch.startDate + "T00:00:00").toLocaleDateString("pt-BR")} — {new Date(batch.endDate + "T00:00:00").toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                    </label>
+                  ))}
                 </div>
-                <div className="grid gap-2">
-                  <Label>Data Fim *</Label>
-                  <Input
-                    type="date"
-                    value={signForm.endDate}
-                    onChange={(e) => setSignForm({ ...signForm, endDate: e.target.value })}
-                    className="bg-background border-border/30"
-                  />
-                </div>
+                {signForm.batchIds.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {signForm.batchIds.length} batch(es) selecionado(s)
+                    {(() => {
+                      const selected = batchesList.filter((b: any) => signForm.batchIds.includes(b.id)).sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+                      if (selected.length === 0) return "";
+                      const first = selected[0];
+                      const last = selected[selected.length - 1];
+                      return ` — ${new Date(first.startDate + "T00:00:00").toLocaleDateString("pt-BR")} a ${new Date(last.endDate + "T00:00:00").toLocaleDateString("pt-BR")}`;
+                    })()}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1069,15 +1116,14 @@ export default function Quotations() {
                   toast.error("Informe a URL da assinatura");
                   return;
                 }
-                if (!signForm.startDate || !signForm.endDate) {
-                  toast.error("Informe as datas de início e fim");
+                if (signForm.batchIds.length === 0) {
+                  toast.error("Selecione pelo menos um batch");
                   return;
                 }
                 signOSMutation.mutate({
                   quotationId: signOsDialogId,
                   signatureUrl: signForm.signatureUrl.trim(),
-                  startDate: signForm.startDate,
-                  endDate: signForm.endDate,
+                  batchIds: signForm.batchIds,
                 });
               }}
               disabled={signOSMutation.isPending || allocatedRestaurants.length === 0}

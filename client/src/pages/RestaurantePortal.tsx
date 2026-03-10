@@ -17,6 +17,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import DOMPurify from "dompurify";
+import { generateTermPdf } from "@/lib/generate-term-pdf";
 import {
   UtensilsCrossed,
   Megaphone,
@@ -36,6 +38,7 @@ import {
   CircleDot,
   AlertCircle,
   ShieldCheck,
+  Download,
 } from "lucide-react";
 
 const campaignStatusConfig: Record<string, { label: string; color: string; icon: typeof CircleDot }> = {
@@ -112,13 +115,24 @@ export default function RestaurantePortal() {
 
   const acceptTermMutation = trpc.restaurantePortal.acceptTerm.useMutation({
     onSuccess: () => {
+      if (acceptingItem) {
+        generateTermPdf({
+          title: acceptingItem.title,
+          content: acceptingItem.content,
+          signerName: acceptForm.name,
+          signerCpf: acceptForm.cpf,
+          signerEmail: user?.email || "",
+          signedAt: new Date().toISOString(),
+          termHash: undefined,
+        });
+      }
       utils.restaurantePortal.pendingTerms.invalidate();
       utils.restaurantePortal.myAcceptances.invalidate();
       utils.restaurantePortal.myTerms.invalidate();
       setAcceptDialogOpen(false);
       setAcceptingItem(null);
       setAcceptForm({ name: "", cpf: "", accepted: false });
-      toast.success("Termo aceito com sucesso!");
+      toast.success("Termo aceito com sucesso! PDF gerado para download.");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -408,7 +422,25 @@ export default function RestaurantePortal() {
                             </div>
                           </div>
                         </div>
-                        <Badge className="bg-emerald-500/10 text-emerald-500">Aceito</Badge>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 gap-1.5 text-xs"
+                            onClick={() => generateTermPdf({
+                              title: acceptance.title,
+                              content: acceptance.termContent || "",
+                              signerName: acceptance.acceptedByName || "",
+                              signerCpf: acceptance.acceptedByCpf || "",
+                              signerEmail: acceptance.acceptedByEmail || "",
+                              signedAt: acceptance.acceptedAt || new Date().toISOString(),
+                              termHash: acceptance.termHash || undefined,
+                            })}
+                          >
+                            <Download className="w-3 h-3" /> PDF
+                          </Button>
+                          <Badge className="bg-emerald-500/10 text-emerald-500">Aceito</Badge>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -577,9 +609,10 @@ export default function RestaurantePortal() {
               <div>
                 <Label className="text-sm text-muted-foreground">Conteúdo do Termo</Label>
                 <ScrollArea className="h-[300px] mt-2 rounded-md border p-4 bg-muted/30">
-                  <div className="whitespace-pre-wrap text-sm">
-                    {acceptingItem?.content || ""}
-                  </div>
+                  <div
+                    className="prose prose-sm prose-invert max-w-none text-sm [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-2 [&_h2]:text-base [&_h2]:font-bold [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-bold [&_h3]:mb-1 [&_p]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_li]:mb-0.5"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(acceptingItem?.content || "") }}
+                  />
                 </ScrollArea>
               </div>
               <div className="grid grid-cols-2 gap-4">

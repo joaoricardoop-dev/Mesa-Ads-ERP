@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { FileText, Plus, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
+import RichTextEditor from "@/components/RichTextEditor";
 
 const ROLE_OPTIONS = [
   { key: "restaurante", label: "Restaurante", color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
@@ -185,7 +186,7 @@ export default function TermTemplates() {
                       })}
                     </div>
                     <p className="text-xs text-muted-foreground line-clamp-2">
-                      {template.content.substring(0, 200)}{template.content.length > 200 ? "..." : ""}
+                      {template.content.replace(/<[^>]*>/g, "").substring(0, 200)}{template.content.length > 200 ? "..." : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
@@ -248,12 +249,10 @@ export default function TermTemplates() {
 
             <div className="grid gap-2">
               <Label>Conteúdo do Termo *</Label>
-              <textarea
+              <RichTextEditor
                 value={form.content}
-                onChange={(e) => setForm({ ...form, content: e.target.value })}
+                onChange={(html) => setForm({ ...form, content: html })}
                 placeholder="Digite o conteúdo completo do termo..."
-                rows={12}
-                className="w-full rounded-md border border-border/30 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-y min-h-[200px]"
               />
             </div>
 
