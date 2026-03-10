@@ -161,6 +161,8 @@ export default function ActiveRestaurantProfile() {
   const [selectedBranch, setSelectedBranch] = useState("");
   const [editingCommission, setEditingCommission] = useState(false);
   const [commissionValue, setCommissionValue] = useState("");
+  const [isLinkUserDialogOpen, setIsLinkUserDialogOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState("");
 
   const utils = trpc.useUtils();
   const { data: restaurant, isLoading } = trpc.activeRestaurant.get.useQuery({ id: restaurantId }, { enabled: restaurantId > 0 });
@@ -169,6 +171,8 @@ export default function ActiveRestaurantProfile() {
   const { data: payments = [] } = trpc.activeRestaurant.getPayments.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
   const { data: allRestaurants = [] } = trpc.activeRestaurant.list.useQuery();
   const { data: terms = [] } = trpc.term.list.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
+  const { data: linkedUsers = [] } = trpc.activeRestaurant.getLinkedUsers.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
+  const { data: availableUsers = [] } = trpc.activeRestaurant.listAvailableUsers.useQuery(undefined, { enabled: isLinkUserDialogOpen });
 
   const branches = useMemo(() =>
     allRestaurants.filter(r => r.parentRestaurantId === restaurantId),
@@ -241,6 +245,15 @@ export default function ActiveRestaurantProfile() {
 
   const updateTermStatusMutation = trpc.term.updateStatus.useMutation({
     onSuccess: () => { utils.term.list.invalidate(); toast.success("Status atualizado!"); },
+  });
+
+  const linkUserMutation = trpc.activeRestaurant.linkUser.useMutation({
+    onSuccess: () => { utils.activeRestaurant.getLinkedUsers.invalidate(); setIsLinkUserDialogOpen(false); setSelectedUserId(""); toast.success("Conta vinculada ao restaurante!"); },
+    onError: (err) => toast.error(err.message),
+  });
+  const unlinkUserMutation = trpc.activeRestaurant.unlinkUser.useMutation({
+    onSuccess: () => { utils.activeRestaurant.getLinkedUsers.invalidate(); toast.success("Conta desvinculada!"); },
+    onError: (err) => toast.error(err.message),
   });
 
   const generateInviteMutation = trpc.term.generateInvite.useMutation({
@@ -356,6 +369,7 @@ export default function ActiveRestaurantProfile() {
               <TabsTrigger value="fotos" className="gap-1.5 text-xs"><Camera className="w-3.5 h-3.5" /> Fotos</TabsTrigger>
               <TabsTrigger value="filiais" className="gap-1.5 text-xs"><Link2 className="w-3.5 h-3.5" /> Filiais</TabsTrigger>
               <TabsTrigger value="termos" className="gap-1.5 text-xs"><FileText className="w-3.5 h-3.5" /> Termos</TabsTrigger>
+              <TabsTrigger value="contas" className="gap-1.5 text-xs"><Users className="w-3.5 h-3.5" /> Contas</TabsTrigger>
             </TabsList>
 
             {/* ─── PAINEL ─── */}
@@ -1079,9 +1093,111 @@ export default function ActiveRestaurantProfile() {
                 </div>
               )}
             </TabsContent>
+
+            {/* ─── CONTAS ASSOCIADAS ─── */}
+            <TabsContent value="contas" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold">Contas Associadas</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Usuários com acesso ao portal deste restaurante</p>
+                </div>
+                <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => { setSelectedUserId(""); setIsLinkUserDialogOpen(true); }}>
+                  <Plus className="w-3.5 h-3.5" /> Vincular Conta
+                </Button>
+              </div>
+
+              {linkedUsers.length === 0 ? (
+                <div className="bg-card border border-border/30 rounded-lg p-8 text-center text-muted-foreground text-sm">
+                  <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p>Nenhuma conta associada a este restaurante</p>
+                  <p className="text-xs mt-1">Vincule uma conta existente ou envie um convite pela aba Termos</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {linkedUsers.map((u: any) => (
+                    <div key={u.id} className="bg-card border border-border/30 rounded-lg p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-sm font-semibold text-primary">
+                          {(u.firstName?.[0] || u.email?.[0] || "?").toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {u.firstName || ""} {u.lastName || ""}
+                            {!u.firstName && !u.lastName && <span className="text-muted-foreground italic">Sem nome</span>}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{u.email || "—"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={u.isActive ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]" : "bg-red-500/20 text-red-400 border-red-500/30 text-[10px]"}>
+                          {u.isActive ? "Ativo" : "Inativo"}
+                        </Badge>
+                        {u.lastLoginAt && (
+                          <span className="text-[10px] text-muted-foreground">
+                            Último acesso: {new Date(u.lastLoginAt).toLocaleDateString("pt-BR")}
+                          </span>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="gap-1.5 text-xs h-7 text-destructive"
+                          disabled={unlinkUserMutation.isPending}
+                          onClick={() => unlinkUserMutation.mutate({ userId: u.id, restaurantId })}
+                        >
+                          <Unlink className="w-3 h-3" /> Desvincular
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         </div>
       </div>
+
+      {/* Link User Dialog */}
+      <Dialog open={isLinkUserDialogOpen} onOpenChange={setIsLinkUserDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border/30">
+          <DialogHeader>
+            <DialogTitle className="text-base">Vincular Conta ao Restaurante</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs mb-1.5 block">Selecionar Usuário</Label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger className="h-9 text-xs bg-background border-border/30">
+                  <SelectValue placeholder="Selecione um usuário..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableUsers
+                    .filter((u: any) => !linkedUsers.some((lu: any) => lu.id === u.id))
+                    .map((u: any) => (
+                      <SelectItem key={u.id} value={u.id} className="text-xs">
+                        {u.email} {u.firstName ? `(${u.firstName} ${u.lastName || ""})`.trim() : ""}
+                      </SelectItem>
+                    ))}
+                  {availableUsers.filter((u: any) => !linkedUsers.some((lu: any) => lu.id === u.id)).length === 0 && (
+                    <div className="px-2 py-3 text-xs text-muted-foreground text-center">Nenhum usuário disponível</div>
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground mt-1.5">O usuário será automaticamente atualizado para o papel "restaurante"</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" className="text-xs" onClick={() => setIsLinkUserDialogOpen(false)}>Cancelar</Button>
+            <Button
+              size="sm"
+              className="text-xs gap-1.5"
+              disabled={!selectedUserId || linkUserMutation.isPending}
+              onClick={() => linkUserMutation.mutate({ userId: selectedUserId, restaurantId })}
+            >
+              {linkUserMutation.isPending ? "Vinculando..." : "Vincular"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment Dialog */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>

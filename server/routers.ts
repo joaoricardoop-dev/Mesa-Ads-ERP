@@ -593,6 +593,122 @@ export const appRouter = router({
       .input(z.object({ branchId: z.number() }))
       .mutation(({ input }) => unlinkBranch(input.branchId)),
 
+    getLinkedUsers: internalProcedure
+      .input(z.object({ restaurantId: z.number() }))
+      .query(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { users } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const rows = await db.select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          role: users.role,
+          isActive: users.isActive,
+          lastLoginAt: users.lastLoginAt,
+          createdAt: users.createdAt,
+        }).from(users).where(eq(users.restaurantId, input.restaurantId));
+        return rows;
+      }),
+
+    linkUser: internalProcedure
+      .input(z.object({ userId: z.string(), restaurantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const { users } = await import("../drizzle/schema");
+        const { activeRestaurants } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+
+        const [restaurant] = await db.select({ id: activeRestaurants.id }).from(activeRestaurants).where(eq(activeRestaurants.id, input.restaurantId));
+        if (!restaurant) throw new TRPCError({ code: "NOT_FOUND", message: "Restaurante não encontrado" });
+
+        const [existing] = await db.select().from(users).where(eq(users.id, input.userId));
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado" });
+
+        const blockedRoles = ["admin", "comercial", "operacoes", "financeiro", "anunciante", "manager"];
+        if (blockedRoles.includes(existing.role || "")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível vincular um usuário com papel privilegiado. Altere o papel primeiro." });
+        }
+
+        const [updated] = await db.update(users).set({
+          restaurantId: input.restaurantId,
+          role: "restaurante",
+          updatedAt: new Date(),
+        }).where(eq(users.id, input.userId)).returning();
+
+        try {
+          const { createClerkClient } = await import("@clerk/express");
+          const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+          const clerkUser = await clerkClient.users.getUser(input.userId);
+          await clerkClient.users.updateUserMetadata(input.userId, {
+            publicMetadata: { ...clerkUser.publicMetadata, role: "restaurante", restaurantId: input.restaurantId },
+          });
+        } catch (err) {
+          console.error("Failed to update Clerk metadata:", err);
+        }
+
+        return updated;
+      }),
+
+    listAvailableUsers: internalProcedure.query(async () => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { users } = await import("../drizzle/schema");
+        const { isNull, or, eq } = await import("drizzle-orm");
+        const rows = await db.select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          role: users.role,
+        }).from(users).where(
+          or(isNull(users.restaurantId), eq(users.role, "user"))
+        );
+        return rows.filter(u => u.role !== "admin" && u.role !== "comercial" && u.role !== "operacoes" && u.role !== "financeiro" && u.role !== "anunciante");
+      }),
+
+    unlinkUser: internalProcedure
+      .input(z.object({ userId: z.string(), restaurantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const { users } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+
+        const [existing] = await db.select().from(users).where(eq(users.id, input.userId));
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado" });
+        if (existing.restaurantId !== input.restaurantId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Usuário não está vinculado a este restaurante" });
+        }
+
+        const [updated] = await db.update(users).set({
+          restaurantId: null,
+          role: "user",
+          updatedAt: new Date(),
+        }).where(and(eq(users.id, input.userId), eq(users.restaurantId, input.restaurantId))).returning();
+
+        try {
+          const { createClerkClient } = await import("@clerk/express");
+          const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+          const clerkUser = await clerkClient.users.getUser(input.userId);
+          const meta = { ...clerkUser.publicMetadata } as any;
+          delete meta.restaurantId;
+          meta.role = "user";
+          await clerkClient.users.updateUserMetadata(input.userId, { publicMetadata: meta });
+        } catch (err) {
+          console.error("Failed to update Clerk metadata:", err);
+        }
+
+        return updated;
+      }),
+
     getPhotos: protectedProcedure
       .input(z.object({ restaurantId: z.number() }))
       .query(({ input }) => listRestaurantPhotos(input.restaurantId)),
