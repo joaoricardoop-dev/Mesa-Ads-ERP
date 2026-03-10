@@ -1,5 +1,5 @@
 import { useState, Fragment } from "react";
-
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +53,7 @@ import {
   ArrowUpDown,
   ChevronUp,
   Mail,
+  Eye,
 } from "lucide-react";
 
 interface ClientForm {
@@ -115,6 +116,7 @@ type SortKey = "name" | "neighborhood" | "contactPhone" | "status";
 type SortDir = "asc" | "desc";
 
 export default function Clients() {
+  const [, navigate] = useLocation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ClientForm>(emptyForm);
@@ -362,6 +364,15 @@ export default function Clients() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
+                          onClick={() => navigate(`/clientes/${c.id}`)}
+                          title="Ver Perfil"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
                           onClick={() => handleEdit(c)}
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -459,6 +470,11 @@ export default function Clients() {
                               )}
                             </div>
                           </div>
+                        </div>
+                        <div className="px-6 pb-4">
+                          <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate(`/clientes/${c.id}`)}>
+                            <Eye className="w-3.5 h-3.5" /> Ver Perfil Completo
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>

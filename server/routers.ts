@@ -857,6 +857,120 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteClient(input.id)),
+
+    getCampaigns: internalProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        const allCampaigns = await listCampaigns();
+        return allCampaigns.filter((c: any) => c.clientId === input.clientId);
+      }),
+
+    getQuotations: internalProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { quotations } = await import("../drizzle/schema");
+        const { eq, desc } = await import("drizzle-orm");
+        return db.select().from(quotations).where(eq(quotations.clientId, input.clientId)).orderBy(desc(quotations.createdAt));
+      }),
+
+    getInvoices: internalProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { invoices, campaigns } = await import("../drizzle/schema");
+        const { eq, desc } = await import("drizzle-orm");
+        return db.select({
+          id: invoices.id,
+          invoiceNumber: invoices.invoiceNumber,
+          campaignId: invoices.campaignId,
+          campaignName: campaigns.name,
+          clientId: invoices.clientId,
+          amount: invoices.amount,
+          issueDate: invoices.issueDate,
+          dueDate: invoices.dueDate,
+          paymentDate: invoices.paymentDate,
+          status: invoices.status,
+          createdAt: invoices.createdAt,
+        }).from(invoices)
+          .leftJoin(campaigns, eq(invoices.campaignId, campaigns.id))
+          .where(eq(invoices.clientId, input.clientId))
+          .orderBy(desc(invoices.issueDate));
+      }),
+
+    getLinkedUsers: internalProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { users } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        return db.select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          role: users.role,
+          isActive: users.isActive,
+          lastLoginAt: users.lastLoginAt,
+          createdAt: users.createdAt,
+        }).from(users).where(eq(users.clientId, input.clientId));
+      }),
+
+    linkUser: internalProcedure
+      .input(z.object({ userId: z.string(), clientId: z.number() }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const { users, clients: clientsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const [client] = await db.select({ id: clientsTable.id }).from(clientsTable).where(eq(clientsTable.id, input.clientId));
+        if (!client) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado" });
+        const [existing] = await db.select().from(users).where(eq(users.id, input.userId));
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado" });
+        const blockedRoles = ["admin", "comercial", "operacoes", "financeiro", "restaurante", "manager"];
+        if (blockedRoles.includes(existing.role || "")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível vincular um usuário com papel privilegiado." });
+        }
+        const [updated] = await db.update(users).set({
+          clientId: input.clientId,
+          role: "anunciante",
+          updatedAt: new Date(),
+        }).where(eq(users.id, input.userId)).returning();
+        try {
+          const { createClerkClient } = await import("@clerk/express");
+          const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+          const clerkUser = await clerkClient.users.getUser(input.userId);
+          await clerkClient.users.updateUserMetadata(input.userId, {
+            publicMetadata: { ...clerkUser.publicMetadata, role: "anunciante", clientId: input.clientId },
+          });
+        } catch (err) {
+          console.error("Failed to update Clerk metadata:", err);
+        }
+        return updated;
+      }),
+
+    listAvailableUsers: internalProcedure.query(async () => {
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return [];
+      const { users } = await import("../drizzle/schema");
+      const { isNull } = await import("drizzle-orm");
+      const rows = await db.select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        role: users.role,
+      }).from(users).where(isNull(users.clientId));
+      return rows.filter(u => !["admin", "comercial", "operacoes", "financeiro", "manager", "restaurante"].includes(u.role || ""));
+    }),
   }),
 
   // ─── Campaigns ────────────────────────────────────────────────────────
