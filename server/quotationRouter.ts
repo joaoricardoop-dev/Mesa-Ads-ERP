@@ -239,6 +239,13 @@ export const quotationRouter = router({
       const existing = await db.select().from(quotations).where(eq(quotations.id, id)).limit(1);
       if (!existing[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
 
+      if (data.status && ["rascunho", "enviada", "ativa"].includes(data.status)) {
+        const existingOS = await db.select({ id: serviceOrders.id }).from(serviceOrders).where(eq(serviceOrders.quotationId, id)).limit(1);
+        if (existingOS[0]) {
+          delete (data as any).status;
+        }
+      }
+
       const clientId = data.clientId ?? existing[0].clientId;
       const coasterVolume = data.coasterVolume ?? existing[0].coasterVolume;
 
@@ -380,16 +387,23 @@ export const quotationRouter = router({
       periodStart: z.string().optional(),
       periodEnd: z.string().optional(),
       paymentTerms: z.string().optional(),
+      batchIds: z.array(z.number()).optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
 
       const quotation = await db.select().from(quotations).where(eq(quotations.id, input.id)).limit(1);
       if (!quotation[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
-      if (quotation[0].status !== "ativa") throw new TRPCError({ code: "BAD_REQUEST", message: "Cotação precisa estar ativa para gerar OS" });
 
       const existingOS = await db.select().from(serviceOrders).where(eq(serviceOrders.quotationId, input.id)).limit(1);
-      if (existingOS[0]) throw new TRPCError({ code: "BAD_REQUEST", message: "OS já foi gerada para esta cotação" });
+      if (existingOS[0]) {
+        if (["rascunho", "enviada", "ativa"].includes(quotation[0].status)) {
+          await db.update(quotations).set({ status: "os_gerada", updatedAt: new Date() }).where(eq(quotations.id, input.id));
+        }
+        return { quotationId: input.id, serviceOrderId: existingOS[0].id, orderNumber: existingOS[0].orderNumber, alreadyExisted: true };
+      }
+
+      if (quotation[0].status !== "ativa") throw new TRPCError({ code: "BAD_REQUEST", message: "Cotação precisa estar ativa para gerar OS" });
 
       const orderNumber = await generateOSNumber(db);
 
@@ -405,6 +419,7 @@ export const quotationRouter = router({
         totalValue: quotation[0].totalValue,
         paymentTerms: input.paymentTerms,
         status: "rascunho" as const,
+        batchSelectionJson: input.batchIds ? JSON.stringify(input.batchIds) : undefined,
       }).returning();
 
       await db

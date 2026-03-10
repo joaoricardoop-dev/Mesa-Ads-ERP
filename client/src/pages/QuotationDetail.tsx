@@ -591,7 +591,7 @@ export default function QuotationDetail() {
                     <Button
                       variant="outline"
                       className="gap-1.5"
-                      onClick={() => { setSigningLinkBatchIds([]); setGeneratedSigningUrl(""); setSigningLinkDialogOpen(true); }}
+                      onClick={() => { let ids: number[] = []; try { if (os?.batchSelectionJson) ids = JSON.parse(os.batchSelectionJson); } catch {} if (!Array.isArray(ids)) ids = []; setSigningLinkBatchIds(ids); setGeneratedSigningUrl(""); setSigningLinkDialogOpen(true); }}
                       disabled={allocatedRestaurants.length === 0}
                     >
                       <Send className="w-4 h-4" />
@@ -599,7 +599,7 @@ export default function QuotationDetail() {
                     </Button>
                     <Button
                       className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
-                      onClick={() => { setSignForm({ batchIds: [], signatureUrl: "" }); setSignDialogOpen(true); }}
+                      onClick={() => { let ids: number[] = []; try { if (os?.batchSelectionJson) ids = JSON.parse(os.batchSelectionJson); } catch {} if (!Array.isArray(ids)) ids = []; setSignForm({ batchIds: ids, signatureUrl: "" }); setSignDialogOpen(true); }}
                       disabled={allocatedRestaurants.length === 0}
                     >
                       <CheckCircle2 className="w-4 h-4" />
@@ -814,6 +814,7 @@ export default function QuotationDetail() {
                 periodStart,
                 periodEnd,
                 paymentTerms: osForm.paymentTerms || undefined,
+                batchIds: osBatchIds.length > 0 ? osBatchIds : undefined,
               });
             }} disabled={generateOSMutation.isPending} className="bg-amber-600 hover:bg-amber-700">
               {generateOSMutation.isPending ? "Gerando..." : "Gerar OS"}

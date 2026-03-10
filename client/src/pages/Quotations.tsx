@@ -72,7 +72,7 @@ function OSActionButton({ quotationId, quotationNumber, clientName, clientCompan
   clientCompany?: string;
   coasterVolume: number;
   totalValue?: string;
-  onSign: () => void;
+  onSign: (savedBatchIds: number[]) => void;
 }) {
   const { data: os } = trpc.quotation.getOS.useQuery({ quotationId });
   const { data: restaurants = [] } = trpc.quotation.getRestaurants.useQuery({ quotationId });
@@ -130,7 +130,7 @@ function OSActionButton({ quotationId, quotationNumber, clientName, clientCompan
         variant="ghost"
         size="sm"
         className="h-7 text-xs text-emerald-400 hover:text-emerald-300 gap-1"
-        onClick={onSign}
+        onClick={() => { let ids: number[] = []; try { if (os.batchSelectionJson) ids = JSON.parse(os.batchSelectionJson); } catch {} if (!Array.isArray(ids)) ids = []; onSign(ids); }}
         title="Assinar OS e criar campanha"
       >
         <CheckCircle2 className="w-3.5 h-3.5" />
@@ -598,10 +598,10 @@ export default function Quotations() {
                           clientCompany={q.clientCompany || undefined}
                           coasterVolume={q.coasterVolume}
                           totalValue={q.totalValue || undefined}
-                          onSign={() => {
+                          onSign={(savedBatchIds) => {
                           setSignOsDialogId(q.id);
                           setSignForm({
-                            batchIds: [],
+                            batchIds: savedBatchIds,
                             signatureUrl: "",
                           });
                           setRestaurantAllocations([]);
@@ -921,6 +921,7 @@ export default function Quotations() {
                   periodStart,
                   periodEnd,
                   paymentTerms: osForm.paymentTerms || undefined,
+                  batchIds: osBatchIds.length > 0 ? osBatchIds : undefined,
                 });
               }}
               disabled={generateOSMutation.isPending}
