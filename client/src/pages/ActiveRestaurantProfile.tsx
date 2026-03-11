@@ -343,7 +343,7 @@ export default function ActiveRestaurantProfile() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => navigate(`/restaurantes/${restaurant.id}`)}>
                 <Pencil className="w-3.5 h-3.5" /> Editar
               </Button>
@@ -363,16 +363,18 @@ export default function ActiveRestaurantProfile() {
 
         <div className="p-4 lg:p-6 space-y-5">
           <Tabs defaultValue="painel" className="space-y-4">
-            <TabsList className="bg-card border border-border/30">
-              <TabsTrigger value="painel" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>
-              <TabsTrigger value="info" className="gap-1.5 text-xs"><Building2 className="w-3.5 h-3.5" /> Informações</TabsTrigger>
-              <TabsTrigger value="campanhas" className="gap-1.5 text-xs"><Megaphone className="w-3.5 h-3.5" /> Campanhas</TabsTrigger>
-              <TabsTrigger value="financeiro" className="gap-1.5 text-xs"><DollarSign className="w-3.5 h-3.5" /> Financeiro</TabsTrigger>
-              <TabsTrigger value="fotos" className="gap-1.5 text-xs"><Camera className="w-3.5 h-3.5" /> Fotos</TabsTrigger>
-              <TabsTrigger value="filiais" className="gap-1.5 text-xs"><Link2 className="w-3.5 h-3.5" /> Filiais</TabsTrigger>
-              <TabsTrigger value="termos" className="gap-1.5 text-xs"><FileText className="w-3.5 h-3.5" /> Termos</TabsTrigger>
-              <TabsTrigger value="contas" className="gap-1.5 text-xs"><Users className="w-3.5 h-3.5" /> Contas</TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto -mx-1 px-1 scrollbar-hide">
+              <TabsList className="bg-card border border-border/30 inline-flex w-auto min-w-full sm:w-auto">
+                <TabsTrigger value="painel" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>
+                <TabsTrigger value="info" className="gap-1.5 text-xs"><Building2 className="w-3.5 h-3.5" /> Informações</TabsTrigger>
+                <TabsTrigger value="campanhas" className="gap-1.5 text-xs"><Megaphone className="w-3.5 h-3.5" /> Campanhas</TabsTrigger>
+                <TabsTrigger value="financeiro" className="gap-1.5 text-xs"><DollarSign className="w-3.5 h-3.5" /> Financeiro</TabsTrigger>
+                <TabsTrigger value="fotos" className="gap-1.5 text-xs"><Camera className="w-3.5 h-3.5" /> Fotos</TabsTrigger>
+                <TabsTrigger value="filiais" className="gap-1.5 text-xs"><Link2 className="w-3.5 h-3.5" /> Filiais</TabsTrigger>
+                <TabsTrigger value="termos" className="gap-1.5 text-xs"><FileText className="w-3.5 h-3.5" /> Termos</TabsTrigger>
+                <TabsTrigger value="contas" className="gap-1.5 text-xs"><Users className="w-3.5 h-3.5" /> Contas</TabsTrigger>
+              </TabsList>
+            </div>
 
             {/* ─── PAINEL ─── */}
             <TabsContent value="painel" className="space-y-4">
@@ -385,7 +387,7 @@ export default function ActiveRestaurantProfile() {
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <Card title="Operação">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <MiniStat label="Mesas" value={String(restaurant.tableCount)} />
                     <MiniStat label="Assentos" value={String(restaurant.seatCount)} />
                     <MiniStat label="Clientes/Mês" value={restaurant.monthlyCustomers.toLocaleString("pt-BR")} />
@@ -419,7 +421,7 @@ export default function ActiveRestaurantProfile() {
                 </Card>
 
                 <Card title="Financeiro">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <MiniStat label="Comissão Paga" value={formatCurrency(stats.totalPaid)} accent />
                     <MiniStat label="Pendente" value={formatCurrency(stats.totalPending)} warn={stats.totalPending > 0} />
                     <MiniStat label="Coasters Alocados" value={String(restaurant.coastersAllocated)} />
@@ -802,8 +804,8 @@ export default function ActiveRestaurantProfile() {
                   Nenhum pagamento registrado.
                 </div>
               ) : (
-                <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
+                <div className="bg-card border border-border/30 rounded-lg overflow-x-auto">
+                  <table className="w-full text-sm min-w-[600px]">
                     <thead>
                       <tr className="border-b border-border/20">
                         <th className="text-left p-3 text-xs text-muted-foreground font-medium">Mês Ref.</th>
@@ -1338,7 +1340,7 @@ export default function ActiveRestaurantProfile() {
             <DialogTitle className="flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" /> Novo Pagamento</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Mês Referência *</Label>
                 <Input type="month" value={paymentForm.referenceMonth} onChange={(e) => setPaymentForm(p => ({ ...p, referenceMonth: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
@@ -1348,7 +1350,7 @@ export default function ActiveRestaurantProfile() {
                 <Input type="number" step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm(p => ({ ...p, amount: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Campanha</Label>
                 <Select value={paymentForm.campaignId} onValueChange={(v) => setPaymentForm(p => ({ ...p, campaignId: v }))}>
@@ -1411,7 +1413,7 @@ export default function ActiveRestaurantProfile() {
               <Label className="text-xs">URL da Imagem *</Label>
               <Input value={photoForm.url} onChange={(e) => setPhotoForm(p => ({ ...p, url: e.target.value }))} placeholder="https://..." className="bg-background border-border/30 h-9 text-sm" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Legenda</Label>
                 <Input value={photoForm.caption} onChange={(e) => setPhotoForm(p => ({ ...p, caption: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
@@ -1485,7 +1487,7 @@ export default function ActiveRestaurantProfile() {
             <DialogTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-primary" /> {editingTermId ? "Editar Termo" : "Novo Termo"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Válido De</Label>
                 <Input type="date" value={termForm.validFrom} onChange={(e) => setTermForm(p => ({ ...p, validFrom: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />
@@ -1503,7 +1505,7 @@ export default function ActiveRestaurantProfile() {
               <Label className="text-xs">Regra de Remuneração</Label>
               <textarea value={termForm.remunerationRule} onChange={(e) => setTermForm(p => ({ ...p, remunerationRule: e.target.value }))} rows={2} className="w-full rounded-md border border-border/30 bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Categorias Permitidas</Label>
                 <Input value={termForm.allowedCategories} onChange={(e) => setTermForm(p => ({ ...p, allowedCategories: e.target.value }))} className="bg-background border-border/30 h-9 text-sm" />

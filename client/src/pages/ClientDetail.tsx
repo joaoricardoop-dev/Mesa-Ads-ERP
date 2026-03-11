@@ -250,15 +250,17 @@ export default function ClientDetail() {
       </div>
 
       <Tabs defaultValue="painel" className="w-full">
-        <TabsList className="grid w-full grid-cols-7 h-10">
-          <TabsTrigger value="painel" className="text-xs">Painel</TabsTrigger>
-          <TabsTrigger value="info" className="text-xs">Informações</TabsTrigger>
-          <TabsTrigger value="campanhas" className="text-xs">Campanhas</TabsTrigger>
-          <TabsTrigger value="cotacoes" className="text-xs">Cotações</TabsTrigger>
-          <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
-          <TabsTrigger value="os" className="text-xs">Ordens de Serviço</TabsTrigger>
-          <TabsTrigger value="contas" className="text-xs">Contas</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-1 px-1 scrollbar-hide">
+          <TabsList className="inline-flex w-auto min-w-full sm:w-full h-10">
+            <TabsTrigger value="painel" className="text-xs">Painel</TabsTrigger>
+            <TabsTrigger value="info" className="text-xs">Informações</TabsTrigger>
+            <TabsTrigger value="campanhas" className="text-xs">Campanhas</TabsTrigger>
+            <TabsTrigger value="cotacoes" className="text-xs">Cotações</TabsTrigger>
+            <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
+            <TabsTrigger value="os" className="text-xs">Ordens</TabsTrigger>
+            <TabsTrigger value="contas" className="text-xs">Contas</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="painel" className="mt-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

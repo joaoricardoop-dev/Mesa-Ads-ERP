@@ -823,13 +823,15 @@ export default function CampaignDetail() {
           )}
 
           <Tabs defaultValue="resumo" className="space-y-4">
-            <TabsList className="bg-card border border-border/30">
-              <TabsTrigger value="resumo" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>
-              <TabsTrigger value="financeiro" className="gap-1.5 text-xs"><CircleDollarSign className="w-3.5 h-3.5" /> Financeiro</TabsTrigger>
-              <TabsTrigger value="restaurantes" className="gap-1.5 text-xs"><Store className="w-3.5 h-3.5" /> Distribuição</TabsTrigger>
-              <TabsTrigger value="cliente" className="gap-1.5 text-xs"><Building2 className="w-3.5 h-3.5" /> Cliente</TabsTrigger>
-              <TabsTrigger value="historico" className="gap-1.5 text-xs"><Clock className="w-3.5 h-3.5" /> Histórico</TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto -mx-1 px-1 scrollbar-hide">
+              <TabsList className="bg-card border border-border/30 inline-flex w-auto min-w-full sm:w-auto">
+                <TabsTrigger value="resumo" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>
+                <TabsTrigger value="financeiro" className="gap-1.5 text-xs"><CircleDollarSign className="w-3.5 h-3.5" /> Financeiro</TabsTrigger>
+                <TabsTrigger value="restaurantes" className="gap-1.5 text-xs"><Store className="w-3.5 h-3.5" /> Distribuição</TabsTrigger>
+                <TabsTrigger value="cliente" className="gap-1.5 text-xs"><Building2 className="w-3.5 h-3.5" /> Cliente</TabsTrigger>
+                <TabsTrigger value="historico" className="gap-1.5 text-xs"><Clock className="w-3.5 h-3.5" /> Histórico</TabsTrigger>
+              </TabsList>
+            </div>
 
             {/* ─── PAINEL (Dashboard) ─── */}
             <TabsContent value="resumo" className="space-y-4">
@@ -1061,7 +1063,7 @@ export default function CampaignDetail() {
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-card border border-border/30 rounded-lg p-3 text-center">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Restaurantes</p>
                   <p className={`text-lg font-bold font-mono mt-1 ${restaurantsMissing > 0 ? "text-yellow-400" : "text-emerald-400"}`}>{restaurantsConfigured}/{campaign.activeRestaurants}</p>
@@ -1085,8 +1087,8 @@ export default function CampaignDetail() {
                   <Button size="sm" variant="outline" onClick={handleManageRestaurants} className="text-xs">Configurar agora</Button>
                 </div>
               ) : (
-                <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
-                  <table className="w-full">
+                <div className="bg-card border border-border/30 rounded-lg overflow-x-auto">
+                  <table className="w-full min-w-[600px]">
                     <thead>
                       <tr className="border-b border-border/20 bg-muted/10">
                         <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium p-3">Restaurante</th>

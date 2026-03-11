@@ -88,7 +88,7 @@ export default function OperationalCosts() {
       ) : (
         <div className="rounded-xl border border-border/30 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="border-b border-border/20 bg-muted/5">
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Campanha</th>
@@ -108,7 +108,7 @@ export default function OperationalCosts() {
                         <Input
                           type="number"
                           step="0.01"
-                          className="w-28 ml-auto text-right h-8"
+                          className="w-20 sm:w-28 ml-auto text-right h-8"
                           value={editProduction}
                           onChange={(e) => setEditProduction(e.target.value)}
                         />
@@ -121,7 +121,7 @@ export default function OperationalCosts() {
                         <Input
                           type="number"
                           step="0.01"
-                          className="w-28 ml-auto text-right h-8"
+                          className="w-20 sm:w-28 ml-auto text-right h-8"
                           value={editFreight}
                           onChange={(e) => setEditFreight(e.target.value)}
                         />

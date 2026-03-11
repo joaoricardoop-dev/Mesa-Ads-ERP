@@ -251,7 +251,7 @@ export default function QuotationDetail() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {!isTerminal && (
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={openEdit}>
                   <Pencil className="w-3.5 h-3.5" /> Editar
@@ -689,7 +689,7 @@ export default function QuotationDetail() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Regiões</Label>
                 <Input value={editForm.regions} onChange={(e) => setEditForm({ ...editForm, regions: e.target.value })} placeholder="Ex: Zona Sul" className="bg-background border-border/30" />
@@ -720,7 +720,7 @@ export default function QuotationDetail() {
                 </Badge>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Preço Unitário (R$)</Label>
                 <Input value={editForm.isBonificada ? "0.0000" : editForm.unitPrice} onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })} placeholder="0.0000" className="bg-background border-border/30" disabled={editForm.isBonificada} />

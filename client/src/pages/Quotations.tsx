@@ -404,7 +404,7 @@ export default function Quotations() {
         </Button>
       }
     >
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {(["rascunho", "enviada", "ativa", "win", "perdida", "expirada"] as QuotationStatus[]).map((s) => (
           <button
             key={s}
@@ -419,8 +419,8 @@ export default function Quotations() {
         ))}
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar cotação..."
@@ -531,7 +531,7 @@ export default function Quotations() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1 flex-wrap">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -685,7 +685,7 @@ export default function Quotations() {
             </div>
 
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Detalhes</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Tipo de Campanha</Label>
                 <Select
@@ -712,7 +712,7 @@ export default function Quotations() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label>Volume de Bolachas *</Label>
                 <Input
@@ -766,7 +766,7 @@ export default function Quotations() {
                 </Badge>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Preço Unitário (R$)</Label>
                 <Input
@@ -788,7 +788,7 @@ export default function Quotations() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Validade</Label>
                 <Input

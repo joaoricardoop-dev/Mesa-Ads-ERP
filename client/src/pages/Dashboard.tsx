@@ -144,7 +144,7 @@ export default function Dashboard() {
       </div>
 
       <Section title="Pipeline" icon={Factory} description="Volume por status no funil de campanhas">
-        <div className="flex items-end gap-1 h-24">
+        <div className="flex items-end gap-1 h-24 overflow-x-auto scrollbar-hide">
           {PIPELINE_STAGE_DEFS.map((stage) => {
             const count = counts[stage.statusKey] || 0;
             const barHeight = maxPipelineCount > 0 ? Math.max(8, (count / maxPipelineCount) * 60) : 8;

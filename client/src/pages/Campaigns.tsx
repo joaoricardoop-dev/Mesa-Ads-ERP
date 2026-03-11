@@ -576,7 +576,7 @@ export default function Campaigns() {
                     <Label className="text-xs">Nome da Campanha *</Label>
                     <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Campanha Verão 2026" className="bg-background border-border/30 h-9 text-sm" />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
                       <Label className="text-xs">Cliente *</Label>
                       <Select value={form.clientId ? String(form.clientId) : "none"} onValueChange={(v) => setForm({ ...form, clientId: v === "none" ? null : parseInt(v) })}>
@@ -631,7 +631,7 @@ export default function Campaigns() {
                         <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setBatchYear(batchYear + 1)}>&gt;</Button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-border/20 rounded-lg p-2 bg-background/50">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-border/20 rounded-lg p-2 bg-background/50">
                       {batchesList.map((batch: any) => {
                         const isSelected = selectedBatchIds.includes(batch.id);
                         return (
@@ -686,7 +686,7 @@ export default function Campaigns() {
                 <h4 className="text-xs font-semibold text-primary uppercase tracking-wider flex items-center gap-2">
                   <DollarSign className="w-3.5 h-3.5" /> Produção
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FormField label="Tamanho do Lote" value={form.batchSize} onChange={(v) => setForm({ ...form, batchSize: v })} min={100} max={100000} step={500} />
                   <FormField label="Custo do Lote (R$)" value={form.batchCost} onChange={(v) => setForm({ ...form, batchCost: v })} min={0} max={50000} step={50} decimal />
                 </div>
@@ -696,7 +696,7 @@ export default function Campaigns() {
                 <h4 className="text-xs font-semibold text-primary uppercase tracking-wider flex items-center gap-2">
                   <Percent className="w-3.5 h-3.5" /> Precificação
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="grid gap-1.5">
                     <Label className="text-xs">Tipo Markup</Label>
                     <Select value={form.pricingType} onValueChange={(v) => setForm({ ...form, pricingType: v as "variable" | "fixed" })}>
@@ -719,7 +719,7 @@ export default function Campaigns() {
                 <h4 className="text-xs font-semibold text-primary uppercase tracking-wider flex items-center gap-2">
                   <Users className="w-3.5 h-3.5" /> Comissões & Impostos
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="grid gap-1.5">
                     <Label className="text-xs">Tipo Comissão Rest.</Label>
                     <Select value={form.commissionType} onValueChange={(v) => setForm({ ...form, commissionType: v as "variable" | "fixed" })}>
@@ -736,7 +736,7 @@ export default function Campaigns() {
                     <FormField label="Comissão Fixa (R$/un)" value={form.fixedCommission} onChange={(v) => setForm({ ...form, fixedCommission: v })} min={0} max={1} step={0.01} decimal />
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FormField label="Comissão Vendedor (%)" value={form.sellerCommission} onChange={(v) => setForm({ ...form, sellerCommission: v })} min={0} max={30} step={1} />
                   <FormField label="Carga Tributária (%)" value={form.taxRate} onChange={(v) => setForm({ ...form, taxRate: v })} min={0} max={40} step={1} />
                 </div>

@@ -467,13 +467,15 @@ export default function ActiveRestaurantsPage() {
             </DialogHeader>
 
             <Tabs defaultValue="local" className="space-y-4">
-              <TabsList className="grid grid-cols-5 w-full">
-                <TabsTrigger value="local" className="text-xs">Local</TabsTrigger>
-                <TabsTrigger value="contato" className="text-xs">Contato</TabsTrigger>
-                <TabsTrigger value="operacao" className="text-xs">Operação</TabsTrigger>
-                <TabsTrigger value="restricoes" className="text-xs">Restrições</TabsTrigger>
-                <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto -mx-1 px-1 scrollbar-hide">
+                <TabsList className="inline-flex w-auto min-w-full sm:w-full">
+                  <TabsTrigger value="local" className="text-xs">Local</TabsTrigger>
+                  <TabsTrigger value="contato" className="text-xs">Contato</TabsTrigger>
+                  <TabsTrigger value="operacao" className="text-xs">Operação</TabsTrigger>
+                  <TabsTrigger value="restricoes" className="text-xs">Restrições</TabsTrigger>
+                  <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="local" className="space-y-4">
                 <div className="space-y-2">
@@ -484,7 +486,7 @@ export default function ActiveRestaurantsPage() {
                   <Label className="text-xs">Endereço Completo *</Label>
                   <Input value={form.address} onChange={(e) => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Rua, número, complemento" className="bg-background border-border/30" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-xs">Bairro/Zona *</Label>
                     <Input value={form.neighborhood} onChange={(e) => setForm(p => ({ ...p, neighborhood: e.target.value }))} className="bg-background border-border/30" />
@@ -501,7 +503,7 @@ export default function ActiveRestaurantsPage() {
               </TabsContent>
 
               <TabsContent value="contato" className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-xs">Nome do Responsável *</Label>
                     <Input value={form.contactName} onChange={(e) => setForm(p => ({ ...p, contactName: e.target.value }))} className="bg-background border-border/30" />
@@ -511,7 +513,7 @@ export default function ActiveRestaurantsPage() {
                     <Input value={form.contactRole} onChange={(e) => setForm(p => ({ ...p, contactRole: e.target.value }))} className="bg-background border-border/30" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-xs">Tipo de Contato</Label>
                     <Select value={form.contactType} onValueChange={(v) => setForm(p => ({ ...p, contactType: v }))}>
@@ -529,7 +531,7 @@ export default function ActiveRestaurantsPage() {
                     <Input value={form.whatsapp} onChange={(e) => setForm(p => ({ ...p, whatsapp: e.target.value }))} placeholder="(11) 99999-9999" className="bg-background border-border/30" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-xs">Email</Label>
                     <Input type="email" value={form.email} onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))} className="bg-background border-border/30" />
@@ -600,7 +602,7 @@ export default function ActiveRestaurantsPage() {
                 </div>
                 <div className="border-t border-border/20 pt-3 space-y-3">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rating Interno</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label className="text-xs">Ticket Médio (R$)</Label>
                       <Input
@@ -692,7 +694,7 @@ export default function ActiveRestaurantsPage() {
               </TabsContent>
 
               <TabsContent value="financeiro" className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-xs">Chave Pix</Label>
                     <Input value={form.pixKey} onChange={(e) => setForm(p => ({ ...p, pixKey: e.target.value }))} placeholder="CPF, CNPJ, email ou telefone" className="bg-background border-border/30" />

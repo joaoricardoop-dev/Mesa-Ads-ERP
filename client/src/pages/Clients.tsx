@@ -263,7 +263,7 @@ export default function Clients() {
     >
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-card border border-border/30 rounded-lg p-4">
           <p className="text-xs text-muted-foreground">Total Clientes</p>
           <p className="text-2xl font-bold font-mono">{clientsList.length}</p>
@@ -496,7 +496,7 @@ export default function Clients() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Identificação</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Nome / Marca *</Label>
                 <Input
@@ -516,7 +516,7 @@ export default function Clients() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Razão Social</Label>
                 <Input
@@ -601,7 +601,7 @@ export default function Clients() {
             </div>
 
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Contato</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Telefone</Label>
                 <Input
@@ -636,7 +636,7 @@ export default function Clients() {
             </div>
 
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Classificação</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Segmento</Label>
                 <Select

@@ -49,3 +49,11 @@ The application features a sidebar-based layout using `shadcn/ui` with a collaps
 - **TipTap**: Rich text (WYSIWYG) editor for term template content (`@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-underline`).
 - **DOMPurify**: HTML sanitization for rendering rich text content safely.
 - **Anthropic AI SDK**: `@anthropic-ai/sdk` for AI-powered features. Client configured in `server/anthropic.ts` using `ANTHROPIC_API_KEY` secret. Default model: `claude-sonnet-4-20250514`.
+
+### Mobile Responsiveness Patterns
+The application uses consistent mobile-first responsive patterns:
+- **Scrollable Tabs**: `TabsList` components with many items are wrapped in `<div className="overflow-x-auto -mx-1 px-1 scrollbar-hide">` with the TabsList using `inline-flex w-auto min-w-full sm:w-auto`. The `.scrollbar-hide` utility is defined in `client/src/index.css`.
+- **Form Grids**: Dialog/form grids use `grid-cols-1 sm:grid-cols-2` pattern to collapse to single column on mobile.
+- **Button Groups**: Action button containers use `flex-wrap` to wrap on narrow screens instead of overflowing.
+- **Tables**: Raw `<table>` elements are wrapped in `overflow-x-auto` containers with `min-w-[600px]` on the table for proper horizontal scrolling.
+- **KPI Grids**: Use progressive breakpoints (e.g., `grid-cols-1 sm:grid-cols-3` or `grid-cols-2 sm:grid-cols-3 lg:grid-cols-6`) for readable card sizes on all screens.
