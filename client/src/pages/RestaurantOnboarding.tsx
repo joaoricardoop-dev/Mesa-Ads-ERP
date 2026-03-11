@@ -398,10 +398,6 @@ export default function RestaurantOnboarding() {
           {step === 0 && (
             <div className="space-y-4">
               <div>
-                <Label className={labelClass}>Nome do Estabelecimento *</Label>
-                <Input value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Ex: Bar do João" className={inputClass} />
-              </div>
-              <div>
                 <Label className={labelClass}>CNPJ</Label>
                 <div className="flex gap-2 mt-1">
                   <Input
@@ -420,6 +416,10 @@ export default function RestaurantOnboarding() {
                     Buscar
                   </button>
                 </div>
+              </div>
+              <div>
+                <Label className={labelClass}>Nome do Estabelecimento *</Label>
+                <Input value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Ex: Bar do João" className={inputClass} />
               </div>
               <div>
                 <Label className={labelClass}>Razão Social</Label>
