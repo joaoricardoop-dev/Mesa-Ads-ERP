@@ -73,6 +73,7 @@ export const VENUE_TYPE_LABELS: Record<number, string> = {
   3: "Restaurante casual",
   4: "Gastropub / Bar temático / Cervejaria artesanal",
   5: "Fine dining / Rooftop / Lounge",
+  6: "Sala VIP",
 };
 
 export const DIGITAL_PRESENCE_LABELS: Record<number, string> = {
