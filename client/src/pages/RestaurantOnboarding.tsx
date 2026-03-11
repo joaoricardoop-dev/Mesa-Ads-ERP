@@ -164,14 +164,15 @@ export default function RestaurantOnboarding() {
     }
     setCnpjLoading(true);
     try {
-      const res = await fetch(`/api/trpc/cnpj.lookup?input=${encodeURIComponent(JSON.stringify({ cnpj: cnpjClean }))}`);
+      const res = await fetch(`/api/trpc/cnpj.lookup?input=${encodeURIComponent(JSON.stringify({ json: { cnpj: cnpjClean } }))}`);
       const data = await res.json();
       if (data?.error) {
-        const msg = data.error?.message || data.error?.data?.message || "Erro ao consultar CNPJ";
+        const errJson = data.error?.json || data.error;
+        const msg = errJson?.message || "Erro ao consultar CNPJ";
         toast.error(msg);
         return;
       }
-      const result = data?.result?.data;
+      const result = data?.result?.data?.json;
       if (result) {
         setForm((f) => ({
           ...f,
