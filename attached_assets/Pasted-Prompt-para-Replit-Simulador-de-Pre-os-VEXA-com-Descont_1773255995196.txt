@@ -1,0 +1,127 @@
+Prompt para Replit: Simulador de Preços VEXA com Descontos Progressivos
+Objetivo
+Criar um menu na lateral, embaixo de simulador, de tabela de preços, permitindo ao usuário inserir variáveis e visualizar o preço unitário e total, aplicando descontos progressivos com base na quantidade (volume), número de semanas e forma de pagamento.
+Funcionalidades Essenciais
+Interface de Entrada de Dados: Campos para o usuário inserir os seguintes valores:
+
+Volume (A): Quantidade de itens (número inteiro).
+Custo GPC unit (B): Custo unitário por GPC (número decimal).
+Margem (C): Margem de lucro desejada (número decimal, ex: 0.5 para 50%).
+Frete Azul Cargo (D): Custo fixo de frete (número decimal).
+Artes (E): Multiplicador para o custo de produção (pode ser fixo em 1.0 ou um campo de entrada, se variar).
+
+Premissas Fixas: Os seguintes valores devem ser configurados como constantes na aplicação:
+
+IRPJ: 0.06 (6%)
+Comissão Restaurante: 0.15 (15%)
+Comissão Comercial: 0.1 (10%)
+Soma Fixa: 0.4
+
+Cálculos da Tabela de Preços: A aplicação deve realizar os seguintes cálculos dinamicamente:
+
+Denominador (F): 1 - Margem (C) - IRPJ - Comissão Restaurante - Comissão Comercial - Soma Fixa
+Custo Prod Total (G): Custo GPC unit (B) * Artes (E) * Volume (A)
+Custo Total (Prod+Frete) (H): Custo Prod Total (G) + Frete Azul Cargo (D)
+Preço Total Base (4 semanas) (J): Custo Total (Prod+Frete) (H) / Denominador (F)
+Preço Unitário (I): Preço Total Base (4 semanas) (J) / Volume (A)
+Lucro (N): Preço Total Base (4 semanas) (J) * Margem (C)
+
+Descontos Progressivos por Semanas: A aplicação deve calcular o preço total para diferentes durações, aplicando descontos progressivos:
+
+Preço Total 4 semanas: Preço Total Base (4 semanas) (J)
+Preço Total 8 semanas: (Preço Total Base (4 semanas) (J) * 2) * 0.95 (5% de desconto sobre o dobro do preço de 4 semanas)
+Preço Total 12 semanas: (Preço Total Base (4 semanas) (J) * 3) * 0.92 (Sugestão: 8% de desconto sobre o triplo do preço de 4 semanas)
+Preço Total 16 semanas: (Preço Total Base (4 semanas) (J) * 4) * 0.90 (Sugestão: 10% de desconto sobre o quádruplo do preço de 4 semanas)
+
+Nota: Os descontos para 12 e 16 semanas são sugestões para tornar o desconto progressivo. O desconto de 5% para 8 semanas foi extraído da planilha.
+
+Descontos por Forma de Pagamento: Deve haver uma seção para aplicar descontos ou acréscimos com base na forma de pagamento. Exemplo:
+
+À Vista (Pix/Dinheiro): 5% de desconto
+Cartão de Crédito (1x): Sem desconto/acréscimo
+Cartão de Crédito (3x): 3% de acréscimo
+Cartão de Crédito (6x): 6% de acréscimo
+
+O usuário deve poder selecionar a forma de pagamento e ver o preço final ajustado.
+
+Exibição dos Resultados: A aplicação deve exibir de forma clara:
+
+Todos os valores de entrada.
+As premissas fixas.
+Os resultados dos cálculos intermediários (Denominador, Custo Prod Total, Custo Total).
+O Preço Unitário calculado.
+Os Preços Totais para 4, 8, 12 e 16 semanas, com os descontos aplicados.
+O Lucro calculado.
+O Preço Final após aplicar o desconto/acréscimo da forma de pagamento.
+Estrutura do Projeto (Sugestão para Replit)
+Linguagem: Python (com Flask ou Streamlit para a interface web) ou JavaScript (com Node.js e um framework como React/Vue para o frontend).
+Estrutura de Arquivos: main.py (ou index.js), index.html (se for frontend separado), style.css.
+Exemplo de Saída Esperada (Formato da Tabela)
+Variável
+Valor de Entrada
+Unidade/Tipo
+Volume (A)
+[Input]
+Unidades
+Custo GPC unit (B)
+[Input]
+R$
+Margem (C)
+[Input]
+%
+Frete Azul Cargo (D)
+[Input]
+R$
+Artes (E)
+[Input]
+Multiplicador
+
+
+Premissa
+Valor Fixo
+Unidade/Tipo
+IRPJ
+0.06
+%
+Comissão Restaurante
+0.15
+%
+Comissão Comercial
+0.10
+%
+Soma Fixa
+0.40
+R$
+
+
+| Cálculo              | Resultado        | Unidade/Tipo | | :------------------- | :--------------- | :----------- |\n| Denominador (F)      | [Calculado]    | -            | | Custo Prod Total (G) | [Calculado]    | R$           | | Custo Total (H)      | [Calculado]    | R$           | | Preço Unitário (I)   | [Calculado]    | R$           | | Lucro (N)            | [Calculado]    | R$           |
+
+Duração
+Preço Total
+Desconto Aplicado
+4 semanas
+[Calculado]
+0%
+8 semanas
+[Calculado]
+5%
+12 semanas
+[Calculado]
+[Sugestão: 8%]
+16 semanas
+[Calculado]
+[Sugestão: 10%]
+
+
+Forma de Pagamento
+Preço Final
+Ajuste Aplicado
+[Seleção do Usuário]
+[Calculado]
+[Valor do Ajuste]
+
+Considerações Adicionais
+A interface deve ser intuitiva e fácil de usar.
+Validações de entrada para garantir que os valores sejam numéricos e dentro de faixas razoáveis.
+O código deve ser bem comentado e organizado.
+

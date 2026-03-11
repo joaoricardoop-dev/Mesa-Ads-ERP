@@ -35,6 +35,7 @@ import Invoicing from "./pages/financial/Invoicing";
 import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
 import OperationalCosts from "./pages/financial/OperationalCosts";
 import FinancialReport from "./pages/financial/FinancialReport";
+import PriceTable from "./pages/PriceTable";
 import AnunciantePortal from "./pages/AnunciantePortal";
 import RestaurantePortal from "./pages/RestaurantePortal";
 import RestaurantOnboarding from "./pages/RestaurantOnboarding";
@@ -69,6 +70,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/portal" component={AnunciantePortal} />
       <Route path="/comercial/simulador" component={Home} />
+      <Route path="/comercial/tabela-precos" component={PriceTable} />
       <Route path="/comercial/cotacoes/:id" component={QuotationDetail} />
       <Route path="/comercial/cotacoes" component={Quotations} />
       <Route path="/comercial/leads" component={Leads} />

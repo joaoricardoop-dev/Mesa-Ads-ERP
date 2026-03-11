@@ -116,6 +116,7 @@ const NAV_ENTRIES: NavEntry[] = [
     items: [
       { icon: ClipboardList, label: "Cotações", path: "/comercial/cotacoes" },
       { icon: BarChart3, label: "Simulador", path: "/comercial/simulador" },
+      { icon: Calculator, label: "Tabela de Preços", path: "/comercial/tabela-precos" },
       { icon: Users, label: "Leads", path: "/comercial/leads" },
     ],
   },
