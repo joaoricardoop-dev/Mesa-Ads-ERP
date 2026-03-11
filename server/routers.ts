@@ -324,50 +324,106 @@ export const appRouter = router({
         const cleanCnpj = input.cnpj.replace(/\D/g, "");
         if (cleanCnpj.length !== 14) throw new Error("CNPJ inválido");
 
-        const res = await fetch(`https://publica.cnpj.ws/cnpj/${cleanCnpj}`);
-        if (!res.ok) {
-          if (res.status === 429) throw new Error("Muitas consultas. Aguarde alguns segundos.");
-          throw new Error("CNPJ não encontrado");
+        try {
+          const res = await fetch(`https://publica.cnpj.ws/cnpj/${cleanCnpj}`, {
+            headers: { "Accept": "application/json" },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const est = data.estabelecimento || {};
+            const socios = (data.socios || []).map((s: any) => ({
+              nome: s.nome,
+              qualificacao: s.qualificacao_socio?.descricao || "",
+              dataEntrada: s.data_entrada,
+              faixaEtaria: s.faixa_etaria,
+            }));
+            const atividadesSecundarias = (est.atividades_secundarias || []).map((a: any) => ({
+              id: a.id,
+              descricao: a.descricao,
+            }));
+            return {
+              cnpj: cleanCnpj,
+              razaoSocial: data.razao_social || "",
+              nomeFantasia: est.nome_fantasia || "",
+              porte: data.porte?.descricao || "",
+              naturezaJuridica: data.natureza_juridica?.descricao || "",
+              capitalSocial: data.capital_social || "",
+              atividadePrincipal: est.atividade_principal ? `${est.atividade_principal.id} - ${est.atividade_principal.descricao}` : "",
+              atividadesSecundarias,
+              dataAbertura: est.data_inicio_atividade || "",
+              situacaoCadastral: est.situacao_cadastral || "",
+              tipoEstabelecimento: est.tipo || "",
+              logradouro: est.logradouro || "",
+              numero: est.numero || "",
+              complemento: est.complemento || "",
+              bairro: est.bairro || "",
+              cidade: est.cidade?.nome || "",
+              municipio: est.cidade?.nome || "",
+              uf: est.estado?.sigla || "",
+              cep: est.cep || "",
+              telefone1: est.ddd1 && est.telefone1 ? `(${est.ddd1}) ${est.telefone1}` : "",
+              telefone2: est.ddd2 && est.telefone2 ? `(${est.ddd2}) ${est.telefone2}` : "",
+              email: est.email || "",
+              socios,
+            };
+          }
+          if (res.status === 429) {
+            console.warn("CNPJ WS rate limited, trying fallback...");
+          } else {
+            console.warn(`CNPJ WS returned ${res.status}, trying fallback...`);
+          }
+        } catch (err) {
+          console.warn("CNPJ WS failed, trying fallback:", err instanceof Error ? err.message : err);
         }
-        const data = await res.json();
 
-        const est = data.estabelecimento || {};
-        const socios = (data.socios || []).map((s: any) => ({
-          nome: s.nome,
-          qualificacao: s.qualificacao_socio?.descricao || "",
-          dataEntrada: s.data_entrada,
-          faixaEtaria: s.faixa_etaria,
-        }));
-
-        const atividadesSecundarias = (est.atividades_secundarias || []).map((a: any) => ({
-          id: a.id,
-          descricao: a.descricao,
-        }));
-
-        return {
-          cnpj: cleanCnpj,
-          razaoSocial: data.razao_social || "",
-          nomeFantasia: est.nome_fantasia || "",
-          porte: data.porte?.descricao || "",
-          naturezaJuridica: data.natureza_juridica?.descricao || "",
-          capitalSocial: data.capital_social || "",
-          atividadePrincipal: est.atividade_principal ? `${est.atividade_principal.id} - ${est.atividade_principal.descricao}` : "",
-          atividadesSecundarias,
-          dataAbertura: est.data_inicio_atividade || "",
-          situacaoCadastral: est.situacao_cadastral || "",
-          tipoEstabelecimento: est.tipo || "",
-          logradouro: est.logradouro || "",
-          numero: est.numero || "",
-          complemento: est.complemento || "",
-          bairro: est.bairro || "",
-          cidade: est.cidade?.nome || "",
-          uf: est.estado?.sigla || "",
-          cep: est.cep || "",
-          telefone1: est.ddd1 && est.telefone1 ? `(${est.ddd1}) ${est.telefone1}` : "",
-          telefone2: est.ddd2 && est.telefone2 ? `(${est.ddd2}) ${est.telefone2}` : "",
-          email: est.email || "",
-          socios,
-        };
+        try {
+          const fallbackRes = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`, {
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!fallbackRes.ok) {
+            if (fallbackRes.status === 404) throw new Error("CNPJ não encontrado");
+            throw new Error(`Erro ao consultar CNPJ (status ${fallbackRes.status})`);
+          }
+          const fb = await fallbackRes.json();
+          return {
+            cnpj: cleanCnpj,
+            razaoSocial: fb.razao_social || "",
+            nomeFantasia: fb.nome_fantasia || "",
+            porte: fb.porte || "",
+            naturezaJuridica: fb.natureza_juridica || "",
+            capitalSocial: fb.capital_social || "",
+            atividadePrincipal: fb.cnae_fiscal_descricao ? `${fb.cnae_fiscal} - ${fb.cnae_fiscal_descricao}` : "",
+            atividadesSecundarias: (fb.cnaes_secundarios || []).map((a: any) => ({
+              id: String(a.codigo),
+              descricao: a.descricao,
+            })),
+            dataAbertura: fb.data_inicio_atividade || "",
+            situacaoCadastral: fb.situacao_cadastral || "",
+            tipoEstabelecimento: fb.identificador_matriz_filial === 1 ? "Matriz" : "Filial",
+            logradouro: fb.logradouro || "",
+            numero: fb.numero || "",
+            complemento: fb.complemento || "",
+            bairro: fb.bairro || "",
+            cidade: fb.municipio || "",
+            municipio: fb.municipio || "",
+            uf: fb.uf || "",
+            cep: fb.cep || "",
+            telefone1: fb.ddd_telefone_1 || "",
+            telefone2: fb.ddd_telefone_2 || "",
+            email: fb.email || "",
+            socios: (fb.qsa || []).map((s: any) => ({
+              nome: s.nome_socio,
+              qualificacao: s.qual_socio || "",
+              dataEntrada: s.data_entrada_sociedade,
+              faixaEtaria: s.faixa_etaria,
+            })),
+          };
+        } catch (fallbackErr) {
+          console.error("Both CNPJ APIs failed:", fallbackErr instanceof Error ? fallbackErr.message : fallbackErr);
+          if (fallbackErr instanceof Error && fallbackErr.message.includes("CNPJ")) throw fallbackErr;
+          throw new Error("Não foi possível consultar o CNPJ. Tente novamente em alguns segundos.");
+        }
       }),
   }),
 

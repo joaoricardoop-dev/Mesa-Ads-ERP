@@ -166,6 +166,11 @@ export default function RestaurantOnboarding() {
     try {
       const res = await fetch(`/api/trpc/cnpj.lookup?input=${encodeURIComponent(JSON.stringify({ cnpj: cnpjClean }))}`);
       const data = await res.json();
+      if (data?.error) {
+        const msg = data.error?.message || data.error?.data?.message || "Erro ao consultar CNPJ";
+        toast.error(msg);
+        return;
+      }
       const result = data?.result?.data;
       if (result) {
         setForm((f) => ({
@@ -175,15 +180,17 @@ export default function RestaurantOnboarding() {
           address: result.logradouro || f.address,
           addressNumber: result.numero || f.addressNumber,
           neighborhood: result.bairro || f.neighborhood,
-          city: result.municipio || f.city,
+          city: result.municipio || result.cidade || f.city,
           state: result.uf || f.state,
           cep: result.cep || f.cep,
           email: result.email || f.email,
         }));
         toast.success("Dados do CNPJ carregados!");
+      } else {
+        toast.error("CNPJ não encontrado");
       }
     } catch {
-      toast.error("Erro ao consultar CNPJ");
+      toast.error("Erro ao consultar CNPJ. Verifique sua conexão.");
     } finally {
       setCnpjLoading(false);
     }
