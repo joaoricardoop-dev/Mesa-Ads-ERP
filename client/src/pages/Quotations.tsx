@@ -545,31 +545,39 @@ export default function Quotations() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-emerald-500 hover:text-emerald-400"
-                        onClick={() => {
-                          const numRest = q.unitPrice && q.totalValue
-                            ? Math.round(Number(q.totalValue) / Number(q.unitPrice))
-                            : 1;
-                          const duration = q.cycles || 1;
-                          const pricePerRest = q.unitPrice ? Number(q.unitPrice) : 0;
-                          const monthlyTotal = pricePerRest * numRest;
-                          generateProposalPdf({
-                            clientName: q.clientName || "Cliente",
-                            clientCompany: q.clientCompany || undefined,
-                            clientCnpj: q.clientCnpj || undefined,
-                            clientEmail: q.clientEmail || undefined,
-                            clientPhone: q.clientPhone || undefined,
-                            quotationName: q.quotationName || q.quotationNumber,
-                            coasterVolume: q.coasterVolume,
-                            numRestaurants: numRest,
-                            coastersPerRestaurant: numRest > 0 ? Math.round(q.coasterVolume / numRest) : q.coasterVolume,
-                            contractDuration: duration,
-                            pricePerRestaurant: pricePerRest,
-                            monthlyTotal,
-                            contractTotal: Number(q.totalValue || 0),
-                            includesProduction: q.includesProduction ?? true,
-                            restaurants: [],
-                          });
-                          toast.success("PDF da proposta gerado!");
+                        onClick={async () => {
+                          try {
+                            const fetchedRestaurants = await utils.quotation.getRestaurants.fetch({ quotationId: q.id });
+                            const numRest = fetchedRestaurants.length;
+                            const duration = q.cycles || 1;
+                            const pricePerRest = q.unitPrice ? Number(q.unitPrice) : 0;
+                            const monthlyTotal = pricePerRest * (numRest > 0 ? numRest : 1);
+                            const restaurants = fetchedRestaurants.map((r) => ({
+                              name: r.restaurantName || "Restaurante",
+                              neighborhood: r.restaurantAddress || "",
+                              coasters: r.coasterQuantity || 0,
+                            }));
+                            generateProposalPdf({
+                              clientName: q.clientName || "Cliente",
+                              clientCompany: q.clientCompany || undefined,
+                              clientCnpj: q.clientCnpj || undefined,
+                              clientEmail: q.clientEmail || undefined,
+                              clientPhone: q.clientPhone || undefined,
+                              quotationName: q.quotationName || q.quotationNumber,
+                              coasterVolume: q.coasterVolume,
+                              numRestaurants: numRest,
+                              coastersPerRestaurant: numRest > 0 ? Math.round(q.coasterVolume / numRest) : q.coasterVolume,
+                              contractDuration: duration,
+                              pricePerRestaurant: pricePerRest,
+                              monthlyTotal,
+                              contractTotal: Number(q.totalValue || 0),
+                              includesProduction: q.includesProduction ?? true,
+                              restaurants,
+                            });
+                            toast.success("PDF da proposta gerado!");
+                          } catch (err) {
+                            toast.error("Erro ao gerar PDF da proposta");
+                          }
                         }}
                         title="Exportar Proposta PDF"
                       >

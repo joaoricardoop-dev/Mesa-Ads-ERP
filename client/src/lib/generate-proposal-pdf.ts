@@ -149,8 +149,12 @@ export function generateProposalPdf(data: ProposalPDFData) {
 
   y = drawInfoRow(doc, "Formato:", "Bolachas de chopp personalizadas (frente e verso)", y, margin);
   y = drawInfoRow(doc, "Volume total:", `${fmtNumber(data.coasterVolume)} bolachas/mês`, y, margin);
-  y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurante${data.numRestaurants !== 1 ? "s" : ""} parceiro${data.numRestaurants !== 1 ? "s" : ""}`, y, margin);
-  y = drawInfoRow(doc, "Por restaurante:", `${fmtNumber(data.coastersPerRestaurant)} bolachas/mês`, y, margin);
+  if (data.numRestaurants > 0) {
+    y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurante${data.numRestaurants !== 1 ? "s" : ""} parceiro${data.numRestaurants !== 1 ? "s" : ""}`, y, margin);
+    y = drawInfoRow(doc, "Por restaurante:", `${fmtNumber(data.coastersPerRestaurant)} bolachas/mês`, y, margin);
+  } else {
+    y = drawInfoRow(doc, "Distribuição:", "A definir", y, margin);
+  }
   y = drawInfoRow(doc, "Duração:", `${data.contractDuration} ${data.contractDuration === 1 ? "mês" : "meses"}`, y, margin);
   if (data.includesProduction) {
     y = drawInfoRow(doc, "Produção:", "Inclusa no valor", y, margin);
