@@ -1087,15 +1087,12 @@ export const appRouter = router({
         if (input.parentId !== null) {
           const [parent] = await db.select({ id: clientsTable.id, parentId: clientsTable.parentId }).from(clientsTable).where(eq(clientsTable.id, input.parentId));
           if (!parent) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente pai não encontrado." });
-          let currentId: number | null = parent.parentId;
-          const visited = new Set<number>([input.clientId, input.parentId]);
-          while (currentId !== null) {
-            if (visited.has(currentId)) {
-              throw new TRPCError({ code: "BAD_REQUEST", message: "Vinculação criaria um ciclo na hierarquia." });
-            }
-            visited.add(currentId);
-            const [ancestor] = await db.select({ parentId: clientsTable.parentId }).from(clientsTable).where(eq(clientsTable.id, currentId));
-            currentId = ancestor?.parentId ?? null;
+          if (parent.parentId) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível vincular a um cliente que já é filial. Apenas clientes de nível superior podem ser matriz." });
+          }
+          const existingChildren = await db.select({ id: clientsTable.id }).from(clientsTable).where(eq(clientsTable.parentId, input.clientId)).limit(1);
+          if (existingChildren.length > 0) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Este cliente já possui filiais. Não é possível torná-lo filial de outro." });
           }
         }
         const [updated] = await db.update(clientsTable).set({

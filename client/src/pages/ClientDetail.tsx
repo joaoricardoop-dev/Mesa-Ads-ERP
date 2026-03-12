@@ -1028,7 +1028,7 @@ export default function ClientDetail() {
             </div>
             <div className="max-h-60 overflow-y-auto space-y-1">
               {allClients
-                .filter((c: any) => c.id !== clientId && c.name.toLowerCase().includes(parentSearch.toLowerCase()))
+                .filter((c: any) => c.id !== clientId && !c.parentId && c.name.toLowerCase().includes(parentSearch.toLowerCase()))
                 .slice(0, 20)
                 .map((c: any) => (
                   <button
