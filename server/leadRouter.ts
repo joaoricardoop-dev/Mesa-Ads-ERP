@@ -99,6 +99,10 @@ export const leadRouter = router({
       let autoClientId = input.clientId;
       let autoOpportunityType = input.opportunityType;
 
+      if (autoClientId && !autoOpportunityType) {
+        autoOpportunityType = "upsell";
+      }
+
       if (!autoClientId && input.type === "anunciante") {
         const cleanCnpj = input.cnpj?.replace(/\D/g, "");
         if (cleanCnpj && cleanCnpj.length === 14) {

@@ -145,6 +145,8 @@ export default function ClientDetail() {
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
   const [linkParentOpen, setLinkParentOpen] = useState(false);
   const [linkChildOpen, setLinkChildOpen] = useState(false);
+  const [createChildOpen, setCreateChildOpen] = useState(false);
+  const [createChildForm, setCreateChildForm] = useState({ name: "", cnpj: "", contactEmail: "", contactPhone: "" });
   const [parentSearch, setParentSearch] = useState("");
   const [childSearch, setChildSearch] = useState("");
   const [includeChildContacts, setIncludeChildContacts] = useState(false);
@@ -220,6 +222,16 @@ export default function ClientDetail() {
       utils.advertiser.getChildren.invalidate({ clientId });
       setLinkParentOpen(false);
       setLinkChildOpen(false);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const createChildMutation = trpc.advertiser.create.useMutation({
+    onSuccess: () => {
+      toast.success("Filial criada com sucesso!");
+      utils.advertiser.getChildren.invalidate({ clientId });
+      setCreateChildOpen(false);
+      setCreateChildForm({ name: "", cnpj: "", contactEmail: "", contactPhone: "" });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -767,9 +779,14 @@ export default function ClientDetail() {
               <h3 className="font-semibold flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-primary" /> Filiais ({childClients.length})
               </h3>
-              <Button size="sm" variant="outline" className="gap-2" onClick={() => { setChildSearch(""); setLinkChildOpen(true); }}>
-                <Plus className="w-4 h-4" /> Vincular Filial
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" className="gap-2" onClick={() => { setChildSearch(""); setLinkChildOpen(true); }}>
+                  <Link2 className="w-4 h-4" /> Vincular Existente
+                </Button>
+                <Button size="sm" className="gap-2" onClick={() => { setCreateChildForm({ name: "", cnpj: "", contactEmail: "", contactPhone: "" }); setCreateChildOpen(true); }}>
+                  <Plus className="w-4 h-4" /> Nova Filial
+                </Button>
+              </div>
             </div>
             {childClients.length === 0 ? (
               <div className="p-12 text-center text-muted-foreground">
@@ -1027,6 +1044,51 @@ export default function ClientDetail() {
                 ))}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createChildOpen} onOpenChange={setCreateChildOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-primary" /> Nova Filial
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome *</Label>
+              <Input value={createChildForm.name} onChange={(e) => setCreateChildForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome da filial" />
+            </div>
+            <div className="space-y-2">
+              <Label>CNPJ</Label>
+              <Input value={createChildForm.cnpj} onChange={(e) => setCreateChildForm(f => ({ ...f, cnpj: e.target.value }))} placeholder="00.000.000/0000-00" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>E-mail</Label>
+                <Input value={createChildForm.contactEmail} onChange={(e) => setCreateChildForm(f => ({ ...f, contactEmail: e.target.value }))} placeholder="email@exemplo.com" />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone</Label>
+                <Input value={createChildForm.contactPhone} onChange={(e) => setCreateChildForm(f => ({ ...f, contactPhone: e.target.value }))} placeholder="(00) 00000-0000" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateChildOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={!createChildForm.name.trim() || createChildMutation.isPending}
+              onClick={() => createChildMutation.mutate({
+                name: createChildForm.name.trim(),
+                cnpj: createChildForm.cnpj || undefined,
+                contactEmail: createChildForm.contactEmail || undefined,
+                contactPhone: createChildForm.contactPhone || undefined,
+                parentId: clientId,
+              })}
+            >
+              {createChildMutation.isPending ? "Criando..." : "Criar Filial"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

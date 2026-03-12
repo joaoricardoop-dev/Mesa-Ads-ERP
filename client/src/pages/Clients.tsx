@@ -48,6 +48,7 @@ import {
   Search,
   Tag,
   MapPin,
+  Network,
   Instagram,
   ChevronDown,
   ArrowUpDown,
@@ -208,6 +209,10 @@ export default function Clients() {
     }
   };
 
+  const parentIdsSet = new Set(
+    clientsList.filter((c: any) => c.parentId).map((c: any) => c.parentId as number)
+  );
+
   const filtered = clientsList.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -327,6 +332,16 @@ export default function Clients() {
                       <div className="flex items-center gap-2">
                         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === c.id ? "rotate-180" : ""}`} />
                         {c.name}
+                        {parentIdsSet.has(c.id) && (
+                          <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-[10px] px-1.5 py-0">
+                            <Network className="w-3 h-3 mr-0.5" /> Matriz
+                          </Badge>
+                        )}
+                        {(c as any).parentId && (
+                          <Badge variant="outline" className="bg-violet-500/10 text-violet-400 border-violet-500/30 text-[10px] px-1.5 py-0">
+                            <Building2 className="w-3 h-3 mr-0.5" /> Filial
+                          </Badge>
+                        )}
                         {(c as any).selfRegistered && (
                           <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-[10px] px-1.5 py-0">
                             Self-registered

@@ -882,6 +882,7 @@ export const appRouter = router({
           cep: z.string().optional(),
           segment: z.string().optional(),
           status: z.enum(["active", "inactive"]).default("active"),
+          parentId: z.number().nullable().optional(),
         })
       )
       .mutation(({ input }) => createClient(input)),
