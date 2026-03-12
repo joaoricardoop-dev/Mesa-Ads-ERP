@@ -1,11 +1,18 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/format";
-import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, TrendingDown, BarChart3, PieChart, Settings2, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
+import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, TrendingDown, BarChart3, PieChart, Settings2, ChevronDown, ChevronRight, RotateCcw, FileText, Download, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import PageContainer from "@/components/PageContainer";
 import Section from "@/components/Section";
 
@@ -158,8 +165,202 @@ export default function PriceTable() {
     setCustosVolume(DEFAULT_CUSTOS_VOLUME);
   };
 
+  const [, navigate] = useLocation();
+  const [showCotacaoDialog, setShowCotacaoDialog] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("none");
+  const [selectedLeadId, setSelectedLeadId] = useState("none");
+  const [cotacaoNotes, setCotacaoNotes] = useState("");
+
+  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: leadsList = [] } = trpc.lead.list.useQuery({ type: "anunciante" });
+  const utils = trpc.useUtils();
+
+  const createMutation = trpc.quotation.create.useMutation({
+    onSuccess: () => {
+      utils.quotation.list.invalidate();
+      toast.success("Cotação criada com sucesso!");
+      setShowCotacaoDialog(false);
+      setTimeout(() => navigate("/comercial/cotacoes"), 600);
+    },
+    onError: (err: any) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const handleCreateCotacao = () => {
+    if (selectedClientId === "none" && selectedLeadId === "none") {
+      toast.error("Selecione um cliente ou lead");
+      return;
+    }
+    const unitPriceStr = calc.precoUnitComDesc.toFixed(4);
+    const totalValueStr = calc.precoFinal.toFixed(2);
+    const notesAuto = `Tabela de Preços VEXA: ${volume.toLocaleString("pt-BR")} un., ${semanas} semanas, ${pagLabel}, desc. prazo ${(descPrazo * 100).toFixed(0)}%`;
+
+    createMutation.mutate({
+      ...(selectedClientId !== "none" ? { clientId: parseInt(selectedClientId) } : {}),
+      ...(selectedLeadId !== "none" ? { leadId: parseInt(selectedLeadId) } : {}),
+      campaignType: "bolachas",
+      coasterVolume: volume,
+      cycles: Math.ceil(semanas / 4),
+      unitPrice: unitPriceStr,
+      totalValue: totalValueStr,
+      includesProduction: true,
+      notes: cotacaoNotes ? `${notesAuto}\n${cotacaoNotes}` : notesAuto,
+    });
+  };
+
+  const handleExportPdf = useCallback(() => {
+    try {
+      const doc = new jsPDF("p", "mm", "a4");
+      const pw = doc.internal.pageSize.getWidth();
+      const orange = [255, 102, 0] as const;
+      const black = [13, 13, 13] as const;
+
+      doc.setFillColor(...black);
+      doc.rect(0, 0, pw, 42, "F");
+      doc.setFillColor(...orange);
+      doc.rect(0, 42, pw, 2.5, "F");
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.text("MESA ADS", 14, 22);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.text("Simulação de Preços — Tabela VEXA", 14, 32);
+
+      doc.setFontSize(8);
+      doc.setTextColor(180, 180, 180);
+      doc.text(`Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}`, pw - 14, 32, { align: "right" });
+
+      let y = 54;
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Resumo da Simulação", 14, y);
+      y += 8;
+
+      const summaryData = [
+        ["Quantidade", `${volume.toLocaleString("pt-BR")} unidades`],
+        ["Duração", `${semanas} semanas (${calc.nPeriodos} períodos)`],
+        ["Forma de Pagamento", pagLabel],
+        ["Preço Total", formatCurrency(calc.precoFinal)],
+        ["Preço Unitário (c/ desc.)", formatCurrency(calc.precoUnitComDesc)],
+        ["Desconto Combinado", calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"],
+        ["Lucro Bruto", formatCurrency(calc.lucroBruto)],
+        ["Margem Líquida", `${(calc.margemLiquida * 100).toFixed(1)}%`],
+      ];
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Parâmetro", "Valor"]],
+        body: summaryData,
+        theme: "striped",
+        headStyles: { fillColor: [255, 102, 0], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+        bodyStyles: { fontSize: 9 },
+        columnStyles: { 0: { fontStyle: "bold" } },
+        margin: { left: 14, right: 14 },
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 12;
+
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Comissões e Impostos", 14, y);
+      y += 6;
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Item", "% sobre Receita", "Valor (R$)"]],
+        body: [
+          ["IRPJ", `${premissas.irpj}%`, formatCurrency(calc.valorIRPJ)],
+          ["Comissão Restaurante", `${premissas.comissaoRestaurante}%`, formatCurrency(calc.valorComRest)],
+          ["Comissão Comercial", `${premissas.comissaoComercial}%`, formatCurrency(calc.valorComCom)],
+          ["Total Deduções", `${(calc.totalDeducoesPerc * 100).toFixed(0)}%`, formatCurrency(calc.totalDeducoesValor)],
+        ],
+        theme: "striped",
+        headStyles: { fillColor: [255, 102, 0], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+        bodyStyles: { fontSize: 9 },
+        margin: { left: 14, right: 14 },
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 12;
+
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Resultado Final", 14, y);
+      y += 6;
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Indicador", "Valor"]],
+        body: [
+          ["Receita Líquida", formatCurrency(calc.receitaLiquida)],
+          ["Custo Total do Período", formatCurrency(calc.custoTotalPeriodo)],
+          ["Lucro Bruto", formatCurrency(calc.lucroBruto)],
+          ["Margem Líquida", `${(calc.margemLiquida * 100).toFixed(1)}%`],
+          ["Lucro por Unidade", formatCurrency(calc.lucroPorUnidade)],
+          ["Custo por Unidade", formatCurrency(calc.custoPorUnidade)],
+        ],
+        theme: "striped",
+        headStyles: { fillColor: [255, 102, 0], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+        bodyStyles: { fontSize: 9 },
+        columnStyles: { 0: { fontStyle: "bold" } },
+        margin: { left: 14, right: 14 },
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 12;
+
+      if (y > 240) { doc.addPage(); y = 20; }
+
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Tabela de Preços por Duração", 14, y);
+      y += 6;
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Duração", "Preço s/ Desc.", "Desconto", "Economia", "Preço Final"]],
+        body: calc.tabela.map((r) => [
+          `${r.semanas} sem`,
+          formatCurrency(r.precoSemDesconto),
+          r.desconto > 0 ? `${(r.desconto * 100).toFixed(0)}%` : "—",
+          r.economia > 0 ? formatCurrency(r.economia) : "—",
+          formatCurrency(r.precoFinal),
+        ]),
+        theme: "striped",
+        headStyles: { fillColor: [255, 102, 0], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: 14, right: 14 },
+      });
+
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setTextColor(150);
+        doc.text(`Mesa Ads — Tabela VEXA — Página ${i}/${pageCount}`, pw / 2, doc.internal.pageSize.getHeight() - 8, { align: "center" });
+      }
+
+      doc.save(`VEXA_${volume}un_${semanas}sem_${pagLabel}.pdf`);
+      toast.success("PDF exportado!");
+    } catch {
+      toast.error("Erro ao gerar PDF");
+    }
+  }, [volume, semanas, pagLabel, calc, premissas, descPrazo]);
+
   return (
-    <PageContainer title="Tabela de Preços — Simulador VEXA">
+    <PageContainer
+      title="Tabela de Preços — Simulador VEXA"
+      actions={
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportPdf}>
+            <Download className="w-3.5 h-3.5" /> Exportar PDF
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => { setCotacaoNotes(""); setSelectedClientId("none"); setSelectedLeadId("none"); setShowCotacaoDialog(true); }}>
+            <Rocket className="w-3.5 h-3.5" /> Criar Cotação
+          </Button>
+        </div>
+      }
+    >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 space-y-4">
           <Section title="Inputs" icon={Package}>
@@ -391,6 +592,86 @@ export default function PriceTable() {
           </Section>
         </div>
       </div>
+
+      <Dialog open={showCotacaoDialog} onOpenChange={setShowCotacaoDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-primary" />
+              Criar Cotação
+            </DialogTitle>
+            <DialogDescription>
+              Criar cotação a partir da simulação atual
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3 p-3 bg-muted/30 rounded-lg text-xs">
+              <div>
+                <span className="text-muted-foreground">Quantidade</span>
+                <p className="font-mono font-semibold">{volume.toLocaleString("pt-BR")} un.</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Duração</span>
+                <p className="font-mono font-semibold">{semanas} semanas</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Preço Total</span>
+                <p className="font-mono font-semibold text-primary">{formatCurrency(calc.precoFinal)}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Preço Unit.</span>
+                <p className="font-mono font-semibold">{formatCurrency(calc.precoUnitComDesc)}</p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cliente (Anunciante)</Label>
+              <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); if (v !== "none") setSelectedLeadId("none"); }}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {(clientsList as any[]).filter((c: any) => c.status === "active").map((c: any) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.company || c.name} {c.cnpj ? `(${c.cnpj})` : ""}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Ou Lead</Label>
+              <Select value={selectedLeadId} onValueChange={(v) => { setSelectedLeadId(v); if (v !== "none") setSelectedClientId("none"); }}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {(leadsList as any[]).map((l: any) => (
+                    <SelectItem key={l.id} value={String(l.id)}>{l.company || l.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Observações (opcional)</Label>
+              <Textarea
+                className="text-sm resize-none"
+                rows={3}
+                placeholder="Anotações sobre esta cotação..."
+                value={cotacaoNotes}
+                onChange={(e) => setCotacaoNotes(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowCotacaoDialog(false)}>Cancelar</Button>
+            <Button size="sm" className="gap-1.5" onClick={handleCreateCotacao} disabled={createMutation.isPending}>
+              <Rocket className="w-3.5 h-3.5" />
+              {createMutation.isPending ? "Criando..." : "Confirmar Cotação"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }
