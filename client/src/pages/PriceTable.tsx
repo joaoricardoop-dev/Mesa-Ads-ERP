@@ -170,6 +170,7 @@ export default function PriceTable() {
   const [selectedClientId, setSelectedClientId] = useState("none");
   const [selectedLeadId, setSelectedLeadId] = useState("none");
   const [cotacaoNotes, setCotacaoNotes] = useState("");
+  const [cotacaoVolume, setCotacaoVolume] = useState(volume);
 
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
   const { data: leadsList = [] } = trpc.lead.list.useQuery({ type: "anunciante" });
@@ -190,15 +191,19 @@ export default function PriceTable() {
       toast.error("Selecione um cliente ou lead");
       return;
     }
+    if (cotacaoVolume < 1) {
+      toast.error("Volume deve ser no mínimo 1");
+      return;
+    }
     const unitPriceStr = calc.precoUnitComDesc.toFixed(4);
-    const totalValueStr = calc.precoFinal.toFixed(2);
-    const notesAuto = `Tabela de Preços VEXA: ${volume.toLocaleString("pt-BR")} un., ${semanas} semanas, ${pagLabel}, desc. prazo ${(descPrazo * 100).toFixed(0)}%`;
+    const totalValueStr = (calc.precoUnitComDesc * cotacaoVolume).toFixed(2);
+    const notesAuto = `Tabela de Preços VEXA: ${cotacaoVolume.toLocaleString("pt-BR")} un., ${semanas} semanas, ${pagLabel}, desc. prazo ${(descPrazo * 100).toFixed(0)}%`;
 
     createMutation.mutate({
       ...(selectedClientId !== "none" ? { clientId: parseInt(selectedClientId) } : {}),
       ...(selectedLeadId !== "none" ? { leadId: parseInt(selectedLeadId) } : {}),
       campaignType: "bolachas",
-      coasterVolume: volume,
+      coasterVolume: cotacaoVolume,
       cycles: Math.ceil(semanas / 4),
       unitPrice: unitPriceStr,
       totalValue: totalValueStr,
@@ -355,7 +360,7 @@ export default function PriceTable() {
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportPdf}>
             <Download className="w-3.5 h-3.5" /> Exportar PDF
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => { setCotacaoNotes(""); setSelectedClientId("none"); setSelectedLeadId("none"); setShowCotacaoDialog(true); }}>
+          <Button size="sm" className="gap-1.5" onClick={() => { setCotacaoNotes(""); setSelectedClientId("none"); setSelectedLeadId("none"); setCotacaoVolume(volume); setShowCotacaoDialog(true); }}>
             <Rocket className="w-3.5 h-3.5" /> Criar Cotação
           </Button>
         </div>
@@ -606,22 +611,31 @@ export default function PriceTable() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3 p-3 bg-muted/30 rounded-lg text-xs">
-              <div>
-                <span className="text-muted-foreground">Quantidade</span>
-                <p className="font-mono font-semibold">{volume.toLocaleString("pt-BR")} un.</p>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Volume de Bolachas (un.)</Label>
+                <input
+                  type="number"
+                  min={1}
+                  className="w-full bg-background border border-border/30 rounded-md h-9 px-3 text-sm font-mono focus:outline-none focus:border-primary/50"
+                  value={cotacaoVolume}
+                  onChange={(e) => setCotacaoVolume(parseInt(e.target.value) || 0)}
+                />
+                <p className="text-[10px] text-muted-foreground">Pré-preenchido com o volume da simulação ({volume.toLocaleString("pt-BR")}). Ajuste conforme necessário.</p>
               </div>
-              <div>
-                <span className="text-muted-foreground">Duração</span>
-                <p className="font-mono font-semibold">{semanas} semanas</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Preço Total</span>
-                <p className="font-mono font-semibold text-primary">{formatCurrency(calc.precoFinal)}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Preço Unit.</span>
-                <p className="font-mono font-semibold">{formatCurrency(calc.precoUnitComDesc)}</p>
+              <div className="grid grid-cols-3 gap-3 p-3 bg-muted/30 rounded-lg text-xs">
+                <div>
+                  <span className="text-muted-foreground">Duração</span>
+                  <p className="font-mono font-semibold">{semanas} semanas</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Preço Unit.</span>
+                  <p className="font-mono font-semibold">{formatCurrency(calc.precoUnitComDesc)}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Valor Total</span>
+                  <p className="font-mono font-semibold text-primary">{formatCurrency(calc.precoUnitComDesc * cotacaoVolume)}</p>
+                </div>
               </div>
             </div>
 
