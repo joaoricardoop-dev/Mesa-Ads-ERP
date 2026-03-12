@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
-import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, TrendingDown, BarChart3, PieChart, Settings2, ChevronDown, ChevronRight, RotateCcw, FileText, Download, Rocket, Store, Search, X, Divide, CheckCircle2, AlertTriangle, MapPin } from "lucide-react";
+import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, TrendingDown, BarChart3, PieChart, Settings2, ChevronDown, ChevronRight, RotateCcw, FileText, Download, Rocket, Store, Search, X, Divide, CheckCircle2, AlertTriangle, MapPin, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -69,6 +69,7 @@ export default function PriceTable() {
   const [semanaIdx, setSemanaIdx] = useState(0);
   const [formaPagamento, setFormaPagamento] = useState("boleto");
   const [showPremissas, setShowPremissas] = useState(false);
+  const [presentationMode, setPresentationMode] = useState(false);
 
   const [premissas, setPremissas] = useState(DEFAULT_PREMISSAS);
   const [descontosPrazo, setDescontosPrazo] = useState(DEFAULT_DESCONTOS_PRAZO);
@@ -403,6 +404,19 @@ export default function PriceTable() {
       title="Tabela de Preços — Simulador VEXA"
       actions={
         <div className="flex items-center gap-2">
+          <Button
+            variant={presentationMode ? "default" : "outline"}
+            size="sm"
+            className={`gap-1.5 ${presentationMode ? "bg-orange-500 hover:bg-orange-600 text-white" : ""}`}
+            onClick={() => {
+              const next = !presentationMode;
+              setPresentationMode(next);
+              if (next) setShowPremissas(false);
+            }}
+          >
+            {presentationMode ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            {presentationMode ? "Modo Apresentação" : "Apresentação"}
+          </Button>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportPdf}>
             <Download className="w-3.5 h-3.5" /> Exportar PDF
           </Button>
@@ -446,7 +460,7 @@ export default function PriceTable() {
             </div>
           </Section>
 
-          <div className="border border-border/30 rounded-lg overflow-hidden">
+          {!presentationMode && <div className="border border-border/30 rounded-lg overflow-hidden">
             <button
               onClick={() => setShowPremissas(!showPremissas)}
               className="w-full flex items-center justify-between p-3 text-xs font-medium text-muted-foreground hover:bg-muted/20 transition-colors"
@@ -515,18 +529,18 @@ export default function PriceTable() {
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
-          <Section title="Custos" icon={Calculator}>
+          {!presentationMode && <Section title="Custos" icon={Calculator}>
             <div className="space-y-2">
               <EconRow label="Custo GPC Unitário" value={`R$ ${dados.custoGPC.toFixed(4)}`} />
               <EconRow label="Custo Produção Total" value={formatCurrency(calc.custoProducao)} />
               <EconRow label="Frete" value={formatCurrency(dados.frete)} />
               <EconRow label="Custo Total (Prod+Frete)" value={formatCurrency(calc.custoTotal4sem)} bold />
             </div>
-          </Section>
+          </Section>}
 
-          <Section title="Preço Sem Desconto" icon={DollarSign}>
+          {!presentationMode && <Section title="Preço Sem Desconto" icon={DollarSign}>
             <div className="space-y-2">
               <EconRow label="Margem Alvo" value={`${(dados.margem * 100).toFixed(0)}%`} />
               <EconRow label="Denominador" value={calc.denominador.toFixed(4)} />
@@ -536,7 +550,7 @@ export default function PriceTable() {
               <EconRow label="Preço Unit. (4 sem, s/ desc.)" value={formatCurrency(calc.precoUnit4sem)} bold />
               <EconRow label="Preço Total (4 sem, s/ desc.)" value={formatCurrency(calc.precoTotalBase4sem)} bold />
             </div>
-          </Section>
+          </Section>}
 
           <Section title="Descontos" icon={TrendingDown}>
             <div className="space-y-2">
@@ -559,22 +573,22 @@ export default function PriceTable() {
             <KpiCard label="Desconto Total" value={calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"} sub="vs base 1k / 4 sem" variant="discount" icon={TrendingDown} />
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {!presentationMode && <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <KpiCard label="Lucro Bruto" value={formatCurrency(calc.lucroBruto)} sub="rec. líquida − custo total" variant="success" icon={Percent} />
             <KpiCard label="Margem Líquida" value={`${(calc.margemLiquida * 100).toFixed(1)}%`} sub="após deduções" variant="success" icon={PieChart} />
             <KpiCard label="Custo Total" value={formatCurrency(calc.custoTotalPeriodo)} sub={`${calc.nPeriodos} períodos`} icon={Calculator} />
-          </div>
+          </div>}
 
-          <Section title="Comissões e Impostos" icon={BarChart3}>
+          {!presentationMode && <Section title="Comissões e Impostos" icon={BarChart3}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
               <EconRow label={`IRPJ (${premissas.irpj}%)`} value={formatCurrency(calc.valorIRPJ)} />
               <EconRow label={`Comissão Restaurante (${premissas.comissaoRestaurante}%)`} value={formatCurrency(calc.valorComRest)} />
               <EconRow label={`Comissão Comercial (${premissas.comissaoComercial}%)`} value={formatCurrency(calc.valorComCom)} />
               <EconRow label="Total Deduções" value={formatCurrency(calc.totalDeducoesValor)} bold />
             </div>
-          </Section>
+          </Section>}
 
-          <Section title="Resultado Final" icon={TrendingUp}>
+          {!presentationMode && <Section title="Resultado Final" icon={TrendingUp}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
               <EconRow label="Receita Líquida (após deduções)" value={formatCurrency(calc.receitaLiquida)} />
               <EconRow label="Lucro Bruto (Rec.Líq. − Custo Total)" value={formatCurrency(calc.lucroBruto)} bold accent />
@@ -583,9 +597,9 @@ export default function PriceTable() {
               <EconRow label="Lucro por Unidade" value={formatCurrency(calc.lucroPorUnidade)} />
               <EconRow label="Custo por Unidade (total)" value={formatCurrency(calc.custoPorUnidade)} />
             </div>
-          </Section>
+          </Section>}
 
-          <Section title="Decomposição do Preço (por unidade)" icon={PieChart}>
+          {!presentationMode && <Section title="Decomposição do Preço (por unidade)" icon={PieChart}>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -611,7 +625,7 @@ export default function PriceTable() {
                 </tbody>
               </table>
             </div>
-          </Section>
+          </Section>}
 
           <Section title="Distribuição de Restaurantes" icon={Store}>
             <div className="space-y-3">
