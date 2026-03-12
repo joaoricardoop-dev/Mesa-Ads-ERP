@@ -24,9 +24,10 @@ interface ProposalPDFData {
   validityDays?: number;
 }
 
-const ORANGE = [255, 102, 0] as const;
+const GREEN = [39, 216, 3] as const;
 const BLACK = [13, 13, 13] as const;
-const GRAY = [120, 120, 120] as const;
+const DARK_GRAY = [60, 60, 60] as const;
+const GRAY = [100, 100, 100] as const;
 const LIGHT_GRAY = [240, 240, 240] as const;
 const WHITE = [255, 255, 255] as const;
 
@@ -38,63 +39,52 @@ function fmtNumber(val: number): string {
   return val.toLocaleString("pt-BR");
 }
 
-function drawHeader(doc: jsPDF, pageWidth: number) {
+function drawHeader(doc: jsPDF, pageWidth: number, margin: number) {
   doc.setFillColor(...BLACK);
-  doc.rect(0, 0, pageWidth, 50, "F");
+  doc.rect(0, 0, pageWidth, 42, "F");
 
-  doc.setFillColor(...ORANGE);
-  doc.rect(0, 50, pageWidth, 3, "F");
-
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(28);
-  doc.setFont("helvetica", "bold");
-  doc.text("Mesa", 20, 28);
-
-  const mesaWidth = doc.getTextWidth("Mesa");
-  doc.setTextColor(...ORANGE);
-  doc.text("Ads", 20 + mesaWidth + 2, 28);
+  doc.setFillColor(...GREEN);
+  doc.rect(0, 42, pageWidth, 2, "F");
 
   doc.setTextColor(...WHITE);
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "normal");
-  doc.text("Mídia em Bolachas de Chopp", 20, 40);
-
   doc.setFontSize(22);
   doc.setFont("helvetica", "bold");
-  doc.text("PROPOSTA COMERCIAL", pageWidth - 20, 28, { align: "right" });
+  doc.text("mesa", margin, 24);
+  const mesaWidth = doc.getTextWidth("mesa");
+  doc.setTextColor(...GREEN);
+  doc.text(".ads", margin + mesaWidth, 24);
 
+  doc.setTextColor(...WHITE);
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
+  doc.text("PROPOSTA COMERCIAL", margin, 34);
+
   const today = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-  doc.text(today, pageWidth - 20, 40, { align: "right" });
+  doc.setTextColor(200, 200, 200);
+  doc.setFontSize(8);
+  doc.text(today, pageWidth - margin, 34, { align: "right" });
 }
 
-function drawSection(doc: jsPDF, title: string, y: number, pageWidth: number): number {
-  doc.setFillColor(...ORANGE);
-  doc.rect(20, y, 4, 14, "F");
-
+function drawSectionTitle(doc: jsPDF, title: string, y: number, margin: number): number {
   doc.setTextColor(...BLACK);
-  doc.setFontSize(11);
+  doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
-  doc.text(title, 30, y + 10);
-
-  doc.setDrawColor(230, 230, 230);
-  doc.line(30, y + 16, pageWidth - 20, y + 16);
-
-  return y + 24;
+  doc.text(title, margin, y);
+  y += 3;
+  doc.setDrawColor(220, 220, 220);
+  doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y);
+  return y + 8;
 }
 
-function drawInfoRow(doc: jsPDF, label: string, value: string, y: number, pageWidth: number): number {
+function drawInfoRow(doc: jsPDF, label: string, value: string, y: number, margin: number): number {
   doc.setTextColor(...GRAY);
   doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text(label, 30, y);
-
-  doc.setTextColor(...BLACK);
   doc.setFont("helvetica", "bold");
-  doc.text(value, pageWidth / 2, y);
-
-  return y + 7;
+  doc.text(label, margin, y);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...DARK_GRAY);
+  doc.text(value, margin + 35, y);
+  return y + 6;
 }
 
 function checkPageBreak(doc: jsPDF, y: number, needed: number): number {
@@ -109,103 +99,100 @@ function checkPageBreak(doc: jsPDF, y: number, needed: number): number {
 export function generateProposalPdf(data: ProposalPDFData) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  const contentWidth = pageWidth - margin * 2;
 
-  drawHeader(doc, pageWidth);
+  drawHeader(doc, pageWidth, margin);
 
-  let y = 68;
+  let y = 56;
 
   if (data.quotationName) {
     doc.setTextColor(...GRAY);
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text(`Ref: ${data.quotationName}`, 20, y);
-    y += 12;
+    doc.text(`Ref: ${data.quotationName}`, margin, y);
+    y += 10;
   }
 
-  y = drawSection(doc, "DESTINATÁRIO", y, pageWidth);
+  y = drawSectionTitle(doc, "DESTINATÁRIO", y, margin);
 
   if (data.clientCompany) {
-    y = drawInfoRow(doc, "Empresa:", data.clientCompany, y, pageWidth);
+    y = drawInfoRow(doc, "Empresa:", data.clientCompany, y, margin);
   }
-  y = drawInfoRow(doc, "Nome:", data.clientName, y, pageWidth);
+  y = drawInfoRow(doc, "Nome:", data.clientName, y, margin);
   if (data.clientCnpj) {
-    y = drawInfoRow(doc, "CNPJ:", data.clientCnpj, y, pageWidth);
+    y = drawInfoRow(doc, "CNPJ:", data.clientCnpj, y, margin);
   }
   if (data.clientEmail) {
-    y = drawInfoRow(doc, "E-mail:", data.clientEmail, y, pageWidth);
+    y = drawInfoRow(doc, "E-mail:", data.clientEmail, y, margin);
   }
   if (data.clientPhone) {
-    y = drawInfoRow(doc, "Telefone:", data.clientPhone, y, pageWidth);
+    y = drawInfoRow(doc, "Telefone:", data.clientPhone, y, margin);
   }
 
-  y += 10;
-  y = drawSection(doc, "SOBRE A MESA ADS", y, pageWidth);
+  y += 8;
+  y = drawSectionTitle(doc, "SOBRE A MESA ADS", y, margin);
 
-  doc.setTextColor(60, 60, 60);
+  doc.setTextColor(...DARK_GRAY);
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  const aboutText = [
-    "A Mesa Ads é especialista em mídia offline de alto impacto: bolachas de chopp",
-    "personalizadas, distribuídas em restaurantes e bares selecionados.",
-    "",
-    "Sua marca presente na mesa do consumidor — no momento mais descontraído",
-    "do dia, gerando milhares de impressões orgânicas por mês com alta retenção.",
-  ];
-  aboutText.forEach(line => {
-    doc.text(line, 30, y);
-    y += line === "" ? 4 : 6;
-  });
+  const aboutLines = doc.splitTextToSize(
+    "A Mesa Ads é especialista em mídia offline de alto impacto: bolachas de chopp personalizadas, distribuídas em restaurantes e bares selecionados. Sua marca presente na mesa do consumidor — no momento mais descontraído do dia, gerando milhares de impressões orgânicas por mês com alta retenção.",
+    contentWidth
+  );
+  doc.text(aboutLines, margin, y);
+  y += aboutLines.length * 4.5 + 8;
 
-  y += 10;
-  y = checkPageBreak(doc, y, 70);
-  y = drawSection(doc, "DESCRIÇÃO DO SERVIÇO", y, pageWidth);
+  y = checkPageBreak(doc, y, 60);
+  y = drawSectionTitle(doc, "DESCRIÇÃO DO SERVIÇO", y, margin);
 
-  y = drawInfoRow(doc, "Formato:", "Bolachas de chopp personalizadas (frente e verso)", y, pageWidth);
-  y = drawInfoRow(doc, "Volume total:", `${fmtNumber(data.coasterVolume)} bolachas/mês`, y, pageWidth);
-  y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurantes parceiros`, y, pageWidth);
-  y = drawInfoRow(doc, "Por restaurante:", `${fmtNumber(data.coastersPerRestaurant)} bolachas/mês`, y, pageWidth);
-  y = drawInfoRow(doc, "Duração:", `${data.contractDuration} ${data.contractDuration === 1 ? "mês" : "meses"}`, y, pageWidth);
+  y = drawInfoRow(doc, "Formato:", "Bolachas de chopp personalizadas (frente e verso)", y, margin);
+  y = drawInfoRow(doc, "Volume total:", `${fmtNumber(data.coasterVolume)} bolachas/mês`, y, margin);
+  y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurante${data.numRestaurants !== 1 ? "s" : ""} parceiro${data.numRestaurants !== 1 ? "s" : ""}`, y, margin);
+  y = drawInfoRow(doc, "Por restaurante:", `${fmtNumber(data.coastersPerRestaurant)} bolachas/mês`, y, margin);
+  y = drawInfoRow(doc, "Duração:", `${data.contractDuration} ${data.contractDuration === 1 ? "mês" : "meses"}`, y, margin);
   if (data.includesProduction) {
-    y = drawInfoRow(doc, "Produção:", "Inclusa no valor", y, pageWidth);
+    y = drawInfoRow(doc, "Produção:", "Inclusa no valor", y, margin);
   }
 
-  y += 10;
-  y = checkPageBreak(doc, y, 80);
-  y = drawSection(doc, "INVESTIMENTO", y, pageWidth);
+  y += 8;
+  y = checkPageBreak(doc, y, 70);
+  y = drawSectionTitle(doc, "INVESTIMENTO", y, margin);
 
   doc.setFillColor(...LIGHT_GRAY);
-  doc.roundedRect(30, y, pageWidth - 60, 50, 3, 3, "F");
+  doc.roundedRect(margin, y, contentWidth, 50, 3, 3, "F");
 
   doc.setTextColor(...GRAY);
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text("Valor mensal por restaurante", 40, y + 12);
-  doc.text("Investimento mensal total", 40, y + 26);
-  doc.text("Valor total do contrato", 40, y + 40);
+  doc.text("Valor mensal por restaurante", margin + 10, y + 12);
+  doc.text("Investimento mensal total", margin + 10, y + 26);
+  doc.text("Valor total do contrato", margin + 10, y + 40);
 
   doc.setTextColor(...BLACK);
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
-  doc.text(fmtCurrency(data.pricePerRestaurant), pageWidth - 40, y + 12, { align: "right" });
+  doc.text(fmtCurrency(data.pricePerRestaurant), pageWidth - margin - 10, y + 12, { align: "right" });
 
-  doc.setTextColor(...ORANGE);
+  doc.setTextColor(...GREEN);
   doc.setFontSize(14);
-  doc.text(fmtCurrency(data.monthlyTotal), pageWidth - 40, y + 26, { align: "right" });
+  doc.text(fmtCurrency(data.monthlyTotal), pageWidth - margin - 10, y + 26, { align: "right" });
 
   doc.setTextColor(...BLACK);
   doc.setFontSize(16);
-  doc.text(fmtCurrency(data.contractTotal), pageWidth - 40, y + 42, { align: "right" });
+  doc.text(fmtCurrency(data.contractTotal), pageWidth - margin - 10, y + 42, { align: "right" });
 
   doc.setDrawColor(200, 200, 200);
-  doc.line(40, y + 17, pageWidth - 40, y + 17);
-  doc.line(40, y + 31, pageWidth - 40, y + 31);
+  doc.line(margin + 10, y + 17, pageWidth - margin - 10, y + 17);
+  doc.line(margin + 10, y + 31, pageWidth - margin - 10, y + 31);
 
   y += 62;
 
   if (data.restaurants.length > 0) {
-    y += 6;
+    y += 4;
     y = checkPageBreak(doc, y, 60);
-    y = drawSection(doc, "REDE DE DISTRIBUIÇÃO", y, pageWidth);
+    y = drawSectionTitle(doc, "REDE DE DISTRIBUIÇÃO", y, margin);
 
     autoTable(doc, {
       startY: y,
@@ -237,7 +224,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
         fontStyle: "bold",
       },
       alternateRowStyles: { fillColor: [250, 250, 250] },
-      margin: { left: 30, right: 30 },
+      margin: { left: margin, right: margin },
       columnStyles: {
         0: { cellWidth: 12, halign: "center" },
         3: { halign: "right", fontStyle: "bold" },
@@ -247,65 +234,75 @@ export function generateProposalPdf(data: ProposalPDFData) {
     y = (doc as any).lastAutoTable?.finalY || y + 40;
   }
 
-  y += 12;
+  y += 10;
   y = checkPageBreak(doc, y, 60);
-  y = drawSection(doc, "CONDIÇÕES", y, pageWidth);
+
+  doc.setDrawColor(...GREEN);
+  doc.setLineWidth(0.5);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 10;
+
+  doc.setTextColor(...BLACK);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("CONDIÇÕES", margin, y);
+  y += 8;
 
   const validityDays = data.validityDays || 15;
   const conditions = [
     `• Esta proposta é válida por ${validityDays} dias a partir da data de emissão.`,
     "• Pagamento conforme condições acordadas entre as partes.",
     "• A produção das bolachas será iniciada após aprovação da arte pelo anunciante.",
-    "• A Mesa Ads se reserva o direito de selecionar os restaurantes parceiros",
-    "  conforme disponibilidade e perfil da campanha.",
+    "• A Mesa Ads se reserva o direito de selecionar os restaurantes parceiros conforme disponibilidade e perfil da campanha.",
     "• Valores sujeitos a alteração após o período de validade.",
   ];
 
-  doc.setTextColor(60, 60, 60);
+  doc.setTextColor(...DARK_GRAY);
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "normal");
   conditions.forEach(line => {
     y = checkPageBreak(doc, y, 8);
-    doc.text(line, 30, y);
-    y += 6;
+    const wrapped = doc.splitTextToSize(line, contentWidth);
+    doc.text(wrapped, margin, y);
+    y += wrapped.length * 4.5 + 2;
   });
 
-  y += 16;
-  y = checkPageBreak(doc, y, 40);
+  y += 14;
+  y = checkPageBreak(doc, y, 30);
 
   doc.setDrawColor(200, 200, 200);
-  doc.line(30, y, 90, y);
-  doc.line(pageWidth - 90, y, pageWidth - 30, y);
+  doc.line(margin, y, margin + 60, y);
+  doc.line(pageWidth - margin - 60, y, pageWidth - margin, y);
   y += 5;
   doc.setFontSize(8);
   doc.setTextColor(...GRAY);
-  doc.text("Anunciante", 60, y, { align: "center" });
-  doc.text("Mesa Ads", pageWidth - 60, y, { align: "center" });
-
+  doc.text("Anunciante", margin + 30, y, { align: "center" });
+  doc.text("Mesa Ads", pageWidth - margin - 30, y, { align: "center" });
   y += 5;
   doc.setFontSize(7);
-  doc.text(data.clientName, 60, y, { align: "center" });
-  doc.text("Representante Legal", pageWidth - 60, y, { align: "center" });
+  doc.text(data.clientName, margin + 30, y, { align: "center" });
+  doc.text("Representante Legal", pageWidth - margin - 30, y, { align: "center" });
 
-  const pageHeight = doc.internal.pageSize.getHeight();
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
 
-    doc.setFillColor(...BLACK);
-    doc.rect(0, pageHeight - 18, pageWidth, 18, "F");
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, pageHeight - 22, pageWidth - margin, pageHeight - 22);
 
     doc.setFontSize(7);
-    doc.setTextColor(...GRAY);
+    doc.setTextColor(140, 140, 140);
     doc.text(
-      `Mesa Ads — Proposta Comercial — Gerado em ${new Date().toLocaleDateString("pt-BR")}`,
-      pageWidth / 2,
-      pageHeight - 10,
-      { align: "center" }
+      `Documento gerado automaticamente pela plataforma mesa.ads`,
+      margin,
+      pageHeight - 14
     );
 
-    doc.setTextColor(80, 80, 80);
-    doc.text(`${i}/${totalPages}`, pageWidth - 20, pageHeight - 10, { align: "right" });
+    doc.setTextColor(...GREEN);
+    doc.text("mesa.ads", pageWidth - margin, pageHeight - 14, { align: "right" });
+
+    doc.setTextColor(140, 140, 140);
+    doc.text(`${i}/${totalPages}`, pageWidth / 2, pageHeight - 14, { align: "center" });
   }
 
   const filename = data.quotationName
