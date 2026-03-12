@@ -296,6 +296,31 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
       const { createClerkClient } = await import("@clerk/express");
       const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
 
+      let tempClerkUser: any;
+      try {
+        tempClerkUser = await clerkClient.users.createUser({
+          emailAddress: [input.accountEmail],
+          password: input.accountPassword,
+          firstName: input.acceptedByName.split(" ")[0],
+          lastName: input.acceptedByName.split(" ").slice(1).join(" ") || undefined,
+          publicMetadata: {
+            role: "restaurante",
+          },
+        });
+      } catch (clerkErr: any) {
+        const code = clerkErr?.errors?.[0]?.code;
+        if (code === "form_password_pwned") {
+          return res.status(400).json({ error: "Esta senha foi encontrada em vazamentos de dados. Por segurança, escolha uma senha diferente." });
+        }
+        if (code === "form_identifier_exists") {
+          return res.status(400).json({ error: "Este email já está cadastrado. Faça login na plataforma." });
+        }
+        if (code === "form_password_length_too_short") {
+          return res.status(400).json({ error: "A senha deve ter pelo menos 8 caracteres." });
+        }
+        throw clerkErr;
+      }
+
       const [restaurant] = await db.insert(activeRestaurants).values({
         name: input.name,
         cnpj: input.cnpj,
@@ -326,16 +351,14 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
         notes: input.notes,
       }).returning();
 
-      const clerkUser = await clerkClient.users.createUser({
-        emailAddress: [input.accountEmail],
-        password: input.accountPassword,
-        firstName: input.acceptedByName.split(" ")[0],
-        lastName: input.acceptedByName.split(" ").slice(1).join(" ") || undefined,
+      await clerkClient.users.updateUser(tempClerkUser.id, {
         publicMetadata: {
           role: "restaurante",
           restaurantId: restaurant.id,
         },
       });
+
+      const clerkUser = tempClerkUser;
 
       const { authStorage } = await import("./replit_integrations/auth");
       await authStorage.upsertUser({
@@ -434,13 +457,18 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
       res.json({ success: true, message: "Restaurante cadastrado com sucesso!" });
     } catch (err: any) {
       console.error("Submit onboarding error:", err);
-      if (err?.errors?.[0]?.code === "form_identifier_exists") {
+      const clerkCode = err?.errors?.[0]?.code;
+      if (clerkCode === "form_identifier_exists") {
         return res.status(400).json({ error: "Este email já está cadastrado. Faça login na plataforma." });
+      }
+      if (clerkCode === "form_password_pwned") {
+        return res.status(400).json({ error: "Esta senha foi encontrada em vazamentos de dados. Por segurança, escolha uma senha diferente." });
       }
       if (err?.name === "ZodError") {
         return res.status(400).json({ error: "Dados inválidos. Verifique os campos obrigatórios." });
       }
-      res.status(500).json({ error: "Erro ao processar cadastro" });
+      const message = err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || "Erro ao processar cadastro";
+      res.status(500).json({ error: message });
     }
   });
 
