@@ -1,13 +1,15 @@
 import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
-import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, TrendingDown, BarChart3, PieChart, Settings2, ChevronDown, ChevronRight, RotateCcw, FileText, Download, Rocket } from "lucide-react";
+import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, TrendingDown, BarChart3, PieChart, Settings2, ChevronDown, ChevronRight, RotateCcw, FileText, Download, Rocket, Store, Search, X, Divide, CheckCircle2, AlertTriangle, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -15,6 +17,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import PageContainer from "@/components/PageContainer";
 import Section from "@/components/Section";
+import { useRestaurantAllocation, COASTER_CAPACITY_FACTOR } from "@/hooks/useRestaurantAllocation";
 
 const DEFAULT_CUSTOS_VOLUME: Record<number, { custoGPC: number; margem: number; frete: number; artes: number }> = {
   1000:  { custoGPC: 0.4190, margem: 0.50, frete: 80.38,   artes: 1 },
@@ -71,6 +74,22 @@ export default function PriceTable() {
   const [descontosPrazo, setDescontosPrazo] = useState(DEFAULT_DESCONTOS_PRAZO);
   const [pagamentoConfig, setPagamentoConfig] = useState(DEFAULT_PAGAMENTO);
   const [custosVolume, setCustosVolume] = useState(DEFAULT_CUSTOS_VOLUME);
+  const [allocSearch, setAllocSearch] = useState("");
+
+  const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
+  const restaurantsForAllocation = useMemo(
+    () => restaurantsList.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      neighborhood: r.neighborhood,
+      ratingScore: r.ratingScore,
+      ratingMultiplier: r.ratingMultiplier,
+      commissionPercent: r.commissionPercent,
+      monthlyDrinksSold: r.monthlyDrinksSold,
+      status: r.status,
+    })),
+    [restaurantsList]
+  );
 
   const volume = VOLUMES[volumeIdx];
   const dados = custosVolume[volume];
@@ -83,6 +102,15 @@ export default function PriceTable() {
     : 0;
 
   const pagLabel = formaPagamento === "pix" ? "Pix" : formaPagamento === "boleto" ? "Boleto" : "Cartão";
+
+  const allocation = useRestaurantAllocation(restaurantsForAllocation, volume);
+
+  const availableRestaurants = useMemo(() => {
+    const activeRests = restaurantsForAllocation.filter(r => r.status === "active" && !allocation.selectedIds.includes(r.id));
+    if (!allocSearch.trim()) return activeRests;
+    const q = allocSearch.toLowerCase();
+    return activeRests.filter(r => r.name.toLowerCase().includes(q) || (r.neighborhood && r.neighborhood.toLowerCase().includes(q)));
+  }, [restaurantsForAllocation, allocation.selectedIds, allocSearch]);
 
   const calc = useMemo(() => {
     const irpj = premissas.irpj / 100;
@@ -176,8 +204,22 @@ export default function PriceTable() {
   const { data: leadsList = [] } = trpc.lead.list.useQuery({ type: "anunciante" });
   const utils = trpc.useUtils();
 
+  const setRestaurantsMutation = trpc.quotation.setRestaurants.useMutation();
+
   const createMutation = trpc.quotation.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async (created: any) => {
+      if (allocation.hasAllocations && allocation.allocations.length > 0) {
+        try {
+          await setRestaurantsMutation.mutateAsync({
+            quotationId: created.id,
+            restaurants: allocation.allocations
+              .filter(a => a.coasters > 0)
+              .map(a => ({ restaurantId: a.restaurantId, coasterQuantity: a.coasters })),
+          });
+        } catch (err: any) {
+          toast.error(`Cotação criada, mas erro ao salvar restaurantes: ${err.message}`);
+        }
+      }
       utils.quotation.list.invalidate();
       toast.success("Cotação criada com sucesso!");
       setShowCotacaoDialog(false);
@@ -193,6 +235,10 @@ export default function PriceTable() {
     }
     if (cotacaoVolume < 1) {
       toast.error("Volume deve ser no mínimo 1");
+      return;
+    }
+    if (allocation.hasAllocations && allocation.allocatedTotal !== cotacaoVolume) {
+      toast.error(`Volume da distribuição (${allocation.allocatedTotal.toLocaleString("pt-BR")}) não corresponde ao volume da cotação (${cotacaoVolume.toLocaleString("pt-BR")})`);
       return;
     }
     const unitPriceStr = calc.precoUnitComDesc.toFixed(4);
@@ -564,6 +610,109 @@ export default function PriceTable() {
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </Section>
+
+          <Section title="Distribuição de Restaurantes" icon={Store}>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar restaurante..."
+                    className="pl-8 h-8 text-xs"
+                    value={allocSearch}
+                    onChange={(e) => setAllocSearch(e.target.value)}
+                  />
+                </div>
+                {allocation.hasAllocations && (
+                  <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={allocation.distributeEvenly}>
+                    <Divide className="w-3 h-3" /> Distribuir
+                  </Button>
+                )}
+              </div>
+
+              {allocSearch && availableRestaurants.length > 0 && (
+                <div className="border border-border/20 rounded-md max-h-36 overflow-y-auto">
+                  {availableRestaurants.slice(0, 10).map((r) => (
+                    <button
+                      key={r.id}
+                      className="w-full flex items-center justify-between px-3 py-1.5 text-xs hover:bg-muted/30 transition-colors"
+                      onClick={() => { allocation.addRestaurant(r.id); setAllocSearch(""); }}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Store className="w-3 h-3 text-muted-foreground" />
+                        {r.name}
+                        {r.neighborhood && <span className="text-muted-foreground flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{r.neighborhood}</span>}
+                      </span>
+                      <span className="text-muted-foreground font-mono">
+                        {r.monthlyDrinksSold ? `cap. ${Math.round(r.monthlyDrinksSold * COASTER_CAPACITY_FACTOR)}` : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!allocation.hasAllocations && !allocSearch && (
+                <p className="text-xs text-muted-foreground text-center py-3">Busque e adicione restaurantes para distribuir o volume de {volume.toLocaleString("pt-BR")} bolachas</p>
+              )}
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">{allocation.allocations.length} restaurante{allocation.allocations.length !== 1 ? "s" : ""}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono">{allocation.allocatedTotal.toLocaleString("pt-BR")} / {volume.toLocaleString("pt-BR")}</span>
+                  {allocation.isValid ? (
+                    <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/5 text-emerald-400 text-[10px] gap-1"><CheckCircle2 className="w-2.5 h-2.5" /> OK</Badge>
+                  ) : allocation.hasAllocations ? (
+                    <Badge variant="outline" className="border-amber-500/30 bg-amber-500/5 text-amber-400 text-[10px] gap-1"><AlertTriangle className="w-2.5 h-2.5" /> {allocation.remaining > 0 ? `faltam ${allocation.remaining.toLocaleString("pt-BR")}` : `excesso ${Math.abs(allocation.remaining).toLocaleString("pt-BR")}`}</Badge>
+                  ) : null}
+                </div>
+              </div>
+
+              {allocation.hasAllocations && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs min-w-[400px]">
+                    <thead>
+                      <tr className="border-b border-border/20">
+                        <th className="text-left p-2 text-[10px] text-muted-foreground font-medium">Restaurante</th>
+                        <th className="text-right p-2 text-[10px] text-muted-foreground font-medium">Cap.</th>
+                        <th className="text-right p-2 text-[10px] text-muted-foreground font-medium">Bolachas</th>
+                        <th className="text-center p-2 text-[10px] text-muted-foreground font-medium w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allocation.allocations.map((a) => {
+                        const rest = restaurantsForAllocation.find(r => r.id === a.restaurantId);
+                        const cap = rest?.monthlyDrinksSold ? Math.round(rest.monthlyDrinksSold * COASTER_CAPACITY_FACTOR) : null;
+                        const overCap = cap !== null && a.coasters > cap;
+                        return (
+                          <tr key={a.restaurantId} className="border-b border-border/5">
+                            <td className="p-2">
+                              <span className="font-medium">{rest?.name || `#${a.restaurantId}`}</span>
+                              {rest?.neighborhood && <span className="text-muted-foreground ml-1 text-[10px]">{rest.neighborhood}</span>}
+                            </td>
+                            <td className="p-2 text-right font-mono text-muted-foreground">{cap !== null ? cap.toLocaleString("pt-BR") : "—"}</td>
+                            <td className="p-2 text-right">
+                              <input
+                                type="number"
+                                min={0}
+                                className={`bg-transparent border border-border/30 rounded text-right font-mono w-16 text-xs h-6 px-1.5 focus:outline-none focus:border-primary/50 ${overCap ? "text-amber-400" : ""}`}
+                                value={a.coasters}
+                                onChange={(e) => allocation.updateCoasters(a.restaurantId, parseInt(e.target.value) || 0)}
+                              />
+                            </td>
+                            <td className="p-2 text-center">
+                              <button onClick={() => allocation.removeRestaurant(a.restaurantId)} className="text-muted-foreground hover:text-red-400 transition-colors">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </Section>
 
