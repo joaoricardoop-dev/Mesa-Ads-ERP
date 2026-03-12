@@ -370,7 +370,7 @@ export default function Campaigns() {
         return {
           restaurantId: r.id,
           name: r.name,
-          coastersCount: linked ? linked.coastersCount : r.coastersAllocated,
+          coastersCount: linked ? linked.coastersCount : (r.monthlyDrinksSold ? Math.round(r.monthlyDrinksSold * 0.6) : 500),
           usagePerDay: linked ? linked.usagePerDay : 5,
           selected: !!linked,
         };

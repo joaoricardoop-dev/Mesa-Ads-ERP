@@ -424,7 +424,7 @@ export default function ActiveRestaurantProfile() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <MiniStat label="Comissão Paga" value={formatCurrency(stats.totalPaid)} accent />
                     <MiniStat label="Pendente" value={formatCurrency(stats.totalPending)} warn={stats.totalPending > 0} />
-                    <MiniStat label="Coasters Alocados" value={String(restaurant.coastersAllocated)} />
+                    <MiniStat label="Cap. Coasters" value={restaurant.monthlyDrinksSold ? Math.round(restaurant.monthlyDrinksSold * 0.6).toLocaleString("pt-BR") : "—"} />
                     <div className="p-2 bg-background/50 rounded-md">
                       <p className="text-[10px] text-muted-foreground mb-1">Comissão Padrão</p>
                       {editingCommission ? (
@@ -712,7 +712,7 @@ export default function ActiveRestaurantProfile() {
               <Card title="Dados do Sistema">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                   <InfoRow label="ID" value={`#${restaurant.id}`} mono />
-                  <InfoRow label="Coasters Alocados" value={String(restaurant.coastersAllocated)} />
+                  <InfoRow label="Cap. Coasters" value={restaurant.monthlyDrinksSold ? Math.round(restaurant.monthlyDrinksSold * 0.6).toLocaleString("pt-BR") : "—"} />
                   <InfoRow label="Comissão" value={`${restaurant.commissionPercent}%`} />
                   <InfoRow label="Chave Pix" value={restaurant.pixKey || "—"} />
                   <InfoRow label="Cadastrado em" value={new Date(restaurant.createdAt).toLocaleDateString("pt-BR")} />

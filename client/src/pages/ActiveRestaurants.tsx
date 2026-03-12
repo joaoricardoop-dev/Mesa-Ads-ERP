@@ -436,8 +436,8 @@ export default function ActiveRestaurantsPage() {
                           <p className="font-mono font-semibold">{r.monthlyCustomers?.toLocaleString("pt-BR")}</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-xs text-muted-foreground">Coasters</p>
-                          <p className="font-mono">{r.coastersAllocated}</p>
+                          <p className="text-xs text-muted-foreground">Cap. Coasters</p>
+                          <p className="font-mono">{r.monthlyDrinksSold ? Math.round(r.monthlyDrinksSold * 0.6).toLocaleString("pt-BR") : "—"}</p>
                         </div>
                       </div>
 
