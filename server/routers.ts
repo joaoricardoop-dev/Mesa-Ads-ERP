@@ -2,6 +2,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { financialRouter } from "./financialRouter";
 import { quotationRouter } from "./quotationRouter";
 import { leadRouter } from "./leadRouter";
+import { contactRouter } from "./contactRouter";
 import { serviceOrderRouter } from "./serviceOrderRouter";
 import { termRouter } from "./termRouter";
 import { libraryRouter } from "./libraryRouter";
@@ -66,6 +67,7 @@ export const appRouter = router({
   financial: financialRouter,
   quotation: quotationRouter,
   lead: leadRouter,
+  contact: contactRouter,
   serviceOrder: serviceOrderRouter,
   term: termRouter,
   library: libraryRouter,
@@ -1027,6 +1029,62 @@ export const appRouter = router({
       }).from(users).where(isNull(users.clientId));
       return rows.filter(u => !["admin", "comercial", "operacoes", "financeiro", "manager", "restaurante"].includes(u.role || ""));
     }),
+
+    getChildren: internalProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { clients: clientsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        return db.select().from(clientsTable).where(eq(clientsTable.parentId, input.clientId));
+      }),
+
+    getParent: internalProcedure
+      .input(z.object({ parentId: z.number() }))
+      .query(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return null;
+        const { clients: clientsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const [parent] = await db.select().from(clientsTable).where(eq(clientsTable.id, input.parentId));
+        return parent || null;
+      }),
+
+    setParent: internalProcedure
+      .input(z.object({ clientId: z.number(), parentId: z.number().nullable() }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const { clients: clientsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        if (input.parentId === input.clientId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Um cliente não pode ser pai de si mesmo." });
+        }
+        if (input.parentId !== null) {
+          const [parent] = await db.select({ id: clientsTable.id, parentId: clientsTable.parentId }).from(clientsTable).where(eq(clientsTable.id, input.parentId));
+          if (!parent) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente pai não encontrado." });
+          let currentId: number | null = parent.parentId;
+          const visited = new Set<number>([input.clientId, input.parentId]);
+          while (currentId !== null) {
+            if (visited.has(currentId)) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "Vinculação criaria um ciclo na hierarquia." });
+            }
+            visited.add(currentId);
+            const [ancestor] = await db.select({ parentId: clientsTable.parentId }).from(clientsTable).where(eq(clientsTable.id, currentId));
+            currentId = ancestor?.parentId ?? null;
+          }
+        }
+        const [updated] = await db.update(clientsTable).set({
+          parentId: input.parentId,
+          updatedAt: new Date(),
+        }).where(eq(clientsTable.id, input.clientId)).returning();
+        if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado" });
+        return updated;
+      }),
   }),
 
   // ─── Campaigns ────────────────────────────────────────────────────────

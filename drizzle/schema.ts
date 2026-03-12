@@ -91,12 +91,14 @@ export const clients = pgTable("clients", {
   cep: varchar("cep", { length: 10 }),
   segment: varchar("segment", { length: 255 }),
   selfRegistered: boolean("self_registered").default(false),
+  parentId: integer("parentId"),
   status: statusEnum("status").default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
   index("idx_clients_status").on(t.status),
   index("idx_clients_cnpj").on(t.cnpj),
+  index("idx_clients_parent_id").on(t.parentId),
 ]);
 
 export type Client = typeof clients.$inferSelect;
@@ -707,5 +709,25 @@ export const campaignBatchAssignments = pgTable("campaign_batch_assignments", {
 ]);
 
 export type CampaignBatchAssignment = typeof campaignBatchAssignments.$inferSelect;
+
+// ─── Contacts (contatos CRM) ─────────────────────────────────────────────────
+
+export const contacts = pgTable("contacts", {
+  id: serial("id").primaryKey(),
+  clientId: integer("clientId").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 50 }),
+  role: varchar("role", { length: 100 }),
+  notes: text("notes"),
+  isPrimary: boolean("isPrimary").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_contacts_client_id").on(t.clientId),
+]);
+
+export type Contact = typeof contacts.$inferSelect;
+export type InsertContact = typeof contacts.$inferInsert;
 
 export * from "../shared/models/auth";

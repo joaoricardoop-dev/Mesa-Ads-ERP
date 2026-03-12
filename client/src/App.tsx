@@ -28,6 +28,7 @@ import Library from "./pages/Library";
 import Quotations from "./pages/Quotations";
 import QuotationDetail from "./pages/QuotationDetail";
 import Leads from "./pages/Leads";
+import Contacts from "./pages/Contacts";
 import ServiceOrders from "./pages/ServiceOrders";
 import BatchManagement from "./pages/BatchManagement";
 import FinancialDashboard from "./pages/financial/FinancialDashboard";
@@ -74,6 +75,7 @@ function Router() {
       <Route path="/comercial/cotacoes/:id" component={QuotationDetail} />
       <Route path="/comercial/cotacoes" component={Quotations} />
       <Route path="/comercial/leads" component={Leads} />
+      <Route path="/comercial/contatos" component={Contacts} />
       <Route path="/restaurantes/perfil/:id" component={ActiveRestaurantProfile} />
       <Route path="/restaurantes/novo" component={ActiveRestaurantForm} />
       <Route path="/restaurantes/:id" component={ActiveRestaurantForm} />

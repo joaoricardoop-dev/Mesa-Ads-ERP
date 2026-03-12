@@ -3,6 +3,10 @@ import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -50,6 +54,12 @@ import {
   CheckCircle2,
   Clock,
   AlertTriangle,
+  Pencil,
+  Trash2,
+  Star,
+  Network,
+  UserPlus,
+  Search,
 } from "lucide-react";
 
 const CAMPAIGN_STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof CircleDot }> = {
@@ -130,6 +140,11 @@ export default function ClientDetail() {
 
   const [isLinkUserDialogOpen, setIsLinkUserDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<number | null>(null);
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
+  const [linkParentOpen, setLinkParentOpen] = useState(false);
+  const [parentSearch, setParentSearch] = useState("");
 
   const utils = trpc.useUtils();
   const { data: client, isLoading } = trpc.advertiser.get.useQuery({ id: clientId }, { enabled: clientId > 0 });
@@ -139,6 +154,13 @@ export default function ClientDetail() {
   const { data: serviceOrdersData = [] } = trpc.serviceOrder.list.useQuery({ clientId });
   const { data: linkedUsers = [] } = trpc.advertiser.getLinkedUsers.useQuery({ clientId }, { enabled: clientId > 0 });
   const { data: availableUsers = [] } = trpc.advertiser.listAvailableUsers.useQuery(undefined, { enabled: isLinkUserDialogOpen });
+  const { data: contactsList = [] } = trpc.contact.list.useQuery({ clientId }, { enabled: clientId > 0 });
+  const { data: childClients = [] } = trpc.advertiser.getChildren.useQuery({ clientId }, { enabled: clientId > 0 });
+  const { data: parentClient } = trpc.advertiser.getParent.useQuery(
+    { parentId: client?.parentId! },
+    { enabled: !!client?.parentId }
+  );
+  const { data: allClients = [] } = trpc.advertiser.list.useQuery(undefined, { enabled: linkParentOpen });
 
   const linkUserMutation = trpc.advertiser.linkUser.useMutation({
     onSuccess: () => {
@@ -146,6 +168,45 @@ export default function ClientDetail() {
       utils.advertiser.getLinkedUsers.invalidate({ clientId });
       setIsLinkUserDialogOpen(false);
       setSelectedUserId("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const createContactMutation = trpc.contact.create.useMutation({
+    onSuccess: () => {
+      toast.success("Contato adicionado!");
+      utils.contact.list.invalidate({ clientId });
+      setContactDialogOpen(false);
+      setContactForm({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateContactMutation = trpc.contact.update.useMutation({
+    onSuccess: () => {
+      toast.success("Contato atualizado!");
+      utils.contact.list.invalidate({ clientId });
+      setContactDialogOpen(false);
+      setEditingContactId(null);
+      setContactForm({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteContactMutation = trpc.contact.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Contato removido!");
+      utils.contact.list.invalidate({ clientId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const setParentMutation = trpc.advertiser.setParent.useMutation({
+    onSuccess: () => {
+      toast.success("Hierarquia atualizada!");
+      utils.advertiser.get.invalidate({ id: clientId });
+      utils.advertiser.getChildren.invalidate({ clientId });
+      setLinkParentOpen(false);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -215,6 +276,18 @@ export default function ClientDetail() {
         </Button>
       </div>
 
+      {parentClient && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border bg-blue-500/5 border-blue-500/20">
+          <Network className="w-4 h-4 text-blue-400" />
+          <span className="text-sm text-blue-400">
+            Filial de{" "}
+            <button className="font-semibold underline hover:no-underline" onClick={() => navigate(`/clientes/${parentClient.id}`)}>
+              {parentClient.name}
+            </button>
+          </span>
+        </div>
+      )}
+
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
           <div className="p-3 rounded-xl bg-primary/10">
@@ -257,6 +330,8 @@ export default function ClientDetail() {
             <TabsTrigger value="campanhas" className="text-xs">Campanhas</TabsTrigger>
             <TabsTrigger value="cotacoes" className="text-xs">Cotações</TabsTrigger>
             <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
+            <TabsTrigger value="contatos" className="text-xs">Contatos</TabsTrigger>
+            <TabsTrigger value="filiais" className="text-xs">Filiais</TabsTrigger>
             <TabsTrigger value="os" className="text-xs">Ordens</TabsTrigger>
             <TabsTrigger value="contas" className="text-xs">Contas</TabsTrigger>
           </TabsList>
@@ -566,6 +641,138 @@ export default function ClientDetail() {
           </div>
         </TabsContent>
 
+        <TabsContent value="contatos" className="mt-4">
+          <div className="rounded-xl border bg-card">
+            <div className="p-5 border-b flex items-center justify-between">
+              <h3 className="font-semibold flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-primary" /> Contatos ({contactsList.length})
+              </h3>
+              <Button size="sm" className="gap-2" onClick={() => {
+                setEditingContactId(null);
+                setContactForm({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
+                setContactDialogOpen(true);
+              }}>
+                <Plus className="w-4 h-4" /> Novo Contato
+              </Button>
+            </div>
+            {contactsList.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground">
+                <UserPlus className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p>Nenhum contato cadastrado</p>
+                <p className="text-xs mt-1">Adicione contatos para este cliente</p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {contactsList.map((c: any) => (
+                  <div key={c.id} className="flex items-center justify-between p-4 hover:bg-accent/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                        {c.name[0]?.toUpperCase() || "?"}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{c.name}</p>
+                          {c.isPrimary && (
+                            <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-[10px] px-1.5 py-0">
+                              <Star className="w-3 h-3 mr-0.5" /> Principal
+                            </Badge>
+                          )}
+                          {c.role && (
+                            <Badge variant="outline" className="text-[10px]">{c.role}</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                          {c.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {c.email}</span>}
+                          {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {c.phone}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                        setEditingContactId(c.id);
+                        setContactForm({ name: c.name, email: c.email || "", phone: c.phone || "", role: c.role || "", notes: c.notes || "", isPrimary: c.isPrimary });
+                        setContactDialogOpen(true);
+                      }}>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteContactMutation.mutate({ id: c.id })}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="filiais" className="mt-4 space-y-4">
+          <div className="rounded-xl border bg-card">
+            <div className="p-5 border-b flex items-center justify-between">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Network className="w-4 h-4 text-primary" /> Hierarquia
+              </h3>
+              <Button size="sm" variant="outline" className="gap-2" onClick={() => { setParentSearch(""); setLinkParentOpen(true); }}>
+                <Link2 className="w-4 h-4" /> Vincular Matriz
+              </Button>
+            </div>
+            <div className="p-5 space-y-3">
+              {client?.parentId && parentClient ? (
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-blue-500/5 border-blue-500/20">
+                  <div className="flex items-center gap-3">
+                    <Building2 className="w-4 h-4 text-blue-400" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Matriz</p>
+                      <button className="text-sm font-medium text-blue-400 hover:underline" onClick={() => navigate(`/clientes/${parentClient.id}`)}>
+                        {parentClient.name}
+                      </button>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => setParentMutation.mutate({ clientId, parentId: null })}>
+                    Desvincular
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhuma matriz vinculada.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-card">
+            <div className="p-5 border-b">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-primary" /> Filiais ({childClients.length})
+              </h3>
+            </div>
+            {childClients.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground">
+                <Network className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p>Nenhuma filial vinculada</p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {childClients.map((child: any) => (
+                  <div key={child.id} className="flex items-center justify-between p-4 hover:bg-accent/20 cursor-pointer transition-colors" onClick={() => navigate(`/clientes/${child.id}`)}>
+                    <div className="flex items-center gap-3">
+                      <Building2 className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">{child.name}</p>
+                        <p className="text-xs text-muted-foreground">{child.cnpj || "Sem CNPJ"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className={child.status === "active" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-red-500/10 text-red-400 border-red-500/30"}>
+                        {child.status === "active" ? "Ativo" : "Inativo"}
+                      </Badge>
+                      <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
         <TabsContent value="os" className="mt-4">
           <div className="rounded-xl border bg-card">
             <div className="p-5 border-b">
@@ -702,6 +909,94 @@ export default function ClientDetail() {
               {linkUserMutation.isPending ? "Vinculando..." : "Vincular"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={contactDialogOpen} onOpenChange={(open) => { if (!open) { setContactDialogOpen(false); setEditingContactId(null); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-primary" />
+              {editingContactId ? "Editar Contato" : "Novo Contato"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Nome *</Label>
+              <Input value={contactForm.name} onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })} placeholder="Nome do contato" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>E-mail</Label>
+                <Input value={contactForm.email} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} placeholder="email@exemplo.com" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Telefone</Label>
+                <Input value={contactForm.phone} onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })} placeholder="(00) 00000-0000" />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Cargo / Função</Label>
+              <Input value={contactForm.role} onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })} placeholder="Ex: Diretor de Marketing" />
+            </div>
+            <div className="grid gap-2">
+              <Label>Observações</Label>
+              <Textarea value={contactForm.notes} onChange={(e) => setContactForm({ ...contactForm, notes: e.target.value })} placeholder="Notas sobre o contato" rows={2} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox checked={contactForm.isPrimary} onCheckedChange={(v) => setContactForm({ ...contactForm, isPrimary: !!v })} id="isPrimary" />
+              <Label htmlFor="isPrimary" className="text-sm font-normal">Contato principal</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setContactDialogOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={!contactForm.name.trim() || createContactMutation.isPending || updateContactMutation.isPending}
+              onClick={() => {
+                if (editingContactId) {
+                  updateContactMutation.mutate({ id: editingContactId, ...contactForm });
+                } else {
+                  createContactMutation.mutate({ clientId, ...contactForm });
+                }
+              }}
+            >
+              {(createContactMutation.isPending || updateContactMutation.isPending) ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={linkParentOpen} onOpenChange={setLinkParentOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Network className="w-5 h-5 text-primary" /> Vincular Matriz
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input placeholder="Buscar cliente..." value={parentSearch} onChange={(e) => setParentSearch(e.target.value)} className="pl-9" />
+            </div>
+            <div className="max-h-60 overflow-y-auto space-y-1">
+              {allClients
+                .filter((c: any) => c.id !== clientId && c.name.toLowerCase().includes(parentSearch.toLowerCase()))
+                .slice(0, 20)
+                .map((c: any) => (
+                  <button
+                    key={c.id}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-accent/50 transition-colors text-sm flex items-center justify-between"
+                    onClick={() => setParentMutation.mutate({ clientId, parentId: c.id })}
+                  >
+                    <div>
+                      <p className="font-medium">{c.name}</p>
+                      <p className="text-xs text-muted-foreground">{c.cnpj || "Sem CNPJ"}</p>
+                    </div>
+                    <Link2 className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                ))}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -1,9 +1,9 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { leads, leadInteractions } from "../drizzle/schema";
+import { leads, leadInteractions, clients } from "../drizzle/schema";
 import { users } from "../shared/models/auth";
-import { eq, desc, and, ne, sql } from "drizzle-orm";
+import { eq, desc, and, ne, sql, or, ilike } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 async function getDatabase() {
@@ -95,8 +95,45 @@ export const leadRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDatabase();
+
+      let autoClientId = input.clientId;
+      let autoOpportunityType = input.opportunityType;
+
+      if (!autoClientId && input.type === "anunciante") {
+        const cleanCnpj = input.cnpj?.replace(/\D/g, "");
+        if (cleanCnpj && cleanCnpj.length === 14) {
+          const [cnpjMatch] = await db
+            .select({ id: clients.id })
+            .from(clients)
+            .where(sql`regexp_replace(${clients.cnpj}, '[^0-9]', '', 'g') = ${cleanCnpj}`)
+            .limit(1);
+          if (cnpjMatch) {
+            autoClientId = cnpjMatch.id;
+            autoOpportunityType = autoOpportunityType || "upsell";
+          }
+        }
+        if (!autoClientId && input.company && input.company.trim()) {
+          const [nameMatch] = await db
+            .select({ id: clients.id })
+            .from(clients)
+            .where(ilike(clients.name, `%${input.company.trim()}%`))
+            .orderBy(clients.id)
+            .limit(1);
+          if (nameMatch) {
+            autoClientId = nameMatch.id;
+            autoOpportunityType = autoOpportunityType || "upsell";
+          }
+        }
+      }
+
+      if (!autoOpportunityType) {
+        autoOpportunityType = "new";
+      }
+
       const [created] = await db.insert(leads).values({
         ...input,
+        clientId: autoClientId,
+        opportunityType: autoOpportunityType,
         createdBy: ctx.user?.id || null,
         assignedTo: input.assignedTo || ctx.user?.id || null,
       }).returning();
