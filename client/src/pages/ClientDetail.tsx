@@ -187,10 +187,17 @@ export default function ClientDetail() {
     onError: (e) => toast.error(e.message),
   });
 
+  const invalidateContacts = () => {
+    utils.contact.list.invalidate({ clientId });
+    if (includeChildContacts && childIds.length > 0) {
+      utils.contact.listByClients.invalidate({ clientIds: childIds });
+    }
+  };
+
   const createContactMutation = trpc.contact.create.useMutation({
     onSuccess: () => {
       toast.success("Contato adicionado!");
-      utils.contact.list.invalidate({ clientId });
+      invalidateContacts();
       setContactDialogOpen(false);
       setContactForm({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
     },
@@ -200,7 +207,7 @@ export default function ClientDetail() {
   const updateContactMutation = trpc.contact.update.useMutation({
     onSuccess: () => {
       toast.success("Contato atualizado!");
-      utils.contact.list.invalidate({ clientId });
+      invalidateContacts();
       setContactDialogOpen(false);
       setEditingContactId(null);
       setContactForm({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
@@ -211,7 +218,7 @@ export default function ClientDetail() {
   const deleteContactMutation = trpc.contact.delete.useMutation({
     onSuccess: () => {
       toast.success("Contato removido!");
-      utils.contact.list.invalidate({ clientId });
+      invalidateContacts();
     },
     onError: (e) => toast.error(e.message),
   });
