@@ -2,7 +2,7 @@ import { internalProcedure, comercialProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import { contacts, clients } from "../drizzle/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 async function getDatabase() {
@@ -20,6 +20,29 @@ export const contactRouter = router({
         .select()
         .from(contacts)
         .where(eq(contacts.clientId, input.clientId))
+        .orderBy(desc(contacts.isPrimary), desc(contacts.createdAt));
+    }),
+
+  listByClients: internalProcedure
+    .input(z.object({ clientIds: z.array(z.number()).min(1) }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      return db
+        .select({
+          id: contacts.id,
+          clientId: contacts.clientId,
+          clientName: clients.name,
+          name: contacts.name,
+          email: contacts.email,
+          phone: contacts.phone,
+          role: contacts.role,
+          notes: contacts.notes,
+          isPrimary: contacts.isPrimary,
+          createdAt: contacts.createdAt,
+        })
+        .from(contacts)
+        .leftJoin(clients, eq(contacts.clientId, clients.id))
+        .where(inArray(contacts.clientId, input.clientIds))
         .orderBy(desc(contacts.isPrimary), desc(contacts.createdAt));
     }),
 
