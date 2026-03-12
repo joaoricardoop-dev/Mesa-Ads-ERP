@@ -167,12 +167,12 @@ export const serviceOrderRouter = router({
           const campaignNumber = `CMP-${year}-${String(seqNum).padStart(4, "0")}`;
 
           const q = quotation[0];
-          const clientRows = await db.select().from(clients).where(eq(clients.id, q.clientId)).limit(1);
+          const clientRows = await db.select().from(clients).where(eq(clients.id, q.clientId!)).limit(1);
           const clientName = clientRows[0]?.name || clientRows[0]?.company || "Cliente";
 
           const [campaign] = await db.insert(campaigns).values({
             campaignNumber,
-            clientId: q.clientId,
+            clientId: q.clientId!,
             name: `${clientName} - ${q.campaignType || "Campanha"}`,
             startDate: updated.periodStart || new Date().toISOString().split("T")[0],
             endDate: updated.periodEnd || new Date().toISOString().split("T")[0],

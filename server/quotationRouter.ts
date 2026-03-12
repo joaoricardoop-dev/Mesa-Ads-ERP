@@ -289,7 +289,7 @@ export const quotationRouter = router({
 
       const [campaign] = await db.insert(campaigns).values({
         campaignNumber,
-        clientId: quotation[0].clientId,
+        clientId: quotation[0].clientId!,
         name: campaignName,
         startDate: input.startDate,
         endDate: input.endDate,
@@ -354,7 +354,7 @@ export const quotationRouter = router({
       if (!original[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
 
       const quotationNumber = await generateQuotationNumber(db);
-      const client = await db.select().from(clients).where(eq(clients.id, original[0].clientId)).limit(1);
+      const client = await db.select().from(clients).where(eq(clients.id, original[0].clientId!)).limit(1);
       const clientName = client[0]?.name || client[0]?.company || "Cliente";
       const quotationName = generateQuotationName(clientName, original[0].coasterVolume);
 
@@ -411,7 +411,7 @@ export const quotationRouter = router({
         orderNumber,
         type: "anunciante" as const,
         quotationId: quotation[0].id,
-        clientId: quotation[0].clientId,
+        clientId: quotation[0].clientId!,
         description: input.description || `OS referente à cotação ${quotation[0].quotationNumber}`,
         coasterVolume: quotation[0].coasterVolume,
         periodStart: input.periodStart,
@@ -593,7 +593,7 @@ export const quotationRouter = router({
 
       const [campaign] = await db.insert(campaigns).values({
         campaignNumber,
-        clientId: quotation[0].clientId,
+        clientId: quotation[0].clientId!,
         name: campaignName,
         startDate: derivedStartDate,
         endDate: derivedEndDate,
