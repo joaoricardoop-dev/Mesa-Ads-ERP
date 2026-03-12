@@ -1034,7 +1034,10 @@ export default function Leads() {
 
                         {lead.client_id && !lead.convertedToId && (
                           <div className="mt-1.5">
-                            <Badge className="text-[9px] h-3.5 px-1 bg-cyan-500/15 text-cyan-500 border-cyan-500/30">
+                            <Badge
+                              className="text-[9px] h-3.5 px-1 bg-cyan-500/15 text-cyan-500 border-cyan-500/30 cursor-pointer hover:bg-cyan-500/25"
+                              onClick={(e) => { e.stopPropagation(); navigate(`/clientes/${lead.client_id}`); }}
+                            >
                               {lead.clientName || "Cliente existente"}
                             </Badge>
                           </div>
@@ -1391,7 +1394,7 @@ export default function Leads() {
                       <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Anunciante Vinculado</span>
                       <div
                         className="flex items-center gap-2 p-2.5 rounded-lg bg-cyan-500/5 border border-cyan-500/20 cursor-pointer hover:bg-cyan-500/10 transition-colors"
-                        onClick={() => { setSelectedLeadId(null); navigate(`/clientes`); }}
+                        onClick={() => { setSelectedLeadId(null); navigate(`/clientes/${selectedLead.data.client_id}`); }}
                       >
                         <Building2 className="w-4 h-4 text-cyan-500 shrink-0" />
                         <div className="min-w-0">
