@@ -30,18 +30,30 @@ export async function ensureContact(opts: {
 
   if (email) {
     const existing = await db
-      .select({ id: contacts.id })
+      .select({ id: contacts.id, isPrimary: contacts.isPrimary })
       .from(contacts)
       .where(and(entityFilter, eq(contacts.email, email)))
       .limit(1);
-    if (existing.length > 0) return;
+    if (existing.length > 0) {
+      if (isPrimary && !existing[0].isPrimary) {
+        await db.update(contacts).set({ isPrimary: false }).where(entityFilter);
+        await db.update(contacts).set({ isPrimary: true, updatedAt: new Date() }).where(eq(contacts.id, existing[0].id));
+      }
+      return;
+    }
   } else {
     const existing = await db
-      .select({ id: contacts.id })
+      .select({ id: contacts.id, isPrimary: contacts.isPrimary })
       .from(contacts)
       .where(and(entityFilter, eq(contacts.name, contactName), isNull(contacts.email)))
       .limit(1);
-    if (existing.length > 0) return;
+    if (existing.length > 0) {
+      if (isPrimary && !existing[0].isPrimary) {
+        await db.update(contacts).set({ isPrimary: false }).where(entityFilter);
+        await db.update(contacts).set({ isPrimary: true, updatedAt: new Date() }).where(eq(contacts.id, existing[0].id));
+      }
+      return;
+    }
   }
 
   if (isPrimary) {
