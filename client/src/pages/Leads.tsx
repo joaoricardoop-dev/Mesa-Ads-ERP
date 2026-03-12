@@ -280,6 +280,8 @@ export default function Leads() {
   const [quotationNotes, setQuotationNotes] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [collapsedStages, setCollapsedStages] = useState<string[]>(["ganho", "perdido"]);
+  const [contactFormOpen, setContactFormOpen] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", role: "" });
   const [simNumRestaurants, setSimNumRestaurants] = useState("10");
   const [simCoastersPerRest, setSimCoastersPerRest] = useState("500");
   const [simUnitCost, setSimUnitCost] = useState("0.12");
@@ -304,6 +306,37 @@ export default function Leads() {
     { leadId: selectedLeadId! },
     { enabled: !!selectedLeadId }
   );
+
+  const leadContacts = trpc.contact.list.useQuery(
+    { leadId: selectedLeadId! },
+    { enabled: !!selectedLeadId }
+  );
+
+  const createContactMutation = trpc.contact.create.useMutation({
+    onSuccess: () => {
+      setContactForm({ name: "", email: "", phone: "", role: "" });
+      setContactFormOpen(false);
+      utils.contact.list.invalidate();
+      toast.success("Contato adicionado");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const deleteContactMutation = trpc.contact.delete.useMutation({
+    onSuccess: () => {
+      utils.contact.list.invalidate();
+      toast.success("Contato removido");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const copyContactToClientMutation = trpc.contact.copyToClient.useMutation({
+    onSuccess: () => {
+      utils.contact.list.invalidate();
+      toast.success("Contato copiado para a conta do anunciante");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
 
   const internalUsers = trpc.lead.listUsers.useQuery();
   const clientsList = trpc.advertiser.list.useQuery();
@@ -1260,7 +1293,7 @@ export default function Leads() {
       </Dialog>
 
       {/* Lead Detail Sheet */}
-      <Sheet open={!!selectedLeadId} onOpenChange={(open) => { if (!open) { setSelectedLeadId(null); setIsEditing(false); } }}>
+      <Sheet open={!!selectedLeadId} onOpenChange={(open) => { if (!open) { setSelectedLeadId(null); setIsEditing(false); setContactFormOpen(false); setContactForm({ name: "", email: "", phone: "", role: "" }); } }}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto px-5 pt-6">
           {selectedLead.data && (
             <>
@@ -1502,6 +1535,131 @@ export default function Leads() {
                     </div>
                   </>
                 )}
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Contatos ({leadContacts.data?.length ?? 0})
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs gap-1"
+                      onClick={() => setContactFormOpen(!contactFormOpen)}
+                    >
+                      {contactFormOpen ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                      {contactFormOpen ? "Cancelar" : "Adicionar"}
+                    </Button>
+                  </div>
+
+                  {contactFormOpen && (
+                    <div className="space-y-2 p-3 rounded-lg bg-muted/30 border border-border/30">
+                      <Input
+                        placeholder="Nome *"
+                        value={contactForm.name}
+                        onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          placeholder="Cargo"
+                          value={contactForm.role}
+                          onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })}
+                          className="h-8 text-xs"
+                        />
+                        <Input
+                          placeholder="Telefone"
+                          value={contactForm.phone}
+                          onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <Input
+                        placeholder="Email"
+                        value={contactForm.email}
+                        onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                      <Button
+                        size="sm"
+                        className="w-full h-7 text-xs gap-1"
+                        disabled={!contactForm.name.trim() || createContactMutation.isPending}
+                        onClick={() => {
+                          createContactMutation.mutate({
+                            leadId: selectedLeadId!,
+                            name: contactForm.name.trim(),
+                            email: contactForm.email || undefined,
+                            phone: contactForm.phone || undefined,
+                            role: contactForm.role || undefined,
+                          });
+                        }}
+                      >
+                        <Check className="w-3 h-3" />
+                        {createContactMutation.isPending ? "Salvando..." : "Salvar Contato"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {leadContacts.isLoading ? (
+                    <p className="text-xs text-muted-foreground italic">Carregando...</p>
+                  ) : leadContacts.data && leadContacts.data.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {leadContacts.data.map((c: any) => (
+                        <div key={c.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/30 group">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <User className="w-3 h-3 text-muted-foreground shrink-0" />
+                              <span className="text-xs font-medium truncate">{c.name}</span>
+                              {c.isPrimary && (
+                                <Badge variant="secondary" className="text-[9px] h-4 px-1">Principal</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 ml-[18px]">
+                              {c.role && <span className="text-[10px] text-muted-foreground">{c.role}</span>}
+                              {c.phone && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                  <Phone className="w-2.5 h-2.5" />{c.phone}
+                                </span>
+                              )}
+                              {c.email && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                  <Mail className="w-2.5 h-2.5" />{c.email}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            {selectedLead.data?.client_id && !c.clientId && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                title="Copiar para conta do anunciante"
+                                onClick={() => copyContactToClientMutation.mutate({ contactId: c.id, clientId: selectedLead.data!.client_id! })}
+                              >
+                                <ArrowRightCircle className="w-3 h-3 text-blue-500" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => deleteContactMutation.mutate({ id: c.id })}
+                            >
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    !contactFormOpen && (
+                      <p className="text-xs text-muted-foreground italic">Nenhum contato vinculado</p>
+                    )
+                  )}
+                </div>
 
                 <Separator />
 

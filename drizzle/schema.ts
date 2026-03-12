@@ -716,6 +716,7 @@ export const contacts = pgTable("contacts", {
   id: serial("id").primaryKey(),
   clientId: integer("clientId").references(() => clients.id, { onDelete: "cascade" }),
   restaurantId: integer("restaurantId").references(() => restaurants.id, { onDelete: "cascade" }),
+  leadId: integer("leadId").references(() => leads.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 50 }),
@@ -727,6 +728,7 @@ export const contacts = pgTable("contacts", {
 }, (t) => [
   index("idx_contacts_client_id").on(t.clientId),
   index("idx_contacts_restaurant_id").on(t.restaurantId),
+  index("idx_contacts_lead_id").on(t.leadId),
 ]);
 
 export type Contact = typeof contacts.$inferSelect;
