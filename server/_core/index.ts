@@ -175,6 +175,10 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  import("../contactSync").then(({ backfillContacts }) => {
+    backfillContacts().catch(err => console.error("Backfill contacts failed:", err));
+  });
 }
 
 startServer().catch(console.error);

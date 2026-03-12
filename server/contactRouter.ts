@@ -1,7 +1,7 @@
 import { internalProcedure, comercialProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { contacts, clients, restaurants, leads } from "../drizzle/schema";
+import { contacts, clients, activeRestaurants, leads } from "../drizzle/schema";
 import { eq, desc, sql, inArray, isNotNull, or, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -70,7 +70,7 @@ export const contactRouter = router({
           END AS "ownerType"
         FROM contacts c
         LEFT JOIN clients cl ON c."clientId" = cl."id"
-        LEFT JOIN restaurants r ON c."restaurantId" = r."id"
+        LEFT JOIN active_restaurants r ON c."restaurantId" = r."id"
         LEFT JOIN leads l ON c."leadId" = l."id"
         ORDER BY c."createdAt" DESC
       `);

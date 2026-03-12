@@ -5,6 +5,7 @@ import { activeRestaurants, restaurantTerms, termAcceptances, termTemplates } fr
 import { users } from "../shared/models/auth";
 import { eq, and, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "crypto";
+import { ensureContact } from "./contactSync";
 
 const DEFAULT_TERMS = `TERMOS DE PARCERIA — mesa.ads
 
@@ -240,6 +241,17 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
         .set({ status: "assinado", updatedAt: new Date() })
         .where(eq(restaurantTerms.id, term.id));
 
+      try {
+        await ensureContact({
+          restaurantId: restaurant.id,
+          name: input.acceptedByName,
+          email: input.email,
+          isPrimary: false,
+        });
+      } catch (err) {
+        console.error("Failed to create contact on accept-invite:", err);
+      }
+
       res.json({ success: true, message: "Conta criada e termos aceitos com sucesso!" });
     } catch (err: any) {
       console.error("Accept invite error:", err);
@@ -372,6 +384,18 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
         onboardingComplete: true,
         selfRegistered: true,
       });
+
+      try {
+        await ensureContact({
+          restaurantId: restaurant.id,
+          name: input.contactName,
+          email: input.email,
+          phone: input.whatsapp,
+          isPrimary: true,
+        });
+      } catch (err) {
+        console.error("Failed to create contact on submit:", err);
+      }
 
       const ipAddress = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "").split(",")[0].trim();
       const userAgent = req.headers["user-agent"] || null;

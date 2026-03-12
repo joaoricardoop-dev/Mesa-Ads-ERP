@@ -710,6 +710,16 @@ export const appRouter = router({
           console.error("Failed to update Clerk metadata:", err);
         }
 
+        try {
+          const { ensureContact } = await import("./contactSync");
+          const fullName = [existing.firstName, existing.lastName].filter(Boolean).join(" ").trim();
+          if (fullName) {
+            await ensureContact({ restaurantId: input.restaurantId, name: fullName, email: existing.email || undefined });
+          }
+        } catch (err) {
+          console.error("Failed to sync contact on restaurant linkUser:", err);
+        }
+
         return updated;
       }),
 
@@ -1031,6 +1041,17 @@ export const appRouter = router({
         } catch (err) {
           console.error("Failed to update Clerk metadata:", err);
         }
+
+        try {
+          const { ensureContact } = await import("./contactSync");
+          const fullName = [existing.firstName, existing.lastName].filter(Boolean).join(" ").trim();
+          if (fullName) {
+            await ensureContact({ clientId: input.clientId, name: fullName, email: existing.email || undefined });
+          }
+        } catch (err) {
+          console.error("Failed to sync contact on advertiser linkUser:", err);
+        }
+
         return updated;
       }),
 
@@ -1940,6 +1961,20 @@ export const appRouter = router({
           });
         } catch (err) {
           console.error("Failed to update Clerk metadata with clientId:", err);
+        }
+
+        try {
+          const { ensureContact } = await import("./contactSync");
+          const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || input.name;
+          await ensureContact({
+            clientId: newClient.id,
+            name: fullName,
+            email: user.email || input.contactEmail || undefined,
+            phone: input.contactPhone || undefined,
+            isPrimary: true,
+          });
+        } catch (err) {
+          console.error("Failed to sync contact on completeOnboarding:", err);
         }
 
         return newClient;

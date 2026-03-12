@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { Webhook } from "svix";
 import { authStorage } from "./replit_integrations/auth";
+import { ensureContact } from "./contactSync";
 
 export async function clerkWebhookHandler(req: Request, res: Response) {
   try {
@@ -63,6 +64,20 @@ export async function clerkWebhookHandler(req: Request, res: Response) {
         restaurantId: restaurantId ? Number(restaurantId) : null,
         ...(isSelfRegistered ? { onboardingComplete: false, selfRegistered: true } : {}),
       });
+
+      const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+      if (fullName) {
+        try {
+          if (restaurantId) {
+            await ensureContact({ restaurantId: Number(restaurantId), name: fullName, email: email || undefined });
+          }
+          if (clientId) {
+            await ensureContact({ clientId: Number(clientId), name: fullName, email: email || undefined });
+          }
+        } catch (err) {
+          console.error("Failed to sync contact from webhook:", err);
+        }
+      }
 
       if (type === "user.created") {
         try {
