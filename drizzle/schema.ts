@@ -91,7 +91,7 @@ export const clients = pgTable("clients", {
   cep: varchar("cep", { length: 10 }),
   segment: varchar("segment", { length: 255 }),
   selfRegistered: boolean("self_registered").default(false),
-  parentId: integer("parentId").references((): any => clients.id, { onDelete: "set null" }),
+  parentId: integer("parentId").references(() => clients.id, { onDelete: "set null" }),
   status: statusEnum("status").default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
