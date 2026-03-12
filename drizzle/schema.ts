@@ -715,7 +715,7 @@ export type CampaignBatchAssignment = typeof campaignBatchAssignments.$inferSele
 export const contacts = pgTable("contacts", {
   id: serial("id").primaryKey(),
   clientId: integer("clientId").references(() => clients.id, { onDelete: "cascade" }),
-  restaurantId: integer("restaurantId").references(() => restaurants.id, { onDelete: "cascade" }),
+  restaurantId: integer("restaurantId").references(() => activeRestaurants.id, { onDelete: "cascade" }),
   leadId: integer("leadId").references(() => leads.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }),
