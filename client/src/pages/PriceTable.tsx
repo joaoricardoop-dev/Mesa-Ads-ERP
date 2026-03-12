@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { formatCurrency } from "@/lib/format";
-import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, Info, TrendingDown } from "lucide-react";
+import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, Info, TrendingDown, BarChart3, PieChart } from "lucide-react";
 import PageContainer from "@/components/PageContainer";
 import Section from "@/components/Section";
 
@@ -72,42 +72,58 @@ export default function PriceTable() {
   const pagamento = FORMAS_PAGAMENTO.find((f) => f.id === formaPagamento)!;
 
   const calc = useMemo(() => {
-    const totalDeducoes = PREMISSAS.irpj + PREMISSAS.comissaoRestaurante + PREMISSAS.comissaoComercial;
-    const denominador = 1 - dados.margem - totalDeducoes;
+    const totalDeducoesPerc = PREMISSAS.irpj + PREMISSAS.comissaoRestaurante + PREMISSAS.comissaoComercial;
+    const denominador = 1 - dados.margem - totalDeducoesPerc;
 
     const custoProducao = dados.custoGPC * dados.artes * volume;
-    const custoTotal = custoProducao + dados.frete;
+    const custoTotal4sem = custoProducao + dados.frete;
 
-    const precoTotalBase4sem = denominador > 0 ? custoTotal / denominador : 0;
-    const precoUnitario = volume > 0 ? precoTotalBase4sem / volume : 0;
+    const precoTotalBase4sem = denominador > 0 ? custoTotal4sem / denominador : 0;
+    const precoUnit4sem = volume > 0 ? precoTotalBase4sem / volume : 0;
 
     const precoUnit1000 = (() => {
-      const d1000 = CUSTOS_VOLUME[1000];
-      const cp = d1000.custoGPC * d1000.artes * 1000;
-      const ct = cp + d1000.frete;
-      const den = 1 - d1000.margem - totalDeducoes;
+      const d = CUSTOS_VOLUME[1000];
+      const ct = d.custoGPC * d.artes * 1000 + d.frete;
+      const den = 1 - d.margem - totalDeducoesPerc;
       return den > 0 ? ct / den / 1000 : 0;
     })();
-    const descontoQuantidade = precoUnit1000 > 0 ? 1 - (precoUnitario / precoUnit1000) : 0;
+    const descontoQuantidade = precoUnit1000 > 0 && volume > 1000 ? 1 - (precoUnit4sem / precoUnit1000) : 0;
 
-    const multiplicador = semanaInfo.semanas / 4;
-    const precoSemDesconto = precoTotalBase4sem * multiplicador;
-    const precoComDescontoDuracao = precoSemDesconto * (1 - semanaInfo.desconto);
-    const precoFinal = precoComDescontoDuracao * (1 + pagamento.ajuste);
+    const nPeriodos = semanaInfo.semanas / 4;
+    const precoSemDesconto = precoTotalBase4sem * nPeriodos;
+    const precoComDescDuracao = precoSemDesconto * (1 - semanaInfo.desconto);
+    const precoFinal = precoComDescDuracao * (1 - (pagamento.ajuste < 0 ? Math.abs(pagamento.ajuste) : -pagamento.ajuste));
 
-    const economiaDuracao = precoSemDesconto - precoComDescontoDuracao;
-    const economiaPagamento = precoComDescontoDuracao - precoFinal;
+    const precoUnitComDesc = volume > 0 ? precoFinal / volume : 0;
+    const descCombinado = precoUnit1000 > 0 ? 1 - (precoUnitComDesc / precoUnit1000) : 0;
 
-    const lucroBase4sem = precoTotalBase4sem * dados.margem;
-    const comissaoRestaurante4sem = precoTotalBase4sem * PREMISSAS.comissaoRestaurante;
-    const comissaoComercial4sem = precoTotalBase4sem * PREMISSAS.comissaoComercial;
-    const irpj4sem = precoTotalBase4sem * PREMISSAS.irpj;
+    const custoTotalPeriodo = custoTotal4sem * nPeriodos;
+
+    const valorIRPJ = precoFinal * PREMISSAS.irpj;
+    const valorComRest = precoFinal * PREMISSAS.comissaoRestaurante;
+    const valorComCom = precoFinal * PREMISSAS.comissaoComercial;
+    const totalDeducoesValor = valorIRPJ + valorComRest + valorComCom;
+    const receitaLiquida = precoFinal - totalDeducoesValor;
+    const lucroBruto = receitaLiquida - custoTotalPeriodo;
+    const margemLiquida = precoFinal > 0 ? lucroBruto / precoFinal : 0;
+    const margemSobreReceita = dados.margem;
+    const lucroPorUnidade = volume > 0 ? lucroBruto / volume : 0;
+    const custoPorUnidade = volume > 0 ? custoTotal4sem / volume : 0;
+
+    const decomposicaoUnit = [
+      { label: "Custo GPC", valor: dados.custoGPC, perc: precoUnit4sem > 0 ? dados.custoGPC / precoUnit4sem : 0 },
+      { label: "Frete/un.", valor: volume > 0 ? dados.frete / volume : 0, perc: precoUnit4sem > 0 ? (dados.frete / volume) / precoUnit4sem : 0 },
+      { label: "IRPJ", valor: precoUnit4sem * PREMISSAS.irpj, perc: PREMISSAS.irpj },
+      { label: "Com. Restaurante", valor: precoUnit4sem * PREMISSAS.comissaoRestaurante, perc: PREMISSAS.comissaoRestaurante },
+      { label: "Com. Comercial", valor: precoUnit4sem * PREMISSAS.comissaoComercial, perc: PREMISSAS.comissaoComercial },
+      { label: "Margem / Lucro", valor: precoUnit4sem * dados.margem, perc: margemLiquida > 0 ? margemLiquida : dados.margem },
+    ];
 
     const tabela = DESCONTOS_SEMANAS.map((s) => {
       const mult = s.semanas / 4;
       const pSemDesc = precoTotalBase4sem * mult;
       const pComDesc = pSemDesc * (1 - s.desconto);
-      const pFinal = pComDesc * (1 + pagamento.ajuste);
+      const pFinal = pComDesc * (1 - (pagamento.ajuste < 0 ? Math.abs(pagamento.ajuste) : -pagamento.ajuste));
       return {
         semanas: s.semanas,
         desconto: s.desconto,
@@ -119,23 +135,32 @@ export default function PriceTable() {
     });
 
     return {
-      totalDeducoes,
+      totalDeducoesPerc,
       denominador,
       custoProducao,
-      custoTotal,
+      custoTotal4sem,
+      custoTotalPeriodo,
       precoTotalBase4sem,
-      precoUnitario,
+      precoUnit4sem,
       precoUnit1000,
       descontoQuantidade,
+      nPeriodos,
       precoSemDesconto,
-      precoComDescontoDuracao,
+      precoComDescDuracao,
       precoFinal,
-      economiaDuracao,
-      economiaPagamento,
-      lucroBase4sem,
-      comissaoRestaurante4sem,
-      comissaoComercial4sem,
-      irpj4sem,
+      precoUnitComDesc,
+      descCombinado,
+      valorIRPJ,
+      valorComRest,
+      valorComCom,
+      totalDeducoesValor,
+      receitaLiquida,
+      lucroBruto,
+      margemLiquida,
+      margemSobreReceita,
+      lucroPorUnidade,
+      custoPorUnidade,
+      decomposicaoUnit,
       tabela,
     };
   }, [volume, dados, semanaInfo, pagamento]);
@@ -144,46 +169,30 @@ export default function PriceTable() {
     <PageContainer title="Tabela de Preços — Simulador VEXA">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 space-y-4">
-          <Section title="Parâmetros" icon={Package}>
+          <Section title="Inputs" icon={Package}>
             <div className="space-y-5">
               <div className="space-y-2">
                 <Label className="text-xs flex items-center justify-between">
-                  <span className="flex items-center gap-1.5"><Package className="w-3 h-3" /> Quantidade</span>
-                  <span className="font-mono font-bold text-primary">{volume.toLocaleString("pt-BR")} un.</span>
+                  <span className="flex items-center gap-1.5"><Package className="w-3 h-3" /> Quantidade (un.)</span>
+                  <span className="font-mono font-bold text-primary">{volume.toLocaleString("pt-BR")}</span>
                 </Label>
-                <Slider
-                  min={0}
-                  max={VOLUMES.length - 1}
-                  step={1}
-                  value={[volumeIdx]}
-                  onValueChange={([v]) => setVolumeIdx(v)}
-                />
+                <Slider min={0} max={VOLUMES.length - 1} step={1} value={[volumeIdx]} onValueChange={([v]) => setVolumeIdx(v)} />
                 <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                  <span>1.000</span>
-                  <span>20.000</span>
+                  <span>1.000</span><span>20.000</span>
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label className="text-xs flex items-center justify-between">
-                  <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Prazo</span>
-                  <span className="font-mono font-bold text-primary">{semanaInfo.semanas} semanas</span>
+                  <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Semanas</span>
+                  <span className="font-mono font-bold text-primary">{semanaInfo.semanas}</span>
                 </Label>
-                <Slider
-                  min={0}
-                  max={DESCONTOS_SEMANAS.length - 1}
-                  step={1}
-                  value={[semanaIdx]}
-                  onValueChange={([v]) => setSemanaIdx(v)}
-                />
+                <Slider min={0} max={DESCONTOS_SEMANAS.length - 1} step={1} value={[semanaIdx]} onValueChange={([v]) => setSemanaIdx(v)} />
                 <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                  <span>4 sem</span>
-                  <span>52 sem</span>
+                  <span>4</span><span>52</span>
                 </div>
               </div>
-
               <div className="space-y-1.5">
-                <Label className="text-xs flex items-center gap-1.5"><CreditCard className="w-3 h-3" /> Forma de Pagamento</Label>
+                <Label className="text-xs flex items-center gap-1.5"><CreditCard className="w-3 h-3" /> Pagamento</Label>
                 <Select value={formaPagamento} onValueChange={setFormaPagamento}>
                   <SelectTrigger className="bg-background border-border/30 h-9 text-sm">
                     <SelectValue />
@@ -200,51 +209,96 @@ export default function PriceTable() {
             </div>
           </Section>
 
-          <Section title="Premissas do Volume" icon={Info}>
+          <Section title="Custos" icon={Calculator}>
             <div className="space-y-2">
-              <PremissaRow label="Custo GPC Unit." value={`R$ ${dados.custoGPC.toFixed(4)}`} />
-              <PremissaRow label="Margem Alvo" value={`${(dados.margem * 100).toFixed(0)}%`} />
-              <PremissaRow label="Frete" value={formatCurrency(dados.frete)} />
-              <PremissaRow label="Artes" value={`${dados.artes}`} />
-              <div className="border-t border-border/20 pt-2 mt-2" />
-              <PremissaRow label="IRPJ" value={`${(PREMISSAS.irpj * 100).toFixed(0)}%`} />
-              <PremissaRow label="Comissão Restaurante" value={`${(PREMISSAS.comissaoRestaurante * 100).toFixed(0)}%`} />
-              <PremissaRow label="Comissão Comercial" value={`${(PREMISSAS.comissaoComercial * 100).toFixed(0)}%`} />
-              <div className="border-t border-border/20 pt-2">
-                <PremissaRow label="Total Deduções" value={`${(calc.totalDeducoes * 100).toFixed(0)}%`} bold />
-                <PremissaRow label="Denominador" value={calc.denominador.toFixed(4)} bold />
-              </div>
+              <EconRow label="Custo GPC Unitário" value={`R$ ${dados.custoGPC.toFixed(4)}`} />
+              <EconRow label="Custo Produção Total" value={formatCurrency(calc.custoProducao)} />
+              <EconRow label="Frete" value={formatCurrency(dados.frete)} />
+              <EconRow label="Custo Total (Prod+Frete)" value={formatCurrency(calc.custoTotal4sem)} bold />
             </div>
           </Section>
 
-          <Section title="Descontos Aplicados" icon={TrendingDown}>
+          <Section title="Preço Sem Desconto" icon={DollarSign}>
             <div className="space-y-2">
-              <PremissaRow label="Desc. Quantidade" value={calc.descontoQuantidade > 0 ? `${(calc.descontoQuantidade * 100).toFixed(1)}%` : "—"} accent={calc.descontoQuantidade > 0} />
-              <PremissaRow label="Desc. Duração" value={semanaInfo.desconto > 0 ? `${(semanaInfo.desconto * 100).toFixed(0)}%` : "—"} accent={semanaInfo.desconto > 0} />
-              <PremissaRow label="Ajuste Pagamento" value={pagamento.ajuste !== 0 ? `${pagamento.ajuste > 0 ? "+" : ""}${(pagamento.ajuste * 100).toFixed(0)}%` : "—"} accent={pagamento.ajuste < 0} />
+              <EconRow label="Margem Alvo" value={`${(dados.margem * 100).toFixed(0)}%`} />
+              <EconRow label="Denominador" value={calc.denominador.toFixed(4)} />
+              <EconRow label="Preço Unit. (4 sem, s/ desc.)" value={formatCurrency(calc.precoUnit4sem)} bold />
+              <EconRow label="Preço Total (4 sem, s/ desc.)" value={formatCurrency(calc.precoTotalBase4sem)} bold />
+            </div>
+          </Section>
+
+          <Section title="Descontos" icon={TrendingDown}>
+            <div className="space-y-2">
+              <EconRow label="Desc. por Prazo" value={semanaInfo.desconto > 0 ? `${(semanaInfo.desconto * 100).toFixed(0)}%` : "—"} accent={semanaInfo.desconto > 0} />
+              <EconRow label="Desc. por Quantidade" value={calc.descontoQuantidade > 0 ? `${(calc.descontoQuantidade * 100).toFixed(1)}%` : "—"} accent={calc.descontoQuantidade > 0} />
+              <EconRow label="Desc. Forma Pagamento" value={pagamento.ajuste !== 0 ? `${Math.abs(pagamento.ajuste * 100).toFixed(0)}%` : "—"} accent={pagamento.ajuste < 0} />
+              <EconRow label="Desc. Combinado (vs base 1k/4sem)" value={calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"} accent={calc.descCombinado > 0} />
+              <div className="border-t border-border/20 pt-2" />
+              <EconRow label={`Nº Períodos (×4 sem)`} value={`${calc.nPeriodos}`} />
+              <EconRow label="Preço Total c/ Descontos" value={formatCurrency(calc.precoFinal)} bold />
+              <EconRow label="Preço Unit. c/ Descontos" value={formatCurrency(calc.precoUnitComDesc)} bold />
             </div>
           </Section>
         </div>
 
         <div className="lg:col-span-2 space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <KpiCard label="Preço Final" value={formatCurrency(calc.precoFinal)} sub={`${semanaInfo.semanas} sem • ${pagamento.label}`} variant="primary" icon={DollarSign} />
-            <KpiCard label="Preço Unit." value={formatCurrency(calc.precoUnitario)} sub="por bolacha (base 4 sem)" icon={TrendingUp} />
-            <KpiCard label="Lucro Base" value={formatCurrency(calc.lucroBase4sem)} sub={`${(dados.margem * 100).toFixed(0)}% margem (4 sem)`} variant="success" icon={Percent} />
-            <KpiCard label="Custo Total" value={formatCurrency(calc.custoTotal)} sub="produção + frete" icon={Calculator} />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <KpiCard label="Preço Total" value={formatCurrency(calc.precoFinal)} sub={`${semanaInfo.semanas} sem • ${pagamento.label}`} variant="primary" icon={DollarSign} />
+            <KpiCard label="Preço Unitário" value={formatCurrency(calc.precoUnitComDesc)} sub="por bolacha c/ descontos" icon={TrendingUp} />
+            <KpiCard label="Desconto Total" value={calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"} sub="vs base 1k / 4 sem" variant="discount" icon={TrendingDown} />
           </div>
 
-          <Section title="Decomposição do Preço (4 semanas)" icon={Calculator}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <KpiMini label="Custo Produção" value={formatCurrency(calc.custoProducao)} />
-              <KpiMini label="Frete" value={formatCurrency(dados.frete)} />
-              <KpiMini label="Custo Total" value={formatCurrency(calc.custoTotal)} />
-              <KpiMini label="Preço Base (4 sem)" value={formatCurrency(calc.precoTotalBase4sem)} accent />
-              <KpiMini label="IRPJ" value={formatCurrency(calc.irpj4sem)} />
-              <KpiMini label="Com. Restaurante" value={formatCurrency(calc.comissaoRestaurante4sem)} />
-              <KpiMini label="Com. Comercial" value={formatCurrency(calc.comissaoComercial4sem)} />
-              <KpiMini label="Lucro" value={formatCurrency(calc.lucroBase4sem)} accent />
-              <KpiMini label="Preço Unitário" value={formatCurrency(calc.precoUnitario)} accent />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <KpiCard label="Lucro Bruto" value={formatCurrency(calc.lucroBruto)} sub={`rec. líquida − custo total`} variant="success" icon={Percent} />
+            <KpiCard label="Margem Líquida" value={`${(calc.margemLiquida * 100).toFixed(1)}%`} sub="após deduções" variant="success" icon={PieChart} />
+            <KpiCard label="Custo Total" value={formatCurrency(calc.custoTotalPeriodo)} sub={`${calc.nPeriodos} períodos`} icon={Calculator} />
+          </div>
+
+          <Section title="Comissões e Impostos" icon={BarChart3}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+              <EconRow label={`IRPJ (${(PREMISSAS.irpj * 100).toFixed(0)}%)`} value={formatCurrency(calc.valorIRPJ)} />
+              <EconRow label={`Comissão Restaurante (${(PREMISSAS.comissaoRestaurante * 100).toFixed(0)}%)`} value={formatCurrency(calc.valorComRest)} />
+              <EconRow label={`Comissão Comercial (${(PREMISSAS.comissaoComercial * 100).toFixed(0)}%)`} value={formatCurrency(calc.valorComCom)} />
+              <EconRow label="Total Deduções" value={formatCurrency(calc.totalDeducoesValor)} bold />
+            </div>
+          </Section>
+
+          <Section title="Resultado Final" icon={TrendingUp}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+              <EconRow label="Receita Líquida (após deduções)" value={formatCurrency(calc.receitaLiquida)} />
+              <EconRow label="Lucro Bruto (Rec.Líq. − Custo Total)" value={formatCurrency(calc.lucroBruto)} bold accent />
+              <EconRow label="Margem Líquida (após deduções)" value={`${(calc.margemLiquida * 100).toFixed(1)}%`} accent />
+              <EconRow label="Margem sobre Receita Total" value={`${(calc.margemSobreReceita * 100).toFixed(0)}%`} />
+              <EconRow label="Lucro por Unidade" value={formatCurrency(calc.lucroPorUnidade)} />
+              <EconRow label="Custo por Unidade (total)" value={formatCurrency(calc.custoPorUnidade)} />
+            </div>
+          </Section>
+
+          <Section title="Decomposição do Preço (por unidade)" icon={PieChart}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/20">
+                    <th className="text-left p-2 text-xs text-muted-foreground font-medium">Componente</th>
+                    <th className="text-right p-2 text-xs text-muted-foreground font-medium">R$/un.</th>
+                    <th className="text-right p-2 text-xs text-muted-foreground font-medium">% do Preço</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {calc.decomposicaoUnit.map((d) => (
+                    <tr key={d.label} className="border-b border-border/10">
+                      <td className="p-2 text-xs">{d.label}</td>
+                      <td className="p-2 text-right font-mono text-xs">{formatCurrency(d.valor)}</td>
+                      <td className="p-2 text-right font-mono text-xs">{(d.perc * 100).toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-border/30">
+                    <td className="p-2 text-xs font-semibold">Preço Unit. c/ Desc.</td>
+                    <td className="p-2 text-right font-mono text-xs font-semibold text-primary">{formatCurrency(calc.precoUnitComDesc)}</td>
+                    <td className="p-2 text-right font-mono text-xs font-semibold">100%</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </Section>
 
@@ -289,7 +343,7 @@ export default function PriceTable() {
   );
 }
 
-function PremissaRow({ label, value, bold, accent }: { label: string; value: string; bold?: boolean; accent?: boolean }) {
+function EconRow({ label, value, bold, accent }: { label: string; value: string; bold?: boolean; accent?: boolean }) {
   return (
     <div className="flex items-center justify-between text-xs">
       <span className={`text-muted-foreground ${bold ? "font-medium" : ""}`}>{label}</span>
@@ -298,9 +352,9 @@ function PremissaRow({ label, value, bold, accent }: { label: string; value: str
   );
 }
 
-function KpiCard({ label, value, sub, variant, icon: Icon }: { label: string; value: string; sub: string; variant?: "primary" | "success"; icon: typeof DollarSign }) {
-  const borderClass = variant === "primary" ? "border-primary/30 bg-primary/5" : variant === "success" ? "border-emerald-500/30 bg-emerald-500/5" : "border-border/30";
-  const valueClass = variant === "primary" ? "text-primary" : variant === "success" ? "text-emerald-400" : "";
+function KpiCard({ label, value, sub, variant, icon: Icon }: { label: string; value: string; sub: string; variant?: "primary" | "success" | "discount"; icon: typeof DollarSign }) {
+  const borderClass = variant === "primary" ? "border-primary/30 bg-primary/5" : variant === "success" ? "border-emerald-500/30 bg-emerald-500/5" : variant === "discount" ? "border-orange-500/30 bg-orange-500/5" : "border-border/30";
+  const valueClass = variant === "primary" ? "text-primary" : variant === "success" ? "text-emerald-400" : variant === "discount" ? "text-orange-400" : "";
   return (
     <Card className={borderClass}>
       <CardHeader className="pb-1 pt-3 px-3">
@@ -313,14 +367,5 @@ function KpiCard({ label, value, sub, variant, icon: Icon }: { label: string; va
         <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>
       </CardContent>
     </Card>
-  );
-}
-
-function KpiMini({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="bg-card border border-border/30 rounded-lg p-2.5">
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{label}</p>
-      <p className={`text-sm font-bold font-mono ${accent ? "text-primary" : ""}`}>{value}</p>
-    </div>
   );
 }
