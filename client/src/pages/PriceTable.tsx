@@ -4,11 +4,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { formatCurrency } from "@/lib/format";
-import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, Info, TrendingDown, BarChart3, PieChart } from "lucide-react";
+import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, TrendingDown, BarChart3, PieChart, Settings2, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import PageContainer from "@/components/PageContainer";
 import Section from "@/components/Section";
 
-const CUSTOS_VOLUME: Record<number, { custoGPC: number; margem: number; frete: number; artes: number }> = {
+const DEFAULT_CUSTOS_VOLUME: Record<number, { custoGPC: number; margem: number; frete: number; artes: number }> = {
   1000:  { custoGPC: 0.4190, margem: 0.50, frete: 80.38,   artes: 1 },
   2000:  { custoGPC: 0.3495, margem: 0.50, frete: 138.16,  artes: 1 },
   3000:  { custoGPC: 0.3330, margem: 0.50, frete: 219.03,  artes: 1 },
@@ -31,48 +32,56 @@ const CUSTOS_VOLUME: Record<number, { custoGPC: number; margem: number; frete: n
   20000: { custoGPC: 0.2600, margem: 0.50, frete: 1613.59, artes: 1 },
 };
 
-const VOLUMES = Object.keys(CUSTOS_VOLUME).map(Number);
+const VOLUMES = Object.keys(DEFAULT_CUSTOS_VOLUME).map(Number);
 
-const PREMISSAS = {
-  irpj: 0.06,
-  comissaoRestaurante: 0.15,
-  comissaoComercial: 0.10,
+const DEFAULT_PREMISSAS = {
+  irpj: 6,
+  comissaoRestaurante: 15,
+  comissaoComercial: 10,
 };
 
-const DESCONTOS_SEMANAS: { semanas: number; desconto: number }[] = [
-  { semanas: 4,  desconto: 0.00 },
-  { semanas: 8,  desconto: 0.03 },
-  { semanas: 12, desconto: 0.05 },
-  { semanas: 16, desconto: 0.07 },
-  { semanas: 20, desconto: 0.09 },
-  { semanas: 24, desconto: 0.11 },
-  { semanas: 28, desconto: 0.13 },
-  { semanas: 32, desconto: 0.15 },
-  { semanas: 36, desconto: 0.17 },
-  { semanas: 40, desconto: 0.19 },
-  { semanas: 44, desconto: 0.21 },
-  { semanas: 48, desconto: 0.23 },
-  { semanas: 52, desconto: 0.25 },
-];
+const DEFAULT_DESCONTOS_PRAZO: Record<number, number> = {
+  4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11, 28: 13, 32: 15, 36: 17, 40: 19, 44: 21, 48: 23, 52: 25,
+};
 
-const FORMAS_PAGAMENTO = [
-  { id: "pix",    label: "Pix",    ajuste: -0.05 },
-  { id: "boleto", label: "Boleto", ajuste: 0 },
-  { id: "cartao", label: "Cartão", ajuste: 0 },
-];
+const DEFAULT_PAGAMENTO = {
+  pix: 5,
+  boleto: 0,
+  cartao: 0,
+};
+
+const SEMANAS = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52];
+
+const inputCls = "bg-background border-border/30 h-7 text-xs font-mono px-2 w-20 text-right";
 
 export default function PriceTable() {
   const [volumeIdx, setVolumeIdx] = useState(0);
   const [semanaIdx, setSemanaIdx] = useState(0);
   const [formaPagamento, setFormaPagamento] = useState("boleto");
+  const [showPremissas, setShowPremissas] = useState(false);
+
+  const [premissas, setPremissas] = useState(DEFAULT_PREMISSAS);
+  const [descontosPrazo, setDescontosPrazo] = useState(DEFAULT_DESCONTOS_PRAZO);
+  const [pagamentoConfig, setPagamentoConfig] = useState(DEFAULT_PAGAMENTO);
+  const [custosVolume, setCustosVolume] = useState(DEFAULT_CUSTOS_VOLUME);
 
   const volume = VOLUMES[volumeIdx];
-  const dados = CUSTOS_VOLUME[volume];
-  const semanaInfo = DESCONTOS_SEMANAS[semanaIdx];
-  const pagamento = FORMAS_PAGAMENTO.find((f) => f.id === formaPagamento)!;
+  const dados = custosVolume[volume];
+  const semanas = SEMANAS[semanaIdx];
+  const descPrazo = (descontosPrazo[semanas] || 0) / 100;
+
+  const ajustePag = formaPagamento === "pix" ? -(pagamentoConfig.pix / 100)
+    : formaPagamento === "boleto" ? -(pagamentoConfig.boleto / 100)
+    : formaPagamento === "cartao" ? (pagamentoConfig.cartao / 100)
+    : 0;
+
+  const pagLabel = formaPagamento === "pix" ? "Pix" : formaPagamento === "boleto" ? "Boleto" : "Cartão";
 
   const calc = useMemo(() => {
-    const totalDeducoesPerc = PREMISSAS.irpj + PREMISSAS.comissaoRestaurante + PREMISSAS.comissaoComercial;
+    const irpj = premissas.irpj / 100;
+    const comRest = premissas.comissaoRestaurante / 100;
+    const comCom = premissas.comissaoComercial / 100;
+    const totalDeducoesPerc = irpj + comRest + comCom;
     const denominador = 1 - dados.margem - totalDeducoesPerc;
 
     const custoProducao = dados.custoGPC * dados.artes * volume;
@@ -82,88 +91,72 @@ export default function PriceTable() {
     const precoUnit4sem = volume > 0 ? precoTotalBase4sem / volume : 0;
 
     const precoUnit1000 = (() => {
-      const d = CUSTOS_VOLUME[1000];
+      const d = custosVolume[1000];
       const ct = d.custoGPC * d.artes * 1000 + d.frete;
       const den = 1 - d.margem - totalDeducoesPerc;
       return den > 0 ? ct / den / 1000 : 0;
     })();
     const descontoQuantidade = precoUnit1000 > 0 && volume > 1000 ? 1 - (precoUnit4sem / precoUnit1000) : 0;
 
-    const nPeriodos = semanaInfo.semanas / 4;
+    const nPeriodos = semanas / 4;
     const precoSemDesconto = precoTotalBase4sem * nPeriodos;
-    const precoComDescDuracao = precoSemDesconto * (1 - semanaInfo.desconto);
-    const precoFinal = precoComDescDuracao * (1 - (pagamento.ajuste < 0 ? Math.abs(pagamento.ajuste) : -pagamento.ajuste));
+    const precoComDescDuracao = precoSemDesconto * (1 - descPrazo);
+    const precoFinal = precoComDescDuracao * (1 + ajustePag);
 
     const precoUnitComDesc = volume > 0 ? precoFinal / volume : 0;
     const descCombinado = precoUnit1000 > 0 ? 1 - (precoUnitComDesc / precoUnit1000) : 0;
 
     const custoTotalPeriodo = custoTotal4sem * nPeriodos;
 
-    const valorIRPJ = precoFinal * PREMISSAS.irpj;
-    const valorComRest = precoFinal * PREMISSAS.comissaoRestaurante;
-    const valorComCom = precoFinal * PREMISSAS.comissaoComercial;
+    const valorIRPJ = precoFinal * irpj;
+    const valorComRest = precoFinal * comRest;
+    const valorComCom = precoFinal * comCom;
     const totalDeducoesValor = valorIRPJ + valorComRest + valorComCom;
     const receitaLiquida = precoFinal - totalDeducoesValor;
     const lucroBruto = receitaLiquida - custoTotalPeriodo;
     const margemLiquida = precoFinal > 0 ? lucroBruto / precoFinal : 0;
-    const margemSobreReceita = dados.margem;
     const lucroPorUnidade = volume > 0 ? lucroBruto / volume : 0;
     const custoPorUnidade = volume > 0 ? custoTotal4sem / volume : 0;
 
     const decomposicaoUnit = [
       { label: "Custo GPC", valor: dados.custoGPC, perc: precoUnit4sem > 0 ? dados.custoGPC / precoUnit4sem : 0 },
       { label: "Frete/un.", valor: volume > 0 ? dados.frete / volume : 0, perc: precoUnit4sem > 0 ? (dados.frete / volume) / precoUnit4sem : 0 },
-      { label: "IRPJ", valor: precoUnit4sem * PREMISSAS.irpj, perc: PREMISSAS.irpj },
-      { label: "Com. Restaurante", valor: precoUnit4sem * PREMISSAS.comissaoRestaurante, perc: PREMISSAS.comissaoRestaurante },
-      { label: "Com. Comercial", valor: precoUnit4sem * PREMISSAS.comissaoComercial, perc: PREMISSAS.comissaoComercial },
+      { label: "IRPJ", valor: precoUnit4sem * irpj, perc: irpj },
+      { label: "Com. Restaurante", valor: precoUnit4sem * comRest, perc: comRest },
+      { label: "Com. Comercial", valor: precoUnit4sem * comCom, perc: comCom },
       { label: "Margem / Lucro", valor: precoUnit4sem * dados.margem, perc: margemLiquida > 0 ? margemLiquida : dados.margem },
     ];
 
-    const tabela = DESCONTOS_SEMANAS.map((s) => {
-      const mult = s.semanas / 4;
+    const tabela = SEMANAS.map((s) => {
+      const mult = s / 4;
       const pSemDesc = precoTotalBase4sem * mult;
-      const pComDesc = pSemDesc * (1 - s.desconto);
-      const pFinal = pComDesc * (1 - (pagamento.ajuste < 0 ? Math.abs(pagamento.ajuste) : -pagamento.ajuste));
-      return {
-        semanas: s.semanas,
-        desconto: s.desconto,
-        precoSemDesconto: pSemDesc,
-        precoComDesconto: pComDesc,
-        economia: pSemDesc - pComDesc,
-        precoFinal: pFinal,
-      };
+      const dsc = (descontosPrazo[s] || 0) / 100;
+      const pComDesc = pSemDesc * (1 - dsc);
+      const pFinal = pComDesc * (1 + ajustePag);
+      return { semanas: s, desconto: dsc, precoSemDesconto: pSemDesc, precoComDesconto: pComDesc, economia: pSemDesc - pComDesc, precoFinal: pFinal };
     });
 
     return {
-      totalDeducoesPerc,
-      denominador,
-      custoProducao,
-      custoTotal4sem,
-      custoTotalPeriodo,
-      precoTotalBase4sem,
-      precoUnit4sem,
-      precoUnit1000,
-      descontoQuantidade,
-      nPeriodos,
-      precoSemDesconto,
-      precoComDescDuracao,
-      precoFinal,
-      precoUnitComDesc,
-      descCombinado,
-      valorIRPJ,
-      valorComRest,
-      valorComCom,
-      totalDeducoesValor,
-      receitaLiquida,
-      lucroBruto,
-      margemLiquida,
-      margemSobreReceita,
-      lucroPorUnidade,
-      custoPorUnidade,
-      decomposicaoUnit,
-      tabela,
+      totalDeducoesPerc, denominador, custoProducao, custoTotal4sem, custoTotalPeriodo,
+      precoTotalBase4sem, precoUnit4sem, precoUnit1000, descontoQuantidade,
+      nPeriodos, precoSemDesconto, precoComDescDuracao, precoFinal, precoUnitComDesc, descCombinado,
+      valorIRPJ, valorComRest, valorComCom, totalDeducoesValor,
+      receitaLiquida, lucroBruto, margemLiquida, margemSobreReceita: dados.margem,
+      lucroPorUnidade, custoPorUnidade, decomposicaoUnit, tabela,
+      irpj, comRest, comCom,
     };
-  }, [volume, dados, semanaInfo, pagamento]);
+  }, [volume, dados, semanas, descPrazo, ajustePag, premissas, custosVolume, descontosPrazo]);
+
+  const updateVolumeDado = (vol: number, field: keyof typeof dados, val: number) => {
+    setCustosVolume((prev) => ({ ...prev, [vol]: { ...prev[vol], [field]: val } }));
+  };
+
+  const resetPremissas = () => {
+    setPremissas(DEFAULT_PREMISSAS);
+    setDescontosPrazo(DEFAULT_DESCONTOS_PRAZO);
+    setPagamentoConfig(DEFAULT_PAGAMENTO);
+    setCustosVolume(DEFAULT_CUSTOS_VOLUME);
+  };
 
   return (
     <PageContainer title="Tabela de Preços — Simulador VEXA">
@@ -177,37 +170,100 @@ export default function PriceTable() {
                   <span className="font-mono font-bold text-primary">{volume.toLocaleString("pt-BR")}</span>
                 </Label>
                 <Slider min={0} max={VOLUMES.length - 1} step={1} value={[volumeIdx]} onValueChange={([v]) => setVolumeIdx(v)} />
-                <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                  <span>1.000</span><span>20.000</span>
-                </div>
+                <div className="flex justify-between text-[10px] text-muted-foreground font-mono"><span>1.000</span><span>20.000</span></div>
               </div>
               <div className="space-y-2">
                 <Label className="text-xs flex items-center justify-between">
                   <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Semanas</span>
-                  <span className="font-mono font-bold text-primary">{semanaInfo.semanas}</span>
+                  <span className="font-mono font-bold text-primary">{semanas}</span>
                 </Label>
-                <Slider min={0} max={DESCONTOS_SEMANAS.length - 1} step={1} value={[semanaIdx]} onValueChange={([v]) => setSemanaIdx(v)} />
-                <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                  <span>4</span><span>52</span>
-                </div>
+                <Slider min={0} max={SEMANAS.length - 1} step={1} value={[semanaIdx]} onValueChange={([v]) => setSemanaIdx(v)} />
+                <div className="flex justify-between text-[10px] text-muted-foreground font-mono"><span>4</span><span>52</span></div>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs flex items-center gap-1.5"><CreditCard className="w-3 h-3" /> Pagamento</Label>
                 <Select value={formaPagamento} onValueChange={setFormaPagamento}>
-                  <SelectTrigger className="bg-background border-border/30 h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {FORMAS_PAGAMENTO.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.label} {f.ajuste !== 0 && `(${f.ajuste > 0 ? "+" : ""}${(f.ajuste * 100).toFixed(0)}%)`}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="pix">Pix {pagamentoConfig.pix > 0 && `(-${pagamentoConfig.pix}%)`}</SelectItem>
+                    <SelectItem value="boleto">Boleto {pagamentoConfig.boleto > 0 && `(-${pagamentoConfig.boleto}%)`}</SelectItem>
+                    <SelectItem value="cartao">Cartão {pagamentoConfig.cartao > 0 && `(+${pagamentoConfig.cartao}%)`}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           </Section>
+
+          <div className="border border-border/30 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setShowPremissas(!showPremissas)}
+              className="w-full flex items-center justify-between p-3 text-xs font-medium text-muted-foreground hover:bg-muted/20 transition-colors"
+            >
+              <span className="flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" /> Premissas (editáveis)</span>
+              {showPremissas ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </button>
+
+            {showPremissas && (
+              <div className="p-3 pt-0 space-y-4">
+                <div className="flex justify-end">
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1 text-muted-foreground" onClick={resetPremissas}>
+                    <RotateCcw className="w-3 h-3" /> Restaurar padrão
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Impostos e Comissões (%)</p>
+                  <PremissaInput label="IRPJ" value={premissas.irpj} onChange={(v) => setPremissas((p) => ({ ...p, irpj: v }))} suffix="%" />
+                  <PremissaInput label="Com. Restaurante" value={premissas.comissaoRestaurante} onChange={(v) => setPremissas((p) => ({ ...p, comissaoRestaurante: v }))} suffix="%" />
+                  <PremissaInput label="Com. Comercial" value={premissas.comissaoComercial} onChange={(v) => setPremissas((p) => ({ ...p, comissaoComercial: v }))} suffix="%" />
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Forma de Pagamento (%)</p>
+                  <PremissaInput label="Desc. Pix" value={pagamentoConfig.pix} onChange={(v) => setPagamentoConfig((p) => ({ ...p, pix: v }))} suffix="%" />
+                  <PremissaInput label="Desc. Boleto" value={pagamentoConfig.boleto} onChange={(v) => setPagamentoConfig((p) => ({ ...p, boleto: v }))} suffix="%" />
+                  <PremissaInput label="Acrésc. Cartão" value={pagamentoConfig.cartao} onChange={(v) => setPagamentoConfig((p) => ({ ...p, cartao: v }))} suffix="%" />
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Descontos por Prazo (%)</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                    {SEMANAS.map((s) => (
+                      <PremissaInput
+                        key={s}
+                        label={`${s} sem`}
+                        value={descontosPrazo[s] ?? 0}
+                        onChange={(v) => setDescontosPrazo((p) => ({ ...p, [s]: v }))}
+                        suffix="%"
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Custos por Volume</p>
+                  <div className="overflow-x-auto -mx-3 px-3">
+                    <table className="w-full text-[10px] min-w-[380px]">
+                      <thead>
+                        <tr className="border-b border-border/20">
+                          <th className="text-left p-1 font-medium text-muted-foreground">Vol.</th>
+                          <th className="text-right p-1 font-medium text-muted-foreground">GPC (R$)</th>
+                          <th className="text-right p-1 font-medium text-muted-foreground">Margem</th>
+                          <th className="text-right p-1 font-medium text-muted-foreground">Frete (R$)</th>
+                          <th className="text-right p-1 font-medium text-muted-foreground">Artes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {VOLUMES.map((v) => (
+                          <VolumeRow key={v} vol={v} data={custosVolume[v]} active={v === volume} onUpdate={(field, val) => updateVolumeDado(v, field, val)} />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           <Section title="Custos" icon={Calculator}>
             <div className="space-y-2">
@@ -222,6 +278,9 @@ export default function PriceTable() {
             <div className="space-y-2">
               <EconRow label="Margem Alvo" value={`${(dados.margem * 100).toFixed(0)}%`} />
               <EconRow label="Denominador" value={calc.denominador.toFixed(4)} />
+              {calc.denominador <= 0 && (
+                <p className="text-[10px] text-red-400 font-medium">Denominador inválido: margem + deduções excedem 100%. Ajuste as premissas.</p>
+              )}
               <EconRow label="Preço Unit. (4 sem, s/ desc.)" value={formatCurrency(calc.precoUnit4sem)} bold />
               <EconRow label="Preço Total (4 sem, s/ desc.)" value={formatCurrency(calc.precoTotalBase4sem)} bold />
             </div>
@@ -229,9 +288,9 @@ export default function PriceTable() {
 
           <Section title="Descontos" icon={TrendingDown}>
             <div className="space-y-2">
-              <EconRow label="Desc. por Prazo" value={semanaInfo.desconto > 0 ? `${(semanaInfo.desconto * 100).toFixed(0)}%` : "—"} accent={semanaInfo.desconto > 0} />
+              <EconRow label="Desc. por Prazo" value={descPrazo > 0 ? `${(descPrazo * 100).toFixed(0)}%` : "—"} accent={descPrazo > 0} />
               <EconRow label="Desc. por Quantidade" value={calc.descontoQuantidade > 0 ? `${(calc.descontoQuantidade * 100).toFixed(1)}%` : "—"} accent={calc.descontoQuantidade > 0} />
-              <EconRow label="Desc. Forma Pagamento" value={pagamento.ajuste !== 0 ? `${Math.abs(pagamento.ajuste * 100).toFixed(0)}%` : "—"} accent={pagamento.ajuste < 0} />
+              <EconRow label="Desc. Forma Pagamento" value={ajustePag !== 0 ? `${Math.abs(ajustePag * 100).toFixed(0)}%` : "—"} accent={ajustePag < 0} />
               <EconRow label="Desc. Combinado (vs base 1k/4sem)" value={calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"} accent={calc.descCombinado > 0} />
               <div className="border-t border-border/20 pt-2" />
               <EconRow label={`Nº Períodos (×4 sem)`} value={`${calc.nPeriodos}`} />
@@ -243,22 +302,22 @@ export default function PriceTable() {
 
         <div className="lg:col-span-2 space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <KpiCard label="Preço Total" value={formatCurrency(calc.precoFinal)} sub={`${semanaInfo.semanas} sem • ${pagamento.label}`} variant="primary" icon={DollarSign} />
+            <KpiCard label="Preço Total" value={formatCurrency(calc.precoFinal)} sub={`${semanas} sem • ${pagLabel}`} variant="primary" icon={DollarSign} />
             <KpiCard label="Preço Unitário" value={formatCurrency(calc.precoUnitComDesc)} sub="por bolacha c/ descontos" icon={TrendingUp} />
             <KpiCard label="Desconto Total" value={calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"} sub="vs base 1k / 4 sem" variant="discount" icon={TrendingDown} />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <KpiCard label="Lucro Bruto" value={formatCurrency(calc.lucroBruto)} sub={`rec. líquida − custo total`} variant="success" icon={Percent} />
+            <KpiCard label="Lucro Bruto" value={formatCurrency(calc.lucroBruto)} sub="rec. líquida − custo total" variant="success" icon={Percent} />
             <KpiCard label="Margem Líquida" value={`${(calc.margemLiquida * 100).toFixed(1)}%`} sub="após deduções" variant="success" icon={PieChart} />
             <KpiCard label="Custo Total" value={formatCurrency(calc.custoTotalPeriodo)} sub={`${calc.nPeriodos} períodos`} icon={Calculator} />
           </div>
 
           <Section title="Comissões e Impostos" icon={BarChart3}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-              <EconRow label={`IRPJ (${(PREMISSAS.irpj * 100).toFixed(0)}%)`} value={formatCurrency(calc.valorIRPJ)} />
-              <EconRow label={`Comissão Restaurante (${(PREMISSAS.comissaoRestaurante * 100).toFixed(0)}%)`} value={formatCurrency(calc.valorComRest)} />
-              <EconRow label={`Comissão Comercial (${(PREMISSAS.comissaoComercial * 100).toFixed(0)}%)`} value={formatCurrency(calc.valorComCom)} />
+              <EconRow label={`IRPJ (${premissas.irpj}%)`} value={formatCurrency(calc.valorIRPJ)} />
+              <EconRow label={`Comissão Restaurante (${premissas.comissaoRestaurante}%)`} value={formatCurrency(calc.valorComRest)} />
+              <EconRow label={`Comissão Comercial (${premissas.comissaoComercial}%)`} value={formatCurrency(calc.valorComCom)} />
               <EconRow label="Total Deduções" value={formatCurrency(calc.totalDeducoesValor)} bold />
             </div>
           </Section>
@@ -316,18 +375,11 @@ export default function PriceTable() {
                 </thead>
                 <tbody>
                   {calc.tabela.map((row) => (
-                    <tr
-                      key={row.semanas}
-                      className={`border-b border-border/10 transition-colors ${row.semanas === semanaInfo.semanas ? "bg-primary/10" : "hover:bg-muted/20"}`}
-                    >
+                    <tr key={row.semanas} className={`border-b border-border/10 transition-colors ${row.semanas === semanas ? "bg-primary/10" : "hover:bg-muted/20"}`}>
                       <td className="p-2.5 font-medium">{row.semanas} sem</td>
                       <td className="p-2.5 text-right font-mono text-muted-foreground">{formatCurrency(row.precoSemDesconto)}</td>
                       <td className="p-2.5 text-center">
-                        {row.desconto > 0 ? (
-                          <span className="text-emerald-400 font-mono text-xs font-semibold">-{(row.desconto * 100).toFixed(0)}%</span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
+                        {row.desconto > 0 ? <span className="text-emerald-400 font-mono text-xs font-semibold">-{(row.desconto * 100).toFixed(0)}%</span> : <span className="text-muted-foreground text-xs">—</span>}
                       </td>
                       <td className="p-2.5 text-right font-mono text-emerald-400">{row.economia > 0 ? formatCurrency(row.economia) : "—"}</td>
                       <td className="p-2.5 text-right font-mono font-semibold text-primary">{formatCurrency(row.precoFinal)}</td>
@@ -340,6 +392,65 @@ export default function PriceTable() {
         </div>
       </div>
     </PageContainer>
+  );
+}
+
+function VolumeRow({ vol, data, active, onUpdate }: { vol: number; data: { custoGPC: number; margem: number; frete: number; artes: number }; active: boolean; onUpdate: (field: "custoGPC" | "margem" | "frete" | "artes", val: number) => void }) {
+  const [gpc, setGpc] = useState(String(data.custoGPC));
+  const [margem, setMargem] = useState(String(data.margem));
+  const [frete, setFrete] = useState(String(data.frete));
+  const [artes, setArtes] = useState(String(data.artes));
+
+  const commit = (field: "custoGPC" | "margem" | "frete" | "artes", raw: string, setter: (s: string) => void, fallback: number) => {
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed)) onUpdate(field, parsed);
+    else setter(String(fallback));
+  };
+
+  const cellCls = "bg-transparent border-none text-right font-mono text-[10px] focus:outline-none focus:bg-muted/30 rounded px-1";
+
+  return (
+    <tr className={`border-b border-border/5 ${active ? "bg-primary/5" : ""}`}>
+      <td className="p-1 font-mono font-medium">{(vol / 1000).toFixed(0)}k</td>
+      <td className="p-1 text-right">
+        <input type="text" inputMode="decimal" className={`${cellCls} w-16`} value={gpc} onChange={(e) => setGpc(e.target.value)} onBlur={() => commit("custoGPC", gpc, setGpc, data.custoGPC)} />
+      </td>
+      <td className="p-1 text-right">
+        <input type="text" inputMode="decimal" className={`${cellCls} w-12`} value={margem} onChange={(e) => setMargem(e.target.value)} onBlur={() => commit("margem", margem, setMargem, data.margem)} />
+      </td>
+      <td className="p-1 text-right">
+        <input type="text" inputMode="decimal" className={`${cellCls} w-16`} value={frete} onChange={(e) => setFrete(e.target.value)} onBlur={() => commit("frete", frete, setFrete, data.frete)} />
+      </td>
+      <td className="p-1 text-right">
+        <input type="text" inputMode="decimal" className={`${cellCls} w-10`} value={artes} onChange={(e) => setArtes(e.target.value)} onBlur={() => commit("artes", artes, setArtes, data.artes)} />
+      </td>
+    </tr>
+  );
+}
+
+function PremissaInput({ label, value, onChange, suffix }: { label: string; value: number; onChange: (v: number) => void; suffix?: string }) {
+  const [localVal, setLocalVal] = useState(String(value));
+  const commitValue = () => {
+    const parsed = parseFloat(localVal);
+    if (!isNaN(parsed)) onChange(parsed);
+    else setLocalVal(String(value));
+  };
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-0.5">
+        <input
+          type="text"
+          inputMode="decimal"
+          className="bg-transparent border border-border/30 rounded text-right font-mono w-16 text-[11px] h-6 px-1.5 focus:outline-none focus:border-primary/50"
+          value={localVal}
+          onChange={(e) => setLocalVal(e.target.value)}
+          onBlur={commitValue}
+          onKeyDown={(e) => { if (e.key === "Enter") commitValue(); }}
+        />
+        {suffix && <span className="text-[10px] text-muted-foreground">{suffix}</span>}
+      </div>
+    </div>
   );
 }
 
