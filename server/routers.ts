@@ -918,32 +918,47 @@ export const appRouter = router({
       .mutation(({ input }) => deleteClient(input.id)),
 
     getCampaigns: internalProcedure
-      .input(z.object({ clientId: z.number() }))
+      .input(z.object({ clientId: z.number(), includeChildren: z.boolean().optional() }))
       .query(async ({ input }) => {
         const allCampaigns = await listCampaigns();
-        return allCampaigns.filter((c: any) => c.clientId === input.clientId);
+        if (!input.includeChildren) {
+          return allCampaigns.filter((c: any) => c.clientId === input.clientId);
+        }
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return allCampaigns.filter((c: any) => c.clientId === input.clientId);
+        const { clients: clientsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const children = await db.select({ id: clientsTable.id }).from(clientsTable).where(eq(clientsTable.parentId, input.clientId));
+        const ids = new Set([input.clientId, ...children.map(c => c.id)]);
+        return allCampaigns.filter((c: any) => ids.has(c.clientId));
       }),
 
     getQuotations: internalProcedure
-      .input(z.object({ clientId: z.number() }))
+      .input(z.object({ clientId: z.number(), includeChildren: z.boolean().optional() }))
       .query(async ({ input }) => {
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
         if (!db) return [];
-        const { quotations } = await import("../drizzle/schema");
-        const { eq, desc } = await import("drizzle-orm");
-        return db.select().from(quotations).where(eq(quotations.clientId, input.clientId)).orderBy(desc(quotations.createdAt));
+        const { quotations, clients: clientsTable } = await import("../drizzle/schema");
+        const { eq, desc, inArray } = await import("drizzle-orm");
+        if (!input.includeChildren) {
+          return db.select().from(quotations).where(eq(quotations.clientId, input.clientId)).orderBy(desc(quotations.createdAt));
+        }
+        const children = await db.select({ id: clientsTable.id }).from(clientsTable).where(eq(clientsTable.parentId, input.clientId));
+        const ids = [input.clientId, ...children.map(c => c.id)];
+        return db.select().from(quotations).where(inArray(quotations.clientId, ids)).orderBy(desc(quotations.createdAt));
       }),
 
     getInvoices: internalProcedure
-      .input(z.object({ clientId: z.number() }))
+      .input(z.object({ clientId: z.number(), includeChildren: z.boolean().optional() }))
       .query(async ({ input }) => {
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
         if (!db) return [];
-        const { invoices, campaigns } = await import("../drizzle/schema");
-        const { eq, desc } = await import("drizzle-orm");
-        return db.select({
+        const { invoices, campaigns, clients: clientsTable } = await import("../drizzle/schema");
+        const { eq, desc, inArray } = await import("drizzle-orm");
+        const baseSelect = db.select({
           id: invoices.id,
           invoiceNumber: invoices.invoiceNumber,
           campaignId: invoices.campaignId,
@@ -956,9 +971,13 @@ export const appRouter = router({
           status: invoices.status,
           createdAt: invoices.createdAt,
         }).from(invoices)
-          .leftJoin(campaigns, eq(invoices.campaignId, campaigns.id))
-          .where(eq(invoices.clientId, input.clientId))
-          .orderBy(desc(invoices.issueDate));
+          .leftJoin(campaigns, eq(invoices.campaignId, campaigns.id));
+        if (!input.includeChildren) {
+          return baseSelect.where(eq(invoices.clientId, input.clientId)).orderBy(desc(invoices.issueDate));
+        }
+        const children = await db.select({ id: clientsTable.id }).from(clientsTable).where(eq(clientsTable.parentId, input.clientId));
+        const ids = [input.clientId, ...children.map(c => c.id)];
+        return baseSelect.where(inArray(invoices.clientId, ids)).orderBy(desc(invoices.issueDate));
       }),
 
     getLinkedUsers: internalProcedure

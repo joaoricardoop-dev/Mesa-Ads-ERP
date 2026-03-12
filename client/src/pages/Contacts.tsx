@@ -14,6 +14,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Search,
   Download,
   Phone,
@@ -27,21 +34,34 @@ import {
 export default function Contacts() {
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("all");
 
   const { data: contacts = [], isLoading } = trpc.contact.listAll.useQuery();
 
+  const clientNames = useMemo(() => {
+    const names = new Set<string>();
+    contacts.forEach((c: any) => { if (c.clientName) names.add(c.clientName); });
+    return Array.from(names).sort();
+  }, [contacts]);
+
   const filtered = useMemo(() => {
-    if (!search) return contacts;
-    const q = search.toLowerCase();
-    return contacts.filter(
-      (c: any) =>
-        c.name.toLowerCase().includes(q) ||
-        (c.email || "").toLowerCase().includes(q) ||
-        (c.phone || "").toLowerCase().includes(q) ||
-        (c.clientName || "").toLowerCase().includes(q) ||
-        (c.role || "").toLowerCase().includes(q)
-    );
-  }, [contacts, search]);
+    let result = contacts;
+    if (companyFilter !== "all") {
+      result = result.filter((c: any) => c.clientName === companyFilter);
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (c: any) =>
+          c.name.toLowerCase().includes(q) ||
+          (c.email || "").toLowerCase().includes(q) ||
+          (c.phone || "").toLowerCase().includes(q) ||
+          (c.clientName || "").toLowerCase().includes(q) ||
+          (c.role || "").toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [contacts, search, companyFilter]);
 
   function handleCsvExport() {
     const headers = ["Nome", "E-mail", "Telefone", "Cargo", "Cliente", "Principal", "Notas"];
@@ -89,14 +109,28 @@ export default function Contacts() {
         </div>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar contato..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 bg-card border-border/30"
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative max-w-sm flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar contato..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-card border-border/30"
+          />
+        </div>
+        <Select value={companyFilter} onValueChange={setCompanyFilter}>
+          <SelectTrigger className="w-[200px] bg-card border-border/30">
+            <Building2 className="w-4 h-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Filtrar por cliente" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os clientes</SelectItem>
+            {clientNames.map((name) => (
+              <SelectItem key={name} value={name}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="bg-card border border-border/30 rounded-lg overflow-hidden">

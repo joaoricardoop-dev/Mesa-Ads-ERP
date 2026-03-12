@@ -153,13 +153,14 @@ export default function ClientDetail() {
 
   const utils = trpc.useUtils();
   const { data: client, isLoading } = trpc.advertiser.get.useQuery({ id: clientId }, { enabled: clientId > 0 });
-  const { data: campaigns = [] } = trpc.advertiser.getCampaigns.useQuery({ clientId }, { enabled: clientId > 0 });
-  const { data: quotationsData = [] } = trpc.advertiser.getQuotations.useQuery({ clientId }, { enabled: clientId > 0 });
-  const { data: invoicesData = [] } = trpc.advertiser.getInvoices.useQuery({ clientId }, { enabled: clientId > 0 });
+  const { data: childClients = [] } = trpc.advertiser.getChildren.useQuery({ clientId }, { enabled: clientId > 0 });
+  const isParent = childClients.length > 0;
+  const { data: campaigns = [] } = trpc.advertiser.getCampaigns.useQuery({ clientId, includeChildren: isParent }, { enabled: clientId > 0 });
+  const { data: quotationsData = [] } = trpc.advertiser.getQuotations.useQuery({ clientId, includeChildren: isParent }, { enabled: clientId > 0 });
+  const { data: invoicesData = [] } = trpc.advertiser.getInvoices.useQuery({ clientId, includeChildren: isParent }, { enabled: clientId > 0 });
   const { data: serviceOrdersData = [] } = trpc.serviceOrder.list.useQuery({ clientId });
   const { data: linkedUsers = [] } = trpc.advertiser.getLinkedUsers.useQuery({ clientId }, { enabled: clientId > 0 });
   const { data: availableUsers = [] } = trpc.advertiser.listAvailableUsers.useQuery(undefined, { enabled: isLinkUserDialogOpen });
-  const { data: childClients = [] } = trpc.advertiser.getChildren.useQuery({ clientId }, { enabled: clientId > 0 });
   const { data: contactsList = [] } = trpc.contact.list.useQuery({ clientId }, { enabled: clientId > 0 });
   const childIds = useMemo(() => (childClients as any[]).map((c: any) => c.id), [childClients]);
   const { data: childContactsList = [] } = trpc.contact.listByClients.useQuery(
