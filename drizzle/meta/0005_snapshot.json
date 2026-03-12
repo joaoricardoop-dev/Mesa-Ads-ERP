@@ -1918,10 +1918,10 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "contacts_restaurantId_restaurants_id_fk": {
-          "name": "contacts_restaurantId_restaurants_id_fk",
+        "contacts_restaurantId_active_restaurants_id_fk": {
+          "name": "contacts_restaurantId_active_restaurants_id_fk",
           "tableFrom": "contacts",
-          "tableTo": "restaurants",
+          "tableTo": "active_restaurants",
           "columnsFrom": [
             "restaurantId"
           ],
