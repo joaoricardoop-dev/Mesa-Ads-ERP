@@ -166,7 +166,7 @@ export default function ActiveRestaurantProfile() {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
-  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", notes: "", isPrimary: false });
 
   const utils = trpc.useUtils();
   const { data: restaurant, isLoading } = trpc.activeRestaurant.get.useQuery({ id: restaurantId }, { enabled: restaurantId > 0 });
@@ -1094,7 +1094,7 @@ export default function ActiveRestaurantProfile() {
                 </div>
                 <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => {
                   setEditingContactId(null);
-                  setContactForm({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
+                  setContactForm({ name: "", email: "", phone: "", notes: "", isPrimary: false });
                   setContactDialogOpen(true);
                 }}>
                   <Plus className="w-3.5 h-3.5" /> Novo Contato
@@ -1114,7 +1114,6 @@ export default function ActiveRestaurantProfile() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-sm font-medium">{contact.name}</span>
                             {contact.isPrimary && <Star className="w-3 h-3 text-amber-500" />}
-                            {contact.role && <Badge variant="outline" className="text-[9px] h-4 px-1">{contact.role}</Badge>}
                           </div>
                           <div className="flex items-center gap-3 mt-0.5">
                             {contact.email && <span className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" /> {contact.email}</span>}
@@ -1129,7 +1128,6 @@ export default function ActiveRestaurantProfile() {
                             name: contact.name,
                             email: contact.email || "",
                             phone: contact.phone || "",
-                            role: contact.role || "",
                             notes: contact.notes || "",
                             isPrimary: contact.isPrimary,
                           });
@@ -1648,10 +1646,6 @@ export default function ActiveRestaurantProfile() {
                 <Label className="text-xs mb-1.5 block">Telefone</Label>
                 <Input value={contactForm.phone} onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })} className="bg-background border-border/30" />
               </div>
-            </div>
-            <div>
-              <Label className="text-xs mb-1.5 block">Cargo</Label>
-              <Input value={contactForm.role} onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })} className="bg-background border-border/30" />
             </div>
             <div>
               <Label className="text-xs mb-1.5 block">Notas</Label>

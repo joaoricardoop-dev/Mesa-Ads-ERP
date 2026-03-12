@@ -281,7 +281,7 @@ export default function Leads() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [collapsedStages, setCollapsedStages] = useState<string[]>(["ganho", "perdido"]);
   const [contactFormOpen, setContactFormOpen] = useState(false);
-  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", role: "" });
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "" });
   const [simNumRestaurants, setSimNumRestaurants] = useState("10");
   const [simCoastersPerRest, setSimCoastersPerRest] = useState("500");
   const [simUnitCost, setSimUnitCost] = useState("0.12");
@@ -314,7 +314,7 @@ export default function Leads() {
 
   const createContactMutation = trpc.contact.create.useMutation({
     onSuccess: () => {
-      setContactForm({ name: "", email: "", phone: "", role: "" });
+      setContactForm({ name: "", email: "", phone: "" });
       setContactFormOpen(false);
       utils.contact.list.invalidate();
       toast.success("Contato adicionado");
@@ -1293,7 +1293,7 @@ export default function Leads() {
       </Dialog>
 
       {/* Lead Detail Sheet */}
-      <Sheet open={!!selectedLeadId} onOpenChange={(open) => { if (!open) { setSelectedLeadId(null); setIsEditing(false); setContactFormOpen(false); setContactForm({ name: "", email: "", phone: "", role: "" }); } }}>
+      <Sheet open={!!selectedLeadId} onOpenChange={(open) => { if (!open) { setSelectedLeadId(null); setIsEditing(false); setContactFormOpen(false); setContactForm({ name: "", email: "", phone: "" }); } }}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto px-5 pt-6">
           {selectedLead.data && (
             <>
@@ -1562,20 +1562,12 @@ export default function Leads() {
                         onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
                         className="h-8 text-xs"
                       />
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          placeholder="Cargo"
-                          value={contactForm.role}
-                          onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })}
-                          className="h-8 text-xs"
-                        />
-                        <Input
-                          placeholder="Telefone"
-                          value={contactForm.phone}
-                          onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
-                          className="h-8 text-xs"
-                        />
-                      </div>
+                      <Input
+                        placeholder="Telefone"
+                        value={contactForm.phone}
+                        onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                        className="h-8 text-xs"
+                      />
                       <Input
                         placeholder="Email"
                         value={contactForm.email}
@@ -1592,7 +1584,6 @@ export default function Leads() {
                             name: contactForm.name.trim(),
                             email: contactForm.email || undefined,
                             phone: contactForm.phone || undefined,
-                            role: contactForm.role || undefined,
                           });
                         }}
                       >
@@ -1617,7 +1608,6 @@ export default function Leads() {
                               )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5 ml-[18px]">
-                              {c.role && <span className="text-[10px] text-muted-foreground">{c.role}</span>}
                               {c.phone && (
                                 <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                                   <Phone className="w-2.5 h-2.5" />{c.phone}
