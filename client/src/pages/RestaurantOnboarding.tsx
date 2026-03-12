@@ -36,14 +36,52 @@ const STATES = [
 ];
 
 const EXCLUDED_CATEGORIES = [
-  "Bebidas Alcoólicas",
-  "Tabaco",
-  "Apostas / Jogos de Azar",
-  "Política / Partidos",
+  "Concorrentes diretos",
+  "Bebidas alcoólicas",
+  "Bebidas não alcoólicas",
+  "Alimentação (marcas de comida, snacks, etc.)",
+  "Cafeterias e docerias",
+  "Sorveterias / açaí / sobremesas",
+  "Apps de delivery e marketplaces",
+  "Supermercados / atacarejos",
+  "Varejo em geral",
+  "Moda (roupas, calçados, acessórios)",
+  "Beleza e cuidados pessoais",
+  "Salão / barbearia / estética",
+  "Óticas",
+  "Joias / relógios / acessórios premium",
+  "Produtos e serviços pet",
+  "Academias e estúdios",
+  "Saúde (clínicas, odontologia, etc.)",
+  "Planos e seguros",
+  "Bancos e fintechs",
+  "Pagamentos (maquininha, carteiras digitais)",
+  "Cripto/investimentos de alto risco",
+  "Empréstimos agressivos",
+  "Contabilidade e serviços B2B",
+  "Telefonia / internet",
+  "Eletrônicos e acessórios",
+  "Softwares e ferramentas (SaaS, ERP)",
+  "Transporte e mobilidade",
+  "Automotivo",
+  "Turismo e viagens",
+  "Eventos e entretenimento",
+  "Cultura e lazer",
+  "Educação",
+  "Casa e construção",
+  "Imobiliário",
+  "Serviços residenciais",
+  "Logística e serviços locais",
+  "Energia e utilidades",
+  "Sustentabilidade",
+  "Tecnologia/serviços profissionais",
+  "Saúde e bem-estar lifestyle",
+  "Esportes e hobbies",
+  "Gastronomia e experiências",
+  "Gaming/bets/Apostas",
+  "Política",
   "Religião",
-  "Armas",
-  "Conteúdo Adulto",
-  "Concorrentes Diretos",
+  "Conteúdo adulto/sexual",
 ];
 
 const BUSY_DAYS_OPTIONS = [
@@ -226,7 +264,7 @@ export default function RestaurantOnboarding() {
       return form.name.trim().length > 0 && form.address.trim().length > 0 && form.neighborhood.trim().length > 0;
     }
     if (step === 1) {
-      return form.contactName.trim().length > 0 && form.contactRole.trim().length > 0 && form.whatsapp.trim().length > 0 && form.email.trim().length > 0 && parseInt(form.tableCount) > 0 && parseInt(form.seatCount) > 0 && parseInt(form.monthlyCustomers) > 0;
+      return form.contactName.trim().length > 0 && form.contactRole.trim().length > 0 && form.whatsapp.trim().length > 0 && form.email.trim().length > 0 && parseInt(form.tableCount) > 0 && parseInt(form.seatCount) > 0 && parseInt(form.monthlyCustomers) > 0 && parseInt(form.monthlyDrinksSold) > 0;
     }
     if (step === 2) return true;
     if (step === 3) {
@@ -527,7 +565,7 @@ export default function RestaurantOnboarding() {
                   <Input value={form.monthlyCustomers} onChange={(e) => update("monthlyCustomers", e.target.value.replace(/\D/g, ""))} placeholder="Ex: 3000" className={inputClass} type="text" inputMode="numeric" />
                 </div>
                 <div>
-                  <Label className={labelClass}>Bebidas vendidas/mês</Label>
+                  <Label className={labelClass}>Bebidas vendidas/mês *</Label>
                   <Input value={form.monthlyDrinksSold} onChange={(e) => update("monthlyDrinksSold", e.target.value.replace(/\D/g, ""))} placeholder="Ex: 5000" className={inputClass} type="text" inputMode="numeric" />
                 </div>
               </div>
