@@ -1,8 +1,8 @@
 import { internalProcedure, comercialProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { contacts, clients } from "../drizzle/schema";
-import { eq, desc, sql, inArray } from "drizzle-orm";
+import { contacts, clients, restaurants } from "../drizzle/schema";
+import { eq, desc, sql, inArray, isNotNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 async function getDatabase() {
@@ -13,14 +13,18 @@ async function getDatabase() {
 
 export const contactRouter = router({
   list: internalProcedure
-    .input(z.object({ clientId: z.number() }))
+    .input(z.object({ clientId: z.number().optional(), restaurantId: z.number().optional() }))
     .query(async ({ input }) => {
       const db = await getDatabase();
-      return db
-        .select()
-        .from(contacts)
-        .where(eq(contacts.clientId, input.clientId))
-        .orderBy(desc(contacts.isPrimary), desc(contacts.createdAt));
+      if (input.clientId) {
+        return db.select().from(contacts).where(eq(contacts.clientId, input.clientId))
+          .orderBy(desc(contacts.isPrimary), desc(contacts.createdAt));
+      }
+      if (input.restaurantId) {
+        return db.select().from(contacts).where(eq(contacts.restaurantId, input.restaurantId))
+          .orderBy(desc(contacts.isPrimary), desc(contacts.createdAt));
+      }
+      return [];
     }),
 
   listByClients: internalProcedure
@@ -49,28 +53,27 @@ export const contactRouter = router({
   listAll: internalProcedure
     .query(async () => {
       const db = await getDatabase();
-      const rows = await db
-        .select({
-          id: contacts.id,
-          clientId: contacts.clientId,
-          clientName: clients.name,
-          name: contacts.name,
-          email: contacts.email,
-          phone: contacts.phone,
-          role: contacts.role,
-          notes: contacts.notes,
-          isPrimary: contacts.isPrimary,
-          createdAt: contacts.createdAt,
-        })
-        .from(contacts)
-        .leftJoin(clients, eq(contacts.clientId, clients.id))
-        .orderBy(desc(contacts.createdAt));
-      return rows;
+      const rows = await db.execute(sql`
+        SELECT c.*,
+          cl."name" AS "clientName",
+          r."name" AS "restaurantName",
+          CASE
+            WHEN c."clientId" IS NOT NULL THEN 'anunciante'
+            WHEN c."restaurantId" IS NOT NULL THEN 'restaurante'
+            ELSE 'outro'
+          END AS "ownerType"
+        FROM contacts c
+        LEFT JOIN clients cl ON c."clientId" = cl."id"
+        LEFT JOIN restaurants r ON c."restaurantId" = r."id"
+        ORDER BY c."createdAt" DESC
+      `);
+      return rows.rows as any[];
     }),
 
   create: comercialProcedure
     .input(z.object({
-      clientId: z.number(),
+      clientId: z.number().optional(),
+      restaurantId: z.number().optional(),
       name: z.string().min(1),
       email: z.string().optional(),
       phone: z.string().optional(),
@@ -80,8 +83,15 @@ export const contactRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
+      if (!input.clientId && !input.restaurantId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "clientId ou restaurantId é obrigatório" });
+      }
       if (input.isPrimary) {
-        await db.update(contacts).set({ isPrimary: false }).where(eq(contacts.clientId, input.clientId));
+        if (input.clientId) {
+          await db.update(contacts).set({ isPrimary: false }).where(eq(contacts.clientId, input.clientId));
+        } else if (input.restaurantId) {
+          await db.update(contacts).set({ isPrimary: false }).where(eq(contacts.restaurantId, input.restaurantId));
+        }
       }
       const [created] = await db.insert(contacts).values(input).returning();
       return created;
@@ -101,9 +111,13 @@ export const contactRouter = router({
       const db = await getDatabase();
       const { id, ...data } = input;
       if (data.isPrimary) {
-        const [existing] = await db.select({ clientId: contacts.clientId }).from(contacts).where(eq(contacts.id, id));
+        const [existing] = await db.select({ clientId: contacts.clientId, restaurantId: contacts.restaurantId }).from(contacts).where(eq(contacts.id, id));
         if (existing) {
-          await db.update(contacts).set({ isPrimary: false }).where(eq(contacts.clientId, existing.clientId));
+          if (existing.clientId) {
+            await db.update(contacts).set({ isPrimary: false }).where(eq(contacts.clientId, existing.clientId));
+          } else if (existing.restaurantId) {
+            await db.update(contacts).set({ isPrimary: false }).where(eq(contacts.restaurantId, existing.restaurantId));
+          }
         }
       }
       const [updated] = await db

@@ -164,6 +164,9 @@ export default function ActiveRestaurantProfile() {
   const [commissionValue, setCommissionValue] = useState("");
   const [isLinkUserDialogOpen, setIsLinkUserDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<number | null>(null);
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
 
   const utils = trpc.useUtils();
   const { data: restaurant, isLoading } = trpc.activeRestaurant.get.useQuery({ id: restaurantId }, { enabled: restaurantId > 0 });
@@ -175,6 +178,20 @@ export default function ActiveRestaurantProfile() {
   const { data: termAcceptances = [] } = trpc.term.listAcceptances.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
   const { data: linkedUsers = [] } = trpc.activeRestaurant.getLinkedUsers.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
   const { data: availableUsers = [] } = trpc.activeRestaurant.listAvailableUsers.useQuery(undefined, { enabled: isLinkUserDialogOpen });
+  const { data: contactsList = [] } = trpc.contact.list.useQuery({ restaurantId }, { enabled: restaurantId > 0 });
+
+  const createContactMutation = trpc.contact.create.useMutation({
+    onSuccess: () => { toast.success("Contato criado!"); utils.contact.list.invalidate({ restaurantId }); setContactDialogOpen(false); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const updateContactMutation = trpc.contact.update.useMutation({
+    onSuccess: () => { toast.success("Contato atualizado!"); utils.contact.list.invalidate({ restaurantId }); setContactDialogOpen(false); setEditingContactId(null); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteContactMutation = trpc.contact.delete.useMutation({
+    onSuccess: () => { toast.success("Contato removido!"); utils.contact.list.invalidate({ restaurantId }); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const branches = useMemo(() =>
     allRestaurants.filter(r => r.parentRestaurantId === restaurantId),
@@ -372,6 +389,7 @@ export default function ActiveRestaurantProfile() {
                 <TabsTrigger value="fotos" className="gap-1.5 text-xs"><Camera className="w-3.5 h-3.5" /> Fotos</TabsTrigger>
                 <TabsTrigger value="filiais" className="gap-1.5 text-xs"><Link2 className="w-3.5 h-3.5" /> Filiais</TabsTrigger>
                 <TabsTrigger value="termos" className="gap-1.5 text-xs"><FileText className="w-3.5 h-3.5" /> Termos</TabsTrigger>
+                <TabsTrigger value="contatos" className="gap-1.5 text-xs"><Phone className="w-3.5 h-3.5" /> Contatos</TabsTrigger>
                 <TabsTrigger value="contas" className="gap-1.5 text-xs"><Users className="w-3.5 h-3.5" /> Contas</TabsTrigger>
               </TabsList>
             </div>
@@ -1067,6 +1085,69 @@ export default function ActiveRestaurantProfile() {
               )}
             </TabsContent>
 
+            {/* ─── CONTATOS ─── */}
+            <TabsContent value="contatos" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold">Contatos</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Pessoas de contato deste restaurante</p>
+                </div>
+                <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => {
+                  setEditingContactId(null);
+                  setContactForm({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
+                  setContactDialogOpen(true);
+                }}>
+                  <Plus className="w-3.5 h-3.5" /> Novo Contato
+                </Button>
+              </div>
+              {contactsList.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">Nenhum contato cadastrado</div>
+              ) : (
+                <div className="space-y-2">
+                  {contactsList.map((contact: any) => (
+                    <div key={contact.id} className="flex items-center justify-between p-3 bg-card border border-border/30 rounded-lg">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center text-xs font-bold text-orange-500 flex-shrink-0">
+                          {contact.name[0]?.toUpperCase() || "?"}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium">{contact.name}</span>
+                            {contact.isPrimary && <Star className="w-3 h-3 text-amber-500" />}
+                            {contact.role && <Badge variant="outline" className="text-[9px] h-4 px-1">{contact.role}</Badge>}
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5">
+                            {contact.email && <span className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" /> {contact.email}</span>}
+                            {contact.phone && <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" /> {contact.phone}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                          setEditingContactId(contact.id);
+                          setContactForm({
+                            name: contact.name,
+                            email: contact.email || "",
+                            phone: contact.phone || "",
+                            role: contact.role || "",
+                            notes: contact.notes || "",
+                            isPrimary: contact.isPrimary,
+                          });
+                          setContactDialogOpen(true);
+                        }}>
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300"
+                          onClick={() => deleteContactMutation.mutate({ id: contact.id })}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
             {/* ─── FILIAIS ─── */}
             <TabsContent value="filiais" className="space-y-4">
               <div className="flex items-center justify-between">
@@ -1543,6 +1624,54 @@ export default function ActiveRestaurantProfile() {
                 createTermMutation.mutate({ restaurantId, ...data });
               }
             }}>{editingTermId ? "Salvar" : "Criar Termo"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Contact Dialog */}
+      <Dialog open={contactDialogOpen} onOpenChange={(v) => { setContactDialogOpen(v); if (!v) setEditingContactId(null); }}>
+        <DialogContent className="sm:max-w-md bg-card border-border/30">
+          <DialogHeader>
+            <DialogTitle className="text-base">{editingContactId ? "Editar Contato" : "Novo Contato"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs mb-1.5 block">Nome *</Label>
+              <Input value={contactForm.name} onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })} className="bg-background border-border/30" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs mb-1.5 block">E-mail</Label>
+                <Input value={contactForm.email} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} className="bg-background border-border/30" />
+              </div>
+              <div>
+                <Label className="text-xs mb-1.5 block">Telefone</Label>
+                <Input value={contactForm.phone} onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })} className="bg-background border-border/30" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs mb-1.5 block">Cargo</Label>
+              <Input value={contactForm.role} onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })} className="bg-background border-border/30" />
+            </div>
+            <div>
+              <Label className="text-xs mb-1.5 block">Notas</Label>
+              <Input value={contactForm.notes} onChange={(e) => setContactForm({ ...contactForm, notes: e.target.value })} className="bg-background border-border/30" />
+            </div>
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input type="checkbox" checked={contactForm.isPrimary} onChange={(e) => setContactForm({ ...contactForm, isPrimary: e.target.checked })} className="rounded" />
+              Contato principal
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setContactDialogOpen(false); setEditingContactId(null); }}>Cancelar</Button>
+            <Button onClick={() => {
+              if (!contactForm.name.trim()) { toast.error("Nome é obrigatório"); return; }
+              if (editingContactId) {
+                updateContactMutation.mutate({ id: editingContactId, ...contactForm });
+              } else {
+                createContactMutation.mutate({ restaurantId, ...contactForm });
+              }
+            }}>{editingContactId ? "Salvar" : "Criar"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
