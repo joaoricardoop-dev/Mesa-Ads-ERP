@@ -908,7 +908,7 @@ function EconRow({ label, value, bold, accent }: { label: string; value: string;
 }
 
 function KpiCard({ label, value, sub, variant, icon: Icon }: { label: string; value: string; sub: string; variant?: "primary" | "success" | "discount"; icon: typeof DollarSign }) {
-  const borderClass = variant === "primary" ? "border-primary/30 bg-primary/5" : variant === "success" ? "border-emerald-500/30 bg-emerald-500/5" : variant === "discount" ? "border-orange-500/30 bg-orange-500/5" : "border-border/30";
+  const borderClass = "border-border/30 bg-white dark:bg-card";
   const valueClass = variant === "primary" ? "text-primary" : variant === "success" ? "text-emerald-400" : variant === "discount" ? "text-orange-400" : "";
   return (
     <Card className={borderClass}>
