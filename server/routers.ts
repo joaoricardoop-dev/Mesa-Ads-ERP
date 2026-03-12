@@ -713,9 +713,7 @@ export const appRouter = router({
         try {
           const { ensureContact } = await import("./contactSync");
           const fullName = [existing.firstName, existing.lastName].filter(Boolean).join(" ").trim();
-          if (fullName) {
-            await ensureContact({ restaurantId: input.restaurantId, name: fullName, email: existing.email || undefined });
-          }
+          await ensureContact({ restaurantId: input.restaurantId, name: fullName || undefined, email: existing.email || undefined });
         } catch (err) {
           console.error("Failed to sync contact on restaurant linkUser:", err);
         }
@@ -1045,9 +1043,7 @@ export const appRouter = router({
         try {
           const { ensureContact } = await import("./contactSync");
           const fullName = [existing.firstName, existing.lastName].filter(Boolean).join(" ").trim();
-          if (fullName) {
-            await ensureContact({ clientId: input.clientId, name: fullName, email: existing.email || undefined });
-          }
+          await ensureContact({ clientId: input.clientId, name: fullName || undefined, email: existing.email || undefined });
         } catch (err) {
           console.error("Failed to sync contact on advertiser linkUser:", err);
         }

@@ -1,12 +1,12 @@
 import { getDb } from "./db";
 import { contacts } from "../drizzle/schema";
-import { eq, and, or, sql } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
 
 export async function ensureContact(opts: {
   clientId?: number | null;
   restaurantId?: number | null;
   leadId?: number | null;
-  name: string;
+  name?: string | null;
   email?: string | null;
   phone?: string | null;
   isPrimary?: boolean;
@@ -14,10 +14,13 @@ export async function ensureContact(opts: {
   const db = await getDb();
   if (!db) return;
 
-  const { clientId, restaurantId, leadId, name, email, phone, isPrimary } = opts;
+  const { clientId, restaurantId, leadId, email, phone, isPrimary } = opts;
   if (!clientId && !restaurantId && !leadId) return;
-  const trimmedName = (name || "").trim();
-  if (!trimmedName) return;
+
+  const trimmedName = (opts.name || "").trim();
+  const contactName = trimmedName || email || "Sem nome";
+
+  if (!email && !trimmedName) return;
 
   const entityFilter = clientId
     ? eq(contacts.clientId, clientId)
@@ -25,17 +28,21 @@ export async function ensureContact(opts: {
       ? eq(contacts.restaurantId, restaurantId)
       : eq(contacts.leadId, leadId!);
 
-  const matchConditions = [];
-  if (email) matchConditions.push(eq(contacts.email, email));
-  matchConditions.push(eq(contacts.name, trimmedName));
-
-  const existing = await db
-    .select({ id: contacts.id })
-    .from(contacts)
-    .where(and(entityFilter, or(...matchConditions)))
-    .limit(1);
-
-  if (existing.length > 0) return;
+  if (email) {
+    const existing = await db
+      .select({ id: contacts.id })
+      .from(contacts)
+      .where(and(entityFilter, eq(contacts.email, email)))
+      .limit(1);
+    if (existing.length > 0) return;
+  } else {
+    const existing = await db
+      .select({ id: contacts.id })
+      .from(contacts)
+      .where(and(entityFilter, eq(contacts.name, contactName), isNull(contacts.email)))
+      .limit(1);
+    if (existing.length > 0) return;
+  }
 
   if (isPrimary) {
     await db.update(contacts).set({ isPrimary: false }).where(entityFilter);
@@ -45,7 +52,7 @@ export async function ensureContact(opts: {
     clientId: clientId ?? undefined,
     restaurantId: restaurantId ?? undefined,
     leadId: leadId ?? undefined,
-    name: trimmedName,
+    name: contactName,
     email: email || undefined,
     phone: phone || undefined,
     isPrimary: isPrimary ?? false,
@@ -66,8 +73,8 @@ export async function backfillContacts(): Promise<void> {
           SELECT 1 FROM contacts c 
           WHERE c."restaurantId" = ar.id 
             AND (
-              (c.email IS NOT NULL AND ar.email IS NOT NULL AND c.email = ar.email)
-              OR (c.name = ar."contactName")
+              (ar.email IS NOT NULL AND c.email = ar.email)
+              OR (ar.email IS NULL AND c.name = ar."contactName" AND c.email IS NULL)
             )
         )
     `);
@@ -75,18 +82,17 @@ export async function backfillContacts(): Promise<void> {
     await db.execute(sql`
       INSERT INTO contacts ("restaurantId", "name", "email", "isPrimary", "createdAt", "updatedAt")
       SELECT u.restaurant_id, 
-             TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))),
+             COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))), ''), u.email, 'Sem nome'),
              u.email, false, NOW(), NOW()
       FROM users u
       WHERE u.restaurant_id IS NOT NULL 
         AND u.is_active = true
-        AND TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))) <> ''
         AND NOT EXISTS (
           SELECT 1 FROM contacts c 
           WHERE c."restaurantId" = u.restaurant_id 
             AND (
-              (c.email IS NOT NULL AND u.email IS NOT NULL AND c.email = u.email)
-              OR (c.name = TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))))
+              (u.email IS NOT NULL AND c.email = u.email)
+              OR (u.email IS NULL AND c.name = COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))), ''), 'Sem nome') AND c.email IS NULL)
             )
         )
     `);
@@ -94,18 +100,17 @@ export async function backfillContacts(): Promise<void> {
     await db.execute(sql`
       INSERT INTO contacts ("clientId", "name", "email", "isPrimary", "createdAt", "updatedAt")
       SELECT u.client_id,
-             TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))),
+             COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))), ''), u.email, 'Sem nome'),
              u.email, false, NOW(), NOW()
       FROM users u
       WHERE u.client_id IS NOT NULL
         AND u.is_active = true
-        AND TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))) <> ''
         AND NOT EXISTS (
           SELECT 1 FROM contacts c
           WHERE c."clientId" = u.client_id 
             AND (
-              (c.email IS NOT NULL AND u.email IS NOT NULL AND c.email = u.email)
-              OR (c.name = TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))))
+              (u.email IS NOT NULL AND c.email = u.email)
+              OR (u.email IS NULL AND c.name = COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))), ''), 'Sem nome') AND c.email IS NULL)
             )
         )
     `);

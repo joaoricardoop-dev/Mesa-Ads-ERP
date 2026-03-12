@@ -66,13 +66,13 @@ export async function clerkWebhookHandler(req: Request, res: Response) {
       });
 
       const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
-      if (fullName) {
+      if (fullName || email) {
         try {
           if (restaurantId) {
-            await ensureContact({ restaurantId: Number(restaurantId), name: fullName, email: email || undefined });
+            await ensureContact({ restaurantId: Number(restaurantId), name: fullName || undefined, email: email || undefined });
           }
           if (clientId) {
-            await ensureContact({ clientId: Number(clientId), name: fullName, email: email || undefined });
+            await ensureContact({ clientId: Number(clientId), name: fullName || undefined, email: email || undefined });
           }
         } catch (err) {
           console.error("Failed to sync contact from webhook:", err);
