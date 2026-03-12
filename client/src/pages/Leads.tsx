@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import PageContainer from "@/components/PageContainer";
 import Confetti from "@/components/Confetti";
 import { trpc } from "@/lib/trpc";
@@ -1033,13 +1033,12 @@ export default function Leads() {
                         )}
 
                         {lead.client_id && !lead.convertedToId && (
-                          <div className="mt-1.5">
-                            <Badge
-                              className="text-[9px] h-3.5 px-1 bg-cyan-500/15 text-cyan-500 border-cyan-500/30 cursor-pointer hover:bg-cyan-500/25"
-                              onClick={(e) => { e.stopPropagation(); navigate(`/clientes/${lead.client_id}`); }}
-                            >
-                              {lead.clientName || "Cliente existente"}
-                            </Badge>
+                          <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                            <Link href={`/clientes/${lead.client_id}`}>
+                              <Badge className="text-[9px] h-3.5 px-1 bg-cyan-500/15 text-cyan-500 border-cyan-500/30 cursor-pointer hover:bg-cyan-500/25">
+                                {lead.clientName || "Cliente existente"}
+                              </Badge>
+                            </Link>
                           </div>
                         )}
 
@@ -1392,9 +1391,10 @@ export default function Leads() {
                     <Separator />
                     <div className="space-y-2">
                       <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Anunciante Vinculado</span>
-                      <div
-                        className="flex items-center gap-2 p-2.5 rounded-lg bg-cyan-500/5 border border-cyan-500/20 cursor-pointer hover:bg-cyan-500/10 transition-colors"
-                        onClick={() => { setSelectedLeadId(null); navigate(`/clientes/${selectedLead.data.client_id}`); }}
+                      <Link
+                        href={`/clientes/${selectedLead.data.client_id}`}
+                        onClick={() => setSelectedLeadId(null)}
+                        className="flex items-center gap-2 p-2.5 rounded-lg bg-cyan-500/5 border border-cyan-500/20 cursor-pointer hover:bg-cyan-500/10 transition-colors no-underline"
                       >
                         <Building2 className="w-4 h-4 text-cyan-500 shrink-0" />
                         <div className="min-w-0">
@@ -1402,7 +1402,7 @@ export default function Leads() {
                           <p className="text-[10px] text-muted-foreground">Clique para ver cadastro</p>
                         </div>
                         <ChevronRight className="w-3.5 h-3.5 text-cyan-500/60 ml-auto shrink-0" />
-                      </div>
+                      </Link>
                     </div>
                   </>
                 )}
