@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
-import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, TrendingDown, BarChart3, PieChart, Settings2, ChevronDown, ChevronRight, RotateCcw, FileText, Download, Rocket, Store, Search, X, Divide, CheckCircle2, AlertTriangle, MapPin, Eye, EyeOff } from "lucide-react";
+import { DollarSign, Percent, Package, Calculator, CreditCard, Clock, TrendingUp, TrendingDown, BarChart3, PieChart, Settings2, ChevronDown, ChevronRight, RotateCcw, FileText, Download, Rocket, Store, Search, X, Divide, CheckCircle2, AlertTriangle, MapPin, Eye, EyeOff, CalendarDays, Handshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -70,6 +70,7 @@ export default function PriceTable() {
   const [formaPagamento, setFormaPagamento] = useState("boleto");
   const [showPremissas, setShowPremissas] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
+  const [descontoParceiro, setDescontoParceiro] = useState(false);
 
   const [premissas, setPremissas] = useState(DEFAULT_PREMISSAS);
   const [descontosPrazo, setDescontosPrazo] = useState(DEFAULT_DESCONTOS_PRAZO);
@@ -138,9 +139,12 @@ export default function PriceTable() {
     const nPeriodos = semanas / 4;
     const precoSemDesconto = precoTotalBase4sem * nPeriodos;
     const precoComDescDuracao = precoSemDesconto * (1 - descPrazo);
-    const precoFinal = precoComDescDuracao * (1 + ajustePag);
+    const precoAntesDescParceiro = precoComDescDuracao * (1 + ajustePag);
+    const descParcPerc = descontoParceiro ? 0.10 : 0;
+    const precoFinal = precoAntesDescParceiro * (1 - descParcPerc);
 
     const precoUnitComDesc = volume > 0 ? precoFinal / volume : 0;
+    const precoMensal = nPeriodos > 0 ? precoFinal / (semanas / 4.345) : 0;
     const descCombinado = precoUnit1000 > 0 ? 1 - (precoUnitComDesc / precoUnit1000) : 0;
 
     const custoTotalPeriodo = custoTotal4sem * nPeriodos;
@@ -169,20 +173,21 @@ export default function PriceTable() {
       const pSemDesc = precoTotalBase4sem * mult;
       const dsc = (descontosPrazo[s] || 0) / 100;
       const pComDesc = pSemDesc * (1 - dsc);
-      const pFinal = pComDesc * (1 + ajustePag);
+      const pFinal = pComDesc * (1 + ajustePag) * (1 - descParcPerc);
       return { semanas: s, desconto: dsc, precoSemDesconto: pSemDesc, precoComDesconto: pComDesc, economia: pSemDesc - pComDesc, precoFinal: pFinal };
     });
 
     return {
       totalDeducoesPerc, denominador, custoProducao, custoTotal4sem, custoTotalPeriodo,
       precoTotalBase4sem, precoUnit4sem, precoUnit1000, descontoQuantidade,
-      nPeriodos, precoSemDesconto, precoComDescDuracao, precoFinal, precoUnitComDesc, descCombinado,
+      nPeriodos, precoSemDesconto, precoComDescDuracao, precoFinal, precoUnitComDesc, precoMensal, descCombinado,
+      descParcPerc,
       valorIRPJ, valorComRest, valorComCom, totalDeducoesValor,
       receitaLiquida, lucroBruto, margemLiquida, margemSobreReceita: dados.margem,
       lucroPorUnidade, custoPorUnidade, decomposicaoUnit, tabela,
       irpj, comRest, comCom,
     };
-  }, [volume, dados, semanas, descPrazo, ajustePag, premissas, custosVolume, descontosPrazo]);
+  }, [volume, dados, semanas, descPrazo, ajustePag, premissas, custosVolume, descontosPrazo, descontoParceiro]);
 
   const updateVolumeDado = (vol: number, field: keyof typeof dados, val: number) => {
     setCustosVolume((prev) => ({ ...prev, [vol]: { ...prev[vol], [field]: val } }));
@@ -458,6 +463,18 @@ export default function PriceTable() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs flex items-center gap-1.5"><Handshake className="w-3 h-3" /> Desconto Parceiro</Label>
+                <Button
+                  variant={descontoParceiro ? "default" : "outline"}
+                  size="sm"
+                  className={`w-full gap-1.5 h-9 text-sm ${descontoParceiro ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}`}
+                  onClick={() => setDescontoParceiro(!descontoParceiro)}
+                >
+                  <Handshake className="w-3.5 h-3.5" />
+                  {descontoParceiro ? "Parceiro ativo (−10%)" : "Ativar desconto parceiro (−10%)"}
+                </Button>
+              </div>
             </div>
           </Section>
 
@@ -558,6 +575,7 @@ export default function PriceTable() {
               <EconRow label="Desc. por Prazo" value={descPrazo > 0 ? `${(descPrazo * 100).toFixed(0)}%` : "—"} accent={descPrazo > 0} />
               <EconRow label="Desc. por Quantidade" value={calc.descontoQuantidade > 0 ? `${(calc.descontoQuantidade * 100).toFixed(1)}%` : "—"} accent={calc.descontoQuantidade > 0} />
               <EconRow label="Desc. Forma Pagamento" value={ajustePag !== 0 ? `${Math.abs(ajustePag * 100).toFixed(0)}%` : "—"} accent={ajustePag < 0} />
+              <EconRow label="Desc. Parceiro" value={descontoParceiro ? "10%" : "—"} accent={descontoParceiro} />
               <EconRow label="Desc. Combinado (vs base 1k/4sem)" value={calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"} accent={calc.descCombinado > 0} />
               <div className="border-t border-border/20 pt-2" />
               <EconRow label={`Nº Períodos (×4 sem)`} value={`${calc.nPeriodos}`} />
@@ -568,10 +586,11 @@ export default function PriceTable() {
         </div>
 
         <div className="lg:col-span-2 space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <KpiCard label="Preço Total" value={formatCurrency(calc.precoFinal)} sub={`${semanas} sem • ${pagLabel}`} variant="primary" icon={DollarSign} />
-            <KpiCard label="Preço Unitário" value={formatCurrency(calc.precoUnitComDesc)} sub="por bolacha c/ descontos" icon={TrendingUp} />
-            <KpiCard label="Desconto Total" value={calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"} sub="vs base 1k / 4 sem" variant="discount" icon={TrendingDown} />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <KpiCard label="Preço Total" value={formatCurrency(calc.precoFinal)} sub={`${semanas} sem • ${pagLabel}${descontoParceiro ? " • parceiro" : ""}`} variant="primary" icon={DollarSign} />
+            <KpiCard label="Preço Unitário" value={formatCurrency(calc.precoUnitComDesc)} sub={`por bolacha · ${semanas} semanas`} icon={TrendingUp} />
+            <KpiCard label="Preço Mensal" value={formatCurrency(calc.precoMensal)} sub={`${semanas} sem ≈ ${(semanas / 4.345).toFixed(1)} meses`} icon={CalendarDays} />
+            <KpiCard label="Desconto Total" value={calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"} sub={`vs base 1k / 4 sem${descontoParceiro ? " + parceiro" : ""}`} variant="discount" icon={TrendingDown} />
           </div>
 
           {!presentationMode && <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
