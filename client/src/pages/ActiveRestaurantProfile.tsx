@@ -73,6 +73,9 @@ import {
   Star,
   Wine,
   Send,
+  Upload,
+  Image,
+  Loader2,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -585,6 +588,7 @@ export default function ActiveRestaurantProfile() {
 
             {/* ─── INFORMAÇÕES ─── */}
             <TabsContent value="info" className="space-y-4">
+              <LogoSection restaurant={restaurant} onUpdated={() => utils.activeRestaurant.get.invalidate({ id: restaurant.id })} />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Card title="Local & Endereço" icon={<MapPin className="w-4 h-4" />}>
                   <div className="space-y-2">
@@ -1681,6 +1685,109 @@ function KPICard({ label, value, icon, accent, warn }: { label: string; value: s
         <div className={`${accent ? "text-emerald-400" : warn ? "text-yellow-400" : "text-muted-foreground"}`}>{icon}</div>
       </div>
       <p className={`text-xl font-bold font-mono ${accent ? "text-emerald-400" : warn ? "text-yellow-400" : ""}`}>{value}</p>
+    </div>
+  );
+}
+
+function LogoSection({ restaurant, onUpdated }: { restaurant: any; onUpdated: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = async (file: File) => {
+    if (file.type !== "image/png") {
+      toast.error("Apenas arquivos PNG são aceitos.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("O arquivo deve ter no máximo 2MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      formData.append("restaurantId", String(restaurant.id));
+      const res = await fetch("/api/restaurant-logo/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Erro ao fazer upload.");
+        return;
+      }
+      toast.success("Logotipo atualizado!");
+      onUpdated();
+    } catch {
+      toast.error("Erro ao fazer upload do logotipo.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="bg-card border border-border/30 rounded-lg p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-3">
+        <Image className="w-4 h-4" /> Logotipo
+      </h3>
+      <div className="flex items-center gap-4">
+        {restaurant.logoUrl ? (
+          <>
+            <img
+              src={restaurant.logoUrl}
+              alt={`Logo de ${restaurant.name}`}
+              className="w-20 h-20 object-contain rounded-lg border border-border/30 bg-background p-1"
+            />
+            <div className="flex flex-col gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs gap-1.5"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                Alterar
+              </Button>
+            </div>
+          </>
+        ) : (
+          <label className="flex items-center justify-center gap-2 px-6 py-4 rounded-lg border border-dashed border-border/40 bg-background cursor-pointer hover:border-border/60 transition-colors w-full">
+            {uploading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            ) : (
+              <Upload className="w-4 h-4 text-muted-foreground" />
+            )}
+            <span className="text-xs text-muted-foreground">
+              {uploading ? "Enviando..." : "Clique para enviar o logotipo (PNG, máx. 2MB)"}
+            </span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleLogoUpload(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        )}
+        {restaurant.logoUrl && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleLogoUpload(f);
+              e.target.value = "";
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }

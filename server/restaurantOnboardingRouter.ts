@@ -478,7 +478,7 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
         });
       }
 
-      res.json({ success: true, message: "Restaurante cadastrado com sucesso!" });
+      res.json({ success: true, message: "Restaurante cadastrado com sucesso!", restaurantId: restaurant.id });
     } catch (err: any) {
       console.error("Submit onboarding error:", err);
       const clerkCode = err?.errors?.[0]?.code;

@@ -265,6 +265,7 @@ export const activeRestaurants = pgTable("active_restaurants", {
   coastersAllocated: integer("coastersAllocated").default(500).notNull(),
   commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("20.00").notNull(),
   status: statusEnum("status").default("active").notNull(),
+  logoUrl: varchar("logoUrl", { length: 500 }),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

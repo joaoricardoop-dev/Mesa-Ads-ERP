@@ -569,6 +569,7 @@ export const appRouter = router({
           primaryDrink: z.string().optional(),
           coastersAllocated: z.number().int().optional(),
           commissionPercent: z.string().optional(),
+          logoUrl: z.string().optional(),
           notes: z.string().optional(),
         }),
       )
@@ -622,6 +623,7 @@ export const appRouter = router({
           primaryDrink: z.string().optional(),
           coastersAllocated: z.number().int().optional(),
           commissionPercent: z.string().optional(),
+          logoUrl: z.string().nullable().optional(),
           status: z.enum(["active", "inactive"]).optional(),
           notes: z.string().optional(),
         }),

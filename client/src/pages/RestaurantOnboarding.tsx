@@ -28,6 +28,7 @@ import {
   Lock,
   Mail,
   CheckCircle2,
+  Camera,
 } from "lucide-react";
 
 const STATES = [
@@ -140,6 +141,8 @@ export default function RestaurantOnboarding() {
   const [termTemplates, setTermTemplates] = useState<TermTemplateItem[]>([]);
   const [termsLoaded, setTermsLoaded] = useState(false);
   const [acceptedTemplateIds, setAcceptedTemplateIds] = useState<Set<number | null>>(new Set());
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>({
     name: "",
     cnpj: "",
@@ -328,6 +331,19 @@ export default function RestaurantOnboarding() {
         return;
       }
 
+      if (logoFile && data.restaurantId) {
+        try {
+          const logoFormData = new window.FormData();
+          logoFormData.append("logo", logoFile);
+          logoFormData.append("restaurantId", String(data.restaurantId));
+          await fetch("/api/restaurant-logo/upload", {
+            method: "POST",
+            body: logoFormData,
+          });
+        } catch {
+        }
+      }
+
       setSuccess(true);
       toast.success("Cadastro realizado com sucesso!");
     } catch {
@@ -505,6 +521,47 @@ export default function RestaurantOnboarding() {
               <div>
                 <Label className={labelClass}>Instagram</Label>
                 <Input value={form.instagram} onChange={(e) => update("instagram", e.target.value)} placeholder="@restaurante" className={inputClass} />
+              </div>
+              <div>
+                <Label className={labelClass}>Logotipo do restaurante (PNG)</Label>
+                <div className="mt-1">
+                  {logoPreview ? (
+                    <div className="flex items-center gap-3">
+                      <img src={logoPreview} alt="Logo preview" className="w-16 h-16 object-contain rounded-lg border border-[hsl(0,0%,18%)] bg-[hsl(0,0%,11%)] p-1" />
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-[hsl(0,0%,55%)]">{logoFile?.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => { setLogoFile(null); setLogoPreview(null); }}
+                          className="text-xs text-red-400 hover:text-red-300 text-left"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-dashed border-[hsl(0,0%,22%)] bg-[hsl(0,0%,11%)] cursor-pointer hover:border-[hsl(0,0%,30%)] transition-colors">
+                      <Camera className="w-4 h-4 text-[hsl(0,0%,45%)]" />
+                      <span className="text-xs text-[hsl(0,0%,45%)]">Clique para selecionar o logotipo</span>
+                      <input
+                        type="file"
+                        accept="image/png"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            if (f.size > 2 * 1024 * 1024) {
+                              toast.error("O arquivo deve ter no máximo 2MB.");
+                              return;
+                            }
+                            setLogoFile(f);
+                            setLogoPreview(URL.createObjectURL(f));
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
             </div>
           )}

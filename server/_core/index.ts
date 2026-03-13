@@ -10,6 +10,7 @@ import { setupClerkAuth } from "../replit_integrations/auth";
 import { clerkWebhookHandler } from "../clerkWebhook";
 import { setupRestaurantOnboardingRoutes } from "../restaurantOnboardingRouter";
 import { setupPublicSigningRoutes } from "../publicSigningRouter";
+import { setupLogoUploadRoutes } from "../logoUploadRouter";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -43,6 +44,7 @@ async function startServer() {
 
   setupRestaurantOnboardingRoutes(app);
   setupPublicSigningRoutes(app);
+  setupLogoUploadRoutes(app);
 
   setupClerkAuth(app);
 
