@@ -72,7 +72,42 @@ export function createOnboardingUploadToken(restaurantId: number): string {
   return token;
 }
 
-export function setupLogoUploadRoutes(app: express.Express) {
+export function setupPublicLogoUploadRoutes(app: express.Express) {
+  app.post("/api/restaurant-logo/upload-public", async (req, res) => {
+    try {
+      await handleUpload(req, res);
+      if (res.headersSent) return;
+
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: "Nenhum arquivo enviado." });
+      }
+
+      const uploadToken = req.body.uploadToken;
+      if (!uploadToken) {
+        return res.status(403).json({ error: "Token de upload não fornecido." });
+      }
+
+      const tokenData = onboardingUploadTokens.get(uploadToken);
+      if (!tokenData || tokenData.expiresAt < Date.now()) {
+        onboardingUploadTokens.delete(uploadToken);
+        return res.status(403).json({ error: "Token de upload inválido ou expirado." });
+      }
+
+      const restaurantId = tokenData.restaurantId;
+      onboardingUploadTokens.delete(uploadToken);
+
+      await saveLogoToStorage(file, restaurantId, res);
+    } catch (err: any) {
+      console.error("Logo upload (public) error:", err);
+      if (!res.headersSent) {
+        return res.status(500).json({ error: "Erro ao fazer upload do logotipo." });
+      }
+    }
+  });
+}
+
+export function setupAuthenticatedLogoUploadRoutes(app: express.Express) {
   app.post("/api/restaurant-logo/upload", async (req, res) => {
     try {
       await handleUpload(req, res);
@@ -115,39 +150,6 @@ export function setupLogoUploadRoutes(app: express.Express) {
       await saveLogoToStorage(file, restaurantId, res);
     } catch (err: any) {
       console.error("Logo upload error:", err);
-      if (!res.headersSent) {
-        return res.status(500).json({ error: "Erro ao fazer upload do logotipo." });
-      }
-    }
-  });
-
-  app.post("/api/restaurant-logo/upload-public", async (req, res) => {
-    try {
-      await handleUpload(req, res);
-      if (res.headersSent) return;
-
-      const file = req.file;
-      if (!file) {
-        return res.status(400).json({ error: "Nenhum arquivo enviado." });
-      }
-
-      const uploadToken = req.body.uploadToken;
-      if (!uploadToken) {
-        return res.status(403).json({ error: "Token de upload não fornecido." });
-      }
-
-      const tokenData = onboardingUploadTokens.get(uploadToken);
-      if (!tokenData || tokenData.expiresAt < Date.now()) {
-        onboardingUploadTokens.delete(uploadToken);
-        return res.status(403).json({ error: "Token de upload inválido ou expirado." });
-      }
-
-      const restaurantId = tokenData.restaurantId;
-      onboardingUploadTokens.delete(uploadToken);
-
-      await saveLogoToStorage(file, restaurantId, res);
-    } catch (err: any) {
-      console.error("Logo upload (public) error:", err);
       if (!res.headersSent) {
         return res.status(500).json({ error: "Erro ao fazer upload do logotipo." });
       }
