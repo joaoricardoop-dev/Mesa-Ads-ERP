@@ -2289,22 +2289,6 @@ export default function Leads() {
                 </div>
 
                 <DialogFooter className="flex-col gap-2 sm:flex-row">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-muted-foreground"
-                    onClick={() => {
-                      setQuotationOpen(false);
-                      const clientId = selectedLead.data?.client_id || selectedLead.data?.convertedToId;
-                      const leadId = selectedLead.data?.id;
-                      const params = new URLSearchParams();
-                      if (clientId) params.set("clientId", String(clientId));
-                      if (leadId) params.set("leadId", String(leadId));
-                      navigate(`/comercial/simulador${params.toString() ? `?${params}` : ""}`);
-                    }}
-                  >
-                    Simulador completo →
-                  </Button>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => setQuotationOpen(false)}>Cancelar</Button>
                     <Button
