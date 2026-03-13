@@ -15,33 +15,45 @@ export async function createContext(
   let user: User | null = null;
 
   try {
-    const auth = getAuth(opts.req);
-    if (auth?.userId) {
-      const dbUser = await authStorage.getUser(auth.userId);
-      if (dbUser) {
-        user = dbUser;
-      } else {
-        const clerkModule = await import("@clerk/express");
-        const clerkClient = clerkModule.createClerkClient({
-          secretKey: process.env.CLERK_SECRET_KEY!,
-        });
-        const clerkUser = await clerkClient.users.getUser(auth.userId);
-        const meta = (clerkUser.publicMetadata as any) || {};
-        const role = meta.role || "anunciante";
-        const clientId = meta.clientId || null;
-        const restaurantId = meta.restaurantId || null;
+    if (process.env.NODE_ENV === "development") {
+      const devUserId = (opts.req as any).cookies?.dev_user_id;
+      if (devUserId) {
+        const devUser = await authStorage.getUser(devUserId);
+        if (devUser) {
+          user = devUser;
+        }
+      }
+    }
 
-        const newUser = await authStorage.upsertUser({
-          id: clerkUser.id,
-          email: clerkUser.emailAddresses?.[0]?.emailAddress || null,
-          firstName: clerkUser.firstName || null,
-          lastName: clerkUser.lastName || null,
-          profileImageUrl: clerkUser.imageUrl || null,
-          role,
-          clientId: clientId ? Number(clientId) : null,
-          restaurantId: restaurantId ? Number(restaurantId) : null,
-        });
-        user = newUser;
+    if (!user) {
+      const auth = getAuth(opts.req);
+      if (auth?.userId) {
+        const dbUser = await authStorage.getUser(auth.userId);
+        if (dbUser) {
+          user = dbUser;
+        } else {
+          const clerkModule = await import("@clerk/express");
+          const clerkClient = clerkModule.createClerkClient({
+            secretKey: process.env.CLERK_SECRET_KEY!,
+          });
+          const clerkUser = await clerkClient.users.getUser(auth.userId);
+          const meta = (clerkUser.publicMetadata as any) || {};
+          const role = meta.role || "anunciante";
+          const clientId = meta.clientId || null;
+          const restaurantId = meta.restaurantId || null;
+
+          const newUser = await authStorage.upsertUser({
+            id: clerkUser.id,
+            email: clerkUser.emailAddresses?.[0]?.emailAddress || null,
+            firstName: clerkUser.firstName || null,
+            lastName: clerkUser.lastName || null,
+            profileImageUrl: clerkUser.imageUrl || null,
+            role,
+            clientId: clientId ? Number(clientId) : null,
+            restaurantId: restaurantId ? Number(restaurantId) : null,
+          });
+          user = newUser;
+        }
       }
     }
   } catch (error) {

@@ -125,6 +125,112 @@ const clerkAppearance = {
   },
 };
 
+function DevLoginButton() {
+  const { devLogin } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+
+  const handleQuickLogin = async () => {
+    setLoading(true);
+    try {
+      await devLogin();
+    } catch {
+      console.error("Dev login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleShowPicker = async () => {
+    setShowPicker(true);
+    try {
+      const res = await fetch("/api/dev-users", { credentials: "include" });
+      const data = await res.json();
+      setUsers(data);
+    } catch {
+      console.error("Failed to load dev users");
+    }
+  };
+
+  const handlePickUser = async (userId: string) => {
+    setLoading(true);
+    try {
+      await devLogin(userId);
+    } catch {
+      console.error("Dev login failed");
+    } finally {
+      setLoading(false);
+      setShowPicker(false);
+    }
+  };
+
+  const roleColors: Record<string, string> = {
+    admin: "text-red-400",
+    comercial: "text-blue-400",
+    operacoes: "text-amber-400",
+    financeiro: "text-emerald-400",
+    anunciante: "text-purple-400",
+    restaurante: "text-cyan-400",
+  };
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
+      {showPicker && (
+        <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,18%)] rounded-lg shadow-2xl p-3 w-72 max-h-80 overflow-y-auto">
+          <p className="text-[10px] uppercase tracking-wider text-[hsl(0,0%,40%)] font-semibold mb-2">Selecionar usuário</p>
+          {users.length === 0 ? (
+            <p className="text-xs text-[hsl(0,0%,40%)]">Carregando...</p>
+          ) : (
+            <div className="space-y-1">
+              {users.map((u: any) => (
+                <button
+                  key={u.id}
+                  onClick={() => handlePickUser(u.id)}
+                  disabled={loading}
+                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[hsl(0,0%,14%)] transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-[hsl(0,0%,85%)] truncate">
+                      {u.firstName} {u.lastName}
+                    </p>
+                    <p className="text-[10px] text-[hsl(0,0%,45%)] truncate">{u.email}</p>
+                  </div>
+                  <span className={`text-[10px] font-mono shrink-0 ${roleColors[u.role] || "text-[hsl(0,0%,50%)]"}`}>
+                    {u.role}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setShowPicker(false)}
+            className="mt-2 w-full text-[10px] text-[hsl(0,0%,40%)] hover:text-[hsl(0,0%,60%)] transition-colors"
+          >
+            Fechar
+          </button>
+        </div>
+      )}
+      <div className="flex gap-1.5">
+        <button
+          onClick={handleShowPicker}
+          disabled={loading}
+          className="px-3 py-2 bg-[hsl(0,0%,10%)] hover:bg-[hsl(0,0%,15%)] border border-[hsl(0,0%,20%)] text-[hsl(0,0%,60%)] rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+        >
+          Escolher
+        </button>
+        <button
+          onClick={handleQuickLogin}
+          disabled={loading}
+          className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-black rounded-lg text-xs font-bold transition-colors disabled:opacity-50 shadow-lg"
+        >
+          {loading ? "Entrando..." : "Dev Login (Admin)"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ClerkLoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
 
@@ -165,6 +271,7 @@ function ClerkLoginPage() {
           mesa.ads &copy; {new Date().getFullYear()} &mdash; Plataforma de gestão
         </p>
       </div>
+      {import.meta.env.DEV && <DevLoginButton />}
     </div>
   );
 }

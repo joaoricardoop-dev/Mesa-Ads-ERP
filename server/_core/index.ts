@@ -46,26 +46,92 @@ async function startServer() {
   setupPublicSigningRoutes(app);
   setupPublicLogoUploadRoutes(app);
 
+  if (process.env.NODE_ENV === "development") {
+    const cookieParser = await import("cookie-parser");
+    app.use(cookieParser.default());
+
+    app.post("/api/dev-login", async (req, res) => {
+      try {
+        const { authStorage } = await import("../replit_integrations/auth");
+        const allUsers = await authStorage.listUsers();
+        const targetId = req.body?.userId;
+        let user = targetId
+          ? allUsers.find((u) => u.id === targetId)
+          : allUsers.find((u) => u.role === "admin") || allUsers[0];
+        if (!user) {
+          return res.status(404).json({ message: "Nenhum usuário encontrado no banco." });
+        }
+        res.cookie("dev_user_id", user.id, {
+          httpOnly: true,
+          maxAge: 1000 * 60 * 60 * 24 * 7,
+          sameSite: "lax",
+          path: "/",
+        });
+        const { passwordHash: _, ...safeUser } = user;
+        res.json(safeUser);
+      } catch (error) {
+        console.error("Dev login error:", error);
+        res.status(500).json({ message: "Erro no dev login." });
+      }
+    });
+
+    app.post("/api/dev-logout", (_req, res) => {
+      res.clearCookie("dev_user_id", { path: "/" });
+      res.json({ ok: true });
+    });
+
+    app.get("/api/dev-users", async (_req, res) => {
+      try {
+        const { authStorage } = await import("../replit_integrations/auth");
+        const allUsers = await authStorage.listUsers();
+        const safeUsers = allUsers.map(({ passwordHash: _, ...u }) => u);
+        res.json(safeUsers);
+      } catch (error) {
+        console.error("Dev users error:", error);
+        res.status(500).json({ message: "Erro ao listar usuários." });
+      }
+    });
+  }
+
   setupClerkAuth(app);
 
   setupAuthenticatedLogoUploadRoutes(app);
 
   app.get("/api/auth/user", async (req, res) => {
     try {
-      const { getAuth } = await import("@clerk/express");
-      const auth = getAuth(req);
-      if (!auth?.userId) {
+      let userId: string | null = null;
+
+      if (process.env.NODE_ENV === "development") {
+        const devUserId = (req as any).cookies?.dev_user_id;
+        if (devUserId) {
+          userId = devUserId;
+        }
+      }
+
+      if (!userId) {
+        const { getAuth } = await import("@clerk/express");
+        const auth = getAuth(req);
+        if (auth?.userId) {
+          userId = auth.userId;
+        }
+      }
+
+      if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
+
       const { authStorage } = await import("../replit_integrations/auth");
-      let user = await authStorage.getUser(auth.userId);
+      let user = await authStorage.getUser(userId);
       if (!user) {
+        if (process.env.NODE_ENV === "development" && (req as any).cookies?.dev_user_id) {
+          return res.status(401).json({ message: "Dev user not found in DB" });
+        }
         try {
           const clerkModule = await import("@clerk/express");
           const clerkClient = clerkModule.createClerkClient({
             secretKey: process.env.CLERK_SECRET_KEY!,
           });
-          const clerkUser = await clerkClient.users.getUser(auth.userId);
+          const clerkUser = await clerkClient.users.getUser(userId);
           const meta = (clerkUser.publicMetadata || {}) as any;
           const role = meta.role || "anunciante";
           const isSelfRegistered = !meta.role;
