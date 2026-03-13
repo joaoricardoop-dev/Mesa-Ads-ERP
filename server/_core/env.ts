@@ -1,3 +1,4 @@
+console.log("[env] FORGE_API_URL set:", !!process.env.BUILT_IN_FORGE_API_URL, "FORGE_API_KEY set:", !!process.env.BUILT_IN_FORGE_API_KEY);
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
