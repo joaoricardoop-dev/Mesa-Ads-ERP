@@ -44,7 +44,7 @@ export default function RestaurantAvatar({ name, logoUrl, size = "sm", className
   return (
     <Avatar className={cn(sizeClass, "shrink-0", className)}>
       {logoUrl && (
-        <AvatarImage src={logoUrl} alt={`Logo de ${name}`} className="object-contain p-0.5" />
+        <AvatarImage src={logoUrl} alt={`Foto de perfil de ${name}`} className="object-contain p-0.5" />
       )}
       <AvatarFallback className={cn(colorClass, "text-white font-semibold")}>
         {getInitials(name)}

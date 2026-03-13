@@ -10,10 +10,10 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "image/png") {
+    if (file.mimetype === "image/png" || file.mimetype === "image/jpeg") {
       cb(null, true);
     } else {
-      cb(new Error("Apenas arquivos PNG são aceitos."));
+      cb(new Error("Apenas arquivos PNG ou JPG são aceitos."));
     }
   },
 });
@@ -50,8 +50,9 @@ async function saveLogoToStorage(file: Express.Multer.File, restaurantId: number
     return res.status(404).json({ error: "Restaurante não encontrado." });
   }
 
-  const key = `logos/restaurant-${restaurantId}-${Date.now()}.png`;
-  const { url } = await storagePut(key, file.buffer, "image/png");
+  const ext = file.mimetype === "image/jpeg" ? "jpg" : "png";
+  const key = `logos/restaurant-${restaurantId}-${Date.now()}.${ext}`;
+  const { url } = await storagePut(key, file.buffer, file.mimetype);
 
   await db
     .update(activeRestaurants)
@@ -101,7 +102,7 @@ export function setupPublicLogoUploadRoutes(app: express.Express) {
     } catch (err: any) {
       console.error("Logo upload (public) error:", err);
       if (!res.headersSent) {
-        return res.status(500).json({ error: "Erro ao fazer upload do logotipo." });
+        return res.status(500).json({ error: "Erro ao fazer upload da foto de perfil." });
       }
     }
   });
@@ -144,14 +145,14 @@ export function setupAuthenticatedLogoUploadRoutes(app: express.Express) {
       const isOwnRestaurant = user.role === "restaurante" && user.restaurantId === restaurantId;
 
       if (!isInternal && !isOwnRestaurant) {
-        return res.status(403).json({ error: "Sem permissão para alterar o logotipo deste restaurante." });
+        return res.status(403).json({ error: "Sem permissão para alterar a foto de perfil deste restaurante." });
       }
 
       await saveLogoToStorage(file, restaurantId, res);
     } catch (err: any) {
       console.error("Logo upload error:", err);
       if (!res.headersSent) {
-        return res.status(500).json({ error: "Erro ao fazer upload do logotipo." });
+        return res.status(500).json({ error: "Erro ao fazer upload da foto de perfil." });
       }
     }
   });

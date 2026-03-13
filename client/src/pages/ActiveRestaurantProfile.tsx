@@ -1698,8 +1698,8 @@ function LogoSection({ restaurant, onUpdated }: { restaurant: any; onUpdated: ()
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (file: File) => {
-    if (file.type !== "image/png") {
-      toast.error("Apenas arquivos PNG são aceitos.");
+    if (file.type !== "image/png" && file.type !== "image/jpeg") {
+      toast.error("Apenas arquivos PNG ou JPG são aceitos.");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
@@ -1731,11 +1731,11 @@ function LogoSection({ restaurant, onUpdated }: { restaurant: any; onUpdated: ()
         toast.error(data.error || "Erro ao fazer upload.");
         return;
       }
-      toast.success("Logotipo atualizado!");
+      toast.success("Foto de perfil atualizada!");
       cancelPending();
       onUpdated();
     } catch {
-      toast.error("Erro ao fazer upload do logotipo.");
+      toast.error("Erro ao fazer upload da foto de perfil.");
     } finally {
       setUploading(false);
     }
@@ -1744,13 +1744,13 @@ function LogoSection({ restaurant, onUpdated }: { restaurant: any; onUpdated: ()
   return (
     <div className="bg-card border border-border/30 rounded-lg p-4">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-3">
-        <Image className="w-4 h-4" /> Logotipo
+        <Image className="w-4 h-4" /> Foto de Perfil
       </h3>
       {pendingPreview ? (
         <div className="flex items-center gap-4">
           <img
             src={pendingPreview}
-            alt="Preview do novo logotipo"
+            alt="Preview da nova foto de perfil"
             className="w-20 h-20 object-contain rounded-lg border border-primary/40 bg-background p-1"
           />
           <div className="flex flex-col gap-2">
@@ -1783,7 +1783,7 @@ function LogoSection({ restaurant, onUpdated }: { restaurant: any; onUpdated: ()
             <>
               <img
                 src={restaurant.logoUrl}
-                alt={`Logo de ${restaurant.name}`}
+                alt={`Foto de perfil de ${restaurant.name}`}
                 className="w-20 h-20 object-contain rounded-lg border border-border/30 bg-background p-1"
               />
               <div className="flex flex-col gap-2">
@@ -1802,12 +1802,12 @@ function LogoSection({ restaurant, onUpdated }: { restaurant: any; onUpdated: ()
             <label className="flex items-center justify-center gap-2 px-6 py-4 rounded-lg border border-dashed border-border/40 bg-background cursor-pointer hover:border-border/60 transition-colors w-full">
               <Upload className="w-4 h-4 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">
-                Clique para enviar o logotipo (PNG, máx. 2MB)
+                Clique para enviar a foto de perfil (PNG ou JPG, máx. 2MB)
               </span>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png"
+                accept="image/png,image/jpeg"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];

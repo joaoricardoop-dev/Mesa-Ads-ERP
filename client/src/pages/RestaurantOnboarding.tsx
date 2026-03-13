@@ -341,10 +341,10 @@ export default function RestaurantOnboarding() {
             body: logoFormData,
           });
           if (!logoRes.ok) {
-            toast.error("O logotipo não pôde ser enviado, mas seu cadastro foi concluído.");
+            toast.error("A foto de perfil não pôde ser enviada, mas seu cadastro foi concluído.");
           }
         } catch {
-          toast.error("O logotipo não pôde ser enviado, mas seu cadastro foi concluído.");
+          toast.error("A foto de perfil não pôde ser enviada, mas seu cadastro foi concluído.");
         }
       }
 
@@ -527,7 +527,7 @@ export default function RestaurantOnboarding() {
                 <Input value={form.instagram} onChange={(e) => update("instagram", e.target.value)} placeholder="@restaurante" className={inputClass} />
               </div>
               <div>
-                <Label className={labelClass}>Logotipo do restaurante (PNG)</Label>
+                <Label className={labelClass}>Foto de perfil do restaurante (PNG ou JPG)</Label>
                 <div className="mt-1">
                   {logoPreview ? (
                     <div className="flex items-center gap-3">
@@ -546,10 +546,10 @@ export default function RestaurantOnboarding() {
                   ) : (
                     <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-dashed border-[hsl(0,0%,22%)] bg-[hsl(0,0%,11%)] cursor-pointer hover:border-[hsl(0,0%,30%)] transition-colors">
                       <Camera className="w-4 h-4 text-[hsl(0,0%,45%)]" />
-                      <span className="text-xs text-[hsl(0,0%,45%)]">Clique para selecionar o logotipo</span>
+                      <span className="text-xs text-[hsl(0,0%,45%)]">Clique para selecionar a foto de perfil</span>
                       <input
                         type="file"
-                        accept="image/png"
+                        accept="image/png,image/jpeg"
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
