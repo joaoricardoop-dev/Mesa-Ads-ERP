@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import AvatarCropDialog from "@/components/AvatarCropDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -143,6 +144,8 @@ export default function RestaurantOnboarding() {
   const [acceptedTemplateIds, setAcceptedTemplateIds] = useState<Set<number | null>>(new Set());
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [cropRawSrc, setCropRawSrc] = useState<string | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const [form, setForm] = useState<FormData>({
     name: "",
     cnpj: "",
@@ -531,12 +534,12 @@ export default function RestaurantOnboarding() {
                 <div className="mt-1">
                   {logoPreview ? (
                     <div className="flex items-center gap-3">
-                      <img src={logoPreview} alt="Logo preview" className="w-16 h-16 object-contain rounded-lg border border-[hsl(0,0%,18%)] bg-[hsl(0,0%,11%)] p-1" />
+                      <img src={logoPreview} alt="Preview da foto" className="w-16 h-16 object-cover rounded-full border border-[hsl(0,0%,18%)] bg-[hsl(0,0%,11%)]" />
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-[hsl(0,0%,55%)]">{logoFile?.name}</span>
                         <button
                           type="button"
-                          onClick={() => { setLogoFile(null); setLogoPreview(null); }}
+                          onClick={() => { if (logoPreview) URL.revokeObjectURL(logoPreview); setLogoFile(null); setLogoPreview(null); }}
                           className="text-xs text-red-400 hover:text-red-300 text-left"
                         >
                           Remover
@@ -558,14 +561,34 @@ export default function RestaurantOnboarding() {
                               toast.error("O arquivo deve ter no máximo 2MB.");
                               return;
                             }
-                            setLogoFile(f);
-                            setLogoPreview(URL.createObjectURL(f));
+                            setCropRawSrc(URL.createObjectURL(f));
+                            setCropOpen(true);
                           }
+                          e.target.value = "";
                         }}
                       />
                     </label>
                   )}
                 </div>
+                {cropRawSrc && (
+                  <AvatarCropDialog
+                    open={cropOpen}
+                    imageSrc={cropRawSrc}
+                    onConfirm={(croppedFile) => {
+                      setCropOpen(false);
+                      if (cropRawSrc) URL.revokeObjectURL(cropRawSrc);
+                      setCropRawSrc(null);
+                      if (logoPreview) URL.revokeObjectURL(logoPreview);
+                      setLogoFile(croppedFile);
+                      setLogoPreview(URL.createObjectURL(croppedFile));
+                    }}
+                    onCancel={() => {
+                      setCropOpen(false);
+                      if (cropRawSrc) URL.revokeObjectURL(cropRawSrc);
+                      setCropRawSrc(null);
+                    }}
+                  />
+                )}
               </div>
             </div>
           )}
