@@ -53,7 +53,6 @@ import {
   Zap,
   RotateCcw,
   TrendingUp,
-  Calculator,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -275,17 +274,10 @@ export default function Leads() {
   const [convertForm, setConvertForm] = useState<ConvertRestaurantForm>(emptyConvertRestaurantForm);
   const [convertAnuncianteOpen, setConvertAnuncianteOpen] = useState(false);
 
-  const [quotationOpen, setQuotationOpen] = useState(false);
-  const [quotationVolume, setQuotationVolume] = useState("");
-  const [quotationNotes, setQuotationNotes] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [collapsedStages, setCollapsedStages] = useState<string[]>(["ganho", "perdido"]);
   const [contactFormOpen, setContactFormOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "" });
-  const [simNumRestaurants, setSimNumRestaurants] = useState("10");
-  const [simCoastersPerRest, setSimCoastersPerRest] = useState("500");
-  const [simUnitCost, setSimUnitCost] = useState("0.12");
-  const [simMarkup, setSimMarkup] = useState("80");
 
   const utils = trpc.useUtils();
 
@@ -440,22 +432,6 @@ export default function Leads() {
     onError: (err: any) => toast.error(`Erro: ${err.message}`),
   });
 
-  const createQuotationMutation = trpc.quotation.create.useMutation({
-    onSuccess: (data) => {
-      setQuotationOpen(false);
-      setQuotationVolume("");
-      setQuotationNotes("");
-      toast.success(`Cotação ${data.quotationNumber} criada!`, {
-        action: {
-          label: "Ver cotação",
-          onClick: () => navigate(`/comercial/cotacoes/${data.id}`),
-        },
-      });
-      utils.quotation.list.invalidate();
-      utils.lead.get.invalidate();
-    },
-    onError: (err: any) => toast.error(`Erro ao criar cotação: ${err.message}`),
-  });
 
   useEffect(() => {
     if (selectedLead.data && isEditing) {
@@ -1314,9 +1290,12 @@ export default function Leads() {
                         size="sm"
                         className="gap-1 text-primary border-primary/30 hover:bg-primary/10"
                         onClick={() => {
-                          setQuotationVolume("");
-                          setQuotationNotes("");
-                          setQuotationOpen(true);
+                          const lead = selectedLead.data!;
+                          const clientId = lead.client_id || (lead.convertedToId ? lead.convertedToId : undefined);
+                          const params = new URLSearchParams();
+                          params.set("leadId", String(lead.id));
+                          if (clientId) params.set("clientId", String(clientId));
+                          navigate(`/comercial/tabela-precos?${params.toString()}`);
                         }}
                       >
                         <FileText className="w-3 h-3" />
@@ -2191,131 +2170,6 @@ export default function Leads() {
               {createClientMutation.isPending ? "Cadastrando..." : "Cadastrar Anunciante"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      {/* Create Quotation from Lead Dialog — Mini-Simulator */}
-      <Dialog open={quotationOpen} onOpenChange={setQuotationOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-primary" />
-              Nova Cotação
-            </DialogTitle>
-          </DialogHeader>
-
-          {selectedLead.data && (
-            <div className="space-y-1 text-sm bg-muted/30 rounded-lg p-3">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Lead:</span>
-                <span className="font-medium">{selectedLead.data.name}</span>
-              </div>
-              {selectedLead.data.company && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Empresa:</span>
-                  <span>{selectedLead.data.company}</span>
-                </div>
-              )}
-              {isConverted && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Vínculo:</span>
-                  <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30 text-[10px]">Anunciante cadastrado</Badge>
-                </div>
-              )}
-            </div>
-          )}
-
-          {(() => {
-            const nRest = parseInt(simNumRestaurants) || 0;
-            const cPerR = parseInt(simCoastersPerRest) || 0;
-            const totalVol = nRest * cPerR;
-            const unitCost = parseFloat(simUnitCost) || 0;
-            const markup = parseFloat(simMarkup) || 0;
-            const unitPrice = unitCost * (1 + markup / 100);
-            const totalValue = totalVol * unitPrice;
-            const grossMargin = unitPrice > 0 ? ((unitPrice - unitCost) / unitPrice) * 100 : 0;
-
-            return (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-[10px] text-muted-foreground">Nº Restaurantes</Label>
-                    <Input type="number" min={1} value={simNumRestaurants} onChange={(e) => setSimNumRestaurants(e.target.value)} className="h-8 text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[10px] text-muted-foreground">Bolachas/Restaurante</Label>
-                    <Input type="number" min={1} value={simCoastersPerRest} onChange={(e) => setSimCoastersPerRest(e.target.value)} className="h-8 text-sm" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-[10px] text-muted-foreground">Custo Unitário (R$)</Label>
-                    <Input type="number" step="0.01" min={0} value={simUnitCost} onChange={(e) => setSimUnitCost(e.target.value)} className="h-8 text-sm font-mono" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[10px] text-muted-foreground">Markup (%)</Label>
-                    <Input type="number" min={0} value={simMarkup} onChange={(e) => setSimMarkup(e.target.value)} className="h-8 text-sm font-mono" />
-                  </div>
-                </div>
-
-                <div className="bg-muted/40 border border-border/30 rounded-lg p-3 grid grid-cols-2 gap-y-2 gap-x-4">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground">Volume Total</p>
-                    <p className="text-sm font-semibold font-mono">{totalVol.toLocaleString("pt-BR")}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground">Preço Unitário</p>
-                    <p className="text-sm font-semibold font-mono text-primary">R$ {unitPrice.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground">Valor Total</p>
-                    <p className="text-sm font-semibold font-mono">R$ {totalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground">Margem Bruta</p>
-                    <p className={`text-sm font-semibold font-mono ${grossMargin >= 30 ? "text-emerald-500" : grossMargin >= 15 ? "text-amber-500" : "text-red-500"}`}>{grossMargin.toFixed(1)}%</p>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] text-muted-foreground">Observações</Label>
-                  <Textarea
-                    value={quotationNotes}
-                    onChange={(e) => setQuotationNotes(e.target.value)}
-                    placeholder="Detalhes adicionais..."
-                    rows={2}
-                    className="text-sm"
-                  />
-                </div>
-
-                <DialogFooter className="flex-col gap-2 sm:flex-row">
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setQuotationOpen(false)}>Cancelar</Button>
-                    <Button
-                      onClick={() => {
-                        if (totalVol < 1) { toast.error("Volume deve ser maior que zero"); return; }
-                        const lead = selectedLead.data!;
-                        const qClientId = lead.client_id || (isConverted && lead.convertedToId ? lead.convertedToId : undefined);
-                        createQuotationMutation.mutate({
-                          ...(qClientId ? { clientId: qClientId } : {}),
-                          leadId: lead.id,
-                          coasterVolume: totalVol,
-                          unitPrice: unitPrice.toFixed(2),
-                          totalValue: totalValue.toFixed(2),
-                          notes: quotationNotes
-                            ? `${nRest} restaurantes, ${cPerR} bol/rest, custo R$${unitCost.toFixed(2)}, markup ${markup}% | ${quotationNotes}`
-                            : `${nRest} restaurantes, ${cPerR} bol/rest, custo R$${unitCost.toFixed(2)}, markup ${markup}%`,
-                        });
-                      }}
-                      disabled={createQuotationMutation.isPending}
-                    >
-                      {createQuotationMutation.isPending ? "Criando..." : "Criar Cotação"}
-                    </Button>
-                  </div>
-                </DialogFooter>
-              </div>
-            );
-          })()}
         </DialogContent>
       </Dialog>
       <Confetti active={showConfetti} />

@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -201,6 +201,7 @@ export default function PriceTable() {
   };
 
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const [showCotacaoDialog, setShowCotacaoDialog] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("none");
   const [selectedLeadId, setSelectedLeadId] = useState("none");
@@ -210,6 +211,23 @@ export default function PriceTable() {
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
   const { data: leadsList = [] } = trpc.lead.list.useQuery({ type: "anunciante" });
   const utils = trpc.useUtils();
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const leadIdParam = params.get("leadId");
+    const clientIdParam = params.get("clientId");
+    if (leadIdParam || clientIdParam) {
+      if (clientIdParam) {
+        setSelectedClientId(clientIdParam);
+        setSelectedLeadId("none");
+      }
+      if (leadIdParam) {
+        setSelectedLeadId(leadIdParam);
+        if (!clientIdParam) setSelectedClientId("none");
+      }
+      setShowCotacaoDialog(true);
+    }
+  }, [searchString]);
 
   const setRestaurantsMutation = trpc.quotation.setRestaurants.useMutation();
 
