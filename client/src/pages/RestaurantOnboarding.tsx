@@ -336,11 +336,15 @@ export default function RestaurantOnboarding() {
           const logoFormData = new window.FormData();
           logoFormData.append("logo", logoFile);
           logoFormData.append("uploadToken", data.logoUploadToken);
-          await fetch("/api/restaurant-logo/upload-public", {
+          const logoRes = await fetch("/api/restaurant-logo/upload-public", {
             method: "POST",
             body: logoFormData,
           });
+          if (!logoRes.ok) {
+            toast.error("O logotipo não pôde ser enviado, mas seu cadastro foi concluído.");
+          }
         } catch {
+          toast.error("O logotipo não pôde ser enviado, mas seu cadastro foi concluído.");
         }
       }
 
