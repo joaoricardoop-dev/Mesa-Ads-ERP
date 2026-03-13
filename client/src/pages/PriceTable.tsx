@@ -143,7 +143,7 @@ export default function PriceTable() {
     const descParcPerc = descontoParceiro ? 0.10 : 0;
     const precoFinal = precoAntesDescParceiro * (1 - descParcPerc);
 
-    const precoUnitComDesc = volume > 0 ? precoFinal / volume : 0;
+    const precoUnitComDesc = volume > 0 ? precoFinal / (volume * nPeriodos) : 0;
     const precoMensal = nPeriodos > 0 ? precoFinal / (semanas / 4.345) : 0;
     const descCombinado = precoUnit1000 > 0 ? 1 - (precoUnitComDesc / precoUnit1000) : 0;
 
@@ -267,7 +267,7 @@ export default function PriceTable() {
       return;
     }
     const unitPriceStr = calc.precoUnitComDesc.toFixed(4);
-    const totalValueStr = (calc.precoUnitComDesc * cotacaoVolume).toFixed(2);
+    const totalValueStr = (calc.precoUnitComDesc * cotacaoVolume * calc.nPeriodos).toFixed(2);
     const notesAuto = `Tabela de Preços VEXA: ${cotacaoVolume.toLocaleString("pt-BR")} un., ${semanas} semanas, ${pagLabel}, desc. prazo ${(descPrazo * 100).toFixed(0)}%`;
 
     createMutation.mutate({
@@ -835,7 +835,7 @@ export default function PriceTable() {
                 </div>
                 <div>
                   <span className="text-muted-foreground">Valor Total</span>
-                  <p className="font-mono font-semibold text-primary">{formatCurrency(calc.precoUnitComDesc * cotacaoVolume)}</p>
+                  <p className="font-mono font-semibold text-primary">{formatCurrency(calc.precoUnitComDesc * cotacaoVolume * calc.nPeriodos)}</p>
                 </div>
               </div>
             </div>
