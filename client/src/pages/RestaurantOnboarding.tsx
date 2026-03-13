@@ -132,6 +132,14 @@ interface FormData {
   accountEmail: string;
   accountPassword: string;
   accountPasswordConfirm: string;
+  porte: string;
+  naturezaJuridica: string;
+  atividadePrincipal: string;
+  atividadesSecundarias: string;
+  capitalSocial: string;
+  dataAbertura: string;
+  situacaoCadastral: string;
+  socios: string;
 }
 
 export default function RestaurantOnboarding() {
@@ -181,6 +189,14 @@ export default function RestaurantOnboarding() {
     accountEmail: "",
     accountPassword: "",
     accountPasswordConfirm: "",
+    porte: "",
+    naturezaJuridica: "",
+    atividadePrincipal: "",
+    atividadesSecundarias: "",
+    capitalSocial: "",
+    dataAbertura: "",
+    situacaoCadastral: "",
+    socios: "",
   });
 
   const update = (field: keyof FormData, value: any) =>
@@ -229,6 +245,14 @@ export default function RestaurantOnboarding() {
           state: result.uf || f.state,
           cep: result.cep || f.cep,
           email: result.email || f.email,
+          porte: result.porte || f.porte,
+          naturezaJuridica: result.naturezaJuridica || f.naturezaJuridica,
+          atividadePrincipal: result.atividadePrincipal || f.atividadePrincipal,
+          atividadesSecundarias: result.atividadesSecundarias ? JSON.stringify(result.atividadesSecundarias) : f.atividadesSecundarias,
+          capitalSocial: result.capitalSocial || f.capitalSocial,
+          dataAbertura: result.dataAbertura || f.dataAbertura,
+          situacaoCadastral: result.situacaoCadastral || f.situacaoCadastral,
+          socios: result.socios ? JSON.stringify(result.socios) : f.socios,
         }));
         toast.success("Dados do CNPJ carregados!");
       } else {
@@ -315,6 +339,14 @@ export default function RestaurantOnboarding() {
         photoAuthorization: form.photoAuthorization as "sim" | "nao",
         pixKey: form.pixKey.trim() || undefined,
         notes: form.notes.trim() || undefined,
+        porte: form.porte || undefined,
+        naturezaJuridica: form.naturezaJuridica || undefined,
+        atividadePrincipal: form.atividadePrincipal || undefined,
+        atividadesSecundarias: form.atividadesSecundarias || undefined,
+        capitalSocial: form.capitalSocial || undefined,
+        dataAbertura: form.dataAbertura || undefined,
+        situacaoCadastral: form.situacaoCadastral || undefined,
+        socios: form.socios || undefined,
         acceptedByName: form.acceptedByName.trim(),
         acceptedByCpf: form.acceptedByCpf.replace(/\D/g, ""),
         accountEmail: form.accountEmail.trim(),
