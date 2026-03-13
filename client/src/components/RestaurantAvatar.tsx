@@ -23,11 +23,11 @@ function getInitials(name: string): string {
 }
 
 const SIZE_MAP = {
-  xs: "size-6 text-[10px]",
-  sm: "size-8 text-xs",
-  md: "size-10 text-sm",
-  lg: "size-14 text-base",
-  xl: "size-20 text-xl",
+  xs: "size-8 text-[10px]",
+  sm: "size-10 text-xs",
+  md: "size-14 text-sm",
+  lg: "size-20 text-base",
+  xl: "size-28 text-xl",
 } as const;
 
 interface RestaurantAvatarProps {
@@ -44,7 +44,7 @@ export default function RestaurantAvatar({ name, logoUrl, size = "sm", className
   return (
     <Avatar className={cn(sizeClass, "shrink-0", className)}>
       {logoUrl && (
-        <AvatarImage src={logoUrl} alt={`Foto de perfil de ${name}`} className="object-contain p-0.5" />
+        <AvatarImage src={logoUrl} alt={`Foto de perfil de ${name}`} className="object-cover" />
       )}
       <AvatarFallback className={cn(colorClass, "text-white font-semibold")}>
         {getInitials(name)}
