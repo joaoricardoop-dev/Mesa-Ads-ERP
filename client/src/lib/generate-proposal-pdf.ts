@@ -23,6 +23,7 @@ interface ProposalPDFData {
     coasters: number;
   }>;
   validityDays?: number;
+  pixDiscountPercent?: number;
 }
 
 const FONT_NAME = "HostGrotesk";
@@ -32,6 +33,23 @@ const DARK_GRAY = [60, 60, 60] as const;
 const GRAY = [100, 100, 100] as const;
 const LIGHT_GRAY = [240, 240, 240] as const;
 const WHITE = [255, 255, 255] as const;
+
+const VEXA_BASE_1000 = {
+  custoGPC: 0.4190,
+  frete: 80.38,
+  artes: 1,
+  margem: 0.50,
+  irpj: 0.06,
+  comRestaurante: 0.15,
+  comComercial: 0.10,
+};
+
+function getVexaUnitPrice1000(): number {
+  const v = VEXA_BASE_1000;
+  const custoTotal = v.custoGPC * v.artes * 1000 + v.frete;
+  const denominador = 1 - v.margem - v.irpj - v.comRestaurante - v.comComercial;
+  return denominador > 0 ? custoTotal / denominador / 1000 : 0;
+}
 
 function registerFonts(doc: jsPDF) {
   doc.addFileToVFS("HostGrotesk-Regular.ttf", HOST_GROTESK_REGULAR);
@@ -47,6 +65,10 @@ function fmtCurrency(val: number): string {
 
 function fmtNumber(val: number): string {
   return val.toLocaleString("pt-BR");
+}
+
+function fmtPercent(val: number): string {
+  return `${val.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
 function justifyText(doc: jsPDF, text: string, x: number, y: number, maxWidth: number, lineHeight: number): number {
@@ -162,6 +184,12 @@ export function generateProposalPdf(data: ProposalPDFData) {
   const monthlyTotal = data.monthlyTotal > 0 ? data.monthlyTotal : data.pricePerRestaurant * numRest;
   const pricePerRestaurant = data.pricePerRestaurant > 0 ? data.pricePerRestaurant : (monthlyTotal / numRest);
   const contractTotal = data.contractTotal > 0 ? data.contractTotal : monthlyTotal * data.contractDuration;
+  const pixDiscount = data.pixDiscountPercent ?? 5;
+
+  const vexaUnitPrice = getVexaUnitPrice1000();
+  const listPriceTotal = vexaUnitPrice * data.coasterVolume * data.contractDuration;
+  const discountPercent = listPriceTotal > 0 ? ((listPriceTotal - contractTotal) / listPriceTotal) * 100 : 0;
+  const discountValue = listPriceTotal - contractTotal;
 
   drawHeader(doc, pageWidth, margin);
 
@@ -251,6 +279,57 @@ export function generateProposalPdf(data: ProposalPDFData) {
 
   y += 62;
 
+  if (discountPercent > 0) {
+    y += 4;
+    y = checkPageBreak(doc, y, 55);
+    y = drawSectionTitle(doc, "DESCONTO APLICADO", y, margin);
+
+    doc.setFillColor(245, 255, 245);
+    doc.roundedRect(margin, y, contentWidth, 42, 3, 3, "F");
+    doc.setDrawColor(...GREEN);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(margin, y, contentWidth, 42, 3, 3, "S");
+    doc.setLineWidth(0.2);
+
+    doc.setTextColor(...GRAY);
+    doc.setFontSize(8);
+    doc.setFont(FONT_NAME, "normal");
+    doc.text("Preço de tabela (ref. 1.000 un. / 4 semanas)", margin + 10, y + 10);
+
+    doc.setTextColor(160, 160, 160);
+    doc.setFontSize(10);
+    doc.setFont(FONT_NAME, "normal");
+    doc.text(fmtCurrency(listPriceTotal), pageWidth - margin - 10, y + 10, { align: "right" });
+
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin + 10, y + 15, pageWidth - margin - 10, y + 15);
+
+    doc.setTextColor(...GRAY);
+    doc.setFontSize(8);
+    doc.setFont(FONT_NAME, "normal");
+    doc.text("Preço desta proposta", margin + 10, y + 23);
+
+    doc.setTextColor(...BLACK);
+    doc.setFontSize(10);
+    doc.setFont(FONT_NAME, "bold");
+    doc.text(fmtCurrency(contractTotal), pageWidth - margin - 10, y + 23, { align: "right" });
+
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin + 10, y + 28, pageWidth - margin - 10, y + 28);
+
+    doc.setTextColor(...GRAY);
+    doc.setFontSize(8);
+    doc.setFont(FONT_NAME, "normal");
+    doc.text("Economia total", margin + 10, y + 36);
+
+    doc.setTextColor(...GREEN);
+    doc.setFontSize(11);
+    doc.setFont(FONT_NAME, "bold");
+    doc.text(`${fmtCurrency(discountValue)}  (−${fmtPercent(discountPercent)})`, pageWidth - margin - 10, y + 36, { align: "right" });
+
+    y += 52;
+  }
+
   if (data.restaurants.length > 0) {
     y += 4;
     y = checkPageBreak(doc, y, 60);
@@ -302,6 +381,91 @@ export function generateProposalPdf(data: ProposalPDFData) {
   }
 
   y += 10;
+  y = checkPageBreak(doc, y, 75);
+
+  y = drawSectionTitle(doc, "FORMAS DE PAGAMENTO", y, margin);
+
+  const pixTotal = contractTotal * (1 - pixDiscount / 100);
+  const pixSaving = contractTotal - pixTotal;
+  const boletoParcela = data.contractDuration > 0 ? contractTotal / data.contractDuration : contractTotal;
+
+  const paymentBoxHeight = 34;
+  const paymentBoxGap = 6;
+  const threeBoxWidth = (contentWidth - paymentBoxGap * 2) / 3;
+
+  const drawPaymentBox = (
+    xPos: number, yPos: number, width: number,
+    icon: string, title: string, detail: string, highlight: string,
+    sub: string, isAccent: boolean,
+  ) => {
+    if (isAccent) {
+      doc.setFillColor(245, 255, 245);
+      doc.roundedRect(xPos, yPos, width, paymentBoxHeight, 2, 2, "F");
+      doc.setDrawColor(...GREEN);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(xPos, yPos, width, paymentBoxHeight, 2, 2, "S");
+      doc.setLineWidth(0.2);
+    } else {
+      doc.setFillColor(...LIGHT_GRAY);
+      doc.roundedRect(xPos, yPos, width, paymentBoxHeight, 2, 2, "F");
+    }
+
+    doc.setTextColor(isAccent ? GREEN[0] : GRAY[0], isAccent ? GREEN[1] : GRAY[1], isAccent ? GREEN[2] : GRAY[2]);
+    doc.setFontSize(10);
+    doc.setFont(FONT_NAME, "bold");
+    doc.text(icon, xPos + 6, yPos + 8);
+
+    doc.setTextColor(...BLACK);
+    doc.setFontSize(8);
+    doc.setFont(FONT_NAME, "bold");
+    doc.text(title, xPos + 14, yPos + 8);
+
+    doc.setTextColor(...DARK_GRAY);
+    doc.setFontSize(7);
+    doc.setFont(FONT_NAME, "normal");
+    doc.text(detail, xPos + 6, yPos + 16);
+
+    doc.setTextColor(isAccent ? GREEN[0] : BLACK[0], isAccent ? GREEN[1] : BLACK[1], isAccent ? GREEN[2] : BLACK[2]);
+    doc.setFontSize(10);
+    doc.setFont(FONT_NAME, "bold");
+    doc.text(highlight, xPos + 6, yPos + 25);
+
+    doc.setTextColor(...GRAY);
+    doc.setFontSize(6.5);
+    doc.setFont(FONT_NAME, "normal");
+    doc.text(sub, xPos + 6, yPos + 31);
+  };
+
+  drawPaymentBox(
+    margin, y, threeBoxWidth,
+    "💳", "Cartão de Crédito",
+    "Parcela única sem juros",
+    fmtCurrency(contractTotal),
+    "1x sem juros",
+    false,
+  );
+
+  drawPaymentBox(
+    margin + threeBoxWidth + paymentBoxGap, y, threeBoxWidth,
+    "📄", "Boleto Bancário",
+    `Parcelado em ${data.contractDuration}x`,
+    fmtCurrency(boletoParcela) + "/mês",
+    `${data.contractDuration}x de ${fmtCurrency(boletoParcela)}`,
+    false,
+  );
+
+  drawPaymentBox(
+    margin + (threeBoxWidth + paymentBoxGap) * 2, y, threeBoxWidth,
+    "⚡", "PIX à Vista",
+    `${pixDiscount}% de desconto adicional`,
+    fmtCurrency(pixTotal),
+    `Economia de ${fmtCurrency(pixSaving)}`,
+    true,
+  );
+
+  y += paymentBoxHeight + 10;
+
+  y += 4;
   y = checkPageBreak(doc, y, 60);
 
   doc.setDrawColor(...GREEN);
