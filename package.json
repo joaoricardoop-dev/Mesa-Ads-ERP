@@ -774,6 +774,7 @@
       "send",
       "serve-static",
       "setprototypeof",
+      "sharp",
       "shiki",
       "side-channel",
       "side-channel-list",
