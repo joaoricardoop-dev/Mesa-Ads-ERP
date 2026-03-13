@@ -144,7 +144,7 @@ export default function PriceTable() {
     const precoFinal = precoAntesDescParceiro * (1 - descParcPerc);
 
     const precoUnitComDesc = volume > 0 ? precoFinal / (volume * nPeriodos) : 0;
-    const precoMensal = nPeriodos > 0 ? precoFinal / (semanas / 4.345) : 0;
+    const precoMensal = nPeriodos > 0 ? precoFinal / nPeriodos : 0;
     const descCombinado = precoUnit1000 > 0 ? 1 - (precoUnitComDesc / precoUnit1000) : 0;
 
     const custoTotalPeriodo = custoTotal4sem * nPeriodos;
@@ -607,7 +607,7 @@ export default function PriceTable() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <KpiCard label="Preço Total" value={formatCurrency(calc.precoFinal)} sub={`${semanas} sem • ${pagLabel}${descontoParceiro ? " • parceiro" : ""}`} variant="primary" icon={DollarSign} />
             <KpiCard label="Preço Unitário" value={formatCurrency(calc.precoUnitComDesc)} sub={`por bolacha · ${semanas} semanas`} icon={TrendingUp} />
-            <KpiCard label="Preço Mensal" value={formatCurrency(calc.precoMensal)} sub={`${semanas} sem ≈ ${(semanas / 4.345).toFixed(1)} meses`} icon={CalendarDays} />
+            <KpiCard label="Preço Mensal" value={formatCurrency(calc.precoMensal)} sub={`${semanas} sem = ${calc.nPeriodos} ${calc.nPeriodos === 1 ? "mês" : "meses"}`} icon={CalendarDays} />
             <KpiCard label="Desconto Total" value={calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"} sub={`vs base 1k / 4 sem${descontoParceiro ? " + parceiro" : ""}`} variant="discount" icon={TrendingDown} />
           </div>
 
