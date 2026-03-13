@@ -49,7 +49,7 @@ The application features a sidebar-based layout using `shadcn/ui` with a collaps
 - **Clerk**: For authentication, user management, and authorization.
 - **Neon Database**: Provides the PostgreSQL database infrastructure.
 - **Recharts**: For data visualization in the UI.
-- **jsPDF + jspdf-autotable**: For client-side PDF generation (e.g., Service Orders, Term acceptance PDFs).
+- **jsPDF + jspdf-autotable**: For client-side PDF generation (e.g., Service Orders, Term acceptance PDFs, Proposal PDFs). Proposal PDFs use embedded Host Grotesk font (regular + bold) and the Mesa Ads logo image in the header, with justified text paragraphs. Font/logo assets are base64-encoded in `client/src/lib/pdf-assets.ts`.
 - **TipTap**: Rich text (WYSIWYG) editor for term template content (`@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-underline`).
 - **DOMPurify**: HTML sanitization for rendering rich text content safely.
 - **Multer**: Multipart form-data handling for file uploads (restaurant logo upload).

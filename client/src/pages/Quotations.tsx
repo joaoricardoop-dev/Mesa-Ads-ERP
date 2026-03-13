@@ -550,8 +550,10 @@ export default function Quotations() {
                             const fetchedRestaurants = await utils.quotation.getRestaurants.fetch({ quotationId: q.id });
                             const numRest = fetchedRestaurants.length;
                             const duration = q.cycles || 1;
-                            const pricePerRest = q.unitPrice ? Number(q.unitPrice) : 0;
-                            const monthlyTotal = pricePerRest * (numRest > 0 ? numRest : 1);
+                            const totalContractValue = Number(q.totalValue || 0);
+                            const monthlyTotal = duration > 0 ? totalContractValue / duration : totalContractValue;
+                            const effectiveNumRest = numRest > 0 ? numRest : 1;
+                            const pricePerRest = monthlyTotal / effectiveNumRest;
                             const restaurants = fetchedRestaurants.map((r) => ({
                               name: r.restaurantName || "Restaurante",
                               neighborhood: r.restaurantAddress || "",
@@ -570,7 +572,7 @@ export default function Quotations() {
                               contractDuration: duration,
                               pricePerRestaurant: pricePerRest,
                               monthlyTotal,
-                              contractTotal: Number(q.totalValue || 0),
+                              contractTotal: totalContractValue,
                               includesProduction: q.includesProduction ?? true,
                               restaurants,
                             });
