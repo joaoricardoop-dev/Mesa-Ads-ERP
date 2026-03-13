@@ -134,6 +134,7 @@ export default function Home() {
       id: r.id,
       name: r.name,
       neighborhood: r.neighborhood,
+      logoUrl: (r as any).logoUrl,
       ratingScore: r.ratingScore,
       ratingMultiplier: r.ratingMultiplier,
       commissionPercent: r.commissionPercent,

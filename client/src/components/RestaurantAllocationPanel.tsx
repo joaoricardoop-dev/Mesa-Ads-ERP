@@ -27,6 +27,7 @@ import type {
   RestaurantForAllocation,
   AllocationEntry,
 } from "@/hooks/useRestaurantAllocation";
+import RestaurantAvatar from "@/components/RestaurantAvatar";
 import { COASTER_CAPACITY_FACTOR } from "@/hooks/useRestaurantAllocation";
 import { calcPricing, type SimulatorInputs } from "@/hooks/useSimulator";
 
@@ -255,6 +256,7 @@ export default function RestaurantAllocationPanel({
                               }}
                               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left border-b border-border/10 last:border-b-0"
                             >
+                              <RestaurantAvatar name={r.name} logoUrl={r.logoUrl} size="xs" />
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate">{r.name}</p>
                                 <div className="flex items-center gap-2 mt-0.5">
@@ -362,10 +364,15 @@ export default function RestaurantAllocationPanel({
                           className={`text-sm border-t border-border/10 hover:bg-muted/10 transition-colors ${idx % 2 === 0 ? "" : "bg-muted/5"}`}
                         >
                           <td className="py-2.5 px-5">
-                            <p className="font-medium text-sm truncate max-w-[180px]">{r.name}</p>
-                            {r.neighborhood && (
-                              <p className="text-[11px] text-muted-foreground truncate max-w-[180px]">{r.neighborhood}</p>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <RestaurantAvatar name={r.name} logoUrl={r.logoUrl} size="xs" />
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm truncate max-w-[180px]">{r.name}</p>
+                                {r.neighborhood && (
+                                  <p className="text-[11px] text-muted-foreground truncate max-w-[180px]">{r.neighborhood}</p>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="py-2.5 px-2 text-center">
                             {score !== null ? (
@@ -468,6 +475,7 @@ export default function RestaurantAllocationPanel({
                       <div key={r.id} className="bg-card border border-border/20 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
+                            <RestaurantAvatar name={r.name} logoUrl={r.logoUrl} size="xs" />
                             <span className="text-sm font-semibold truncate max-w-[200px]">{r.name}</span>
                             {r.ratingScore && (
                               <Badge variant="outline" className="border-primary/30 text-primary text-[10px] px-1.5 py-0 font-mono gap-0.5">

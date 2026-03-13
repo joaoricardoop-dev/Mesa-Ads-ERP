@@ -4,6 +4,7 @@ export interface RestaurantForAllocation {
   id: number;
   name: string;
   neighborhood: string | null;
+  logoUrl?: string | null;
   ratingScore: string | null;
   ratingMultiplier: string | null;
   commissionPercent: string;

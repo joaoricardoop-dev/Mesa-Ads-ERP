@@ -83,6 +83,7 @@ export default function PriceTable() {
       id: r.id,
       name: r.name,
       neighborhood: r.neighborhood,
+      logoUrl: r.logoUrl,
       ratingScore: r.ratingScore,
       ratingMultiplier: r.ratingMultiplier,
       commissionPercent: r.commissionPercent,

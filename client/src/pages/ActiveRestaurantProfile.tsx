@@ -32,6 +32,7 @@ import {
   PRIMARY_DRINK_LABELS,
   RATING_DIMENSION_LABELS,
 } from "@shared/rating-config";
+import RestaurantAvatar from "@/components/RestaurantAvatar";
 import {
   ArrowLeft,
   Pencil,
@@ -346,6 +347,7 @@ export default function ActiveRestaurantProfile() {
               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/restaurantes")}>
                 <ArrowLeft className="w-4 h-4" />
               </Button>
+              <RestaurantAvatar name={restaurant.name} logoUrl={restaurant.logoUrl} size="md" />
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg font-bold tracking-tight">{restaurant.name}</h1>

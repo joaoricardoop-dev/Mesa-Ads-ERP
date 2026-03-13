@@ -49,6 +49,7 @@ import {
   DIGITAL_PRESENCE_LABELS,
   PRIMARY_DRINK_LABELS,
 } from "@shared/rating-config";
+import RestaurantAvatar from "@/components/RestaurantAvatar";
 
 const CONTACT_TYPE_LABELS: Record<string, string> = {
   proprietario: "Proprietário",
@@ -399,6 +400,7 @@ export default function ActiveRestaurantsPage() {
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <RestaurantAvatar name={r.name} logoUrl={(r as any).logoUrl} size="sm" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-sm truncate">{r.name}</h3>

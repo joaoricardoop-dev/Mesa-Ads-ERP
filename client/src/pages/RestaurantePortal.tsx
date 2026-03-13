@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import DOMPurify from "dompurify";
+import RestaurantAvatar from "@/components/RestaurantAvatar";
 import { generateTermPdf } from "@/lib/generate-term-pdf";
 import {
   UtensilsCrossed,
@@ -209,9 +210,12 @@ export default function RestaurantePortal() {
               Bem-vindo, {user?.firstName || restaurant.contactName || restaurant.name}
             </p>
           </div>
-          <Badge variant="outline" className="text-sm px-3 py-1">
-            {restaurant.name}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <RestaurantAvatar name={restaurant.name} logoUrl={(restaurant as any).logoUrl} size="sm" />
+            <Badge variant="outline" className="text-sm px-3 py-1">
+              {restaurant.name}
+            </Badge>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
