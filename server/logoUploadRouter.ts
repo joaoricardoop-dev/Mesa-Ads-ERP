@@ -3,7 +3,7 @@ import multer from "multer";
 import { getDb } from "./db";
 import { activeRestaurants } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
-import { storagePut } from "./storage";
+import { objectStorageClient } from "./replit_integrations/object_storage";
 import { randomUUID } from "crypto";
 
 const upload = multer({
@@ -34,6 +34,16 @@ function handleUpload(req: express.Request, res: express.Response): Promise<void
   });
 }
 
+function getBucketName(): string {
+  const searchPaths = process.env.PUBLIC_OBJECT_SEARCH_PATHS || "";
+  const firstPath = searchPaths.split(",")[0]?.trim();
+  if (firstPath) {
+    const parts = firstPath.replace(/^\//, "").split("/");
+    if (parts[0]) return parts[0];
+  }
+  throw new Error("PUBLIC_OBJECT_SEARCH_PATHS not configured — cannot determine storage bucket.");
+}
+
 async function saveLogoToStorage(file: Express.Multer.File, restaurantId: number, res: express.Response) {
   const db = await getDb();
   if (!db) {
@@ -51,15 +61,25 @@ async function saveLogoToStorage(file: Express.Multer.File, restaurantId: number
   }
 
   const ext = file.mimetype === "image/jpeg" ? "jpg" : "png";
-  const key = `logos/restaurant-${restaurantId}-${Date.now()}.${ext}`;
-  const { url } = await storagePut(key, file.buffer, file.mimetype);
+  const objectName = `logos/restaurant-${restaurantId}-${Date.now()}.${ext}`;
+
+  const bucketName = getBucketName();
+  const bucket = objectStorageClient.bucket(bucketName);
+  const gcsFile = bucket.file(objectName);
+
+  await gcsFile.save(file.buffer, {
+    contentType: file.mimetype,
+    metadata: { cacheControl: "public, max-age=31536000" },
+  });
+
+  const logoUrl = `/api/restaurant-logo/serve/${encodeURIComponent(objectName)}`;
 
   await db
     .update(activeRestaurants)
-    .set({ logoUrl: url, updatedAt: new Date() })
+    .set({ logoUrl, updatedAt: new Date() })
     .where(eq(activeRestaurants.id, restaurantId));
 
-  return res.json({ logoUrl: url });
+  return res.json({ logoUrl });
 }
 
 const onboardingUploadTokens = new Map<string, { restaurantId: number; expiresAt: number }>();
@@ -74,6 +94,44 @@ export function createOnboardingUploadToken(restaurantId: number): string {
 }
 
 export function setupPublicLogoUploadRoutes(app: express.Express) {
+  app.get("/api/restaurant-logo/serve/:objectName(*)", async (_req, res) => {
+    try {
+      const objectName = _req.params.objectName;
+      if (!objectName || !objectName.startsWith("logos/")) {
+        return res.status(400).json({ error: "Caminho inválido." });
+      }
+
+      const bucketName = getBucketName();
+      const bucket = objectStorageClient.bucket(bucketName);
+      const gcsFile = bucket.file(objectName);
+
+      const [exists] = await gcsFile.exists();
+      if (!exists) {
+        return res.status(404).json({ error: "Arquivo não encontrado." });
+      }
+
+      const [metadata] = await gcsFile.getMetadata();
+      res.set({
+        "Content-Type": (metadata.contentType as string) || "image/png",
+        "Cache-Control": "public, max-age=31536000, immutable",
+      });
+
+      const stream = gcsFile.createReadStream();
+      stream.on("error", (err) => {
+        console.error("Logo stream error:", err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Erro ao ler arquivo." });
+        }
+      });
+      stream.pipe(res);
+    } catch (err: any) {
+      console.error("Logo serve error:", err);
+      if (!res.headersSent) {
+        return res.status(500).json({ error: "Erro ao servir imagem." });
+      }
+    }
+  });
+
   app.post("/api/restaurant-logo/upload-public", async (req, res) => {
     try {
       await handleUpload(req, res);

@@ -5,7 +5,7 @@ packages = ["unzip"]
 
 [agent]
 expertMode = true
-integrations = ["javascript_log_in_with_replit:2.0.0", "javascript_anthropic:1.0.0"]
+integrations = ["javascript_log_in_with_replit:2.0.0", "javascript_anthropic:1.0.0", "javascript_object_storage:2.0.0"]
 
 [workflows]
 runButton = "Project"
@@ -45,8 +45,8 @@ externalPort = 3001
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["pnpm", "run", "start"]
-build = ["pnpm", "run", "build"]
+run = ["npm", "run", "start"]
+build = ["npm", "run", "build"]
 publicDir = "dist/public"
 
 [userenv]
