@@ -6,6 +6,7 @@ import { users } from "../shared/models/auth";
 import { eq, and, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "crypto";
 import { ensureContact } from "./contactSync";
+import { createOnboardingUploadToken } from "./logoUploadRouter";
 
 const DEFAULT_TERMS = `TERMOS DE PARCERIA — mesa.ads
 
@@ -478,7 +479,8 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
         });
       }
 
-      res.json({ success: true, message: "Restaurante cadastrado com sucesso!", restaurantId: restaurant.id });
+      const logoUploadToken = createOnboardingUploadToken(restaurant.id);
+      res.json({ success: true, message: "Restaurante cadastrado com sucesso!", restaurantId: restaurant.id, logoUploadToken });
     } catch (err: any) {
       console.error("Submit onboarding error:", err);
       const clerkCode = err?.errors?.[0]?.code;

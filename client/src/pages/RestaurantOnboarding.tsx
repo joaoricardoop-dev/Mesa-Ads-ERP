@@ -331,11 +331,11 @@ export default function RestaurantOnboarding() {
         return;
       }
 
-      if (logoFile && data.restaurantId) {
+      if (logoFile && data.restaurantId && data.logoUploadToken) {
         try {
           const logoFormData = new window.FormData();
           logoFormData.append("logo", logoFile);
-          logoFormData.append("restaurantId", String(data.restaurantId));
+          logoFormData.append("uploadToken", data.logoUploadToken);
           await fetch("/api/restaurant-logo/upload-public", {
             method: "POST",
             body: logoFormData,

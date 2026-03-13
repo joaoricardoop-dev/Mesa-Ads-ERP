@@ -1691,9 +1691,11 @@ function KPICard({ label, value, icon, accent, warn }: { label: string; value: s
 
 function LogoSection({ restaurant, onUpdated }: { restaurant: any; onUpdated: () => void }) {
   const [uploading, setUploading] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogoUpload = async (file: File) => {
+  const handleFileSelect = (file: File) => {
     if (file.type !== "image/png") {
       toast.error("Apenas arquivos PNG são aceitos.");
       return;
@@ -1702,10 +1704,21 @@ function LogoSection({ restaurant, onUpdated }: { restaurant: any; onUpdated: ()
       toast.error("O arquivo deve ter no máximo 2MB.");
       return;
     }
+    setPendingFile(file);
+    setPendingPreview(URL.createObjectURL(file));
+  };
+
+  const cancelPending = () => {
+    setPendingFile(null);
+    setPendingPreview(null);
+  };
+
+  const confirmUpload = async () => {
+    if (!pendingFile) return;
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append("logo", file);
+      formData.append("logo", pendingFile);
       formData.append("restaurantId", String(restaurant.id));
       const res = await fetch("/api/restaurant-logo/upload", {
         method: "POST",
@@ -1717,6 +1730,7 @@ function LogoSection({ restaurant, onUpdated }: { restaurant: any; onUpdated: ()
         return;
       }
       toast.success("Logotipo atualizado!");
+      cancelPending();
       onUpdated();
     } catch {
       toast.error("Erro ao fazer upload do logotipo.");
@@ -1730,37 +1744,78 @@ function LogoSection({ restaurant, onUpdated }: { restaurant: any; onUpdated: ()
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-3">
         <Image className="w-4 h-4" /> Logotipo
       </h3>
-      <div className="flex items-center gap-4">
-        {restaurant.logoUrl ? (
-          <>
-            <img
-              src={restaurant.logoUrl}
-              alt={`Logo de ${restaurant.name}`}
-              className="w-20 h-20 object-contain rounded-lg border border-border/30 bg-background p-1"
-            />
-            <div className="flex flex-col gap-2">
+      {pendingPreview ? (
+        <div className="flex items-center gap-4">
+          <img
+            src={pendingPreview}
+            alt="Preview do novo logotipo"
+            className="w-20 h-20 object-contain rounded-lg border border-primary/40 bg-background p-1"
+          />
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-muted-foreground">{pendingFile?.name}</p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="text-xs gap-1.5"
+                disabled={uploading}
+                onClick={confirmUpload}
+              >
+                {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                Confirmar upload
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
-                className="text-xs gap-1.5"
+                className="text-xs"
                 disabled={uploading}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={cancelPending}
               >
-                {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                Alterar
+                Cancelar
               </Button>
             </div>
-          </>
-        ) : (
-          <label className="flex items-center justify-center gap-2 px-6 py-4 rounded-lg border border-dashed border-border/40 bg-background cursor-pointer hover:border-border/60 transition-colors w-full">
-            {uploading ? (
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-            ) : (
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-4">
+          {restaurant.logoUrl ? (
+            <>
+              <img
+                src={restaurant.logoUrl}
+                alt={`Logo de ${restaurant.name}`}
+                className="w-20 h-20 object-contain rounded-lg border border-border/30 bg-background p-1"
+              />
+              <div className="flex flex-col gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs gap-1.5"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Alterar
+                </Button>
+              </div>
+            </>
+          ) : (
+            <label className="flex items-center justify-center gap-2 px-6 py-4 rounded-lg border border-dashed border-border/40 bg-background cursor-pointer hover:border-border/60 transition-colors w-full">
               <Upload className="w-4 h-4 text-muted-foreground" />
-            )}
-            <span className="text-xs text-muted-foreground">
-              {uploading ? "Enviando..." : "Clique para enviar o logotipo (PNG, máx. 2MB)"}
-            </span>
+              <span className="text-xs text-muted-foreground">
+                Clique para enviar o logotipo (PNG, máx. 2MB)
+              </span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFileSelect(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          )}
+          {restaurant.logoUrl && (
             <input
               ref={fileInputRef}
               type="file"
@@ -1768,26 +1823,13 @@ function LogoSection({ restaurant, onUpdated }: { restaurant: any; onUpdated: ()
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) handleLogoUpload(f);
+                if (f) handleFileSelect(f);
                 e.target.value = "";
               }}
             />
-          </label>
-        )}
-        {restaurant.logoUrl && (
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleLogoUpload(f);
-              e.target.value = "";
-            }}
-          />
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
