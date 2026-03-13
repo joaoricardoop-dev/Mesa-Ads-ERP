@@ -43,6 +43,13 @@
       "when": 1773348996042,
       "tag": "0005_premium_impossible_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1773420300000,
+      "tag": "0006_add_logo_url",
+      "breakpoints": true
     }
   ]
 }

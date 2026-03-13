@@ -336,7 +336,7 @@ export default function RestaurantOnboarding() {
           const logoFormData = new window.FormData();
           logoFormData.append("logo", logoFile);
           logoFormData.append("restaurantId", String(data.restaurantId));
-          await fetch("/api/restaurant-logo/upload", {
+          await fetch("/api/restaurant-logo/upload-public", {
             method: "POST",
             body: logoFormData,
           });
