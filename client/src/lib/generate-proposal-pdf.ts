@@ -283,7 +283,15 @@ export function generateProposalPdf(data: ProposalPDFData) {
   if (discountPercent > 0) {
     y += 4;
     const hasPartner = data.hasPartnerDiscount === true;
-    const discountBoxHeight = hasPartner ? 56 : 42;
+
+    const priceBeforePartner = hasPartner ? contractTotal / 0.9 : contractTotal;
+    const volumeDiscountValue = listPriceTotal - priceBeforePartner;
+    const volumeDiscountPercent = listPriceTotal > 0 ? (volumeDiscountValue / listPriceTotal) * 100 : 0;
+    const partnerDiscountValue = hasPartner ? priceBeforePartner * 0.1 : 0;
+
+    const rowH = 13;
+    const rowCount = hasPartner ? 5 : 4;
+    const discountBoxHeight = 10 + rowCount * rowH;
     y = checkPageBreak(doc, y, discountBoxHeight + 15);
     y = drawSectionTitle(doc, "DESCONTO APLICADO", y, margin);
 
@@ -294,60 +302,68 @@ export function generateProposalPdf(data: ProposalPDFData) {
     doc.roundedRect(margin, y, contentWidth, discountBoxHeight, 3, 3, "S");
     doc.setLineWidth(0.2);
 
+    let row = 0;
+    const rowY = (r: number) => y + 10 + r * rowH;
+    const sepY = (r: number) => rowY(r) + 5;
+
     doc.setTextColor(...GRAY);
     doc.setFontSize(8);
     doc.setFont(FONT_NAME, "normal");
-    doc.text("Preço de tabela (ref. 1.000 un. / 4 semanas)", margin + 10, y + 10);
-
+    doc.text("Preço de tabela (ref. 1.000 un. / 4 semanas)", margin + 10, rowY(row));
     doc.setTextColor(160, 160, 160);
     doc.setFontSize(10);
     doc.setFont(FONT_NAME, "normal");
-    doc.text(fmtCurrency(listPriceTotal), pageWidth - margin - 10, y + 10, { align: "right" });
-
+    doc.text(fmtCurrency(listPriceTotal), pageWidth - margin - 10, rowY(row), { align: "right" });
     doc.setDrawColor(220, 220, 220);
-    doc.line(margin + 10, y + 15, pageWidth - margin - 10, y + 15);
+    doc.line(margin + 10, sepY(row), pageWidth - margin - 10, sepY(row));
+    row++;
 
     doc.setTextColor(...GRAY);
     doc.setFontSize(8);
     doc.setFont(FONT_NAME, "normal");
-    doc.text("Preço desta proposta", margin + 10, y + 23);
-
-    doc.setTextColor(...BLACK);
+    doc.text("Desconto por volume e prazo", margin + 10, rowY(row));
+    doc.setTextColor(...GREEN);
     doc.setFontSize(10);
     doc.setFont(FONT_NAME, "bold");
-    doc.text(fmtCurrency(contractTotal), pageWidth - margin - 10, y + 23, { align: "right" });
-
+    doc.text(`−${fmtCurrency(volumeDiscountValue)}  (−${fmtPercent(volumeDiscountPercent)})`, pageWidth - margin - 10, rowY(row), { align: "right" });
     doc.setDrawColor(220, 220, 220);
-    doc.line(margin + 10, y + 28, pageWidth - margin - 10, y + 28);
+    doc.line(margin + 10, sepY(row), pageWidth - margin - 10, sepY(row));
+    row++;
 
     if (hasPartner) {
-      const partnerDiscountValue = contractTotal / 0.9 * 0.1;
-
       doc.setTextColor(...GRAY);
       doc.setFontSize(8);
       doc.setFont(FONT_NAME, "normal");
-      doc.text("Desconto de parceiro", margin + 10, y + 35);
-
+      doc.text("Desconto de parceiro", margin + 10, rowY(row));
       doc.setTextColor(...GREEN);
       doc.setFontSize(10);
       doc.setFont(FONT_NAME, "bold");
-      doc.text(`−${fmtCurrency(partnerDiscountValue)}  (−10%)`, pageWidth - margin - 10, y + 35, { align: "right" });
-
+      doc.text(`−${fmtCurrency(partnerDiscountValue)}  (−10%)`, pageWidth - margin - 10, rowY(row), { align: "right" });
       doc.setDrawColor(220, 220, 220);
-      doc.line(margin + 10, y + 40, pageWidth - margin - 10, y + 40);
+      doc.line(margin + 10, sepY(row), pageWidth - margin - 10, sepY(row));
+      row++;
     }
-
-    const econY = hasPartner ? y + 50 : y + 36;
 
     doc.setTextColor(...GRAY);
     doc.setFontSize(8);
     doc.setFont(FONT_NAME, "normal");
-    doc.text("Economia total", margin + 10, econY);
+    doc.text("Preço desta proposta", margin + 10, rowY(row));
+    doc.setTextColor(...BLACK);
+    doc.setFontSize(10);
+    doc.setFont(FONT_NAME, "bold");
+    doc.text(fmtCurrency(contractTotal), pageWidth - margin - 10, rowY(row), { align: "right" });
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin + 10, sepY(row), pageWidth - margin - 10, sepY(row));
+    row++;
 
+    doc.setTextColor(...GRAY);
+    doc.setFontSize(8);
+    doc.setFont(FONT_NAME, "normal");
+    doc.text("Economia total", margin + 10, rowY(row));
     doc.setTextColor(...GREEN);
     doc.setFontSize(11);
     doc.setFont(FONT_NAME, "bold");
-    doc.text(`${fmtCurrency(discountValue)}  (−${fmtPercent(discountPercent)})`, pageWidth - margin - 10, econY, { align: "right" });
+    doc.text(`${fmtCurrency(discountValue)}  (−${fmtPercent(discountPercent)})`, pageWidth - margin - 10, rowY(row), { align: "right" });
 
     y += discountBoxHeight + 10;
   }
