@@ -283,7 +283,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
   if (discountPercent > 0) {
     y += 4;
     const hasPartner = data.hasPartnerDiscount === true;
-    const discountBoxHeight = hasPartner ? 52 : 42;
+    const discountBoxHeight = hasPartner ? 56 : 42;
     y = checkPageBreak(doc, y, discountBoxHeight + 15);
     y = drawSectionTitle(doc, "DESCONTO APLICADO", y, margin);
 
@@ -321,16 +321,23 @@ export function generateProposalPdf(data: ProposalPDFData) {
     doc.line(margin + 10, y + 28, pageWidth - margin - 10, y + 28);
 
     if (hasPartner) {
+      const partnerDiscountValue = contractTotal / 0.9 * 0.1;
+
+      doc.setTextColor(...GRAY);
+      doc.setFontSize(8);
+      doc.setFont(FONT_NAME, "normal");
+      doc.text("Desconto de parceiro", margin + 10, y + 35);
+
       doc.setTextColor(...GREEN);
-      doc.setFontSize(7.5);
+      doc.setFontSize(10);
       doc.setFont(FONT_NAME, "bold");
-      doc.text("✦  Inclui desconto de parceiro (−10%)", margin + 10, y + 35);
+      doc.text(`−${fmtCurrency(partnerDiscountValue)}  (−10%)`, pageWidth - margin - 10, y + 35, { align: "right" });
 
       doc.setDrawColor(220, 220, 220);
-      doc.line(margin + 10, y + 38, pageWidth - margin - 10, y + 38);
+      doc.line(margin + 10, y + 40, pageWidth - margin - 10, y + 40);
     }
 
-    const econY = hasPartner ? y + 46 : y + 36;
+    const econY = hasPartner ? y + 50 : y + 36;
 
     doc.setTextColor(...GRAY);
     doc.setFontSize(8);
