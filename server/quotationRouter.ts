@@ -97,6 +97,9 @@ export const quotationRouter = router({
           clientPhone: clients.contactPhone,
           leadName: leads.name,
           leadCompany: leads.company,
+          leadCnpj: leads.cnpj,
+          leadEmail: leads.contactEmail,
+          leadPhone: leads.contactPhone,
         })
         .from(quotations)
         .leftJoin(clients, eq(quotations.clientId, clients.id))
@@ -143,6 +146,9 @@ export const quotationRouter = router({
           clientPhone: clients.contactPhone,
           leadName: leads.name,
           leadCompany: leads.company,
+          leadCnpj: leads.cnpj,
+          leadEmail: leads.contactEmail,
+          leadPhone: leads.contactPhone,
         })
         .from(quotations)
         .leftJoin(clients, eq(quotations.clientId, clients.id))

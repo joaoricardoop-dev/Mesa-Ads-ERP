@@ -24,6 +24,7 @@ interface ProposalPDFData {
   }>;
   validityDays?: number;
   pixDiscountPercent?: number;
+  hasPartnerDiscount?: boolean;
 }
 
 const FONT_NAME = "HostGrotesk";
@@ -117,8 +118,8 @@ function drawHeader(doc: jsPDF, pageWidth: number, margin: number) {
 
   try {
     const logoWidth = 40;
-    const logoHeight = 14;
-    doc.addImage(LOGO_WHITE_BASE64, "PNG", margin, 12, logoWidth, logoHeight);
+    const logoHeight = logoWidth / 4.254;
+    doc.addImage(LOGO_WHITE_BASE64, "PNG", margin, 14, logoWidth, logoHeight);
   } catch {
     doc.setTextColor(...WHITE);
     doc.setFontSize(22);
@@ -281,14 +282,16 @@ export function generateProposalPdf(data: ProposalPDFData) {
 
   if (discountPercent > 0) {
     y += 4;
-    y = checkPageBreak(doc, y, 55);
+    const hasPartner = data.hasPartnerDiscount === true;
+    const discountBoxHeight = hasPartner ? 52 : 42;
+    y = checkPageBreak(doc, y, discountBoxHeight + 15);
     y = drawSectionTitle(doc, "DESCONTO APLICADO", y, margin);
 
     doc.setFillColor(245, 255, 245);
-    doc.roundedRect(margin, y, contentWidth, 42, 3, 3, "F");
+    doc.roundedRect(margin, y, contentWidth, discountBoxHeight, 3, 3, "F");
     doc.setDrawColor(...GREEN);
     doc.setLineWidth(0.3);
-    doc.roundedRect(margin, y, contentWidth, 42, 3, 3, "S");
+    doc.roundedRect(margin, y, contentWidth, discountBoxHeight, 3, 3, "S");
     doc.setLineWidth(0.2);
 
     doc.setTextColor(...GRAY);
@@ -317,17 +320,29 @@ export function generateProposalPdf(data: ProposalPDFData) {
     doc.setDrawColor(220, 220, 220);
     doc.line(margin + 10, y + 28, pageWidth - margin - 10, y + 28);
 
+    if (hasPartner) {
+      doc.setTextColor(...GREEN);
+      doc.setFontSize(7.5);
+      doc.setFont(FONT_NAME, "bold");
+      doc.text("✦  Inclui desconto de parceiro (−10%)", margin + 10, y + 35);
+
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin + 10, y + 38, pageWidth - margin - 10, y + 38);
+    }
+
+    const econY = hasPartner ? y + 46 : y + 36;
+
     doc.setTextColor(...GRAY);
     doc.setFontSize(8);
     doc.setFont(FONT_NAME, "normal");
-    doc.text("Economia total", margin + 10, y + 36);
+    doc.text("Economia total", margin + 10, econY);
 
     doc.setTextColor(...GREEN);
     doc.setFontSize(11);
     doc.setFont(FONT_NAME, "bold");
-    doc.text(`${fmtCurrency(discountValue)}  (−${fmtPercent(discountPercent)})`, pageWidth - margin - 10, y + 36, { align: "right" });
+    doc.text(`${fmtCurrency(discountValue)}  (−${fmtPercent(discountPercent)})`, pageWidth - margin - 10, econY, { align: "right" });
 
-    y += 52;
+    y += discountBoxHeight + 10;
   }
 
   if (data.restaurants.length > 0) {

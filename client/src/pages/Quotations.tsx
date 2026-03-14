@@ -560,11 +560,11 @@ export default function Quotations() {
                               coasters: r.coasterQuantity || 0,
                             }));
                             generateProposalPdf({
-                              clientName: q.clientName || "Cliente",
-                              clientCompany: q.clientCompany || undefined,
-                              clientCnpj: q.clientCnpj || undefined,
-                              clientEmail: q.clientEmail || undefined,
-                              clientPhone: q.clientPhone || undefined,
+                              clientName: q.clientName || q.leadName || "Cliente",
+                              clientCompany: q.clientCompany || q.leadCompany || undefined,
+                              clientCnpj: q.clientCnpj || q.leadCnpj || undefined,
+                              clientEmail: q.clientEmail || q.leadEmail || undefined,
+                              clientPhone: q.clientPhone || q.leadPhone || undefined,
                               quotationName: q.quotationName || q.quotationNumber,
                               coasterVolume: q.coasterVolume,
                               numRestaurants: numRest,

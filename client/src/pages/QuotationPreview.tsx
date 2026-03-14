@@ -220,15 +220,17 @@ export default function QuotationPreview() {
     onError: (err) => toast.error(`Erro ao criar cotação: ${err.message}`),
   });
 
+  const selectedLead = leadsList.find((l: any) => l.id === parseInt(selectedLeadId));
+
   const handleExportPdf = () => {
-    if (selectedClientId === "none") { toast.error("Selecione um cliente antes de exportar"); return; }
+    if (selectedClientId === "none" && selectedLeadId === "none") { toast.error("Selecione um cliente ou lead antes de exportar"); return; }
     try {
     generateProposalPdf({
-      clientName: selectedClient?.name || "Cliente",
-      clientCompany: selectedClient?.company || undefined,
-      clientCnpj: selectedClient?.cnpj || undefined,
-      clientEmail: selectedClient?.contactEmail || undefined,
-      clientPhone: selectedClient?.contactPhone || undefined,
+      clientName: selectedClient?.name || selectedLead?.name || "Cliente",
+      clientCompany: selectedClient?.company || selectedLead?.company || undefined,
+      clientCnpj: selectedClient?.cnpj || selectedLead?.cnpj || undefined,
+      clientEmail: selectedClient?.contactEmail || selectedLead?.contactEmail || undefined,
+      clientPhone: selectedClient?.contactPhone || selectedLead?.contactPhone || undefined,
       coasterVolume: totalCoasters,
       numRestaurants: allocatedRestaurants.length > 0 ? allocatedRestaurants.length : n,
       coastersPerRestaurant: allocatedRestaurants.length > 0 ? Math.round(totalCoasters / allocatedRestaurants.length) : inputs.coastersPerRestaurant,
