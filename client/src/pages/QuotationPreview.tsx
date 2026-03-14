@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -114,6 +116,7 @@ export default function QuotationPreview() {
   const urlLeadId = urlParams.get("leadId");
   const [selectedClientId, setSelectedClientId] = useState<string>(urlClientId || "none");
   const [selectedLeadId, setSelectedLeadId] = useState<string>(urlLeadId || "none");
+  const [hasPartnerDiscount, setHasPartnerDiscount] = useState(false);
 
   const { data: budgetsList = [] } = trpc.budget.listActiveWithItems.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
@@ -239,6 +242,7 @@ export default function QuotationPreview() {
       monthlyTotal: revenue,
       contractTotal: ue.contractValue,
       includesProduction: true,
+      hasPartnerDiscount,
       restaurants: allocatedRestaurants.map(r => ({
         name: r.name,
         neighborhood: r.neighborhood,
@@ -267,6 +271,7 @@ export default function QuotationPreview() {
       unitPrice: String(pr.sellingPrice),
       totalValue: String(totalValueCalc),
       includesProduction: true,
+      hasPartnerDiscount,
       notes: selectedBudget
         ? `Orçamento: ${selectedBudget.code || selectedBudget.description} | ${n} restaurantes, ${inputs.coastersPerRestaurant} coasters/rest, markup ${inputs.pricingType === "variable" ? inputs.markupPercent + "%" : "fixo R$" + inputs.fixedPrice}, duração ${d} meses`
         : `${n} restaurantes, ${inputs.coastersPerRestaurant} coasters/rest, markup ${inputs.pricingType === "variable" ? inputs.markupPercent + "%" : "fixo R$" + inputs.fixedPrice}, duração ${d} meses`,
@@ -378,6 +383,21 @@ export default function QuotationPreview() {
                     </Select>
                   </div>
                   <p className="text-[10px] text-muted-foreground">O nome da cotação será gerado automaticamente como: <span className="font-mono text-foreground/70">{`{Mês Ano} | {Anunciante} | {Volume}`}</span></p>
+                  <div className="flex items-center gap-3 p-3 rounded-lg border border-green-500/30 bg-green-500/5 mt-1">
+                    <Switch
+                      id="preview-partner-discount"
+                      checked={hasPartnerDiscount}
+                      onCheckedChange={setHasPartnerDiscount}
+                    />
+                    <Label htmlFor="preview-partner-discount" className="cursor-pointer text-sm font-medium text-green-500">
+                      Desconto de parceiro (−10%)
+                    </Label>
+                    {hasPartnerDiscount && (
+                      <Badge variant="outline" className="bg-green-500/20 text-green-500 border-green-500/30 text-[10px] ml-auto">
+                        Parceiro
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
 

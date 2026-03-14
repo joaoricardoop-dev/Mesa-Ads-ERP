@@ -155,6 +155,7 @@ interface QuotationForm {
   notes: string;
   validUntil: string;
   isBonificada: boolean;
+  hasPartnerDiscount: boolean;
 }
 
 const emptyForm: QuotationForm = {
@@ -170,6 +171,7 @@ const emptyForm: QuotationForm = {
   notes: "",
   validUntil: "",
   isBonificada: false,
+  hasPartnerDiscount: false,
 };
 
 const STATUS_CONFIG: Record<QuotationStatus, { label: string; className: string }> = {
@@ -304,6 +306,7 @@ export default function Quotations() {
       notes: form.notes || undefined,
       validUntil: form.validUntil || undefined,
       isBonificada: form.isBonificada,
+      hasPartnerDiscount: form.hasPartnerDiscount,
     };
 
     if (editingId) {
@@ -326,6 +329,7 @@ export default function Quotations() {
       notes: q.notes || "",
       validUntil: q.validUntil || "",
       isBonificada: q.isBonificada ?? false,
+      hasPartnerDiscount: q.hasPartnerDiscount ?? false,
     });
     setIsDialogOpen(true);
   };
@@ -773,6 +777,21 @@ export default function Quotations() {
               {form.isBonificada && (
                 <Badge variant="outline" className="bg-amber-500/20 text-amber-500 border-amber-500/30 text-[10px] ml-auto">
                   Bonificada
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-green-500/30 bg-green-500/5">
+              <Switch
+                id="partner-discount-toggle"
+                checked={form.hasPartnerDiscount}
+                onCheckedChange={(checked) => setForm({ ...form, hasPartnerDiscount: checked })}
+              />
+              <Label htmlFor="partner-discount-toggle" className="cursor-pointer text-sm font-medium text-green-500">
+                Desconto de parceiro (−10%)
+              </Label>
+              {form.hasPartnerDiscount && (
+                <Badge variant="outline" className="bg-green-500/20 text-green-500 border-green-500/30 text-[10px] ml-auto">
+                  Parceiro
                 </Badge>
               )}
             </div>

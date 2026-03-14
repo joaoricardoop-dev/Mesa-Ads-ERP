@@ -88,6 +88,7 @@ export const quotationRouter = router({
           lossReason: quotations.lossReason,
           createdBy: quotations.createdBy,
           isBonificada: quotations.isBonificada,
+          hasPartnerDiscount: quotations.hasPartnerDiscount,
           createdAt: quotations.createdAt,
           updatedAt: quotations.updatedAt,
           clientName: clients.name,
@@ -135,6 +136,7 @@ export const quotationRouter = router({
           lossReason: quotations.lossReason,
           createdBy: quotations.createdBy,
           isBonificada: quotations.isBonificada,
+          hasPartnerDiscount: quotations.hasPartnerDiscount,
           createdAt: quotations.createdAt,
           updatedAt: quotations.updatedAt,
           publicToken: quotations.publicToken,
@@ -175,6 +177,7 @@ export const quotationRouter = router({
       validUntil: z.string().optional(),
       createdBy: z.string().optional(),
       isBonificada: z.boolean().optional(),
+      hasPartnerDiscount: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -215,6 +218,7 @@ export const quotationRouter = router({
         validUntil: input.validUntil,
         createdBy: input.createdBy,
         isBonificada: input.isBonificada ?? false,
+        hasPartnerDiscount: input.hasPartnerDiscount ?? false,
       }).returning();
 
       return created;
@@ -237,6 +241,7 @@ export const quotationRouter = router({
       status: z.enum(["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]).optional(),
       lossReason: z.string().optional(),
       isBonificada: z.boolean().optional(),
+      hasPartnerDiscount: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
