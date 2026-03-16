@@ -279,6 +279,7 @@ export default function PriceTable() {
       unitPrice: unitPriceStr,
       totalValue: totalValueStr,
       includesProduction: true,
+      productId: 1,
       notes: cotacaoNotes ? `${notesAuto}\n${cotacaoNotes}` : notesAuto,
     });
   };
