@@ -27,3 +27,5 @@ CREATE TABLE IF NOT EXISTS "product_pricing_tiers" (
 CREATE INDEX IF NOT EXISTS "idx_product_pricing_tiers_product_id" ON "product_pricing_tiers" ("productId");
 --> statement-breakpoint
 ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "productId" integer REFERENCES "products"("id");
+--> statement-breakpoint
+UPDATE "quotations" SET "productId" = 1 WHERE "productId" IS NULL;
