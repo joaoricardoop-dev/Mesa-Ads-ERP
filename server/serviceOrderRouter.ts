@@ -100,6 +100,7 @@ export const serviceOrderRouter = router({
       estimatedDeadline: z.string().optional(),
       artPdfUrl: z.string().optional(),
       artImageUrls: z.string().optional(),
+      productId: z.number().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();

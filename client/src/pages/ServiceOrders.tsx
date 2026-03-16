@@ -191,6 +191,7 @@ export default function ServiceOrders() {
       }
     }
 
+    const selectedCampaign = form.campaignId ? campaignsList.find(c => c.id === form.campaignId) : null;
     const payload: any = {
       type: form.type,
       description: form.description || undefined,
@@ -207,6 +208,7 @@ export default function ServiceOrders() {
       coasterVolume: form.coasterVolume || undefined,
       campaignId: form.campaignId || undefined,
       clientId: form.clientId || undefined,
+      productId: selectedCampaign?.productId || undefined,
     };
 
     if (editingId) {
