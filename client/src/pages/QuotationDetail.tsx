@@ -323,6 +323,12 @@ export default function QuotationDetail() {
                   <Package className="w-3.5 h-3.5" /> Detalhes
                 </h3>
                 <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                  {quotation.productName && (
+                    <>
+                      <span className="text-muted-foreground">Produto</span>
+                      <span className="font-medium">{quotation.productName}</span>
+                    </>
+                  )}
                   <span className="text-muted-foreground">Volume</span>
                   <span className="font-mono font-medium">{quotation.coasterVolume.toLocaleString("pt-BR")} un.</span>
                   <span className="text-muted-foreground">Tipo</span>

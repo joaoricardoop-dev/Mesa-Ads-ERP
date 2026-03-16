@@ -1,7 +1,7 @@
 import { internalProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { serviceOrders, campaigns, clients, quotations, campaignHistory } from "../drizzle/schema";
+import { serviceOrders, campaigns, clients, quotations, campaignHistory, products } from "../drizzle/schema";
 import { eq, and, desc, sql, inArray, ilike } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -47,9 +47,11 @@ export const serviceOrderRouter = router({
 
       const campaignIds = Array.from(new Set(rows.map(r => r.campaignId).filter((v): v is number => v != null)));
       const clientIds = Array.from(new Set(rows.map(r => r.clientId).filter((v): v is number => v != null)));
+      const productIds = Array.from(new Set(rows.map(r => r.productId).filter((v): v is number => v != null)));
 
       const campaignMap: Record<number, string> = {};
       const clientMap: Record<number, string> = {};
+      const productMap: Record<number, string> = {};
 
       if (campaignIds.length > 0) {
         const campRows = await db.select({ id: campaigns.id, name: campaigns.name }).from(campaigns).where(inArray(campaigns.id, campaignIds));
@@ -59,11 +61,16 @@ export const serviceOrderRouter = router({
         const cliRows = await db.select({ id: clients.id, name: clients.name }).from(clients).where(inArray(clients.id, clientIds));
         for (const c of cliRows) clientMap[c.id] = c.name;
       }
+      if (productIds.length > 0) {
+        const prodRows = await db.select({ id: products.id, name: products.name }).from(products).where(inArray(products.id, productIds));
+        for (const p of prodRows) productMap[p.id] = p.name;
+      }
 
       return rows.map(r => ({
         ...r,
         campaignName: r.campaignId ? (campaignMap[r.campaignId] || "—") : "—",
         clientName: r.clientId ? (clientMap[r.clientId] || "—") : "—",
+        productName: r.productId ? (productMap[r.productId] || null) : null,
       }));
     }),
 
@@ -195,6 +202,7 @@ export const serviceOrderRouter = router({
             batchSize: q.coasterVolume,
             batchCost: "1200.00",
             notes: q.notes,
+            productId: q.productId,
           }).returning();
 
           await db.insert(campaignHistory).values({

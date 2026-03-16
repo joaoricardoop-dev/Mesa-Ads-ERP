@@ -529,7 +529,8 @@ export default function CampaignDetail() {
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {client?.name || "—"} {client?.company ? `· ${client.company}` : ""} · ID #{campaign.id}
+                  {client?.name || "—"} {client?.company ? `· ${client.company}` : ""}
+                  {campaign.productName ? ` · ${campaign.productName}` : ""} · ID #{campaign.id}
                 </p>
               </div>
             </div>

@@ -15,6 +15,7 @@ import {
   suppliers,
   budgets,
   budgetItems,
+  products,
   type InsertRestaurant,
   type InsertClient,
   type InsertCampaign,
@@ -161,13 +162,16 @@ export async function listCampaigns() {
       batchCost: campaigns.batchCost,
       budgetId: campaigns.budgetId,
       isBonificada: campaigns.isBonificada,
+      productId: campaigns.productId,
       createdAt: campaigns.createdAt,
       updatedAt: campaigns.updatedAt,
       clientName: clients.name,
       clientCompany: clients.company,
+      productName: products.name,
     })
     .from(campaigns)
     .leftJoin(clients, eq(campaigns.clientId, clients.id))
+    .leftJoin(products, eq(campaigns.productId, products.id))
     .orderBy(desc(campaigns.createdAt));
   return result;
 }
@@ -176,11 +180,16 @@ export async function getCampaign(id: number) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db
-    .select()
+    .select({
+      campaign: campaigns,
+      productName: products.name,
+    })
     .from(campaigns)
+    .leftJoin(products, eq(campaigns.productId, products.id))
     .where(eq(campaigns.id, id))
     .limit(1);
-  return result[0];
+  if (!result[0]) return undefined;
+  return { ...result[0].campaign, productName: result[0].productName };
 }
 
 export async function createCampaign(data: Omit<InsertCampaign, "id" | "createdAt" | "updatedAt">) {

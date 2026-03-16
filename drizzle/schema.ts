@@ -141,6 +141,7 @@ export const campaigns = pgTable("campaigns", {
   productionCost: decimal("productionCost", { precision: 12, scale: 2 }),
   freightCost: decimal("freightCost", { precision: 12, scale: 2 }),
   isBonificada: boolean("isBonificada").default(false).notNull(),
+  productId: integer("productId").references(() => products.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -488,6 +489,7 @@ export const serviceOrders = pgTable("service_orders", {
   signedByCpf: varchar("signedByCpf", { length: 20 }),
   signedAt: timestamp("signedAt"),
   signatureHash: varchar("signatureHash", { length: 128 }),
+  productId: integer("productId").references(() => products.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [

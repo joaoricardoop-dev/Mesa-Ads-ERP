@@ -502,6 +502,7 @@ export default function Campaigns() {
                           <p className="text-xs text-muted-foreground truncate">
                             {c.clientName || "—"}
                             {c.clientCompany ? ` · ${c.clientCompany}` : ""}
+                            {c.productName ? ` · ${c.productName}` : ""}
                           </p>
                         </div>
                       </div>

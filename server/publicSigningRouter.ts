@@ -251,6 +251,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
           batchCost: "1200.00",
           notes: quotation[0].notes,
           isBonificada,
+          productId: quotation[0].productId,
         }).returning();
 
         campaignId = campaign.id;

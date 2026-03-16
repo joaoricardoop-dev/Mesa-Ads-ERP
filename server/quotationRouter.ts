@@ -350,6 +350,7 @@ export const quotationRouter = router({
         batchCost: "1200.00",
         notes: quotation[0].notes,
         isBonificada: quotation[0].isBonificada,
+        productId: quotation[0].productId,
       }).returning();
 
       await db.insert(campaignHistory).values({
@@ -463,6 +464,7 @@ export const quotationRouter = router({
         paymentTerms: input.paymentTerms,
         status: "rascunho" as const,
         batchSelectionJson: input.batchIds ? JSON.stringify(input.batchIds) : undefined,
+        productId: quotation[0].productId,
       }).returning();
 
       await db
@@ -660,6 +662,7 @@ export const quotationRouter = router({
         batchCost: "1200.00",
         notes: quotation[0].notes,
         isBonificada,
+        productId: quotation[0].productId,
       }).returning();
 
       await db.insert(campaignBatchAssignments).values(

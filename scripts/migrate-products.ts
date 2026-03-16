@@ -87,6 +87,22 @@ async function main() {
     await client.query('UPDATE quotations SET "productId" = 1 WHERE "productId" IS NULL');
     console.log("Backfilled quotations with productId=1");
 
+    const campCol = await client.query("SELECT column_name FROM information_schema.columns WHERE table_name='campaigns' AND column_name='productId'");
+    if (campCol.rows.length === 0) {
+      await client.query('ALTER TABLE campaigns ADD COLUMN "productId" integer REFERENCES products(id) ON DELETE SET NULL');
+      console.log("Added productId column to campaigns");
+    }
+    await client.query('UPDATE campaigns SET "productId" = 1 WHERE "productId" IS NULL');
+    console.log("Backfilled campaigns with productId=1");
+
+    const soCol = await client.query("SELECT column_name FROM information_schema.columns WHERE table_name='service_orders' AND column_name='productId'");
+    if (soCol.rows.length === 0) {
+      await client.query('ALTER TABLE service_orders ADD COLUMN "productId" integer REFERENCES products(id) ON DELETE SET NULL');
+      console.log("Added productId column to service_orders");
+    }
+    await client.query('UPDATE service_orders SET "productId" = 1 WHERE "productId" IS NULL');
+    console.log("Backfilled service_orders with productId=1");
+
     console.log("Products migration complete");
   } finally {
     client.release();

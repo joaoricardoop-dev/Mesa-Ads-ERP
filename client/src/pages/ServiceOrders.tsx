@@ -388,7 +388,10 @@ export default function ServiceOrders() {
                       <td className="p-3">
                         <div>
                           <p className="text-sm font-medium truncate max-w-[200px]">{order.clientName || "—"}</p>
-                          <p className="text-xs text-muted-foreground truncate max-w-[200px]">{order.campaignName || "—"}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            {order.campaignName || "—"}
+                            {order.productName ? ` · ${order.productName}` : ""}
+                          </p>
                         </div>
                       </td>
                       <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">

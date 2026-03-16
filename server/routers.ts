@@ -1285,6 +1285,7 @@ export const appRouter = router({
             description: `OS de produção para campanha ${campaign.name}`,
             coasterVolume: campaign.coastersPerRestaurant * campaign.activeRestaurants,
             status: "execucao" as const,
+            productId: campaign.productId,
           });
         }
       }),
