@@ -7,6 +7,7 @@ import { serviceOrderRouter } from "./serviceOrderRouter";
 import { termRouter } from "./termRouter";
 import { libraryRouter } from "./libraryRouter";
 import { batchRouter } from "./batchRouter";
+import { productRouter } from "./productRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, anuncianteProcedure, restauranteProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -72,6 +73,7 @@ export const appRouter = router({
   term: termRouter,
   library: libraryRouter,
   batch: batchRouter,
+  product: productRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
 

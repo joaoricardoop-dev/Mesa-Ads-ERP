@@ -736,4 +736,40 @@ export const contacts = pgTable("contacts", {
 export type Contact = typeof contacts.$inferSelect;
 export type InsertContact = typeof contacts.$inferInsert;
 
+// ─── Products (biblioteca de produtos) ────────────────────────────────────────
+
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  unitLabel: varchar("unitLabel", { length: 50 }).notNull().default("unidade"),
+  unitLabelPlural: varchar("unitLabelPlural", { length: 50 }).notNull().default("unidades"),
+  defaultQtyPerLocation: integer("defaultQtyPerLocation").default(500),
+  irpj: decimal("irpj", { precision: 5, scale: 2 }).default("6.00"),
+  comRestaurante: decimal("comRestaurante", { precision: 5, scale: 2 }).default("15.00"),
+  comComercial: decimal("comComercial", { precision: 5, scale: 2 }).default("10.00"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = typeof products.$inferInsert;
+
+export const productPricingTiers = pgTable("product_pricing_tiers", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
+  volumeMin: integer("volumeMin").notNull(),
+  volumeMax: integer("volumeMax"),
+  custoUnitario: decimal("custoUnitario", { precision: 10, scale: 4 }).notNull(),
+  frete: decimal("frete", { precision: 10, scale: 2 }).notNull(),
+  margem: decimal("margem", { precision: 5, scale: 2 }).notNull().default("50.00"),
+  artes: integer("artes").default(1),
+}, (t) => [
+  index("idx_product_pricing_tiers_product_id").on(t.productId),
+]);
+
+export type ProductPricingTier = typeof productPricingTiers.$inferSelect;
+export type InsertProductPricingTier = typeof productPricingTiers.$inferInsert;
+
 export * from "../shared/models/auth";

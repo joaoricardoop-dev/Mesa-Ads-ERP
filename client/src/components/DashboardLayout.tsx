@@ -73,6 +73,7 @@ import {
   ClipboardList,
   Layers,
   Eye,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -137,6 +138,7 @@ const NAV_ENTRIES: NavEntry[] = [
     ],
   },
   { icon: UtensilsCrossed, label: "Restaurantes", path: "/restaurantes" },
+  { icon: Package, label: "Produtos", path: "/produtos", adminOnly: true },
   { icon: Image, label: "Biblioteca", path: "/biblioteca" },
   {
     icon: Settings,
