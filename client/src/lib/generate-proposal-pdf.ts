@@ -25,6 +25,8 @@ interface ProposalPDFData {
   validityDays?: number;
   pixDiscountPercent?: number;
   hasPartnerDiscount?: boolean;
+  productName?: string;
+  productUnitLabelPlural?: string;
 }
 
 const FONT_NAME = "HostGrotesk";
@@ -226,19 +228,21 @@ export function generateProposalPdf(data: ProposalPDFData) {
   doc.setTextColor(...DARK_GRAY);
   doc.setFontSize(9);
   doc.setFont(FONT_NAME, "normal");
+  const unitLabel = data.productUnitLabelPlural || "bolachas de chopp";
+  const prodName = data.productName || "bolachas de chopp personalizadas";
   const aboutText =
-    "A Mesa Ads é especialista em mídia offline de alto impacto: bolachas de chopp personalizadas, distribuídas em restaurantes e bares selecionados. Sua marca presente na mesa do consumidor — no momento mais descontraído do dia, gerando milhares de impressões orgânicas por mês com alta retenção.";
+    `A Mesa Ads é especialista em mídia offline de alto impacto: ${unitLabel} personalizadas, distribuídas em restaurantes e bares selecionados. Sua marca presente na mesa do consumidor — no momento mais descontraído do dia, gerando milhares de impressões orgânicas por mês com alta retenção.`;
   y = justifyText(doc, aboutText, margin, y, contentWidth, 4.5);
   y += 8;
 
   y = checkPageBreak(doc, y, 60);
   y = drawSectionTitle(doc, "DESCRIÇÃO DO SERVIÇO", y, margin);
 
-  y = drawInfoRow(doc, "Formato:", "Bolachas de chopp personalizadas (frente e verso)", y, margin);
-  y = drawInfoRow(doc, "Volume total:", `${fmtNumber(data.coasterVolume)} bolachas/mês`, y, margin);
+  y = drawInfoRow(doc, "Formato:", `${prodName} (frente e verso)`, y, margin);
+  y = drawInfoRow(doc, "Volume total:", `${fmtNumber(data.coasterVolume)} ${unitLabel}/mês`, y, margin);
   if (data.numRestaurants > 0) {
     y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurante${data.numRestaurants !== 1 ? "s" : ""} parceiro${data.numRestaurants !== 1 ? "s" : ""}`, y, margin);
-    y = drawInfoRow(doc, "Por restaurante:", `${fmtNumber(data.coastersPerRestaurant)} bolachas/mês`, y, margin);
+    y = drawInfoRow(doc, "Por restaurante:", `${fmtNumber(data.coastersPerRestaurant)} ${unitLabel}/mês`, y, margin);
   } else {
     y = drawInfoRow(doc, "Distribuição:", "A definir", y, margin);
   }
@@ -375,7 +379,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
 
     autoTable(doc, {
       startY: y,
-      head: [["#", "Restaurante", "Bairro", "Bolachas/mês"]],
+      head: [["#", "Restaurante", "Bairro", `${(data.productUnitLabelPlural || "Bolachas").charAt(0).toUpperCase() + (data.productUnitLabelPlural || "Bolachas").slice(1)}/mês`]],
       body: data.restaurants.map((r, i) => [
         String(i + 1),
         r.name,
@@ -521,7 +525,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
   const conditions = [
     `Esta proposta é válida por ${validityDays} dias a partir da data de emissão.`,
     "Pagamento conforme condições acordadas entre as partes.",
-    "A produção das bolachas será iniciada após aprovação da arte pelo anunciante.",
+    `A produção ${data.productUnitLabelPlural ? "dos " + data.productUnitLabelPlural : "das bolachas"} será iniciada após aprovação da arte pelo anunciante.`,
     "A Mesa Ads se reserva o direito de selecionar os restaurantes parceiros conforme disponibilidade e perfil da campanha.",
     "Valores sujeitos a alteração após o período de validade.",
   ];

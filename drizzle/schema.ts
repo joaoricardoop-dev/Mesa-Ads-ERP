@@ -390,6 +390,7 @@ export const quotations = pgTable("quotations", {
   signatureData: text("signatureData"),
   isBonificada: boolean("isBonificada").default(false).notNull(),
   hasPartnerDiscount: boolean("hasPartnerDiscount").default(false).notNull(),
+  productId: integer("productId").references(() => products.id),
   createdBy: varchar("createdBy", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

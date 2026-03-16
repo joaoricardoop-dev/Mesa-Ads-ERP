@@ -272,6 +272,7 @@ export default function QuotationPreview() {
       totalValue: String(totalValueCalc),
       includesProduction: true,
       hasPartnerDiscount,
+      productId: 1,
       notes: selectedBudget
         ? `Orçamento: ${selectedBudget.code || selectedBudget.description} | ${n} restaurantes, ${inputs.coastersPerRestaurant} coasters/rest, markup ${inputs.pricingType === "variable" ? inputs.markupPercent + "%" : "fixo R$" + inputs.fixedPrice}, duração ${d} meses`
         : `${n} restaurantes, ${inputs.coastersPerRestaurant} coasters/rest, markup ${inputs.pricingType === "variable" ? inputs.markupPercent + "%" : "fixo R$" + inputs.fixedPrice}, duração ${d} meses`,

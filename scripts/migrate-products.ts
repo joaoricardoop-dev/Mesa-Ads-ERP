@@ -79,6 +79,14 @@ async function main() {
       console.log("Bolacha de Chopp already exists (id=" + existing.rows[0].id + "), skipping seed");
     }
 
+    const colCheck = await client.query("SELECT column_name FROM information_schema.columns WHERE table_name='quotations' AND column_name='productId'");
+    if (colCheck.rows.length === 0) {
+      await client.query('ALTER TABLE quotations ADD COLUMN "productId" integer REFERENCES products(id)');
+      console.log("Added productId column to quotations");
+    }
+    await client.query('UPDATE quotations SET "productId" = 1 WHERE "productId" IS NULL');
+    console.log("Backfilled quotations with productId=1");
+
     console.log("Products migration complete");
   } finally {
     client.release();

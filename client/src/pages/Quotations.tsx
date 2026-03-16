@@ -156,6 +156,7 @@ interface QuotationForm {
   validUntil: string;
   isBonificada: boolean;
   hasPartnerDiscount: boolean;
+  productId: number | "";
 }
 
 const emptyForm: QuotationForm = {
@@ -172,6 +173,7 @@ const emptyForm: QuotationForm = {
   validUntil: "",
   isBonificada: false,
   hasPartnerDiscount: false,
+  productId: "",
 };
 
 const STATUS_CONFIG: Record<QuotationStatus, { label: string; className: string }> = {
@@ -212,6 +214,7 @@ export default function Quotations() {
   const utils = trpc.useUtils();
   const { data: quotationsList = [], isLoading } = trpc.quotation.list.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: productsList = [] } = trpc.product.list.useQuery();
   const { data: activeRestaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
   const { data: batchesList = [] } = trpc.batch.list.useQuery();
   const { data: allocatedRestaurants = [] } = trpc.quotation.getRestaurants.useQuery(
@@ -307,6 +310,7 @@ export default function Quotations() {
       validUntil: form.validUntil || undefined,
       isBonificada: form.isBonificada,
       hasPartnerDiscount: form.hasPartnerDiscount,
+      productId: form.productId ? Number(form.productId) : undefined,
     };
 
     if (editingId) {
@@ -330,6 +334,7 @@ export default function Quotations() {
       validUntil: q.validUntil || "",
       isBonificada: q.isBonificada ?? false,
       hasPartnerDiscount: q.hasPartnerDiscount ?? false,
+      productId: q.productId || "",
     });
     setIsDialogOpen(true);
   };
@@ -507,7 +512,10 @@ export default function Quotations() {
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {q.coasterVolume.toLocaleString("pt-BR")} un.
+                    <span>{q.coasterVolume.toLocaleString("pt-BR")} un.</span>
+                    {(q as any).productName && (
+                      <p className="text-[10px] text-muted-foreground/70">{(q as any).productName}</p>
+                    )}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
                     {q.totalValue ? formatCurrency(Number(q.totalValue)) : "—"}
@@ -579,6 +587,8 @@ export default function Quotations() {
                               contractTotal: totalContractValue,
                               includesProduction: q.includesProduction ?? true,
                               restaurants,
+                              productName: (q as any).productName || undefined,
+                              productUnitLabelPlural: (q as any).productUnitLabelPlural || undefined,
                             });
                             toast.success("PDF da proposta gerado!");
                           } catch (err) {
@@ -692,6 +702,25 @@ export default function Quotations() {
                   {clientsList.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       {c.name} {c.company ? `(${c.company})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Produto *</Label>
+              <Select
+                value={form.productId ? String(form.productId) : ""}
+                onValueChange={(v) => setForm({ ...form, productId: Number(v) })}
+              >
+                <SelectTrigger className="bg-background border-border/30">
+                  <SelectValue placeholder="Selecione um produto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {productsList.filter((p: any) => p.isActive).map((p: any) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
