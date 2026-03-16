@@ -57,6 +57,13 @@
       "when": 1773511932525,
       "tag": "0007_dapper_starbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773691800000,
+      "tag": "0008_add_products_and_quotation_productid",
+      "breakpoints": true
     }
   ]
 }

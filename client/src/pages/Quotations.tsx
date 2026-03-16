@@ -295,6 +295,10 @@ export default function Quotations() {
       toast.error("Volume de bolachas deve ser pelo menos 1");
       return;
     }
+    if (!form.productId) {
+      toast.error("Selecione um produto");
+      return;
+    }
 
     const payload = {
       clientId: form.clientId as number,
@@ -310,7 +314,7 @@ export default function Quotations() {
       validUntil: form.validUntil || undefined,
       isBonificada: form.isBonificada,
       hasPartnerDiscount: form.hasPartnerDiscount,
-      productId: form.productId ? Number(form.productId) : undefined,
+      productId: Number(form.productId),
     };
 
     if (editingId) {
@@ -513,8 +517,8 @@ export default function Quotations() {
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
                     <span>{q.coasterVolume.toLocaleString("pt-BR")} un.</span>
-                    {(q as any).productName && (
-                      <p className="text-[10px] text-muted-foreground/70">{(q as any).productName}</p>
+                    {q.productName && (
+                      <p className="text-[10px] text-muted-foreground/70">{q.productName}</p>
                     )}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
@@ -587,8 +591,8 @@ export default function Quotations() {
                               contractTotal: totalContractValue,
                               includesProduction: q.includesProduction ?? true,
                               restaurants,
-                              productName: (q as any).productName || undefined,
-                              productUnitLabelPlural: (q as any).productUnitLabelPlural || undefined,
+                              productName: q.productName || undefined,
+                              productUnitLabelPlural: q.productUnitLabelPlural || undefined,
                             });
                             toast.success("PDF da proposta gerado!");
                           } catch (err) {
@@ -718,7 +722,7 @@ export default function Quotations() {
                   <SelectValue placeholder="Selecione um produto" />
                 </SelectTrigger>
                 <SelectContent>
-                  {productsList.filter((p: any) => p.isActive).map((p: any) => (
+                  {productsList.filter((p) => p.isActive).map((p) => (
                     <SelectItem key={p.id} value={String(p.id)}>
                       {p.name}
                     </SelectItem>

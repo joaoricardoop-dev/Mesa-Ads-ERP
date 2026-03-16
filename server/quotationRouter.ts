@@ -189,7 +189,7 @@ export const quotationRouter = router({
       createdBy: z.string().optional(),
       isBonificada: z.boolean().optional(),
       hasPartnerDiscount: z.boolean().optional(),
-      productId: z.number().optional(),
+      productId: z.number(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -237,7 +237,7 @@ export const quotationRouter = router({
         createdBy: input.createdBy,
         isBonificada: input.isBonificada ?? false,
         hasPartnerDiscount: input.hasPartnerDiscount ?? false,
-        productId: input.productId ?? null,
+        productId: input.productId,
       }).returning();
 
       return created;
