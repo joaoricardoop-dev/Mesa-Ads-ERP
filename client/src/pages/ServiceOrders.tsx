@@ -515,6 +515,17 @@ export default function ServiceOrders() {
               </Select>
             </div>
 
+            {(() => {
+              const editingOrder = editingId ? ordersList.find(o => o.id === editingId) : null;
+              const pName = editingOrder?.productName;
+              return pName ? (
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Produto</Label>
+                  <div className="bg-muted/50 border border-border/30 rounded-md px-3 py-2 text-sm text-muted-foreground">{pName}</div>
+                </div>
+              ) : null;
+            })()}
+
             <div className="grid gap-1.5">
               <Label className="text-xs">Descrição</Label>
               <Textarea

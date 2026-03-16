@@ -64,6 +64,13 @@
       "when": 1773691800000,
       "tag": "0008_add_products_and_quotation_productid",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773692800000,
+      "tag": "0009_add_productid_campaigns_service_orders",
+      "breakpoints": true
     }
   ]
 }
