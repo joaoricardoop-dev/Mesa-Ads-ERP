@@ -517,7 +517,8 @@ export default function ServiceOrders() {
 
             {(() => {
               const editingOrder = editingId ? ordersList.find(o => o.id === editingId) : null;
-              const pName = editingOrder?.productName;
+              const selectedCampaign = form.campaignId ? campaignsList.find(c => c.id === form.campaignId) : null;
+              const pName = editingOrder?.productName || selectedCampaign?.productName || null;
               return pName ? (
                 <div className="grid gap-1.5">
                   <Label className="text-xs">Produto</Label>
