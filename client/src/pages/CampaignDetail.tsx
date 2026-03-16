@@ -529,9 +529,13 @@ export default function CampaignDetail() {
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {client?.name || "—"} {client?.company ? `· ${client.company}` : ""}
-                  {campaign.productName ? ` · ${campaign.productName}` : ""} · ID #{campaign.id}
+                  {client?.name || "—"} {client?.company ? `· ${client.company}` : ""} · ID #{campaign.id}
                 </p>
+                {campaign.productName && (
+                  <Badge variant="outline" className="mt-1 text-xs font-normal bg-blue-500/10 text-blue-400 border-blue-500/20">
+                    {campaign.productName}
+                  </Badge>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
