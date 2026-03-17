@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ClientPresentation from "@/components/ClientPresentation";
 import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
@@ -58,6 +59,7 @@ import {
   DollarSign,
   Clock,
   Link2,
+  Presentation,
 } from "lucide-react";
 
 type QuotationStatus = "rascunho" | "enviada" | "ativa" | "os_gerada" | "win" | "perdida" | "expirada";
@@ -91,6 +93,7 @@ export default function QuotationDetail() {
   const [signingLinkDialogOpen, setSigningLinkDialogOpen] = useState(false);
   const [signingLinkBatchIds, setSigningLinkBatchIds] = useState<number[]>([]);
   const [generatedSigningUrl, setGeneratedSigningUrl] = useState("");
+  const [presentationOpen, setPresentationOpen] = useState(false);
   const [restaurantAllocations, setRestaurantAllocations] = useState<Array<{ restaurantId: number; coasterQuantity: number }>>([]);
   const [addRestaurantId, setAddRestaurantId] = useState<string>("");
 
@@ -323,6 +326,14 @@ export default function QuotationDetail() {
                   <Pencil className="w-3.5 h-3.5" /> Editar
                 </Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-8 border-pink-500/40 text-pink-400 hover:bg-pink-500/10 hover:text-pink-300"
+                onClick={() => setPresentationOpen(true)}
+              >
+                <Presentation className="w-3.5 h-3.5" /> Apresentação
+              </Button>
               <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={handleExportProposal}>
                 <Download className="w-3.5 h-3.5" /> Proposta
               </Button>
@@ -1175,6 +1186,13 @@ export default function QuotationDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ClientPresentation
+        isOpen={presentationOpen}
+        onClose={() => setPresentationOpen(false)}
+        quotation={quotation}
+        quotationItems={quotationItemsList}
+      />
     </div>
   );
 }
