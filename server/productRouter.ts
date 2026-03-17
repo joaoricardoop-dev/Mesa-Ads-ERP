@@ -92,7 +92,7 @@ export const productRouter = router({
         .orderBy(asc(productPricingTiers.volumeMin));
     }),
 
-  upsertTiers: adminProcedure
+  upsertTiers: protectedProcedure
     .input(z.object({
       productId: z.number(),
       tiers: z.array(z.object({

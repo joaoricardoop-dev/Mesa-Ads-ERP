@@ -291,6 +291,29 @@ export function calcPricing(
   };
 }
 
+const DEFAULT_PRODUCT_TIERS: ProductPricingTier[] = [
+  { volumeMin: 1000,  volumeMax: 1999,  custoUnitario: "0.4190", frete: "80.38",   margem: "50.00", artes: 1 },
+  { volumeMin: 2000,  volumeMax: 2999,  custoUnitario: "0.3495", frete: "138.16",  margem: "50.00", artes: 1 },
+  { volumeMin: 3000,  volumeMax: 3999,  custoUnitario: "0.3330", frete: "219.03",  margem: "50.00", artes: 1 },
+  { volumeMin: 4000,  volumeMax: 4999,  custoUnitario: "0.3248", frete: "299.41",  margem: "50.00", artes: 1 },
+  { volumeMin: 5000,  volumeMax: 5999,  custoUnitario: "0.2998", frete: "357.19",  margem: "50.00", artes: 1 },
+  { volumeMin: 6000,  volumeMax: 6999,  custoUnitario: "0.2998", frete: "438.06",  margem: "50.00", artes: 1 },
+  { volumeMin: 7000,  volumeMax: 7999,  custoUnitario: "0.2998", frete: "518.44",  margem: "50.00", artes: 1 },
+  { volumeMin: 8000,  volumeMax: 8999,  custoUnitario: "0.2998", frete: "576.22",  margem: "50.00", artes: 1 },
+  { volumeMin: 9000,  volumeMax: 9999,  custoUnitario: "0.2998", frete: "657.09",  margem: "50.00", artes: 1 },
+  { volumeMin: 10000, volumeMax: 10999, custoUnitario: "0.2700", frete: "737.47",  margem: "50.00", artes: 1 },
+  { volumeMin: 11000, volumeMax: 11999, custoUnitario: "0.2700", frete: "876.12",  margem: "50.00", artes: 1 },
+  { volumeMin: 12000, volumeMax: 12999, custoUnitario: "0.2700", frete: "956.50",  margem: "50.00", artes: 1 },
+  { volumeMin: 13000, volumeMax: 13999, custoUnitario: "0.2700", frete: "1094.66", margem: "50.00", artes: 1 },
+  { volumeMin: 14000, volumeMax: 14999, custoUnitario: "0.2700", frete: "1175.53", margem: "50.00", artes: 1 },
+  { volumeMin: 15000, volumeMax: 15999, custoUnitario: "0.2700", frete: "1255.91", margem: "50.00", artes: 1 },
+  { volumeMin: 16000, volumeMax: 16999, custoUnitario: "0.2700", frete: "1313.69", margem: "50.00", artes: 1 },
+  { volumeMin: 17000, volumeMax: 17999, custoUnitario: "0.2700", frete: "1394.56", margem: "50.00", artes: 1 },
+  { volumeMin: 18000, volumeMax: 18999, custoUnitario: "0.2700", frete: "1474.94", margem: "50.00", artes: 1 },
+  { volumeMin: 19000, volumeMax: 19999, custoUnitario: "0.2700", frete: "1532.72", margem: "50.00", artes: 1 },
+  { volumeMin: 20000, volumeMax: null,  custoUnitario: "0.2600", frete: "1613.59", margem: "50.00", artes: 1 },
+];
+
 interface TierLookupResult {
   custoUnitario: number;
   frete: number;
@@ -352,13 +375,12 @@ export function useSimulator(
     []
   );
 
+  const activeTiers = productTiers && productTiers.length > 0 ? productTiers : DEFAULT_PRODUCT_TIERS;
+
   const tierLookup = useMemo<TierLookupResult | null>(() => {
-    if (productTiers && productTiers.length > 0) {
-      const totalCoasters = inputs.coastersPerRestaurant * inputs.activeRestaurants;
-      return lookupTierCost(productTiers, totalCoasters);
-    }
-    return null;
-  }, [productTiers, inputs.coastersPerRestaurant, inputs.activeRestaurants]);
+    const totalCoasters = inputs.coastersPerRestaurant * inputs.activeRestaurants;
+    return lookupTierCost(activeTiers, totalCoasters);
+  }, [activeTiers, inputs.coastersPerRestaurant, inputs.activeRestaurants]);
 
   const effectiveUnitCost = useMemo(() => {
     if (selectedBudget && selectedBudget.items.length > 0) {

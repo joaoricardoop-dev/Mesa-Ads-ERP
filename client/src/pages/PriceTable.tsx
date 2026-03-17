@@ -358,6 +358,10 @@ export default function PriceTable() {
       toast.error("Selecione um cliente ou lead");
       return;
     }
+    if (!selectedProductId) {
+      toast.error("Selecione um produto");
+      return;
+    }
     if (cotacaoVolume < 1) {
       toast.error("Volume deve ser no mínimo 1");
       return;
@@ -380,7 +384,7 @@ export default function PriceTable() {
       unitPrice: unitPriceStr,
       totalValue: totalValueStr,
       includesProduction: true,
-      productId: selectedProductId || 1,
+      productId: selectedProductId!,
       notes: cotacaoNotes ? `${notesAuto}\n${cotacaoNotes}` : notesAuto,
     });
   };

@@ -287,6 +287,10 @@ export default function QuotationPreview() {
       toast.error("Selecione um cliente ou lead");
       return;
     }
+    if (!selectedProductId) {
+      toast.error("Selecione um produto");
+      return;
+    }
 
     const totalValueCalc = pr.sellingPrice * n * d;
 
@@ -300,7 +304,7 @@ export default function QuotationPreview() {
       totalValue: String(totalValueCalc),
       includesProduction: true,
       hasPartnerDiscount,
-      productId: selectedProductId || 1,
+      productId: selectedProductId!,
       notes: selectedBudget
         ? `Orçamento: ${selectedBudget.code || selectedBudget.description} | ${n} restaurantes, ${inputs.coastersPerRestaurant} ${unitLabel}/rest, markup ${inputs.pricingType === "variable" ? inputs.markupPercent + "%" : "fixo R$" + inputs.fixedPrice}, duração ${d} meses`
         : `${n} restaurantes, ${inputs.coastersPerRestaurant} ${unitLabel}/rest, markup ${inputs.pricingType === "variable" ? inputs.markupPercent + "%" : "fixo R$" + inputs.fixedPrice}, duração ${d} meses`,
