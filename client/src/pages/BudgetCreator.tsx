@@ -11,7 +11,7 @@ import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
 import { Separator } from "../components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group";
-import { Trash2, Plus, Calculator } from "lucide-react";
+import { Trash2, Plus, Calculator, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import {
   SEMANAS_OPTIONS,
@@ -122,35 +122,33 @@ function BudgetItemCard({ item, productsList, params, onUpdate, onRemove, index 
 
   const pricingInput = getItemPricingInput(item);
   const calc = pricingInput ? calcItemPrice(pricingInput, params) : null;
-
   const isBonificada = params.isBonificada;
 
   const tierLabel = (tier: PricingTier) => {
-    const max = tier.volumeMax ? `–${tier.volumeMax.toLocaleString("pt-BR")}` : "+";
-    return `${tier.volumeMin.toLocaleString("pt-BR")}${max}`;
+    if (tier.volumeMax) {
+      return `${tier.volumeMin.toLocaleString("pt-BR")} – ${tier.volumeMax.toLocaleString("pt-BR")} unid.`;
+    }
+    return `${tier.volumeMin.toLocaleString("pt-BR")}+ unid.`;
   };
 
   return (
-    <Card className="border border-neutral-700 bg-neutral-800/50">
-      <CardHeader className="pb-2 pt-3 px-4 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm font-semibold text-neutral-300">
-          Item {index + 1}
-          {item.productName && (
-            <span className="ml-2 text-neutral-400 font-normal">— {item.productName}</span>
-          )}
-        </CardTitle>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-neutral-500 hover:text-red-400"
-          onClick={() => onRemove(item.id)}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </CardHeader>
-      <CardContent className="px-4 pb-4 space-y-3">
+    <Card className="border border-border/40">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Produto {index + 1}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+            onClick={() => onRemove(item.id)}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+
         <div>
-          <Label className="text-xs text-neutral-400 mb-1 block">Produto</Label>
           <Select
             value={item.productId ? String(item.productId) : ""}
             onValueChange={(v) => {
@@ -165,7 +163,7 @@ function BudgetItemCard({ item, productsList, params, onUpdate, onRemove, index 
               });
             }}
           >
-            <SelectTrigger className="h-8 text-sm bg-neutral-900 border-neutral-600">
+            <SelectTrigger className="h-9 text-sm">
               <SelectValue placeholder="Selecionar produto..." />
             </SelectTrigger>
             <SelectContent>
@@ -179,23 +177,23 @@ function BudgetItemCard({ item, productsList, params, onUpdate, onRemove, index 
         </div>
 
         {item.productId && tiersLoading && (
-          <p className="text-xs text-neutral-500">Carregando faixas...</p>
+          <p className="text-xs text-muted-foreground">Carregando faixas de preço...</p>
         )}
 
         {item.productId && !tiersLoading && item.hasTiers && item.tiers.length > 0 && (
           <div>
-            <Label className="text-xs text-neutral-400 mb-1 block">Volume</Label>
+            <Label className="text-xs text-muted-foreground mb-1 block">Faixa de volume</Label>
             <Select
               value={String(item.volumeIdx)}
               onValueChange={(v) => onUpdate(item.id, { volumeIdx: Number(v) })}
             >
-              <SelectTrigger className="h-8 text-sm bg-neutral-900 border-neutral-600">
+              <SelectTrigger className="h-9 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {item.tiers.map((tier, idx) => (
                   <SelectItem key={tier.id} value={String(idx)}>
-                    {tierLabel(tier)} unid.
+                    {tierLabel(tier)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -206,57 +204,55 @@ function BudgetItemCard({ item, productsList, params, onUpdate, onRemove, index 
         {item.productId && !tiersLoading && !item.hasTiers && (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs text-neutral-400 mb-1 block">Quantidade</Label>
+              <Label className="text-xs text-muted-foreground mb-1 block">Quantidade</Label>
               <Input
                 type="number"
                 min={1}
                 value={item.freeVolume || ""}
                 onChange={(e) => onUpdate(item.id, { freeVolume: parseInt(e.target.value) || 1 })}
-                className="h-8 text-sm bg-neutral-900 border-neutral-600"
+                className="h-9 text-sm"
               />
             </div>
             <div>
-              <Label className="text-xs text-neutral-400 mb-1 block">Custo unit. (R$)</Label>
+              <Label className="text-xs text-muted-foreground mb-1 block">Custo unit. (R$)</Label>
               <Input
                 type="number"
                 min={0}
                 step={0.01}
                 value={item.freeManualCost || ""}
                 onChange={(e) => onUpdate(item.id, { freeManualCost: parseFloat(e.target.value) || 0 })}
-                className="h-8 text-sm bg-neutral-900 border-neutral-600"
+                className="h-9 text-sm"
               />
             </div>
           </div>
         )}
 
         {calc && pricingInput && (
-          <div className="bg-neutral-900/60 rounded-md p-3 space-y-1 text-xs">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-neutral-400">
-              <span>Volume</span>
-              <span className="text-right text-neutral-200">
-                {pricingInput.volume.toLocaleString("pt-BR")} un.
-              </span>
-              <span>Custo/un.</span>
-              <span className="text-right text-neutral-200">{fmtBRL4(pricingInput.custoUnitario)}</span>
+          <div className="bg-muted/40 rounded-md p-3 space-y-1.5 text-xs border border-border/30">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+              <span className="text-muted-foreground">Volume</span>
+              <span className="text-right font-medium">{pricingInput.volume.toLocaleString("pt-BR")} un.</span>
+              <span className="text-muted-foreground">Custo/un.</span>
+              <span className="text-right font-mono">{fmtBRL4(pricingInput.custoUnitario)}</span>
               {pricingInput.frete > 0 && (
                 <>
-                  <span>Frete total</span>
-                  <span className="text-right text-neutral-200">{fmtBRL(pricingInput.frete)}</span>
+                  <span className="text-muted-foreground">Frete total</span>
+                  <span className="text-right font-mono">{fmtBRL(pricingInput.frete)}</span>
                 </>
               )}
-              <span>Preço unit. base</span>
-              <span className="text-right font-medium text-blue-300">
-                {fmtBRL4(calc.precoUnit4sem)}
-              </span>
+              <span className="text-muted-foreground">Preço/un. base</span>
+              <span className="text-right font-mono font-semibold text-primary">{fmtBRL4(calc.precoUnit4sem)}</span>
             </div>
-            <Separator className="my-1.5 bg-neutral-700" />
-            <div className="flex justify-between font-medium text-neutral-200">
-              <span>Subtotal ({params.semanas}sem)</span>
-              <span className={isBonificada ? "line-through text-neutral-500" : ""}>
+            <Separator />
+            <div className="flex justify-between font-semibold">
+              <span className="text-muted-foreground">Subtotal {params.semanas}sem</span>
+              <span className={isBonificada ? "line-through text-muted-foreground" : ""}>
                 {fmtBRL(calc.precoSemDesconto)}
               </span>
             </div>
-            {isBonificada && <div className="text-right text-green-400 font-semibold text-[11px]">Bonificada — R$ 0,00</div>}
+            {isBonificada && (
+              <div className="text-right text-green-600 dark:text-green-400 font-semibold">Bonificada — R$ 0,00</div>
+            )}
           </div>
         )}
       </CardContent>
@@ -275,138 +271,139 @@ interface BudgetSummaryPanelProps {
 }
 
 function BudgetSummaryPanel({ items, params, clientName, onGerarCotacao, isGenerating }: BudgetSummaryPanelProps) {
-  const itemCalcs: (ItemCalcResult & { item: BudgetItemState; input: ItemPricingInput })[] = useMemo(() => {
+  const itemCalcs = useMemo(() => {
     return items
       .filter((item) => item.productId !== null)
       .flatMap((item) => {
         const input = getItemPricingInput(item);
         if (!input || input.volume <= 0) return [];
         const calc = calcItemPrice(input, params);
-        return [{ ...calc, item, input }];
+        return [{ item, input, calc }];
       });
   }, [items, params]);
 
   const totals = useMemo(
-    () => calcBudgetTotals(itemCalcs as ItemCalcResult[], params),
+    () => calcBudgetTotals(itemCalcs.map((c) => c.calc) as ItemCalcResult[], params),
     [itemCalcs, params]
   );
 
   const hasItems = itemCalcs.length > 0;
 
   return (
-    <div className="space-y-4">
-      <Card className="border border-neutral-700 bg-neutral-800/50 sticky top-4">
+    <div className="space-y-3">
+      <Card className="border border-border/40">
         <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-sm font-semibold text-neutral-200">Resumo do Orçamento</CardTitle>
+          <CardTitle className="text-sm font-semibold">Resumo do Orçamento</CardTitle>
         </CardHeader>
         <CardContent className="px-4 pb-4 space-y-3 text-sm">
-          {clientName && (
-            <div className="flex justify-between text-xs">
-              <span className="text-neutral-400">Cliente</span>
-              <span className="text-neutral-200 font-medium">{clientName}</span>
+          {(clientName || params.semanas) && (
+            <div className="space-y-1.5 text-xs">
+              {clientName && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cliente</span>
+                  <span className="font-medium truncate max-w-[55%] text-right">{clientName}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Duração</span>
+                <span>{params.semanas} semanas · {totals.nPeriodos} {totals.nPeriodos === 1 ? "período" : "períodos"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Pagamento</span>
+                <span>
+                  {params.formaPagamento === "pix" ? "Pix (−5%)" : params.formaPagamento === "boleto" ? "Boleto" : "Cartão"}
+                </span>
+              </div>
             </div>
           )}
-          <div className="flex justify-between text-xs">
-            <span className="text-neutral-400">Duração</span>
-            <span className="text-neutral-200">{params.semanas} semanas ({totals.nPeriodos} períodos)</span>
-          </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-neutral-400">Pagamento</span>
-            <span className="text-neutral-200">
-              {params.formaPagamento === "pix" ? "Pix (−5%)" : params.formaPagamento === "boleto" ? "Boleto" : "Cartão"}
-            </span>
-          </div>
 
-          {hasItems && (
+          {hasItems ? (
             <>
-              <Separator className="bg-neutral-700" />
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">Itens</p>
-                {itemCalcs.map(({ item, input, precoSemDesconto }) => (
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Itens</p>
+                {itemCalcs.map(({ item, input, calc }) => (
                   <div key={item.id} className="flex items-start justify-between gap-2 text-xs">
-                    <div>
-                      <p className="text-neutral-200 font-medium leading-tight">{item.productName}</p>
-                      <p className="text-neutral-500 text-[11px]">
-                        {input.volume.toLocaleString("pt-BR")} × {fmtBRL4(input.volume > 0 ? (precoSemDesconto / (input.volume * totals.nPeriodos)) : 0)}
+                    <div className="min-w-0">
+                      <p className="font-medium leading-tight truncate">{item.productName}</p>
+                      <p className="text-muted-foreground text-[11px]">
+                        {input.volume.toLocaleString("pt-BR")} un. × {fmtBRL4(calc.precoUnit4sem)}
                       </p>
                     </div>
-                    <span className={`text-right shrink-0 ${params.isBonificada ? "line-through text-neutral-500" : "text-neutral-300"}`}>
-                      {fmtBRL(precoSemDesconto)}
+                    <span className={`text-right shrink-0 font-mono font-medium ${params.isBonificada ? "line-through text-muted-foreground" : ""}`}>
+                      {fmtBRL(calc.precoSemDesconto)}
                     </span>
                   </div>
                 ))}
               </div>
 
-              <Separator className="bg-neutral-700" />
-              <div className="space-y-1 text-xs">
-                <div className="flex justify-between text-neutral-400">
+              <Separator />
+              <div className="space-y-1.5 text-xs">
+                <div className="flex justify-between text-muted-foreground">
                   <span>Subtotal</span>
-                  <span>{fmtBRL(totals.subtotal)}</span>
+                  <span className="font-mono">{fmtBRL(totals.subtotal)}</span>
                 </div>
                 {totals.descPrazoVal > 0 && (
-                  <div className="flex justify-between text-amber-400">
+                  <div className="flex justify-between text-amber-600 dark:text-amber-400">
                     <span>Desc. prazo ({DESCONTOS_PRAZO[params.semanas] ?? 0}%)</span>
-                    <span>−{fmtBRL(totals.descPrazoVal)}</span>
+                    <span className="font-mono">−{fmtBRL(totals.descPrazoVal)}</span>
                   </div>
                 )}
                 {totals.ajPagamentoVal !== 0 && (
-                  <div className="flex justify-between text-blue-400">
-                    <span>Aj. pagamento (Pix −5%)</span>
-                    <span>{fmtBRL(totals.ajPagamentoVal)}</span>
+                  <div className="flex justify-between text-blue-600 dark:text-blue-400">
+                    <span>Aj. Pix (−5%)</span>
+                    <span className="font-mono">{fmtBRL(totals.ajPagamentoVal)}</span>
                   </div>
                 )}
                 {totals.descParceiroVal > 0 && (
-                  <div className="flex justify-between text-green-400">
+                  <div className="flex justify-between text-green-600 dark:text-green-400">
                     <span>Desc. parceiro (10%)</span>
-                    <span>−{fmtBRL(totals.descParceiroVal)}</span>
+                    <span className="font-mono">−{fmtBRL(totals.descParceiroVal)}</span>
                   </div>
                 )}
               </div>
 
-              <Separator className="bg-neutral-700" />
+              <Separator />
               <div className="space-y-1">
                 <div className="flex justify-between font-bold text-base">
-                  <span className="text-neutral-100">Total</span>
-                  <span className="text-white">
-                    {params.isBonificada ? "R$ 0,00 (Bonificada)" : fmtBRL(totals.total)}
+                  <span>Total</span>
+                  <span className="font-mono">
+                    {params.isBonificada ? "R$ 0,00" : fmtBRL(totals.total)}
                   </span>
                 </div>
                 {!params.isBonificada && totals.mensal > 0 && (
-                  <div className="flex justify-between text-xs text-neutral-400">
-                    <span>Mensal</span>
-                    <span>{fmtBRL(totals.mensal)}</span>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Mensal ({totals.nPeriodos} períodos)</span>
+                    <span className="font-mono">{fmtBRL(totals.mensal)}</span>
                   </div>
+                )}
+                {params.isBonificada && (
+                  <p className="text-xs text-green-600 dark:text-green-400 font-medium">Campanha bonificada</p>
                 )}
               </div>
             </>
-          )}
-
-          {!hasItems && (
-            <div className="py-6 text-center text-neutral-500 text-xs">
+          ) : (
+            <div className="py-8 text-center text-muted-foreground text-xs">
               Adicione produtos para ver o resumo
             </div>
           )}
         </CardContent>
       </Card>
 
-      <Card className="border border-neutral-700 bg-neutral-800/50">
-        <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-sm font-semibold text-neutral-200">Ações</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4 space-y-2">
-          <Button
-            className="w-full"
-            disabled={!hasItems || isGenerating}
-            onClick={onGerarCotacao}
-          >
-            <Calculator className="h-4 w-4 mr-2" />
-            {isGenerating ? "Gerando..." : "Gerar Cotação"}
-          </Button>
-          <p className="text-[11px] text-neutral-500 text-center">
-            Cria cotação com todos os itens e preços calculados
-          </p>
-        </CardContent>
-      </Card>
+      <Button
+        className="w-full"
+        disabled={!hasItems || isGenerating}
+        onClick={onGerarCotacao}
+        size="lg"
+      >
+        <Calculator className="h-4 w-4 mr-2" />
+        {isGenerating ? "Gerando cotação..." : "Gerar Cotação"}
+      </Button>
+      {hasItems && (
+        <p className="text-[11px] text-muted-foreground text-center leading-tight">
+          Cria cotação com todos os {itemCalcs.length} {itemCalcs.length === 1 ? "produto" : "produtos"} e preços calculados
+        </p>
+      )}
     </div>
   );
 }
@@ -459,7 +456,10 @@ export default function BudgetCreator() {
   }, []);
 
   const removeItem = useCallback((id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+    setItems((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      return next.length === 0 ? [makeBlankItem()] : next;
+    });
   }, []);
 
   const addNewItem = useCallback(() => {
@@ -503,7 +503,7 @@ export default function BudgetCreator() {
   }, [items, globalParams]);
 
   const totals = useMemo(
-    () => calcBudgetTotals(itemCalcs.map((c) => c.calc), globalParams),
+    () => calcBudgetTotals(itemCalcs.map((c) => c.calc) as ItemCalcResult[], globalParams),
     [itemCalcs, globalParams]
   );
 
@@ -539,10 +539,12 @@ export default function BudgetCreator() {
         partnerId: descontoParceiro ? partnerId : null,
       });
 
+      const discountRatio = totals.subtotal > 0 ? totals.total / totals.subtotal : 1;
+
       for (const { item, input, calc } of itemCalcs) {
         const unitPriceFinal = isBonificada
           ? "0"
-          : (calc.precoUnit4sem * (totals.total / (totals.subtotal || 1))).toFixed(4);
+          : (calc.precoUnit4sem * discountRatio).toFixed(4);
 
         await addItem.mutateAsync({
           quotationId: quotation.id,
@@ -563,228 +565,220 @@ export default function BudgetCreator() {
   }, [clientId, leadId, itemCalcs, totals, campaignType, networkProfile, regions, cycles, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate]);
 
   return (
-    <div className="p-6 space-y-4 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 flex-shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-100">Novo Orçamento</h1>
-          <p className="text-sm text-neutral-400 mt-0.5">Montagem multiproduto com cálculo automático de preços</p>
+          <h1 className="text-xl font-bold">Novo Orçamento</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Montagem multiproduto com cálculo automático de preços</p>
         </div>
-        <Button variant="outline" size="sm" onClick={clearAll} className="text-neutral-400 border-neutral-700">
-          Limpar Tudo
+        <Button variant="outline" size="sm" onClick={clearAll} className="gap-1.5">
+          <RotateCcw className="h-3.5 w-3.5" />
+          Limpar
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* ── Coluna Esquerda ──────────────────────────────────── */}
-        <div className="lg:col-span-3 space-y-4">
+      {/* ── Body: 2 colunas cada com scroll independente ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+
+        {/* ── Coluna Esquerda (rolável) ── */}
+        <div className="flex-1 min-w-0 overflow-y-auto p-6 space-y-4 border-r border-border/20">
 
           {/* Dados do Cliente */}
-          <Card className="border border-neutral-700 bg-neutral-800/50">
-            <CardHeader className="pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-semibold text-neutral-200">Dados do Cliente</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs text-neutral-400 mb-1 block">Cliente</Label>
-                  <Select
-                    value={clientId ? String(clientId) : ""}
-                    onValueChange={(v) => { setClientId(Number(v)); setLeadId(null); }}
-                  >
-                    <SelectTrigger className="h-8 text-sm bg-neutral-900 border-neutral-600">
-                      <SelectValue placeholder="Selecionar cliente..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(clientsList as any[]).map((c: any) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          {c.name || c.company}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <section>
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Dados do Cliente</h2>
+            <Card className="border border-border/40">
+              <CardContent className="p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Cliente</Label>
+                    <Select
+                      value={clientId ? String(clientId) : ""}
+                      onValueChange={(v) => { setClientId(Number(v)); setLeadId(null); }}
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Selecionar cliente..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(clientsList as any[]).map((c: any) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.name || c.company}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Lead</Label>
+                    <Select
+                      value={leadId ? String(leadId) : ""}
+                      onValueChange={(v) => { setLeadId(Number(v)); setClientId(null); }}
+                      disabled={!!clientId}
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder={clientId ? "—" : "Selecionar lead..."} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {leadsList.map((l: any) => (
+                          <SelectItem key={l.id} value={String(l.id)}>
+                            {l.company || l.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-xs text-neutral-400 mb-1 block">Lead</Label>
-                  <Select
-                    value={leadId ? String(leadId) : ""}
-                    onValueChange={(v) => { setLeadId(Number(v)); setClientId(null); }}
-                    disabled={!!clientId}
-                  >
-                    <SelectTrigger className="h-8 text-sm bg-neutral-900 border-neutral-600">
-                      <SelectValue placeholder={clientId ? "(desativado)" : "Selecionar lead..."} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {leadsList.map((l: any) => (
-                        <SelectItem key={l.id} value={String(l.id)}>
-                          {l.company || l.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <Label className="text-xs text-neutral-400 mb-1 block">Tipo de campanha</Label>
-                  <Select value={campaignType} onValueChange={setCampaignType}>
-                    <SelectTrigger className="h-8 text-sm bg-neutral-900 border-neutral-600">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="padrao">Padrão</SelectItem>
-                      <SelectItem value="premium">Premium</SelectItem>
-                      <SelectItem value="exclusivo">Exclusivo</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Tipo de campanha</Label>
+                    <Select value={campaignType} onValueChange={setCampaignType}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="padrao">Padrão</SelectItem>
+                        <SelectItem value="premium">Premium</SelectItem>
+                        <SelectItem value="exclusivo">Exclusivo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Perfil de rede</Label>
+                    <Input
+                      value={networkProfile}
+                      onChange={(e) => setNetworkProfile(e.target.value)}
+                      className="h-9 text-sm"
+                      placeholder="ex: premium"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Ciclos</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={cycles}
+                      onChange={(e) => setCycles(parseInt(e.target.value) || 1)}
+                      className="h-9 text-sm"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-xs text-neutral-400 mb-1 block">Perfil de rede</Label>
-                  <Input
-                    value={networkProfile}
-                    onChange={(e) => setNetworkProfile(e.target.value)}
-                    className="h-8 text-sm bg-neutral-900 border-neutral-600"
-                    placeholder="ex: premium"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs text-neutral-400 mb-1 block">Ciclos</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={cycles}
-                    onChange={(e) => setCycles(parseInt(e.target.value) || 1)}
-                    className="h-8 text-sm bg-neutral-900 border-neutral-600"
-                  />
-                </div>
-              </div>
 
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="bonificada"
-                    checked={isBonificada}
-                    onCheckedChange={setIsBonificada}
-                  />
-                  <Label htmlFor="bonificada" className="text-sm cursor-pointer text-yellow-400">
-                    Bonificada
-                  </Label>
+                <div className="flex items-center gap-6 pt-1">
+                  <div className="flex items-center gap-2">
+                    <Switch id="bonificada" checked={isBonificada} onCheckedChange={setIsBonificada} />
+                    <Label htmlFor="bonificada" className="text-sm cursor-pointer text-amber-600 dark:text-amber-400">
+                      Bonificada
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch id="desc-parceiro" checked={descontoParceiro} onCheckedChange={setDescontoParceiro} />
+                    <Label htmlFor="desc-parceiro" className="text-sm cursor-pointer text-green-600 dark:text-green-400">
+                      Desc. Parceiro (−10%)
+                    </Label>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="desc-parceiro"
-                    checked={descontoParceiro}
-                    onCheckedChange={setDescontoParceiro}
-                  />
-                  <Label htmlFor="desc-parceiro" className="text-sm cursor-pointer text-green-400">
-                    Desc. Parceiro (−10%)
-                  </Label>
-                </div>
-              </div>
 
-              {descontoParceiro && (
-                <div>
-                  <Label className="text-xs text-neutral-400 mb-1 block">Parceiro</Label>
-                  <Select
-                    value={partnerId ? String(partnerId) : ""}
-                    onValueChange={(v) => setPartnerId(Number(v))}
-                  >
-                    <SelectTrigger className="h-8 text-sm bg-neutral-900 border-neutral-600">
-                      <SelectValue placeholder="Selecionar parceiro..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(partnersList as any[]).map((p: any) => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                {descontoParceiro && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Parceiro</Label>
+                    <Select
+                      value={partnerId ? String(partnerId) : ""}
+                      onValueChange={(v) => setPartnerId(Number(v))}
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Selecionar parceiro..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(partnersList as any[]).map((p: any) => (
+                          <SelectItem key={p.id} value={String(p.id)}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </section>
 
           {/* Parâmetros de Preço */}
-          <Card className="border border-neutral-700 bg-neutral-800/50">
-            <CardHeader className="pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-semibold text-neutral-200">Parâmetros de Preço</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs text-neutral-400 mb-1 block">Duração (semanas)</Label>
-                  <Select
-                    value={String(semanas)}
-                    onValueChange={(v) => setSemanas(Number(v))}
-                  >
-                    <SelectTrigger className="h-8 text-sm bg-neutral-900 border-neutral-600">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SEMANAS_OPTIONS.map((s) => (
-                        <SelectItem key={s} value={String(s)}>
-                          {s} sem. — {s / 4} {s / 4 === 1 ? "período" : "períodos"}
-                          {DESCONTOS_PRAZO[s] ? ` (−${DESCONTOS_PRAZO[s]}%)` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <section>
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Parâmetros de Preço</h2>
+            <Card className="border border-border/40">
+              <CardContent className="p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Duração</Label>
+                    <Select value={String(semanas)} onValueChange={(v) => setSemanas(Number(v))}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SEMANAS_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={String(s)}>
+                            {s} semanas{DESCONTOS_PRAZO[s] ? ` · −${DESCONTOS_PRAZO[s]}%` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Pagamento</Label>
+                    <ToggleGroup
+                      type="single"
+                      value={formaPagamento}
+                      onValueChange={(v) => { if (v) setFormaPagamento(v as typeof formaPagamento); }}
+                      className="justify-start"
+                    >
+                      <ToggleGroupItem value="pix" className="h-9 text-xs px-3">Pix</ToggleGroupItem>
+                      <ToggleGroupItem value="boleto" className="h-9 text-xs px-3">Boleto</ToggleGroupItem>
+                      <ToggleGroupItem value="cartao" className="h-9 text-xs px-3">Cartão</ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-xs text-neutral-400 mb-1 block">Forma de pagamento</Label>
-                  <ToggleGroup
-                    type="single"
-                    value={formaPagamento}
-                    onValueChange={(v) => { if (v) setFormaPagamento(v as typeof formaPagamento); }}
-                    className="justify-start h-8"
-                  >
-                    <ToggleGroupItem value="pix" className="h-8 text-xs px-3">Pix</ToggleGroupItem>
-                    <ToggleGroupItem value="boleto" className="h-8 text-xs px-3">Boleto</ToggleGroupItem>
-                    <ToggleGroupItem value="cartao" className="h-8 text-xs px-3">Cartão</ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-              </div>
 
-              <div>
-                <p className="text-xs text-neutral-500 mb-1.5">Premissas (editáveis)</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: "IRPJ %", key: "irpj" as const },
-                    { label: "Com. Rest. %", key: "comissaoRestaurante" as const },
-                    { label: "Com. Com. %", key: "comissaoComercial" as const },
-                  ].map(({ label, key }) => (
-                    <div key={key}>
-                      <Label className="text-[11px] text-neutral-400 mb-1 block">{label}</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.5}
-                        value={premissas[key]}
-                        onChange={(e) =>
-                          setPremissas((p) => ({ ...p, [key]: parseFloat(e.target.value) || 0 }))
-                        }
-                        className="h-8 text-sm bg-neutral-900 border-neutral-600"
-                      />
-                    </div>
-                  ))}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Premissas (editáveis)</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: "IRPJ %", key: "irpj" as const },
+                      { label: "Com. Rest. %", key: "comissaoRestaurante" as const },
+                      { label: "Com. Com. %", key: "comissaoComercial" as const },
+                    ].map(({ label, key }) => (
+                      <div key={key}>
+                        <Label className="text-[11px] text-muted-foreground mb-1 block">{label}</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.5}
+                          value={premissas[key]}
+                          onChange={(e) =>
+                            setPremissas((p) => ({ ...p, [key]: parseFloat(e.target.value) || 0 }))
+                          }
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </section>
 
           {/* Itens do Orçamento */}
-          <Card className="border border-neutral-700 bg-neutral-800/50">
-            <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-neutral-200">
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Itens do Orçamento
                 {items.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 text-[10px]">{items.length}</Badge>
+                  <Badge variant="secondary" className="ml-2 text-[10px] font-normal">{items.length}</Badge>
                 )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 space-y-3">
+              </h2>
+            </div>
+            <div className="space-y-2">
               {items.map((item, idx) => (
                 <BudgetItemCard
                   key={item.id}
@@ -800,30 +794,28 @@ export default function BudgetCreator() {
                 variant="outline"
                 size="sm"
                 onClick={addNewItem}
-                className="w-full border-dashed border-neutral-600 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500"
+                className="w-full border-dashed gap-1.5 text-muted-foreground hover:text-foreground"
               >
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                <Plus className="h-3.5 w-3.5" />
                 Adicionar Produto
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          {/* Notas */}
-          <Card className="border border-neutral-700 bg-neutral-800/50">
-            <CardContent className="px-4 py-4">
-              <Label className="text-xs text-neutral-400 mb-1 block">Observações</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Observações adicionais para o cliente..."
-                className="text-sm bg-neutral-900 border-neutral-600 min-h-[80px]"
-              />
-            </CardContent>
-          </Card>
+          {/* Observações */}
+          <section>
+            <Label className="text-xs text-muted-foreground mb-2 block">Observações</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Observações adicionais para o cliente..."
+              className="text-sm min-h-[80px] resize-none"
+            />
+          </section>
         </div>
 
-        {/* ── Coluna Direita ───────────────────────────────────── */}
-        <div className="lg:col-span-2">
+        {/* ── Coluna Direita (fixa) ── */}
+        <div className="w-80 xl:w-96 flex-shrink-0 overflow-y-auto p-6">
           <BudgetSummaryPanel
             items={items}
             params={globalParams}
