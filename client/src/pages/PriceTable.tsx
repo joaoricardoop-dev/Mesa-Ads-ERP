@@ -1016,7 +1016,12 @@ function VolumeRow({ vol, data, active, onUpdate }: { vol: number; data: { custo
   const [gpc, setGpc] = useState(String(data.custoGPC));
   const [margem, setMargem] = useState(String(data.margem));
   const [frete, setFrete] = useState(String(data.frete));
-  const [artes, setArtes] = useState(String(data.artes));
+  const [artes, setArtes] = useState(String(data.artes ?? 1));
+
+  useEffect(() => { setGpc(String(data.custoGPC)); }, [data.custoGPC]);
+  useEffect(() => { setMargem(String(data.margem)); }, [data.margem]);
+  useEffect(() => { setFrete(String(data.frete)); }, [data.frete]);
+  useEffect(() => { setArtes(String(data.artes ?? 1)); }, [data.artes]);
 
   const commit = (field: "custoGPC" | "margem" | "frete" | "artes", raw: string, setter: (s: string) => void, fallback: number) => {
     const parsed = parseFloat(raw);
@@ -1047,6 +1052,9 @@ function VolumeRow({ vol, data, active, onUpdate }: { vol: number; data: { custo
 
 function PremissaInput({ label, value, onChange, suffix }: { label: string; value: number; onChange: (v: number) => void; suffix?: string }) {
   const [localVal, setLocalVal] = useState(String(value));
+
+  useEffect(() => { setLocalVal(String(value)); }, [value]);
+
   const commitValue = () => {
     const parsed = parseFloat(localVal);
     if (!isNaN(parsed)) onChange(parsed);
