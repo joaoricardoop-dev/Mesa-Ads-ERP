@@ -93,6 +93,21 @@ export interface ScenarioData {
   annualTotal: number;
 }
 
+export interface ProductTier {
+  volumeMin: number;
+  volumeMax: number | null;
+  custoUnitario: string;
+  frete: string;
+  margem: string;
+  artes: number;
+}
+
+export interface ProductParams {
+  irpj: string;
+  comRestaurante: string;
+  comComercial: string;
+}
+
 const STORAGE_KEY = "mesa-ads-simulator-inputs";
 const BUDGET_STORAGE_KEY = "mesa-ads-simulator-budget-id";
 
@@ -274,9 +289,25 @@ export function calcPricing(
   };
 }
 
+function lookupTierCost(tiers: ProductTier[], volume: number): { custoUnitario: number; frete: number } | null {
+  if (tiers.length === 0) return null;
+  const sorted = [...tiers].sort((a, b) => a.volumeMin - b.volumeMin);
+  for (const t of sorted) {
+    const max = t.volumeMax ?? Infinity;
+    if (volume >= t.volumeMin && volume <= max) {
+      return { custoUnitario: parseFloat(t.custoUnitario), frete: parseFloat(t.frete) };
+    }
+  }
+  const closest = sorted.reduce((prev, curr) =>
+    Math.abs(curr.volumeMin - volume) < Math.abs(prev.volumeMin - volume) ? curr : prev
+  );
+  return { custoUnitario: parseFloat(closest.custoUnitario), frete: parseFloat(closest.frete) };
+}
+
 export function useSimulator(
   selectedBudget?: BudgetOption | null,
   restaurantCommissionRate?: number,
+  productTiers?: ProductTier[],
 ) {
   const [inputs, setInputs] = useState<SimulatorInputs>(loadInputs);
 
@@ -297,9 +328,15 @@ export function useSimulator(
         inputs.coastersPerRestaurant * inputs.activeRestaurants;
       return interpolateUnitCost(selectedBudget.items, totalCoasters);
     }
+    if (productTiers && productTiers.length > 0) {
+      const totalCoasters = inputs.coastersPerRestaurant * inputs.activeRestaurants;
+      const tier = lookupTierCost(productTiers, totalCoasters);
+      if (tier) return tier.custoUnitario;
+    }
     return inputs.batchCost / inputs.batchSize;
   }, [
     selectedBudget,
+    productTiers,
     inputs.coastersPerRestaurant,
     inputs.activeRestaurants,
     inputs.batchCost,

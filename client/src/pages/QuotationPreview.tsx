@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useSimulator, type BudgetOption, loadSavedBudgetId } from "@/hooks/useSimulator";
+import { useSimulator, type BudgetOption, type ProductTier, loadSavedBudgetId } from "@/hooks/useSimulator";
 import { useRestaurantAllocation, type AllocationEntry } from "@/hooks/useRestaurantAllocation";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -117,12 +117,33 @@ export default function QuotationPreview() {
   const [selectedClientId, setSelectedClientId] = useState<string>(urlClientId || "none");
   const [selectedLeadId, setSelectedLeadId] = useState<string>(urlLeadId || "none");
   const [hasPartnerDiscount, setHasPartnerDiscount] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
   const { data: budgetsList = [] } = trpc.budget.listActiveWithItems.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
   const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
   const { data: leadsList = [] } = trpc.lead.list.useQuery({ type: "anunciante" });
+  const { data: productsList = [] } = trpc.product.list.useQuery();
+  const { data: rawProductTiers = [] } = trpc.product.listTiers.useQuery(
+    { productId: selectedProductId! },
+    { enabled: selectedProductId !== null }
+  );
+  const selectedProduct = productsList.find((p: any) => p.id === selectedProductId);
+  const typedProductTiers: ProductTier[] = rawProductTiers.map((t: any) => ({
+    volumeMin: t.volumeMin,
+    volumeMax: t.volumeMax,
+    custoUnitario: t.custoUnitario,
+    frete: t.frete,
+    margem: t.margem,
+    artes: t.artes,
+  }));
   const utils = trpc.useUtils();
+
+  useEffect(() => {
+    if (productsList.length > 0 && selectedProductId === null) {
+      setSelectedProductId(productsList[0].id);
+    }
+  }, [productsList]);
 
   useEffect(() => {
     if (selectedLeadId !== "none" && leadsList.length > 0 && selectedClientId === "none") {
@@ -168,14 +189,15 @@ export default function QuotationPreview() {
     [restaurantsList]
   );
 
-  const simulatorBase = useSimulator(selectedBudget);
+  const tiersForSimulator = typedProductTiers.length > 0 ? typedProductTiers : undefined;
+  const simulatorBase = useSimulator(selectedBudget, undefined, tiersForSimulator);
   const totalCoasters = simulatorBase.inputs.coastersPerRestaurant * simulatorBase.inputs.activeRestaurants;
 
   const allocation = useRestaurantAllocation(restaurantsForAllocation, totalCoasters);
 
   const allocCommission = allocation.isValid ? allocation.weightedCommission : undefined;
 
-  const simulator = useSimulator(selectedBudget, allocCommission);
+  const simulator = useSimulator(selectedBudget, allocCommission, tiersForSimulator);
   const pr = simulator.perRestaurant;
   const ue = simulator.unitEconomics;
   const inputs = simulator.inputs;
@@ -263,6 +285,7 @@ export default function QuotationPreview() {
 
     const totalValueCalc = pr.sellingPrice * n * d;
 
+    const unitLabel = selectedProduct?.unitLabelPlural || "coasters";
     createQuotationMutation.mutate({
       ...(selectedClientId !== "none" ? { clientId: parseInt(selectedClientId) } : {}),
       ...(selectedLeadId !== "none" ? { leadId: parseInt(selectedLeadId) } : {}),
@@ -272,10 +295,10 @@ export default function QuotationPreview() {
       totalValue: String(totalValueCalc),
       includesProduction: true,
       hasPartnerDiscount,
-      productId: 1,
+      productId: selectedProductId || 1,
       notes: selectedBudget
-        ? `Orçamento: ${selectedBudget.code || selectedBudget.description} | ${n} restaurantes, ${inputs.coastersPerRestaurant} coasters/rest, markup ${inputs.pricingType === "variable" ? inputs.markupPercent + "%" : "fixo R$" + inputs.fixedPrice}, duração ${d} meses`
-        : `${n} restaurantes, ${inputs.coastersPerRestaurant} coasters/rest, markup ${inputs.pricingType === "variable" ? inputs.markupPercent + "%" : "fixo R$" + inputs.fixedPrice}, duração ${d} meses`,
+        ? `Orçamento: ${selectedBudget.code || selectedBudget.description} | ${n} restaurantes, ${inputs.coastersPerRestaurant} ${unitLabel}/rest, markup ${inputs.pricingType === "variable" ? inputs.markupPercent + "%" : "fixo R$" + inputs.fixedPrice}, duração ${d} meses`
+        : `${n} restaurantes, ${inputs.coastersPerRestaurant} ${unitLabel}/rest, markup ${inputs.pricingType === "variable" ? inputs.markupPercent + "%" : "fixo R$" + inputs.fixedPrice}, duração ${d} meses`,
     });
   };
 
@@ -294,6 +317,11 @@ export default function QuotationPreview() {
                 <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
                   <FileText className="w-5 h-5 text-primary" />
                   Preview da Cotação
+                  {selectedProduct && (
+                    <Badge variant="outline" className="text-xs font-normal bg-blue-500/10 text-blue-400 border-blue-500/20">
+                      {selectedProduct.name}
+                    </Badge>
+                  )}
                 </h1>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Revise os valores do simulador antes de criar a cotação
@@ -332,6 +360,19 @@ export default function QuotationPreview() {
                   <Building2 className="w-3.5 h-3.5" /> Dados da Cotação
                 </h3>
                 <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Produto *</Label>
+                    <Select value={selectedProductId ? String(selectedProductId) : ""} onValueChange={(v) => setSelectedProductId(parseInt(v))}>
+                      <SelectTrigger className="bg-background border-border/30 h-9 text-sm">
+                        <SelectValue placeholder="Selecione um produto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {productsList.map((p: any) => (
+                          <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Cliente (Anunciante) *</Label>
                     <Select value={selectedClientId} onValueChange={setSelectedClientId}>
@@ -513,7 +554,7 @@ export default function QuotationPreview() {
                         Restaurantes Alocados
                       </h3>
                       <p className="text-[10px] text-muted-foreground">
-                        {allocatedRestaurants.length} restaurantes · {formatNumber(allocation.allocatedTotal)} coasters alocados
+                        {allocatedRestaurants.length} restaurantes · {formatNumber(allocation.allocatedTotal)} {selectedProduct?.unitLabelPlural || "coasters"} alocados
                       </p>
                     </div>
                     <div className="flex items-center gap-3 text-right">
@@ -529,7 +570,7 @@ export default function QuotationPreview() {
                         <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/20">
                           <th className="text-left px-5 py-2 font-medium">Restaurante</th>
                           <th className="text-left px-3 py-2 font-medium">Bairro</th>
-                          <th className="text-right px-3 py-2 font-medium">Coasters</th>
+                          <th className="text-right px-3 py-2 font-medium">{selectedProduct?.unitLabelPlural ? selectedProduct.unitLabelPlural.charAt(0).toUpperCase() + selectedProduct.unitLabelPlural.slice(1) : "Coasters"}</th>
                           <th className="text-right px-3 py-2 font-medium">Rating</th>
                           <th className="text-right px-3 py-2 font-medium">Com. %</th>
                           <th className="text-right px-5 py-2 font-medium">% Volume</th>
@@ -583,12 +624,12 @@ export default function QuotationPreview() {
                   <Package className="w-3.5 h-3.5 text-primary" /> Parâmetros Operacionais
                 </h3>
                 <div className="grid grid-cols-2 gap-x-8">
-                  <ParamRow label="Coasters/Restaurante" value={formatNumber(inputs.coastersPerRestaurant)} />
+                  <ParamRow label={`${selectedProduct?.unitLabelPlural ? selectedProduct.unitLabelPlural.charAt(0).toUpperCase() + selectedProduct.unitLabelPlural.slice(1) : "Coasters"}/Restaurante`} value={formatNumber(inputs.coastersPerRestaurant)} />
                   <ParamRow label="Restaurantes" value={String(n)} />
                   <ParamRow label="Uso Médio/Dia" value={`${inputs.usagePerDay}x`} />
                   <ParamRow label="Dias/Mês" value={String(inputs.daysPerMonth)} />
                   <ParamRow label="Impressões/Rest./Mês" value={formatNumber(pr.impressions)} />
-                  <ParamRow label="Total Coasters" value={formatNumber(totalCoasters)} />
+                  <ParamRow label={`Total ${selectedProduct?.unitLabelPlural ? selectedProduct.unitLabelPlural.charAt(0).toUpperCase() + selectedProduct.unitLabelPlural.slice(1) : "Coasters"}`} value={formatNumber(totalCoasters)} />
                   <ParamRow label={inputs.pricingType === "variable" ? "Markup" : "Preço Fixo"} value={inputs.pricingType === "variable" ? `${inputs.markupPercent}%` : formatCurrency(inputs.fixedPrice)} />
                   <ParamRow label="Duração" value={`${d} meses`} />
                   <ParamRow label={inputs.commissionType === "variable" ? "Com. Agência (%)" : "Com. Agência (R$/un)"} value={inputs.commissionType === "variable" ? `${inputs.restaurantCommission}%` : `R$ ${inputs.fixedCommission.toFixed(4)}`} />

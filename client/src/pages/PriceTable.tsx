@@ -78,6 +78,79 @@ export default function PriceTable() {
   const [custosVolume, setCustosVolume] = useState(DEFAULT_CUSTOS_VOLUME);
   const [allocSearch, setAllocSearch] = useState("");
 
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const { data: productsList = [] } = trpc.product.list.useQuery();
+  const { data: productTiers = [], refetch: refetchTiers } = trpc.product.listTiers.useQuery(
+    { productId: selectedProductId! },
+    { enabled: selectedProductId !== null }
+  );
+  const selectedProduct = productsList.find((p: any) => p.id === selectedProductId);
+  const upsertTiersMutation = trpc.product.upsertTiers.useMutation({
+    onSuccess: () => { refetchTiers(); toast.success("Faixas salvas!"); },
+    onError: (err: any) => toast.error(`Erro: ${err.message}`),
+  });
+
+  useEffect(() => {
+    if (productsList.length > 0 && selectedProductId === null) {
+      setSelectedProductId(productsList[0].id);
+    }
+  }, [productsList]);
+
+  useEffect(() => {
+    if (productTiers.length > 0) {
+      const newCustos: Record<number, { custoGPC: number; margem: number; frete: number; artes: number }> = {};
+      for (const t of productTiers) {
+        newCustos[t.volumeMin] = {
+          custoGPC: parseFloat(t.custoUnitario),
+          margem: parseFloat(t.margem) / 100,
+          frete: parseFloat(t.frete),
+          artes: t.artes,
+        };
+      }
+      setCustosVolume(prev => {
+        const merged = { ...DEFAULT_CUSTOS_VOLUME };
+        Object.keys(newCustos).forEach(k => { merged[Number(k)] = newCustos[Number(k)]; });
+        return merged;
+      });
+    }
+  }, [productTiers]);
+
+  useEffect(() => {
+    if (selectedProduct) {
+      setPremissas({
+        irpj: parseFloat(selectedProduct.irpj),
+        comissaoRestaurante: parseFloat(selectedProduct.comRestaurante),
+        comissaoComercial: parseFloat(selectedProduct.comComercial),
+      });
+    }
+  }, [selectedProduct]);
+
+  const volumes = useMemo(() => {
+    if (productTiers.length > 0) {
+      return productTiers.map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b);
+    }
+    return VOLUMES;
+  }, [productTiers]);
+
+  const handleSaveTiers = () => {
+    if (!selectedProductId) return;
+    const tiers = volumes.map((v: number) => {
+      const d = custosVolume[v] || DEFAULT_CUSTOS_VOLUME[v];
+      if (!d) return null;
+      const idx = volumes.indexOf(v);
+      const nextVol = idx < volumes.length - 1 ? volumes[idx + 1] : null;
+      return {
+        volumeMin: v,
+        volumeMax: nextVol ? nextVol - 1 : null,
+        custoUnitario: d.custoGPC.toFixed(4),
+        frete: d.frete.toFixed(2),
+        margem: (d.margem * 100).toFixed(2),
+        artes: d.artes,
+      };
+    }).filter(Boolean) as any[];
+    upsertTiersMutation.mutate({ productId: selectedProductId, tiers });
+  };
+
   const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
   const restaurantsForAllocation = useMemo(
     () => restaurantsList.map((r: any) => ({
@@ -94,8 +167,8 @@ export default function PriceTable() {
     [restaurantsList]
   );
 
-  const volume = VOLUMES[volumeIdx];
-  const dados = custosVolume[volume];
+  const volume = volumes[Math.min(volumeIdx, volumes.length - 1)];
+  const dados = custosVolume[volume] || { custoGPC: 0.27, margem: 0.50, frete: 0, artes: 1 };
   const semanas = SEMANAS[semanaIdx];
   const descPrazo = (descontosPrazo[semanas] || 0) / 100;
 
@@ -194,10 +267,31 @@ export default function PriceTable() {
   };
 
   const resetPremissas = () => {
-    setPremissas(DEFAULT_PREMISSAS);
+    if (selectedProduct) {
+      setPremissas({
+        irpj: parseFloat(selectedProduct.irpj),
+        comissaoRestaurante: parseFloat(selectedProduct.comRestaurante),
+        comissaoComercial: parseFloat(selectedProduct.comComercial),
+      });
+    } else {
+      setPremissas(DEFAULT_PREMISSAS);
+    }
     setDescontosPrazo(DEFAULT_DESCONTOS_PRAZO);
     setPagamentoConfig(DEFAULT_PAGAMENTO);
-    setCustosVolume(DEFAULT_CUSTOS_VOLUME);
+    if (productTiers.length > 0) {
+      const newCustos: Record<number, { custoGPC: number; margem: number; frete: number; artes: number }> = {};
+      for (const t of productTiers) {
+        newCustos[t.volumeMin] = {
+          custoGPC: parseFloat(t.custoUnitario),
+          margem: parseFloat(t.margem) / 100,
+          frete: parseFloat(t.frete),
+          artes: t.artes,
+        };
+      }
+      setCustosVolume({ ...DEFAULT_CUSTOS_VOLUME, ...newCustos });
+    } else {
+      setCustosVolume(DEFAULT_CUSTOS_VOLUME);
+    }
   };
 
   const [, navigate] = useLocation();
@@ -268,7 +362,8 @@ export default function PriceTable() {
     }
     const unitPriceStr = calc.precoUnitComDesc.toFixed(4);
     const totalValueStr = (calc.precoUnitComDesc * cotacaoVolume * calc.nPeriodos).toFixed(2);
-    const notesAuto = `Tabela de Preços VEXA: ${cotacaoVolume.toLocaleString("pt-BR")} un., ${semanas} semanas, ${pagLabel}, desc. prazo ${(descPrazo * 100).toFixed(0)}%`;
+    const productLabel = selectedProduct?.name || "VEXA";
+    const notesAuto = `Tabela de Preços ${productLabel}: ${cotacaoVolume.toLocaleString("pt-BR")} un., ${semanas} semanas, ${pagLabel}, desc. prazo ${(descPrazo * 100).toFixed(0)}%`;
 
     createMutation.mutate({
       ...(selectedClientId !== "none" ? { clientId: parseInt(selectedClientId) } : {}),
@@ -279,7 +374,7 @@ export default function PriceTable() {
       unitPrice: unitPriceStr,
       totalValue: totalValueStr,
       includesProduction: true,
-      productId: 1,
+      productId: selectedProductId || 1,
       notes: cotacaoNotes ? `${notesAuto}\n${cotacaoNotes}` : notesAuto,
     });
   };
@@ -302,7 +397,7 @@ export default function PriceTable() {
       doc.text("MESA ADS", 14, 22);
       doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
-      doc.text("Simulação de Preços — Tabela VEXA", 14, 32);
+      doc.text(`Simulação de Preços — ${selectedProduct?.name || "Tabela VEXA"}`, 14, 32);
 
       doc.setFontSize(8);
       doc.setTextColor(180, 180, 180);
@@ -414,10 +509,10 @@ export default function PriceTable() {
         doc.setPage(i);
         doc.setFontSize(7);
         doc.setTextColor(150);
-        doc.text(`Mesa Ads — Tabela VEXA — Página ${i}/${pageCount}`, pw / 2, doc.internal.pageSize.getHeight() - 8, { align: "center" });
+        doc.text(`Mesa Ads — ${selectedProduct?.name || "Tabela VEXA"} — Página ${i}/${pageCount}`, pw / 2, doc.internal.pageSize.getHeight() - 8, { align: "center" });
       }
 
-      doc.save(`VEXA_${volume}un_${semanas}sem_${pagLabel}.pdf`);
+      doc.save(`${(selectedProduct?.name || "VEXA").replace(/\s+/g, "_")}_${volume}un_${semanas}sem_${pagLabel}.pdf`);
       toast.success("PDF exportado!");
     } catch {
       toast.error("Erro ao gerar PDF");
@@ -426,9 +521,24 @@ export default function PriceTable() {
 
   return (
     <PageContainer
-      title="Tabela de Preços — Simulador VEXA"
+      title={`Tabela de Preços${selectedProduct ? ` — ${selectedProduct.name}` : ""}`}
       actions={
         <div className="flex items-center gap-2">
+          <Select value={selectedProductId ? String(selectedProductId) : ""} onValueChange={(v) => setSelectedProductId(parseInt(v))}>
+            <SelectTrigger className="bg-background border-border/30 h-8 text-xs w-48">
+              <SelectValue placeholder="Selecione um produto" />
+            </SelectTrigger>
+            <SelectContent>
+              {productsList.map((p: any) => (
+                <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {!presentationMode && selectedProductId && (
+            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={handleSaveTiers} disabled={upsertTiersMutation.isPending}>
+              {upsertTiersMutation.isPending ? "Salvando..." : "Salvar Faixas"}
+            </Button>
+          )}
           <Button
             variant={presentationMode ? "default" : "outline"}
             size="sm"
@@ -460,8 +570,8 @@ export default function PriceTable() {
                   <span className="flex items-center gap-1.5"><Package className="w-3 h-3" /> Quantidade (un.)</span>
                   <span className="font-mono font-bold text-primary">{volume.toLocaleString("pt-BR")}</span>
                 </Label>
-                <Slider min={0} max={VOLUMES.length - 1} step={1} value={[volumeIdx]} onValueChange={([v]) => setVolumeIdx(v)} />
-                <div className="flex justify-between text-[10px] text-muted-foreground font-mono"><span>1.000</span><span>20.000</span></div>
+                <Slider min={0} max={volumes.length - 1} step={1} value={[volumeIdx]} onValueChange={([v]) => setVolumeIdx(v)} />
+                <div className="flex justify-between text-[10px] text-muted-foreground font-mono"><span>{volumes[0]?.toLocaleString("pt-BR")}</span><span>{volumes[volumes.length - 1]?.toLocaleString("pt-BR")}</span></div>
               </div>
               <div className="space-y-2">
                 <Label className="text-xs flex items-center justify-between">
@@ -557,8 +667,8 @@ export default function PriceTable() {
                         </tr>
                       </thead>
                       <tbody>
-                        {VOLUMES.map((v) => (
-                          <VolumeRow key={v} vol={v} data={custosVolume[v]} active={v === volume} onUpdate={(field, val) => updateVolumeDado(v, field, val)} />
+                        {volumes.map((v: number) => (
+                          <VolumeRow key={v} vol={v} data={custosVolume[v] || { custoGPC: 0.27, margem: 0.50, frete: 0, artes: 1 }} active={v === volume} onUpdate={(field, val) => updateVolumeDado(v, field, val)} />
                         ))}
                       </tbody>
                     </table>
@@ -607,7 +717,7 @@ export default function PriceTable() {
         <div className="lg:col-span-2 space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <KpiCard label="Preço Total" value={formatCurrency(calc.precoFinal)} sub={`${semanas} sem • ${pagLabel}${descontoParceiro ? " • parceiro" : ""}`} variant="primary" icon={DollarSign} />
-            <KpiCard label="Preço Unitário" value={formatCurrency(calc.precoUnitComDesc)} sub={`por bolacha · ${semanas} semanas`} icon={TrendingUp} />
+            <KpiCard label="Preço Unitário" value={formatCurrency(calc.precoUnitComDesc)} sub={`por ${selectedProduct?.unitLabel || "bolacha"} · ${semanas} semanas`} icon={TrendingUp} />
             <KpiCard label="Preço Mensal" value={formatCurrency(calc.precoMensal)} sub={`${semanas} sem = ${calc.nPeriodos} ${calc.nPeriodos === 1 ? "mês" : "meses"}`} icon={CalendarDays} />
             <KpiCard label="Desconto Total" value={calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"} sub={`vs base 1k / 4 sem${descontoParceiro ? " + parceiro" : ""}`} variant="discount" icon={TrendingDown} />
           </div>
@@ -707,7 +817,7 @@ export default function PriceTable() {
               )}
 
               {!allocation.hasAllocations && !allocSearch && (
-                <p className="text-xs text-muted-foreground text-center py-3">Busque e adicione restaurantes para distribuir o volume de {volume.toLocaleString("pt-BR")} bolachas</p>
+                <p className="text-xs text-muted-foreground text-center py-3">Busque e adicione restaurantes para distribuir o volume de {volume.toLocaleString("pt-BR")} {selectedProduct?.unitLabelPlural || "bolachas"}</p>
               )}
 
               <div className="flex items-center justify-between text-xs">
@@ -729,7 +839,7 @@ export default function PriceTable() {
                       <tr className="border-b border-border/20">
                         <th className="text-left p-2 text-[10px] text-muted-foreground font-medium">Restaurante</th>
                         <th className="text-right p-2 text-[10px] text-muted-foreground font-medium">Cap.</th>
-                        <th className="text-right p-2 text-[10px] text-muted-foreground font-medium">Bolachas</th>
+                        <th className="text-right p-2 text-[10px] text-muted-foreground font-medium">{selectedProduct?.unitLabelPlural ? selectedProduct.unitLabelPlural.charAt(0).toUpperCase() + selectedProduct.unitLabelPlural.slice(1) : "Bolachas"}</th>
                         <th className="text-center p-2 text-[10px] text-muted-foreground font-medium w-8"></th>
                       </tr>
                     </thead>
@@ -815,7 +925,7 @@ export default function PriceTable() {
           <div className="space-y-4 py-2">
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Volume de Bolachas (un.)</Label>
+                <Label className="text-xs">Volume de {selectedProduct?.unitLabelPlural ? selectedProduct.unitLabelPlural.charAt(0).toUpperCase() + selectedProduct.unitLabelPlural.slice(1) : "Bolachas"} (un.)</Label>
                 <input
                   type="number"
                   min={1}
