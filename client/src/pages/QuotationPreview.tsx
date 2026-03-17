@@ -179,7 +179,7 @@ export default function QuotationPreview() {
       id: r.id,
       name: r.name,
       neighborhood: r.neighborhood,
-      logoUrl: (r as any).logoUrl,
+      logoUrl: 'logoUrl' in r ? (r.logoUrl as string | null) : null,
       ratingScore: r.ratingScore,
       ratingMultiplier: r.ratingMultiplier,
       commissionPercent: r.commissionPercent,
