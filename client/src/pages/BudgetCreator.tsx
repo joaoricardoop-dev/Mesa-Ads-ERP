@@ -14,6 +14,7 @@ import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group";
 import { Trash2, Plus, Calculator, RotateCcw, ExternalLink, Building2, Mail, Phone, MapPin, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { BudgetPricingDialog, type PricingDialogImportResult } from "../components/BudgetPricingDialog";
+import { CoasterPricingDialog } from "../components/CoasterPricingDialog";
 import {
   calcItemPrice,
   calcBudgetTotals,
@@ -194,7 +195,7 @@ function ClientQualificationCard({ client }: { client: ClientInfo }) {
 
 interface BudgetItemCardProps {
   item: BudgetItemState;
-  productsList: { id: number; name: string }[];
+  productsList: { id: number; name: string; tipo?: string | null }[];
   globalParams: GlobalBudgetParams;
   onUpdate: (id: string, patch: Partial<BudgetItemState>) => void;
   onRemove: (id: string) => void;
@@ -205,6 +206,9 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
   const [pricingOpen, setPricingOpen] = useState(false);
+
+  const selectedProduct = productsList.find((p) => p.id === item.productId);
+  const isCoaster = selectedProduct?.tipo === "coaster";
 
   const { data: tiersRaw, isLoading: tiersLoading } = trpc.product.getTiers.useQuery(
     { productId: item.productId! },
@@ -396,7 +400,19 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
         </CardContent>
       </Card>
 
-      {pricingOpen && (
+      {pricingOpen && isCoaster && item.tiers.length > 0 && (
+        <CoasterPricingDialog
+          open={pricingOpen}
+          onClose={() => setPricingOpen(false)}
+          productName={item.productName}
+          tiers={item.tiers}
+          initialVolumeIdx={item.volumeIdx}
+          initialSemanas={item.semanas}
+          initialPremissas={item.premissas}
+          onImport={handlePricingImport}
+        />
+      )}
+      {pricingOpen && !isCoaster && (
         <BudgetPricingDialog
           open={pricingOpen}
           onClose={() => setPricingOpen(false)}
@@ -571,7 +587,7 @@ export default function BudgetCreator() {
   const leadsList = useMemo(() => (leadsRaw as any[]) ?? [], [leadsRaw]);
 
   const { data: productsRaw } = trpc.product.list.useQuery();
-  const productsList = useMemo(() => (productsRaw ?? []) as { id: number; name: string; defaultSemanas?: number }[], [productsRaw]);
+  const productsList = useMemo(() => (productsRaw ?? []) as { id: number; name: string; defaultSemanas?: number; tipo?: string | null }[], [productsRaw]);
 
   const { data: partnersList = [] } = trpc.partner.list.useQuery();
 
