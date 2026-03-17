@@ -30,6 +30,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Tag, X } from "lucide-react";
+import { SEMANAS_OPTIONS } from "@/hooks/useBudgetCalculator";
 
 type TipoProduct = "coaster" | "display" | "cardapio" | "totem" | "adesivo" | "porta_guardanapo" | "outro";
 
@@ -79,6 +80,7 @@ interface ProductForm {
   unitLabel: string;
   unitLabelPlural: string;
   defaultQtyPerLocation: string;
+  defaultSemanas: string;
   irpj: string;
   comRestaurante: string;
   comComercial: string;
@@ -94,6 +96,7 @@ const emptyProduct: ProductForm = {
   unitLabel: "unidade",
   unitLabelPlural: "unidades",
   defaultQtyPerLocation: "500",
+  defaultSemanas: "12",
   irpj: "6.00",
   comRestaurante: "15.00",
   comComercial: "10.00",
@@ -179,6 +182,7 @@ export default function Products() {
       unitLabel: p.unitLabel,
       unitLabelPlural: p.unitLabelPlural,
       defaultQtyPerLocation: String(p.defaultQtyPerLocation || 500),
+      defaultSemanas: String(p.defaultSemanas || 12),
       irpj: p.irpj || "6.00",
       comRestaurante: p.comRestaurante || "15.00",
       comComercial: p.comComercial || "10.00",
@@ -198,6 +202,7 @@ export default function Products() {
       unitLabel: form.unitLabel,
       unitLabelPlural: form.unitLabelPlural,
       defaultQtyPerLocation: parseInt(form.defaultQtyPerLocation) || 500,
+      defaultSemanas: parseInt(form.defaultSemanas) || 12,
       irpj: form.irpj,
       comRestaurante: form.comRestaurante,
       comComercial: form.comComercial,
@@ -413,9 +418,24 @@ export default function Products() {
                 <Input value={form.unitLabelPlural} onChange={e => setForm({ ...form, unitLabelPlural: e.target.value })} placeholder="bolachas" />
               </div>
             </div>
-            <div>
-              <Label>Qtd padrão por ponto de venda</Label>
-              <Input type="number" value={form.defaultQtyPerLocation} onChange={e => setForm({ ...form, defaultQtyPerLocation: e.target.value })} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Qtd padrão por ponto de venda</Label>
+                <Input type="number" value={form.defaultQtyPerLocation} onChange={e => setForm({ ...form, defaultQtyPerLocation: e.target.value })} />
+              </div>
+              <div>
+                <Label>Semanas padrão</Label>
+                <Select value={form.defaultSemanas} onValueChange={v => setForm({ ...form, defaultSemanas: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SEMANAS_OPTIONS.map(s => (
+                      <SelectItem key={s} value={String(s)}>{s} semanas</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>

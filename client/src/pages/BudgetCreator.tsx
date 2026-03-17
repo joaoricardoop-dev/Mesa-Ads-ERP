@@ -281,6 +281,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                   tiers: [],
                   hasTiers: false,
                   volumeIdx: 0,
+                  semanas: prod?.defaultSemanas ?? 12,
                 });
               }}
             >
@@ -502,6 +503,12 @@ function BudgetSummaryPanel({ items, globalParams, clientName, onGerarCotacao, i
                     <span className="font-mono">−{fmtBRL(totals.descParceiroVal)}</span>
                   </div>
                 )}
+                {totals.descManualVal > 0 && (
+                  <div className="flex justify-between text-orange-600 dark:text-orange-400">
+                    <span>Desc. manual (−{(totals.descManualPerc * 100).toFixed(1)}%)</span>
+                    <span className="font-mono">−{fmtBRL(totals.descManualVal)}</span>
+                  </div>
+                )}
               </div>
 
               <Separator />
@@ -550,10 +557,10 @@ export default function BudgetCreator() {
   const [leadId, setLeadId] = useState<number | null>(null);
   const [networkProfile, setNetworkProfile] = useState("");
   const [regions, setRegions] = useState("");
-  const [cycles, setCycles] = useState(1);
   const [isBonificada, setIsBonificada] = useState(false);
   const [descontoParceiro, setDescontoParceiro] = useState(false);
   const [partnerId, setPartnerId] = useState<number | null>(null);
+  const [descontoManual, setDescontoManual] = useState(0);
   const [formaPagamento, setFormaPagamento] = useState<"pix" | "boleto" | "cartao">("boleto");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<BudgetItemState[]>(() => [makeBlankItem()]);
@@ -566,7 +573,7 @@ export default function BudgetCreator() {
   const leadsList = useMemo(() => (leadsRaw as any[]) ?? [], [leadsRaw]);
 
   const { data: productsRaw } = trpc.product.list.useQuery();
-  const productsList = useMemo(() => (productsRaw ?? []) as { id: number; name: string }[], [productsRaw]);
+  const productsList = useMemo(() => (productsRaw ?? []) as { id: number; name: string; defaultSemanas?: number }[], [productsRaw]);
 
   const { data: partnersList = [] } = trpc.partner.list.useQuery();
 
@@ -577,7 +584,8 @@ export default function BudgetCreator() {
     formaPagamento,
     descontoParceiro,
     isBonificada,
-  }), [formaPagamento, descontoParceiro, isBonificada]);
+    descontoManualPercent: descontoManual,
+  }), [formaPagamento, descontoParceiro, isBonificada, descontoManual]);
 
   const selectedClient = useMemo(() => {
     if (!clientId) return null;
@@ -608,12 +616,22 @@ export default function BudgetCreator() {
     setItems((prev) => [...prev, makeBlankItem()]);
   }, []);
 
+  useEffect(() => {
+    if (!leadId) return;
+    const lead = leadsList.find((l: any) => l.id === leadId);
+    if (lead?.partnerId) {
+      setPartnerId(lead.partnerId);
+      setDescontoParceiro(true);
+    }
+  }, [leadId, leadsList]);
+
   const clearAll = useCallback(() => {
     setClientId(null);
     setLeadId(null);
     setIsBonificada(false);
     setDescontoParceiro(false);
     setPartnerId(null);
+    setDescontoManual(0);
     setFormaPagamento("boleto");
     setNotes("");
     setItems([makeBlankItem()]);
@@ -655,9 +673,10 @@ export default function BudgetCreator() {
         clientId: clientId ?? undefined,
         leadId: leadId ?? undefined,
         coasterVolume: totalVolume,
+        manualDiscountPercent: descontoManual > 0 ? String(descontoManual) : undefined,
         networkProfile: networkProfile || undefined,
         regions: regions || undefined,
-        cycles,
+        cycles: Math.round((itemCalcs[0]?.item.semanas ?? 12) / 4),
         totalValue,
         notes: notes || undefined,
         isBonificada,
@@ -696,7 +715,7 @@ export default function BudgetCreator() {
     } finally {
       setIsGenerating(false);
     }
-  }, [clientId, leadId, itemCalcs, totals, networkProfile, regions, cycles, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate]);
+  }, [clientId, leadId, itemCalcs, totals, networkProfile, regions, descontoManual, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -782,13 +801,16 @@ export default function BudgetCreator() {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Ciclos</Label>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Desconto manual (%)</Label>
                     <Input
                       type="number"
-                      min={1}
-                      value={cycles}
-                      onChange={(e) => setCycles(parseInt(e.target.value) || 1)}
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={descontoManual || ""}
+                      onChange={(e) => setDescontoManual(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                       className="h-9 text-sm"
+                      placeholder="0"
                     />
                   </div>
                 </div>

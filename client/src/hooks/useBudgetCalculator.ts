@@ -35,6 +35,7 @@ export interface GlobalBudgetParams {
   formaPagamento: "pix" | "boleto" | "cartao";
   descontoParceiro: boolean;
   isBonificada: boolean;
+  descontoManualPercent: number;
 }
 
 export interface ItemCalcResult {
@@ -57,6 +58,8 @@ export interface BudgetTotals {
   ajPagamentoVal: number;
   descParceiroPerc: number;
   descParceiroVal: number;
+  descManualPerc: number;
+  descManualVal: number;
   total: number;
 }
 
@@ -102,10 +105,10 @@ export function calcBudgetTotals(
   itemCalcs: ItemCalcResult[],
   params: GlobalBudgetParams
 ): BudgetTotals {
-  const { formaPagamento, descontoParceiro, isBonificada } = params;
+  const { formaPagamento, descontoParceiro, isBonificada, descontoManualPercent } = params;
 
   if (isBonificada) {
-    return { subtotalPostDuration: 0, ajPagPerc: 0, ajPagamentoVal: 0, descParceiroPerc: 0, descParceiroVal: 0, total: 0 };
+    return { subtotalPostDuration: 0, ajPagPerc: 0, ajPagamentoVal: 0, descParceiroPerc: 0, descParceiroVal: 0, descManualPerc: 0, descManualVal: 0, total: 0 };
   }
 
   const subtotalPostDuration = itemCalcs.reduce((sum, c) => sum + c.precoComDescDuracao, 0);
@@ -114,9 +117,12 @@ export function calcBudgetTotals(
   const aposAjPag = subtotalPostDuration + ajPagamentoVal;
   const descParceiroPerc = descontoParceiro ? 0.10 : 0;
   const descParceiroVal = aposAjPag * descParceiroPerc;
-  const total = aposAjPag - descParceiroVal;
+  const aposDescParceiro = aposAjPag - descParceiroVal;
+  const descManualPerc = Math.min(Math.max(descontoManualPercent, 0), 100) / 100;
+  const descManualVal = aposDescParceiro * descManualPerc;
+  const total = aposDescParceiro - descManualVal;
 
-  return { subtotalPostDuration, ajPagPerc, ajPagamentoVal, descParceiroPerc, descParceiroVal, total };
+  return { subtotalPostDuration, ajPagPerc, ajPagamentoVal, descParceiroPerc, descParceiroVal, descManualPerc, descManualVal, total };
 }
 
 // ─── Formatting ────────────────────────────────────────────────────────────────
