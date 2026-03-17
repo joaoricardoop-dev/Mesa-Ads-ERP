@@ -54,6 +54,8 @@ import {
   RotateCcw,
   TrendingUp,
   Handshake,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -278,6 +280,7 @@ export default function Leads() {
   const [convertAnuncianteOpen, setConvertAnuncianteOpen] = useState(false);
 
   const [showConfetti, setShowConfetti] = useState(false);
+  const [panelSize, setPanelSize] = useState<"md" | "lg" | "xl">("md");
   const [collapsedStages, setCollapsedStages] = useState<string[]>(["ganho", "perdido"]);
   const [contactFormOpen, setContactFormOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "" });
@@ -1293,24 +1296,36 @@ export default function Leads() {
 
       {/* Lead Detail Sheet */}
       <Sheet open={!!selectedLeadId} onOpenChange={(open) => { if (!open) { setSelectedLeadId(null); setIsEditing(false); setContactFormOpen(false); setContactForm({ name: "", email: "", phone: "" }); } }}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto px-5 pt-6">
+        <SheetContent className={`w-full overflow-y-auto px-5 pt-5 transition-all duration-200 ${panelSize === "md" ? "sm:max-w-md" : panelSize === "lg" ? "sm:max-w-xl" : "sm:max-w-3xl"}`}>
           {selectedLead.data && (
             <>
-              <SheetHeader className="pb-2 space-y-2">
-                <SheetTitle className="flex items-center gap-2 text-base">
-                  {selectedLead.data.type === "anunciante" ? (
-                    <Building2 className="w-4 h-4 shrink-0" />
-                  ) : (
-                    <UtensilsCrossed className="w-4 h-4 shrink-0" />
-                  )}
-                  <span className="truncate">{selectedLead.data.name}</span>
-                </SheetTitle>
-                <div className="flex items-center gap-1.5">
+              <SheetHeader className="pb-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <SheetTitle className="flex items-center gap-2 text-base min-w-0">
+                    {selectedLead.data.type === "anunciante" ? (
+                      <Building2 className="w-4 h-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <UtensilsCrossed className="w-4 h-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="truncate">{selectedLead.data.name}</span>
+                  </SheetTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="w-7 h-7 shrink-0 text-muted-foreground hover:text-foreground"
+                    title={panelSize === "xl" ? "Reduzir painel" : "Ampliar painel"}
+                    onClick={() => setPanelSize(s => s === "md" ? "lg" : s === "lg" ? "xl" : "md")}
+                  >
+                    {panelSize === "xl" ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                  </Button>
+                </div>
+                <Separator className="mb-3" />
+                <div className="flex items-center gap-2 flex-wrap">
                   {!isEditing && selectedLead.data.type === "anunciante" && (
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1 text-primary border-primary/30 hover:bg-primary/10"
+                      className="gap-1.5 h-8 text-primary border-primary/30 hover:bg-primary/10"
                       onClick={() => {
                         const lead = selectedLead.data!;
                         const clientId = lead.client_id || (lead.convertedToId ? lead.convertedToId : undefined);
@@ -1320,7 +1335,7 @@ export default function Leads() {
                         navigate(`/comercial/tabela-precos?${params.toString()}`);
                       }}
                     >
-                      <FileText className="w-3 h-3" />
+                      <FileText className="w-3.5 h-3.5" />
                       Cotação
                     </Button>
                   )}
@@ -1328,7 +1343,7 @@ export default function Leads() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
+                      className="gap-1.5 h-8 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
                       onClick={() => {
                         if (selectedLead.data!.client_id) {
                           markLeadConverted.mutate({
@@ -1347,7 +1362,7 @@ export default function Leads() {
                         }
                       }}
                     >
-                      <ArrowRightCircle className="w-3 h-3" />
+                      <ArrowRightCircle className="w-3.5 h-3.5" />
                       Converter
                     </Button>
                   )}
@@ -1357,8 +1372,8 @@ export default function Leads() {
                     </Badge>
                   )}
                   {!isEditing && (
-                    <Button variant="outline" size="sm" className="gap-1" onClick={startEditing}>
-                      <Pencil className="w-3 h-3" />
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={startEditing}>
+                      <Pencil className="w-3.5 h-3.5" />
                       Editar
                     </Button>
                   )}
