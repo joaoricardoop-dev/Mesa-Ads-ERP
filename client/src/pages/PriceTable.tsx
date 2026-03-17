@@ -79,12 +79,17 @@ export default function PriceTable() {
   const [allocSearch, setAllocSearch] = useState("");
 
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
-  const { data: productsList = [] } = trpc.product.list.useQuery();
-  const { data: productTiers = [], refetch: refetchTiers } = trpc.product.getTiers.useQuery(
+  const { data: productsListRaw } = trpc.product.list.useQuery();
+  const productsList = useMemo(() => productsListRaw ?? [], [productsListRaw]);
+  const { data: productTiersRaw, refetch: refetchTiers } = trpc.product.getTiers.useQuery(
     { productId: selectedProductId! },
     { enabled: selectedProductId !== null }
   );
-  const selectedProduct = productsList.find((p) => p.id === selectedProductId);
+  const productTiers = useMemo(() => productTiersRaw ?? [], [productTiersRaw]);
+  const selectedProduct = useMemo(
+    () => productsList.find((p) => p.id === selectedProductId),
+    [productsList, selectedProductId]
+  );
   const upsertTiersMutation = trpc.product.upsertTiers.useMutation({
     onSuccess: () => { refetchTiers(); toast.success("Faixas salvas!"); },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -104,7 +109,7 @@ export default function PriceTable() {
           custoGPC: parseFloat(t.custoUnitario),
           margem: parseFloat(t.margem) / 100,
           frete: parseFloat(t.frete),
-          artes: t.artes,
+          artes: t.artes ?? 1,
         };
       }
       setCustosVolume(newCustos);
@@ -119,9 +124,9 @@ export default function PriceTable() {
   useEffect(() => {
     if (selectedProduct) {
       setPremissas({
-        irpj: parseFloat(selectedProduct.irpj),
-        comissaoRestaurante: parseFloat(selectedProduct.comRestaurante),
-        comissaoComercial: parseFloat(selectedProduct.comComercial),
+        irpj: parseFloat(selectedProduct.irpj ?? "6"),
+        comissaoRestaurante: parseFloat(selectedProduct.comRestaurante ?? "15"),
+        comissaoComercial: parseFloat(selectedProduct.comComercial ?? "10"),
       });
     }
   }, [selectedProduct]);
@@ -152,7 +157,8 @@ export default function PriceTable() {
     upsertTiersMutation.mutate({ productId: selectedProductId, tiers });
   };
 
-  const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
+  const { data: restaurantsListRaw } = trpc.activeRestaurant.list.useQuery();
+  const restaurantsList = useMemo(() => restaurantsListRaw ?? [], [restaurantsListRaw]);
   const restaurantsForAllocation = useMemo(
     () => restaurantsList.map((r) => ({
       id: r.id,
@@ -272,9 +278,9 @@ export default function PriceTable() {
   const resetPremissas = () => {
     if (selectedProduct) {
       setPremissas({
-        irpj: parseFloat(selectedProduct.irpj),
-        comissaoRestaurante: parseFloat(selectedProduct.comRestaurante),
-        comissaoComercial: parseFloat(selectedProduct.comComercial),
+        irpj: parseFloat(selectedProduct.irpj ?? "6"),
+        comissaoRestaurante: parseFloat(selectedProduct.comRestaurante ?? "15"),
+        comissaoComercial: parseFloat(selectedProduct.comComercial ?? "10"),
       });
     } else {
       setPremissas(DEFAULT_PREMISSAS);
@@ -288,7 +294,7 @@ export default function PriceTable() {
           custoGPC: parseFloat(t.custoUnitario),
           margem: parseFloat(t.margem) / 100,
           frete: parseFloat(t.frete),
-          artes: t.artes,
+          artes: t.artes ?? 1,
         };
       }
       setCustosVolume(newCustos);

@@ -21,6 +21,15 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
+  componentDidCatch(error: Error, errorInfo: { componentStack: string }) {
+    console.error("[ErrorBoundary] Error caught:", error.message);
+    const stack = errorInfo.componentStack;
+    const chunkSize = 500;
+    for (let i = 0; i < stack.length; i += chunkSize) {
+      console.error("[Stack" + Math.floor(i/chunkSize) + "]", stack.slice(i, i + chunkSize));
+    }
+  }
+
   render() {
     if (this.state.hasError) {
       return (
