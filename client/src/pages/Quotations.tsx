@@ -601,7 +601,10 @@ export default function Quotations() {
                         className="h-8 w-8 text-emerald-500 hover:text-emerald-400"
                         onClick={async () => {
                           try {
-                            const fetchedRestaurants = await utils.quotation.getRestaurants.fetch({ quotationId: q.id });
+                            const [fetchedRestaurants, fetchedItems] = await Promise.all([
+                              utils.quotation.getRestaurants.fetch({ quotationId: q.id }),
+                              utils.quotation.listItems.fetch({ quotationId: q.id }),
+                            ]);
                             const numRest = fetchedRestaurants.length;
                             const duration = q.cycles || 1;
                             const totalContractValue = Number(q.totalValue || 0);
@@ -613,6 +616,22 @@ export default function Quotations() {
                               neighborhood: r.restaurantAddress || "",
                               coasters: r.coasterQuantity || 0,
                             }));
+
+                            // Build multi-product items if the quotation has budget items
+                            const proposalItems = fetchedItems.length > 0
+                              ? fetchedItems.map(item => {
+                                  const semanasMatch = item.notes?.match(/(\d+)sem/);
+                                  const itemSemanas = semanasMatch ? parseInt(semanasMatch[1]) : duration * 4;
+                                  return {
+                                    productName: item.productName,
+                                    volume: Number(item.quantity),
+                                    semanas: itemSemanas,
+                                    unitPrice: Number(item.unitPrice || 0),
+                                    totalPrice: Number(item.totalPrice || 0),
+                                  };
+                                })
+                              : undefined;
+
                             generateProposalPdf({
                               clientName: q.clientName || q.leadName || "Cliente",
                               clientCompany: q.clientCompany || q.leadCompany || undefined,
@@ -624,14 +643,16 @@ export default function Quotations() {
                               numRestaurants: numRest,
                               coastersPerRestaurant: numRest > 0 ? Math.round(q.coasterVolume / numRest) : q.coasterVolume,
                               contractDuration: duration,
-                              semanas: (q.cycles || 1) * 4,
+                              semanas: proposalItems ? undefined : (q.cycles || 1) * 4,
                               pricePerRestaurant: pricePerRest,
                               monthlyTotal,
                               contractTotal: totalContractValue,
                               includesProduction: q.includesProduction ?? true,
+                              isBonificada: q.isBonificada ?? false,
                               restaurants,
                               productName: q.productName || undefined,
                               productUnitLabelPlural: q.productUnitLabelPlural || undefined,
+                              items: proposalItems,
                             });
                             toast.success("PDF da proposta gerado!");
                           } catch (err) {

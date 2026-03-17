@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
+import { generateProposalPdf } from "@/lib/generate-proposal-pdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -181,6 +182,69 @@ export default function QuotationDetail() {
     setEditOpen(true);
   };
 
+  const handleExportProposal = async () => {
+    if (!quotation) return;
+    try {
+      const [fetchedRestaurants, fetchedItems] = await Promise.all([
+        utils.quotation.getRestaurants.fetch({ quotationId }),
+        utils.quotation.listItems.fetch({ quotationId }),
+      ]);
+
+      const numRest = fetchedRestaurants.length;
+      const duration = quotation.cycles || 1;
+      const totalContractValue = Number(quotation.totalValue || 0);
+      const monthlyTotal = duration > 0 ? totalContractValue / duration : totalContractValue;
+      const effectiveNumRest = numRest > 0 ? numRest : 1;
+      const pricePerRest = monthlyTotal / effectiveNumRest;
+
+      const restaurants = fetchedRestaurants.map((r: any) => ({
+        name: r.restaurantName || "Restaurante",
+        neighborhood: r.restaurantAddress || "",
+        coasters: r.coasterQuantity || 0,
+      }));
+
+      const proposalItems = fetchedItems.length > 0
+        ? fetchedItems.map((item) => {
+            const semanasMatch = item.notes?.match(/(\d+)sem/);
+            const itemSemanas = semanasMatch ? parseInt(semanasMatch[1]) : duration * 4;
+            return {
+              productName: item.productName,
+              volume: Number(item.quantity),
+              semanas: itemSemanas,
+              unitPrice: Number(item.unitPrice || 0),
+              totalPrice: Number(item.totalPrice || 0),
+            };
+          })
+        : undefined;
+
+      generateProposalPdf({
+        clientName: quotation.clientName || quotation.leadName || "Cliente",
+        clientCompany: quotation.clientCompany || quotation.leadCompany || undefined,
+        clientCnpj: (quotation as any).clientCnpj || undefined,
+        clientEmail: (quotation as any).clientEmail || undefined,
+        clientPhone: (quotation as any).clientPhone || undefined,
+        quotationName: quotation.quotationName || quotation.quotationNumber,
+        coasterVolume: quotation.coasterVolume,
+        numRestaurants: numRest,
+        coastersPerRestaurant: numRest > 0 ? Math.round(quotation.coasterVolume / numRest) : quotation.coasterVolume,
+        contractDuration: duration,
+        semanas: proposalItems ? undefined : duration * 4,
+        pricePerRestaurant: pricePerRest,
+        monthlyTotal,
+        contractTotal: totalContractValue,
+        includesProduction: quotation.includesProduction ?? true,
+        isBonificada: quotation.isBonificada ?? false,
+        restaurants,
+        productName: (quotation as any).productName || undefined,
+        productUnitLabelPlural: (quotation as any).productUnitLabelPlural || undefined,
+        items: proposalItems,
+      });
+      toast.success("PDF da proposta gerado!");
+    } catch {
+      toast.error("Erro ao gerar PDF da proposta");
+    }
+  };
+
   const handleUpdate = () => {
     if (!editForm.clientId) { toast.error("Selecione um cliente"); return; }
     updateMutation.mutate({
@@ -262,6 +326,9 @@ export default function QuotationDetail() {
                   <Pencil className="w-3.5 h-3.5" /> Editar
                 </Button>
               )}
+              <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={handleExportProposal}>
+                <Download className="w-3.5 h-3.5" /> Proposta
+              </Button>
               <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => duplicateMutation.mutate({ id: quotationId })}>
                 <Copy className="w-3.5 h-3.5" /> Duplicar
               </Button>

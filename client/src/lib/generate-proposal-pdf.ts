@@ -2,6 +2,14 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { HOST_GROTESK_REGULAR, HOST_GROTESK_BOLD, LOGO_WHITE_BASE64 } from "./pdf-assets";
 
+interface ProposalItem {
+  productName: string;
+  volume: number;
+  semanas: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
 interface ProposalPDFData {
   clientName: string;
   clientCompany?: string;
@@ -28,6 +36,9 @@ interface ProposalPDFData {
   productName?: string;
   productUnitLabelPlural?: string;
   semanas?: number;
+  /** Multi-product items from BudgetCreator. When provided, switches to multi-product PDF layout. */
+  items?: ProposalItem[];
+  isBonificada?: boolean;
 }
 
 const FONT_NAME = "HostGrotesk";
@@ -232,6 +243,9 @@ export function generateProposalPdf(data: ProposalPDFData) {
   const margin = 20;
   const contentWidth = pageWidth - margin * 2;
 
+  const isMultiProduct = !!(data.items && data.items.length > 0);
+  const isBonificada = data.isBonificada === true;
+
   const numRest = data.numRestaurants > 0 ? data.numRestaurants : 1;
   const monthlyTotal = data.monthlyTotal > 0 ? data.monthlyTotal : data.pricePerRestaurant * numRest;
   const pricePerRestaurant = data.pricePerRestaurant > 0 ? data.pricePerRestaurant : (monthlyTotal / numRest);
@@ -246,14 +260,12 @@ export function generateProposalPdf(data: ProposalPDFData) {
 
   const hasDetailedDiscounts = data.semanas !== undefined;
 
-  let discountTotal = 0;
   let discountPercent = 0;
   let discountValue = 0;
 
-  if (listPriceTotal > 0 && listPriceTotal > contractTotal) {
+  if (!isMultiProduct && listPriceTotal > 0 && listPriceTotal > contractTotal) {
     discountValue = listPriceTotal - contractTotal;
     discountPercent = (discountValue / listPriceTotal) * 100;
-    discountTotal = discountValue;
   }
 
   drawHeader(doc, pageWidth, margin);
@@ -297,54 +309,191 @@ export function generateProposalPdf(data: ProposalPDFData) {
   y = justifyText(doc, aboutText, margin, y, contentWidth, 4.5);
   y += 8;
 
-  y = checkPageBreak(doc, y, 60);
-  y = drawSectionTitle(doc, "DESCRIÇÃO DO SERVIÇO", y, margin);
+  // ── SECTION: Service description / Products ──────────────────────────────
+  if (isMultiProduct) {
+    // Multi-product layout: show a table of all budget items
+    y = checkPageBreak(doc, y, 60);
+    y = drawSectionTitle(doc, "PRODUTOS DO ORÇAMENTO", y, margin);
 
-  y = drawInfoRow(doc, "Formato:", `${prodName} (frente e verso)`, y, margin);
-  y = drawInfoRow(doc, "Volume total:", `${fmtNumber(data.coasterVolume)} ${unitLabel}/mês`, y, margin);
-  if (data.numRestaurants > 0) {
-    y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurante${data.numRestaurants !== 1 ? "s" : ""} parceiro${data.numRestaurants !== 1 ? "s" : ""}`, y, margin);
-    y = drawInfoRow(doc, "Por restaurante:", `${fmtNumber(data.coastersPerRestaurant)} ${unitLabel}/mês`, y, margin);
+    const items = data.items!;
+    const totalVolume = items.reduce((s, i) => s + i.volume, 0);
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Produto", "Duração", "Volume", "Preço/un.", "Total"]],
+      body: items.map(item => [
+        item.productName,
+        `${item.semanas} sem.`,
+        fmtNumber(item.volume) + " un.",
+        isBonificada ? "—" : `R$ ${item.unitPrice.toFixed(4)}`,
+        isBonificada ? "Bonificado" : fmtCurrency(item.totalPrice),
+      ]),
+      foot: [[
+        `${items.length} produto${items.length !== 1 ? "s" : ""}`,
+        "",
+        fmtNumber(totalVolume) + " un.",
+        "",
+        isBonificada ? "R$ 0,00" : fmtCurrency(contractTotal),
+      ]],
+      theme: "grid",
+      styles: { font: FONT_NAME, fontSize: 8 },
+      headStyles: {
+        fillColor: [...BLACK],
+        textColor: [...WHITE],
+        fontSize: 8,
+        fontStyle: "bold",
+        font: FONT_NAME,
+      },
+      bodyStyles: { textColor: [40, 40, 40], font: FONT_NAME },
+      footStyles: {
+        fillColor: [...LIGHT_GRAY],
+        textColor: [...BLACK],
+        fontSize: 8,
+        fontStyle: "bold",
+        font: FONT_NAME,
+      },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      margin: { left: margin, right: margin },
+      columnStyles: {
+        1: { halign: "center", cellWidth: 22 },
+        2: { halign: "right", cellWidth: 28 },
+        3: { halign: "right", cellWidth: 28 },
+        4: { halign: "right", fontStyle: "bold", cellWidth: 32 },
+      },
+    });
+
+    y = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y + 40;
+    y += 8;
+
+    // Service info below table
+    y = checkPageBreak(doc, y, 30);
+    if (data.includesProduction) {
+      y = drawInfoRow(doc, "Produção:", "Inclusa no valor", y, margin);
+    }
+    if (data.numRestaurants > 0) {
+      y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurante${data.numRestaurants !== 1 ? "s" : ""} parceiro${data.numRestaurants !== 1 ? "s" : ""}`, y, margin);
+    }
   } else {
-    y = drawInfoRow(doc, "Distribuição:", "A definir", y, margin);
-  }
-  y = drawInfoRow(doc, "Duração:", `${data.contractDuration} ${data.contractDuration === 1 ? "período" : "períodos"} de 4 semanas`, y, margin);
-  if (data.includesProduction) {
-    y = drawInfoRow(doc, "Produção:", "Inclusa no valor", y, margin);
+    // Single-product layout (original flow)
+    y = checkPageBreak(doc, y, 60);
+    y = drawSectionTitle(doc, "DESCRIÇÃO DO SERVIÇO", y, margin);
+
+    y = drawInfoRow(doc, "Formato:", `${prodName} (frente e verso)`, y, margin);
+    y = drawInfoRow(doc, "Volume total:", `${fmtNumber(data.coasterVolume)} ${unitLabel}/mês`, y, margin);
+    if (data.numRestaurants > 0) {
+      y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurante${data.numRestaurants !== 1 ? "s" : ""} parceiro${data.numRestaurants !== 1 ? "s" : ""}`, y, margin);
+      y = drawInfoRow(doc, "Por restaurante:", `${fmtNumber(data.coastersPerRestaurant)} ${unitLabel}/mês`, y, margin);
+    } else {
+      y = drawInfoRow(doc, "Distribuição:", "A definir", y, margin);
+    }
+    y = drawInfoRow(doc, "Duração:", `${data.contractDuration} ${data.contractDuration === 1 ? "período" : "períodos"} de 4 semanas`, y, margin);
+    if (data.includesProduction) {
+      y = drawInfoRow(doc, "Produção:", "Inclusa no valor", y, margin);
+    }
   }
 
+  // ── SECTION: Investimento ─────────────────────────────────────────────────
   y += 8;
   y = checkPageBreak(doc, y, 70);
   y = drawSectionTitle(doc, "INVESTIMENTO", y, margin);
 
-  doc.setFillColor(...LIGHT_GRAY);
-  doc.roundedRect(margin, y, contentWidth, 50, 3, 3, "F");
+  if (isMultiProduct) {
+    const multiItems = data.items!;
+    // Dynamic box height: 8 top pad + label row (12) + N item rows (10 each) + separator + total row (14) + 4 bottom pad
+    const boxH = isBonificada
+      ? 30
+      : multiItems.length > 1
+        ? 8 + 12 + multiItems.length * 10 + 4 + 14 + 4
+        : 36;
 
-  doc.setTextColor(...GRAY);
-  doc.setFontSize(9);
-  doc.setFont(FONT_NAME, "normal");
-  doc.text("Valor por período / restaurante", margin + 10, y + 12);
-  doc.text("Investimento por período (total)", margin + 10, y + 26);
-  doc.text("Valor total do contrato", margin + 10, y + 40);
+    y = checkPageBreak(doc, y, boxH + 10);
+    doc.setFillColor(...LIGHT_GRAY);
+    doc.roundedRect(margin, y, contentWidth, boxH, 3, 3, "F");
 
-  doc.setTextColor(...BLACK);
-  doc.setFontSize(12);
-  doc.setFont(FONT_NAME, "bold");
-  doc.text(fmtCurrency(pricePerRestaurant), pageWidth - margin - 10, y + 12, { align: "right" });
+    if (isBonificada) {
+      doc.setTextColor(...GRAY);
+      doc.setFontSize(9);
+      doc.setFont(FONT_NAME, "normal");
+      doc.text("Campanha bonificada — sem custo para o anunciante", margin + 10, y + 12);
+      doc.setTextColor(180, 130, 0);
+      doc.setFontSize(14);
+      doc.setFont(FONT_NAME, "bold");
+      doc.text("R$ 0,00", pageWidth - margin - 10, y + 22, { align: "right" });
+    } else if (multiItems.length <= 1) {
+      // Single item — compact: label + total
+      doc.setTextColor(...GRAY);
+      doc.setFontSize(9);
+      doc.setFont(FONT_NAME, "normal");
+      doc.text("Valor total desta proposta", margin + 10, y + 12);
+      doc.setTextColor(...GREEN);
+      doc.setFontSize(14);
+      doc.setFont(FONT_NAME, "bold");
+      doc.text(fmtCurrency(contractTotal), pageWidth - margin - 10, y + 28, { align: "right" });
+    } else {
+      // Multiple items — show each subtotal then grand total
+      doc.setTextColor(...GRAY);
+      doc.setFontSize(8);
+      doc.setFont(FONT_NAME, "normal");
+      doc.text("Composição do investimento", margin + 10, y + 10);
 
-  doc.setTextColor(...GREEN);
-  doc.setFontSize(14);
-  doc.text(fmtCurrency(monthlyTotal), pageWidth - margin - 10, y + 26, { align: "right" });
+      let rowTop = y + 20;
+      for (const item of multiItems) {
+        doc.setFontSize(7.5);
+        doc.setFont(FONT_NAME, "normal");
+        doc.setTextColor(...GRAY);
+        doc.text(`${item.productName} · ${item.semanas} sem. · ${fmtNumber(item.volume)} un.`, margin + 12, rowTop);
+        doc.setFont(FONT_NAME, "bold");
+        doc.setTextColor(...DARK_GRAY);
+        doc.text(fmtCurrency(item.totalPrice), pageWidth - margin - 10, rowTop, { align: "right" });
+        rowTop += 10;
+      }
 
-  doc.setTextColor(...BLACK);
-  doc.setFontSize(16);
-  doc.text(fmtCurrency(contractTotal), pageWidth - margin - 10, y + 42, { align: "right" });
+      // Separator before total
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin + 10, rowTop + 2, pageWidth - margin - 10, rowTop + 2);
 
-  doc.setDrawColor(200, 200, 200);
-  doc.line(margin + 10, y + 17, pageWidth - margin - 10, y + 17);
-  doc.line(margin + 10, y + 31, pageWidth - margin - 10, y + 31);
+      doc.setTextColor(...GRAY);
+      doc.setFontSize(8);
+      doc.setFont(FONT_NAME, "normal");
+      doc.text("TOTAL DA PROPOSTA", margin + 10, rowTop + 12);
+      doc.setTextColor(...GREEN);
+      doc.setFontSize(14);
+      doc.setFont(FONT_NAME, "bold");
+      doc.text(fmtCurrency(contractTotal), pageWidth - margin - 10, rowTop + 12, { align: "right" });
+    }
 
-  y += 62;
+    y += boxH + 10;
+  } else {
+    // Original single-product investment box
+    doc.setFillColor(...LIGHT_GRAY);
+    doc.roundedRect(margin, y, contentWidth, 50, 3, 3, "F");
+
+    doc.setTextColor(...GRAY);
+    doc.setFontSize(9);
+    doc.setFont(FONT_NAME, "normal");
+    doc.text("Valor por período / restaurante", margin + 10, y + 12);
+    doc.text("Investimento por período (total)", margin + 10, y + 26);
+    doc.text("Valor total do contrato", margin + 10, y + 40);
+
+    doc.setTextColor(...BLACK);
+    doc.setFontSize(12);
+    doc.setFont(FONT_NAME, "bold");
+    doc.text(fmtCurrency(pricePerRestaurant), pageWidth - margin - 10, y + 12, { align: "right" });
+
+    doc.setTextColor(...GREEN);
+    doc.setFontSize(14);
+    doc.text(fmtCurrency(monthlyTotal), pageWidth - margin - 10, y + 26, { align: "right" });
+
+    doc.setTextColor(...BLACK);
+    doc.setFontSize(16);
+    doc.text(fmtCurrency(contractTotal), pageWidth - margin - 10, y + 42, { align: "right" });
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin + 10, y + 17, pageWidth - margin - 10, y + 17);
+    doc.line(margin + 10, y + 31, pageWidth - margin - 10, y + 31);
+
+    y += 62;
+  }
 
   if (discountPercent > 0) {
     y += 4;
