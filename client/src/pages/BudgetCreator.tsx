@@ -555,8 +555,6 @@ export default function BudgetCreator() {
 
   const [clientId, setClientId] = useState<number | null>(null);
   const [leadId, setLeadId] = useState<number | null>(null);
-  const [networkProfile, setNetworkProfile] = useState("");
-  const [regions, setRegions] = useState("");
   const [isBonificada, setIsBonificada] = useState(false);
   const [descontoParceiro, setDescontoParceiro] = useState(false);
   const [partnerId, setPartnerId] = useState<number | null>(null);
@@ -674,8 +672,6 @@ export default function BudgetCreator() {
         leadId: leadId ?? undefined,
         coasterVolume: totalVolume,
         manualDiscountPercent: descontoManual > 0 ? String(descontoManual) : undefined,
-        networkProfile: networkProfile || undefined,
-        regions: regions || undefined,
         cycles: Math.round((itemCalcs[0]?.item.semanas ?? 12) / 4),
         totalValue,
         notes: notes || undefined,
@@ -715,7 +711,7 @@ export default function BudgetCreator() {
     } finally {
       setIsGenerating(false);
     }
-  }, [clientId, leadId, itemCalcs, totals, networkProfile, regions, descontoManual, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate]);
+  }, [clientId, leadId, itemCalcs, totals, descontoManual, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -790,29 +786,18 @@ export default function BudgetCreator() {
                 )}
 
                 {/* Configurações da proposta */}
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Perfil de rede</Label>
-                    <Input
-                      value={networkProfile}
-                      onChange={(e) => setNetworkProfile(e.target.value)}
-                      className="h-9 text-sm"
-                      placeholder="ex: premium"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Desconto manual (%)</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.5}
-                      value={descontoManual || ""}
-                      onChange={(e) => setDescontoManual(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                      className="h-9 text-sm"
-                      placeholder="0"
-                    />
-                  </div>
+                <div className="pt-1">
+                  <Label className="text-xs text-muted-foreground mb-1 block">Desconto manual (%)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.5}
+                    value={descontoManual || ""}
+                    onChange={(e) => setDescontoManual(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                    className="h-9 text-sm"
+                    placeholder="0"
+                  />
                 </div>
 
                 {/* Switches */}
