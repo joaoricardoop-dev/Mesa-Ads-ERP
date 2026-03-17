@@ -71,6 +71,13 @@
       "when": 1773692800000,
       "tag": "0009_add_productid_campaigns_service_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773716680371,
+      "tag": "0010_high_darkstar",
+      "breakpoints": true
     }
   ]
 }

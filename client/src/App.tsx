@@ -45,6 +45,8 @@ import Onboarding from "./pages/Onboarding";
 import TermTemplates from "./pages/TermTemplates";
 import QuotationSign from "./pages/QuotationSign";
 import Products from "./pages/Products";
+import Partners from "./pages/Partners";
+import PartnerDetail from "./pages/PartnerDetail";
 
 function AnuncianteRouter() {
   return (
@@ -77,6 +79,8 @@ function Router() {
       <Route path="/comercial/cotacoes" component={Quotations} />
       <Route path="/comercial/leads" component={Leads} />
       <Route path="/comercial/contatos" component={Contacts} />
+      <Route path="/comercial/parceiros/:id" component={PartnerDetail} />
+      <Route path="/comercial/parceiros" component={Partners} />
       <Route path="/restaurantes/perfil/:id" component={ActiveRestaurantProfile} />
       <Route path="/restaurantes/novo" component={ActiveRestaurantForm} />
       <Route path="/restaurantes/:id" component={ActiveRestaurantForm} />

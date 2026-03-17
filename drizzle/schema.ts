@@ -392,16 +392,45 @@ export const quotations = pgTable("quotations", {
   isBonificada: boolean("isBonificada").default(false).notNull(),
   hasPartnerDiscount: boolean("hasPartnerDiscount").default(false).notNull(),
   productId: integer("productId").references(() => products.id),
+  partnerId: integer("partnerId").references(() => partners.id, { onDelete: "set null" }),
   createdBy: varchar("createdBy", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
   index("idx_quotations_client_id").on(t.clientId),
   index("idx_quotations_status").on(t.status),
+  index("idx_quotations_partner_id").on(t.partnerId),
 ]);
 
 export type Quotation = typeof quotations.$inferSelect;
 export type InsertQuotation = typeof quotations.$inferInsert;
+
+// ─── Partners (parceiros comerciais/agências) ────────────────────────────────
+
+export const partnerTypeEnum = pgEnum("partner_type", ["agencia", "indicador", "consultor"]);
+
+export const partners = pgTable("partners", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  company: varchar("company", { length: 255 }),
+  cnpj: varchar("cnpj", { length: 20 }),
+  contactName: varchar("contactName", { length: 255 }),
+  contactPhone: varchar("contactPhone", { length: 50 }),
+  contactEmail: varchar("contactEmail", { length: 320 }),
+  type: partnerTypeEnum("type").default("indicador").notNull(),
+  commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("10.00").notNull(),
+  status: statusEnum("status").default("active").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_partners_status").on(t.status),
+  index("idx_partners_type").on(t.type),
+  index("idx_partners_cnpj").on(t.cnpj),
+]);
+
+export type Partner = typeof partners.$inferSelect;
+export type InsertPartner = typeof partners.$inferInsert;
 
 // ─── Leads ───────────────────────────────────────────────────────────────────
 
@@ -435,11 +464,13 @@ export const leads = pgTable("leads", {
   clientId: integer("client_id"),
   convertedToId: integer("convertedToId"),
   convertedToType: varchar("convertedToType", { length: 50 }),
+  partnerId: integer("partnerId").references(() => partners.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
   index("idx_leads_type").on(t.type),
   index("idx_leads_stage").on(t.stage),
+  index("idx_leads_partner_id").on(t.partnerId),
 ]);
 
 export type Lead = typeof leads.$inferSelect;

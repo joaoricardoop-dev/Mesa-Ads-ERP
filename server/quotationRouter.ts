@@ -1,7 +1,7 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products } from "../drizzle/schema";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners } from "../drizzle/schema";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -106,11 +106,14 @@ export const quotationRouter = router({
           productName: products.name,
           productUnitLabel: products.unitLabel,
           productUnitLabelPlural: products.unitLabelPlural,
+          partnerId: quotations.partnerId,
+          partnerName: partners.name,
         })
         .from(quotations)
         .leftJoin(clients, eq(quotations.clientId, clients.id))
         .leftJoin(leads, eq(quotations.leadId, leads.id))
         .leftJoin(products, eq(quotations.productId, products.id))
+        .leftJoin(partners, eq(quotations.partnerId, partners.id))
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(quotations.createdAt));
 
@@ -161,11 +164,14 @@ export const quotationRouter = router({
           productName: products.name,
           productUnitLabel: products.unitLabel,
           productUnitLabelPlural: products.unitLabelPlural,
+          partnerId: quotations.partnerId,
+          partnerName: partners.name,
         })
         .from(quotations)
         .leftJoin(clients, eq(quotations.clientId, clients.id))
         .leftJoin(leads, eq(quotations.leadId, leads.id))
         .leftJoin(products, eq(quotations.productId, products.id))
+        .leftJoin(partners, eq(quotations.partnerId, partners.id))
         .where(eq(quotations.id, input.id))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
@@ -190,6 +196,7 @@ export const quotationRouter = router({
       isBonificada: z.boolean().optional(),
       hasPartnerDiscount: z.boolean().optional(),
       productId: z.number(),
+      partnerId: z.number().nullable().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -238,6 +245,7 @@ export const quotationRouter = router({
         isBonificada: input.isBonificada ?? false,
         hasPartnerDiscount: input.hasPartnerDiscount ?? false,
         productId: input.productId,
+        partnerId: input.partnerId ?? null,
       }).returning();
 
       return created;
@@ -262,6 +270,7 @@ export const quotationRouter = router({
       isBonificada: z.boolean().optional(),
       hasPartnerDiscount: z.boolean().optional(),
       productId: z.number().nullable().optional(),
+      partnerId: z.number().nullable().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();

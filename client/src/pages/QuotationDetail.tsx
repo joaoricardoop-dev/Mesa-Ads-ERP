@@ -318,6 +318,15 @@ export default function QuotationDetail() {
                 </div>
               </div>
 
+              {(quotation as any).partnerName && (
+                <div className="bg-card border border-green-500/30 rounded-xl p-5 space-y-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-green-500 flex items-center gap-2">
+                    <Building2 className="w-3.5 h-3.5" /> Parceiro
+                  </h3>
+                  <p className="text-sm font-semibold">{(quotation as any).partnerName}</p>
+                </div>
+              )}
+
               <div className="bg-card border border-border/30 rounded-xl p-5 space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                   <Package className="w-3.5 h-3.5" /> Detalhes

@@ -53,6 +53,7 @@ import {
   Zap,
   RotateCcw,
   TrendingUp,
+  Handshake,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -160,6 +161,7 @@ interface LeadFormData {
   tags: string;
   notes: string;
   clientId?: number;
+  partnerId?: number | null;
 }
 
 const emptyForm: LeadFormData = {
@@ -183,6 +185,7 @@ const emptyForm: LeadFormData = {
   tags: "",
   notes: "",
   clientId: undefined,
+  partnerId: null,
 };
 
 interface ConvertRestaurantForm {
@@ -332,6 +335,7 @@ export default function Leads() {
 
   const internalUsers = trpc.lead.listUsers.useQuery();
   const clientsList = trpc.advertiser.list.useQuery();
+  const partnersList = trpc.partner.list.useQuery();
 
   const cnpjClean = cnpjInput.replace(/\D/g, "");
   const { isFetching: isCnpjLoading, error: cnpjError, refetch: fetchCnpj } = trpc.cnpj.lookup.useQuery(
@@ -455,6 +459,7 @@ export default function Leads() {
         origin: selectedLead.data.origin ?? "",
         tags: selectedLead.data.tags ?? "",
         notes: selectedLead.data.notes ?? "",
+        partnerId: selectedLead.data.partnerId ?? null,
       });
     }
   }, [isEditing, selectedLead.data]);
@@ -911,6 +916,24 @@ export default function Leads() {
               className="h-8 text-sm"
             />
           </div>
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label className="text-xs">Parceiro</Label>
+          <Select
+            value={data.partnerId ? String(data.partnerId) : "none"}
+            onValueChange={(v) => setData({ ...data, partnerId: v === "none" ? null : Number(v) })}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue placeholder="Selecione um parceiro" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Nenhum</SelectItem>
+              {(partnersList.data || []).filter((p: any) => p.status === "active").map((p: any) => (
+                <SelectItem key={p.id} value={String(p.id)}>{p.name}{p.company ? ` (${p.company})` : ""}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid gap-1.5">
@@ -1415,6 +1438,21 @@ export default function Leads() {
                         </div>
                         <ChevronRight className="w-3.5 h-3.5 text-cyan-500/60 ml-auto shrink-0" />
                       </Link>
+                    </div>
+                  </>
+                )}
+
+                {selectedLead.data?.partnerName && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Parceiro</span>
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-500/5 border border-green-500/20">
+                        <Handshake className="w-4 h-4 text-green-500 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-green-500">{selectedLead.data.partnerName}</p>
+                        </div>
+                      </div>
                     </div>
                   </>
                 )}

@@ -313,7 +313,6 @@ const DEFAULT_PRODUCT_TIERS: ProductPricingTier[] = [
   { volumeMin: 19000, volumeMax: 19999, custoUnitario: "0.2700", frete: "1532.72", margem: "50.00", artes: 1 },
   { volumeMin: 20000, volumeMax: null,  custoUnitario: "0.2600", frete: "1613.59", margem: "50.00", artes: 1 },
 ];
-
 interface TierLookupResult {
   custoUnitario: number;
   frete: number;

@@ -157,6 +157,7 @@ interface QuotationForm {
   isBonificada: boolean;
   hasPartnerDiscount: boolean;
   productId: number | "";
+  partnerId: number | "" | null;
 }
 
 const emptyForm: QuotationForm = {
@@ -174,6 +175,7 @@ const emptyForm: QuotationForm = {
   isBonificada: false,
   hasPartnerDiscount: false,
   productId: "",
+  partnerId: "",
 };
 
 const STATUS_CONFIG: Record<QuotationStatus, { label: string; className: string }> = {
@@ -215,6 +217,7 @@ export default function Quotations() {
   const { data: quotationsList = [], isLoading } = trpc.quotation.list.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
   const { data: productsList = [] } = trpc.product.list.useQuery();
+  const { data: partnersList = [] } = trpc.partner.list.useQuery();
   const { data: activeRestaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
   const { data: batchesList = [] } = trpc.batch.list.useQuery();
   const { data: allocatedRestaurants = [] } = trpc.quotation.getRestaurants.useQuery(
@@ -315,6 +318,7 @@ export default function Quotations() {
       isBonificada: form.isBonificada,
       hasPartnerDiscount: form.hasPartnerDiscount,
       productId: Number(form.productId),
+      partnerId: form.partnerId ? Number(form.partnerId) : null,
     };
 
     if (editingId) {
@@ -339,6 +343,7 @@ export default function Quotations() {
       isBonificada: q.isBonificada ?? false,
       hasPartnerDiscount: q.hasPartnerDiscount ?? false,
       productId: q.productId || "",
+      partnerId: (q as any).partnerId || "",
     });
     setIsDialogOpen(true);
   };
@@ -509,6 +514,9 @@ export default function Quotations() {
                       <p className="font-medium">{q.clientName || q.leadName || "—"}</p>
                       {(q.clientCompany || q.leadCompany) && (
                         <p className="text-xs text-muted-foreground">{q.clientCompany || q.leadCompany}</p>
+                      )}
+                      {(q as any).partnerName && (
+                        <p className="text-[11px] text-green-500">via {(q as any).partnerName}</p>
                       )}
                       {!q.clientId && q.leadId && (
                         <Badge variant="outline" className="text-[9px] h-4 px-1 mt-0.5 text-amber-500 border-amber-500/30">Lead</Badge>
@@ -827,6 +835,23 @@ export default function Quotations() {
                   Parceiro
                 </Badge>
               )}
+            </div>
+            <div className="grid gap-2">
+              <Label>Parceiro</Label>
+              <Select
+                value={form.partnerId ? String(form.partnerId) : "none"}
+                onValueChange={(v) => setForm({ ...form, partnerId: v === "none" ? null : Number(v) })}
+              >
+                <SelectTrigger className="bg-background border-border/30">
+                  <SelectValue placeholder="Selecione um parceiro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {(partnersList as any[]).filter((p: any) => p.status === "active").map((p: any) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.name}{p.company ? ` (${p.company})` : ""}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
