@@ -144,7 +144,6 @@ type QuotationStatus = "rascunho" | "enviada" | "ativa" | "os_gerada" | "win" | 
 
 interface QuotationForm {
   clientId: number | "";
-  campaignType: string;
   coasterVolume: number;
   networkProfile: string;
   regions: string;
@@ -162,7 +161,6 @@ interface QuotationForm {
 
 const emptyForm: QuotationForm = {
   clientId: "",
-  campaignType: "padrao",
   coasterVolume: 10000,
   networkProfile: "",
   regions: "",
@@ -331,7 +329,6 @@ export default function Quotations() {
 
     const payload = {
       clientId: form.clientId as number,
-      campaignType: form.campaignType || undefined,
       coasterVolume: form.coasterVolume,
       networkProfile: form.networkProfile || undefined,
       regions: form.regions || undefined,
@@ -356,7 +353,6 @@ export default function Quotations() {
     setEditingId(q.id);
     setForm({
       clientId: q.clientId,
-      campaignType: q.campaignType || "padrao",
       coasterVolume: q.coasterVolume,
       networkProfile: q.networkProfile || "",
       regions: q.regions || "",
@@ -793,22 +789,6 @@ export default function Quotations() {
 
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Detalhes</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Tipo de Campanha</Label>
-                <Select
-                  value={form.campaignType}
-                  onValueChange={(v) => setForm({ ...form, campaignType: v })}
-                >
-                  <SelectTrigger className="bg-background border-border/30">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="padrao">Padrão</SelectItem>
-                    <SelectItem value="premium">Premium</SelectItem>
-                    <SelectItem value="exclusivo">Exclusivo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               <div className="grid gap-2">
                 <Label>Perfil de Rede</Label>
                 <Input

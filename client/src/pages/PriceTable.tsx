@@ -383,7 +383,6 @@ export default function PriceTable() {
     createMutation.mutate({
       ...(selectedClientId !== "none" ? { clientId: parseInt(selectedClientId) } : {}),
       ...(selectedLeadId !== "none" ? { leadId: parseInt(selectedLeadId) } : {}),
-      campaignType: "bolachas",
       coasterVolume: cotacaoVolume,
       cycles: Math.ceil(semanas / 4),
       unitPrice: unitPriceStr,

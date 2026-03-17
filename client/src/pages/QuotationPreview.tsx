@@ -298,7 +298,6 @@ export default function QuotationPreview() {
     createQuotationMutation.mutate({
       ...(selectedClientId !== "none" ? { clientId: parseInt(selectedClientId) } : {}),
       ...(selectedLeadId !== "none" ? { leadId: parseInt(selectedLeadId) } : {}),
-      campaignType: "bolachas",
       coasterVolume: totalCoasters,
       unitPrice: String(pr.sellingPrice),
       totalValue: String(totalValueCalc),

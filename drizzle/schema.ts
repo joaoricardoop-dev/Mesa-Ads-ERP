@@ -375,7 +375,6 @@ export const quotations = pgTable("quotations", {
   quotationName: varchar("quotationName", { length: 255 }),
   clientId: integer("clientId").references(() => clients.id, { onDelete: "cascade" }),
   leadId: integer("leadId"),
-  campaignType: varchar("campaignType", { length: 50 }).default("padrao"),
   coasterVolume: integer("coasterVolume"),
   networkProfile: varchar("networkProfile", { length: 50 }),
   regions: text("regions"),

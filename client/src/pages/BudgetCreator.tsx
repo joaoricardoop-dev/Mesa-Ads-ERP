@@ -548,7 +548,6 @@ export default function BudgetCreator() {
 
   const [clientId, setClientId] = useState<number | null>(null);
   const [leadId, setLeadId] = useState<number | null>(null);
-  const [campaignType, setCampaignType] = useState("padrao");
   const [networkProfile, setNetworkProfile] = useState("");
   const [regions, setRegions] = useState("");
   const [cycles, setCycles] = useState(1);
@@ -655,7 +654,6 @@ export default function BudgetCreator() {
       const quotation = await createQuotation.mutateAsync({
         clientId: clientId ?? undefined,
         leadId: leadId ?? undefined,
-        campaignType,
         coasterVolume: totalVolume,
         networkProfile: networkProfile || undefined,
         regions: regions || undefined,
@@ -698,7 +696,7 @@ export default function BudgetCreator() {
     } finally {
       setIsGenerating(false);
     }
-  }, [clientId, leadId, itemCalcs, totals, campaignType, networkProfile, regions, cycles, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate]);
+  }, [clientId, leadId, itemCalcs, totals, networkProfile, regions, cycles, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -773,20 +771,7 @@ export default function BudgetCreator() {
                 )}
 
                 {/* Configurações da proposta */}
-                <div className="grid grid-cols-3 gap-3 pt-1">
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Tipo de campanha</Label>
-                    <Select value={campaignType} onValueChange={setCampaignType}>
-                      <SelectTrigger className="h-9 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="padrao">Padrão</SelectItem>
-                        <SelectItem value="premium">Premium</SelectItem>
-                        <SelectItem value="exclusivo">Exclusivo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="grid grid-cols-2 gap-3 pt-1">
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1 block">Perfil de rede</Label>
                     <Input

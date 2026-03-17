@@ -96,7 +96,6 @@ export default function QuotationDetail() {
 
   const [editForm, setEditForm] = useState({
     clientId: 0 as number,
-    campaignType: "padrao",
     coasterVolume: 10000,
     networkProfile: "",
     regions: "",
@@ -167,7 +166,6 @@ export default function QuotationDetail() {
     if (!quotation) return;
     setEditForm({
       clientId: quotation.clientId,
-      campaignType: quotation.campaignType || "padrao",
       coasterVolume: quotation.coasterVolume,
       networkProfile: quotation.networkProfile || "",
       regions: quotation.regions || "",
@@ -250,7 +248,6 @@ export default function QuotationDetail() {
     updateMutation.mutate({
       id: quotationId,
       clientId: editForm.clientId,
-      campaignType: editForm.campaignType || undefined,
       coasterVolume: editForm.coasterVolume,
       networkProfile: editForm.networkProfile || undefined,
       regions: editForm.regions || undefined,
@@ -775,10 +772,6 @@ export default function QuotationDetail() {
                 </h3>
                 <div className="space-y-1.5 text-sm">
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground text-xs">Tipo</span>
-                    <span className="capitalize text-xs font-medium">{quotation.campaignType || "padrão"}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
                     <span className="text-muted-foreground text-xs">Ciclos</span>
                     <span className="text-xs font-medium">{quotation.cycles || 1}</span>
                   </div>
@@ -857,7 +850,7 @@ export default function QuotationDetail() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Volume *</Label>
                 <Input type="number" value={editForm.coasterVolume} onChange={(e) => setEditForm({ ...editForm, coasterVolume: Number(e.target.value) })} min={1} className="bg-background border-border/30" />
@@ -865,17 +858,6 @@ export default function QuotationDetail() {
               <div className="grid gap-2">
                 <Label>Ciclos</Label>
                 <Input type="number" value={editForm.cycles} onChange={(e) => setEditForm({ ...editForm, cycles: Number(e.target.value) })} min={1} className="bg-background border-border/30" />
-              </div>
-              <div className="grid gap-2">
-                <Label>Tipo</Label>
-                <Select value={editForm.campaignType} onValueChange={(v) => setEditForm({ ...editForm, campaignType: v })}>
-                  <SelectTrigger className="bg-background border-border/30"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="padrao">Padrão</SelectItem>
-                    <SelectItem value="premium">Premium</SelectItem>
-                    <SelectItem value="exclusivo">Exclusivo</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

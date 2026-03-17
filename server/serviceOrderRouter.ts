@@ -182,12 +182,11 @@ export const serviceOrderRouter = router({
           const [campaign] = await db.insert(campaigns).values({
             campaignNumber,
             clientId: q.clientId!,
-            name: `${clientName} - ${q.campaignType || "Campanha"}`,
+            name: `${clientName} - Campanha`,
             startDate: updated.periodStart || new Date().toISOString().split("T")[0],
             endDate: updated.periodEnd || new Date().toISOString().split("T")[0],
             status: "producao",
             quotationId: q.id,
-            campaignType: q.campaignType,
             coastersPerRestaurant: 500,
             usagePerDay: 3,
             daysPerMonth: 26,
