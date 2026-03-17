@@ -115,6 +115,7 @@ export default function QuotationDetail() {
   const { data: batchesList = [] } = trpc.batch.list.useQuery();
   const { data: os } = trpc.quotation.getOS.useQuery({ quotationId }, { enabled: !!quotation && (quotation.status === "os_gerada" || quotation.status === "win") });
   const { data: allocatedRestaurants = [] } = trpc.quotation.getRestaurants.useQuery({ quotationId });
+  const { data: quotationItemsList = [] } = trpc.quotation.listItems.useQuery({ quotationId }, { enabled: !isNaN(quotationId) });
 
   const updateMutation = trpc.quotation.update.useMutation({
     onSuccess: () => { utils.quotation.get.invalidate({ id: quotationId }); utils.quotation.list.invalidate(); setEditOpen(false); toast.success("Cotação atualizada!"); },
@@ -329,17 +330,9 @@ export default function QuotationDetail() {
 
               <div className="bg-card border border-border/30 rounded-xl p-5 space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Package className="w-3.5 h-3.5" /> Detalhes
+                  <Package className="w-3.5 h-3.5" /> Detalhes da Campanha
                 </h3>
                 <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-                  {quotation.productName && (
-                    <>
-                      <span className="text-muted-foreground">Produto</span>
-                      <span className="font-medium">{quotation.productName}</span>
-                    </>
-                  )}
-                  <span className="text-muted-foreground">Volume</span>
-                  <span className="font-mono font-medium">{quotation.coasterVolume.toLocaleString("pt-BR")} un.</span>
                   <span className="text-muted-foreground">Tipo</span>
                   <span className="capitalize">{quotation.campaignType || "padrão"}</span>
                   <span className="text-muted-foreground">Ciclos</span>
@@ -351,16 +344,103 @@ export default function QuotationDetail() {
                 </div>
               </div>
 
+              {/* ── Produtos do Orçamento ── */}
+              <div className="bg-card border border-border/30 rounded-xl p-5 space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Package className="w-3.5 h-3.5" /> Produtos
+                  {quotationItemsList.length > 0 && (
+                    <span className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded font-normal">
+                      {quotationItemsList.length} {quotationItemsList.length === 1 ? "item" : "itens"}
+                    </span>
+                  )}
+                </h3>
+                {quotationItemsList.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="rounded-lg border border-border/30 overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-muted/40 text-muted-foreground">
+                            <th className="text-left p-2 pl-3 font-medium">Produto</th>
+                            <th className="text-right p-2 font-medium">Volume</th>
+                            <th className="text-right p-2 font-medium">Preço/un.</th>
+                            <th className="text-right p-2 pr-3 font-medium">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {quotationItemsList.map((item) => (
+                            <tr key={item.id} className="border-t border-border/20">
+                              <td className="p-2 pl-3">
+                                <p className="font-medium">{item.productName}</p>
+                                {item.notes && (
+                                  <p className="text-[10px] text-muted-foreground leading-tight">{item.notes}</p>
+                                )}
+                              </td>
+                              <td className="p-2 text-right font-mono text-muted-foreground">
+                                {Number(item.quantity).toLocaleString("pt-BR")}
+                              </td>
+                              <td className="p-2 text-right font-mono text-muted-foreground">
+                                {item.unitPrice && Number(item.unitPrice) > 0 ? `R$ ${Number(item.unitPrice).toFixed(4)}` : "—"}
+                              </td>
+                              <td className="p-2 pr-3 text-right font-mono font-semibold">
+                                {quotation.isBonificada ? (
+                                  <span className="text-amber-500">Bonif.</span>
+                                ) : item.totalPrice && Number(item.totalPrice) > 0 ? (
+                                  formatCurrency(Number(item.totalPrice))
+                                ) : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        {quotationItemsList.length > 1 && !quotation.isBonificada && (
+                          <tfoot>
+                            <tr className="border-t-2 border-border/40 bg-muted/20">
+                              <td colSpan={3} className="p-2 pl-3 text-xs font-semibold text-muted-foreground">
+                                Volume total
+                              </td>
+                              <td className="p-2 pr-3 text-right font-mono text-xs font-semibold text-muted-foreground">
+                                {quotationItemsList.reduce((s, i) => s + Number(i.quantity), 0).toLocaleString("pt-BR")} un.
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                    {quotation.productName && (
+                      <>
+                        <span className="text-muted-foreground">Produto</span>
+                        <span className="font-medium">{quotation.productName}</span>
+                      </>
+                    )}
+                    <span className="text-muted-foreground">Volume</span>
+                    <span className="font-mono font-medium">{quotation.coasterVolume.toLocaleString("pt-BR")} un.</span>
+                  </div>
+                )}
+              </div>
+
               <div className="bg-card border border-border/30 rounded-xl p-5 space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                   <DollarSign className="w-3.5 h-3.5" /> Valores
                 </h3>
-                <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-                  <span className="text-muted-foreground">Unitário</span>
-                  <span className="font-mono">{quotation.unitPrice ? `R$ ${quotation.unitPrice}` : "—"}</span>
-                  <span className="text-muted-foreground">Total</span>
-                  <span className="font-mono font-bold text-primary">{quotation.totalValue ? formatCurrency(Number(quotation.totalValue)) : "—"}</span>
-                </div>
+                {quotation.isBonificada ? (
+                  <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                    <span className="text-sm font-semibold text-amber-500">Campanha Bonificada</span>
+                    <span className="font-mono font-bold text-amber-500 ml-auto">R$ 0,00</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                    {quotationItemsList.length <= 1 && (
+                      <>
+                        <span className="text-muted-foreground">Unitário</span>
+                        <span className="font-mono">{quotation.unitPrice && Number(quotation.unitPrice) > 0 ? `R$ ${Number(quotation.unitPrice).toFixed(4)}` : "—"}</span>
+                      </>
+                    )}
+                    <span className="text-muted-foreground font-semibold">Total</span>
+                    <span className="font-mono font-bold text-primary">{quotation.totalValue ? formatCurrency(Number(quotation.totalValue)) : "—"}</span>
+                  </div>
+                )}
               </div>
 
               {quotation.validUntil && (

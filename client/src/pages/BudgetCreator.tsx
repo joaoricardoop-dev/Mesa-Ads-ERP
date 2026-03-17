@@ -668,12 +668,19 @@ export default function BudgetCreator() {
         partnerId: descontoParceiro ? partnerId : null,
       });
 
+      // discountRatio applies the global payment + partner discounts to each item proportionally
       const discountRatio = totals.subtotalPostDuration > 0 ? totals.total / totals.subtotalPostDuration : 1;
 
       for (const { item, input, calc } of itemCalcs) {
-        const unitPriceFinal = isBonificada
-          ? "0"
-          : (calc.precoUnit4sem * discountRatio).toFixed(4);
+        let unitPriceFinal: string;
+        if (isBonificada) {
+          unitPriceFinal = "0";
+        } else {
+          // Full per-unit price: total for this item (with duration discount) × global ratio ÷ volume
+          const itemTotal = calc.precoComDescDuracao * discountRatio;
+          const unitPrice = input.volume > 0 ? itemTotal / input.volume : 0;
+          unitPriceFinal = unitPrice.toFixed(4);
+        }
 
         await addItem.mutateAsync({
           quotationId: quotation.id,
