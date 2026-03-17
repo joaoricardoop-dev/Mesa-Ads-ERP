@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import PageContainer from "@/components/PageContainer";
 import Confetti from "@/components/Confetti";
@@ -280,7 +280,10 @@ export default function Leads() {
   const [convertAnuncianteOpen, setConvertAnuncianteOpen] = useState(false);
 
   const [showConfetti, setShowConfetti] = useState(false);
-  const [panelSize, setPanelSize] = useState<"md" | "lg" | "xl">("md");
+  const [panelWidth, setPanelWidth] = useState(448);
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(448);
   const [collapsedStages, setCollapsedStages] = useState<string[]>(["ganho", "perdido"]);
   const [contactFormOpen, setContactFormOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "" });
@@ -439,6 +442,29 @@ export default function Leads() {
     onError: (err: any) => toast.error(`Erro: ${err.message}`),
   });
 
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    isResizingRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = panelWidth;
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const delta = startXRef.current - e.clientX;
+      const newWidth = Math.max(320, Math.min(900, startWidthRef.current + delta));
+      setPanelWidth(newWidth);
+    };
+    const handleMouseUp = () => { isResizingRef.current = false; };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
 
   useEffect(() => {
     if (selectedLead.data && isEditing) {
@@ -1296,7 +1322,18 @@ export default function Leads() {
 
       {/* Lead Detail Sheet */}
       <Sheet open={!!selectedLeadId} onOpenChange={(open) => { if (!open) { setSelectedLeadId(null); setIsEditing(false); setContactFormOpen(false); setContactForm({ name: "", email: "", phone: "" }); } }}>
-        <SheetContent className={`w-full overflow-y-auto px-5 pt-5 transition-all duration-200 ${panelSize === "md" ? "sm:max-w-md" : panelSize === "lg" ? "sm:max-w-xl" : "sm:max-w-3xl"}`}>
+        <SheetContent
+          style={{ width: panelWidth, maxWidth: "95vw" }}
+          className="w-full overflow-y-auto px-5 pt-5"
+        >
+          {/* Drag handle */}
+          <div
+            className="absolute left-0 top-0 h-full w-3 cursor-col-resize z-50 flex items-center justify-center group"
+            onMouseDown={handleResizeStart}
+          >
+            <div className="w-0.5 h-10 rounded-full bg-border group-hover:bg-primary/50 transition-colors" />
+          </div>
+
           {selectedLead.data && (
             <>
               <SheetHeader className="pb-0">
@@ -1313,10 +1350,10 @@ export default function Leads() {
                     variant="ghost"
                     size="icon"
                     className="w-7 h-7 shrink-0 text-muted-foreground hover:text-foreground"
-                    title={panelSize === "xl" ? "Reduzir painel" : "Ampliar painel"}
-                    onClick={() => setPanelSize(s => s === "md" ? "lg" : s === "lg" ? "xl" : "md")}
+                    title={panelWidth > 448 ? "Reduzir painel" : "Ampliar painel"}
+                    onClick={() => setPanelWidth(w => w > 448 ? 448 : 720)}
                   >
-                    {panelSize === "xl" ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                    {panelWidth > 448 ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
                   </Button>
                 </div>
                 <Separator className="mb-3" />
