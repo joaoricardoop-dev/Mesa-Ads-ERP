@@ -1,7 +1,7 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners } from "../drizzle/schema";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers } from "../drizzle/schema";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -703,6 +703,134 @@ export const quotationRouter = router({
         .where(eq(quotations.id, input.quotationId));
 
       return { quotationId: input.quotationId, campaignId: campaign.id, campaignNumber };
+    }),
+
+  listItems: protectedProcedure
+    .input(z.object({ quotationId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const items = await db
+        .select({
+          id: quotationItems.id,
+          quotationId: quotationItems.quotationId,
+          productId: quotationItems.productId,
+          quantity: quotationItems.quantity,
+          quantityPerLocation: quotationItems.quantityPerLocation,
+          unitCost: quotationItems.unitCost,
+          unitPrice: quotationItems.unitPrice,
+          totalPrice: quotationItems.totalPrice,
+          notes: quotationItems.notes,
+          createdAt: quotationItems.createdAt,
+          productName: products.name,
+          productUnitLabel: products.unitLabel,
+          productUnitLabelPlural: products.unitLabelPlural,
+          productTemDistribuicaoPorLocal: products.temDistribuicaoPorLocal,
+        })
+        .from(quotationItems)
+        .innerJoin(products, eq(quotationItems.productId, products.id))
+        .where(eq(quotationItems.quotationId, input.quotationId))
+        .orderBy(asc(quotationItems.createdAt));
+      return items;
+    }),
+
+  addItem: comercialProcedure
+    .input(z.object({
+      quotationId: z.number(),
+      productId: z.number(),
+      quantity: z.number().min(1),
+      quantityPerLocation: z.number().optional(),
+      unitPrice: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+
+      const product = await db.select().from(products).where(eq(products.id, input.productId)).limit(1);
+      if (!product.length) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado" });
+
+      const tiers = await db
+        .select()
+        .from(productPricingTiers)
+        .where(eq(productPricingTiers.productId, input.productId))
+        .orderBy(asc(productPricingTiers.volumeMin));
+
+      let unitCost: string | null = null;
+      if (tiers.length > 0) {
+        const tier = tiers.find(t => input.quantity >= t.volumeMin && (t.volumeMax == null || input.quantity <= t.volumeMax))
+          ?? tiers[tiers.length - 1];
+        unitCost = tier.custoUnitario;
+      }
+
+      const unitPrice = input.unitPrice ?? unitCost;
+      const totalPrice = unitPrice ? String(parseFloat(unitPrice) * input.quantity) : null;
+
+      const [item] = await db.insert(quotationItems).values({
+        quotationId: input.quotationId,
+        productId: input.productId,
+        quantity: input.quantity,
+        quantityPerLocation: input.quantityPerLocation,
+        unitCost: unitCost,
+        unitPrice: unitPrice,
+        totalPrice: totalPrice,
+        notes: input.notes,
+      }).returning();
+
+      await db.update(quotations)
+        .set({ updatedAt: new Date() })
+        .where(eq(quotations.id, input.quotationId));
+
+      return item;
+    }),
+
+  updateItem: comercialProcedure
+    .input(z.object({
+      id: z.number(),
+      quantity: z.number().min(1).optional(),
+      quantityPerLocation: z.number().optional().nullable(),
+      unitPrice: z.string().optional(),
+      notes: z.string().optional().nullable(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const { id, ...updates } = input;
+
+      const existing = await db.select().from(quotationItems).where(eq(quotationItems.id, id)).limit(1);
+      if (!existing.length) throw new TRPCError({ code: "NOT_FOUND", message: "Item não encontrado" });
+      const item = existing[0];
+
+      const quantity = updates.quantity ?? item.quantity;
+      const unitPrice = updates.unitPrice ?? item.unitPrice ?? undefined;
+      const totalPrice = unitPrice ? String(parseFloat(unitPrice) * quantity) : item.totalPrice;
+
+      const [updated] = await db.update(quotationItems)
+        .set({
+          quantity,
+          quantityPerLocation: updates.quantityPerLocation !== undefined ? updates.quantityPerLocation : item.quantityPerLocation,
+          unitPrice: unitPrice ?? item.unitPrice,
+          totalPrice,
+          notes: updates.notes !== undefined ? updates.notes : item.notes,
+        })
+        .where(eq(quotationItems.id, id))
+        .returning();
+
+      await db.update(quotations)
+        .set({ updatedAt: new Date() })
+        .where(eq(quotations.id, item.quotationId));
+
+      return updated;
+    }),
+
+  removeItem: comercialProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const existing = await db.select().from(quotationItems).where(eq(quotationItems.id, input.id)).limit(1);
+      if (!existing.length) throw new TRPCError({ code: "NOT_FOUND", message: "Item não encontrado" });
+      await db.delete(quotationItems).where(eq(quotationItems.id, input.id));
+      await db.update(quotations)
+        .set({ updatedAt: new Date() })
+        .where(eq(quotations.id, existing[0].quotationId));
+      return { success: true };
     }),
 
 });

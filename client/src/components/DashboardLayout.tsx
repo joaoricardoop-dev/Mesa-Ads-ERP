@@ -118,8 +118,6 @@ const NAV_ENTRIES: NavEntry[] = [
     label: "Comercial",
     items: [
       { icon: ClipboardList, label: "Cotações", path: "/comercial/cotacoes" },
-      { icon: BarChart3, label: "Simulador", path: "/comercial/simulador" },
-      { icon: Calculator, label: "Tabela de Preços", path: "/comercial/tabela-precos" },
       { icon: Users, label: "Leads", path: "/comercial/leads" },
       { icon: UserPlus, label: "Contatos", path: "/comercial/contatos" },
       { icon: Handshake, label: "Parceiros", path: "/comercial/parceiros" },
@@ -140,12 +138,13 @@ const NAV_ENTRIES: NavEntry[] = [
     ],
   },
   { icon: UtensilsCrossed, label: "Restaurantes", path: "/restaurantes" },
-  { icon: Package, label: "Produtos", path: "/produtos", adminOnly: true },
   { icon: Image, label: "Biblioteca", path: "/biblioteca" },
   {
     icon: Settings,
     label: "Configurações",
     items: [
+      { icon: Package, label: "Produtos & Preços", path: "/produtos", adminOnly: true },
+      { icon: Calculator, label: "Simulador de Preços", path: "/comercial/tabela-precos", adminOnly: true },
       { icon: DollarSign, label: "Economics", path: "/economics" },
       { icon: Factory, label: "Produção", path: "/producao" },
       { icon: Layers, label: "Batches", path: "/configuracoes/batches", adminOnly: true },

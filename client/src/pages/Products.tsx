@@ -13,6 +13,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,6 +30,18 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package } from "lucide-react";
+
+type TipoProduct = "coaster" | "display" | "cardapio" | "totem" | "adesivo" | "porta_guardanapo" | "outro";
+
+const tipoLabels: Record<TipoProduct, string> = {
+  coaster: "Bolacha (Coaster)",
+  display: "Display",
+  cardapio: "Cardápio",
+  totem: "Totem",
+  adesivo: "Adesivo",
+  porta_guardanapo: "Porta-Guardanapo",
+  outro: "Outro",
+};
 
 interface TierForm {
   volumeMin: string;
@@ -38,6 +57,8 @@ const emptyTier: TierForm = { volumeMin: "", volumeMax: "", custoUnitario: "", f
 interface ProductForm {
   name: string;
   description: string;
+  tipo: TipoProduct;
+  temDistribuicaoPorLocal: boolean;
   unitLabel: string;
   unitLabelPlural: string;
   defaultQtyPerLocation: string;
@@ -50,6 +71,8 @@ interface ProductForm {
 const emptyProduct: ProductForm = {
   name: "",
   description: "",
+  tipo: "coaster",
+  temDistribuicaoPorLocal: true,
   unitLabel: "unidade",
   unitLabelPlural: "unidades",
   defaultQtyPerLocation: "500",
@@ -103,6 +126,8 @@ export default function Products() {
     setForm({
       name: p.name,
       description: p.description || "",
+      tipo: (p.tipo as TipoProduct) || "coaster",
+      temDistribuicaoPorLocal: p.temDistribuicaoPorLocal ?? true,
       unitLabel: p.unitLabel,
       unitLabelPlural: p.unitLabelPlural,
       defaultQtyPerLocation: String(p.defaultQtyPerLocation || 500),
@@ -118,6 +143,8 @@ export default function Products() {
     const payload = {
       name: form.name,
       description: form.description || undefined,
+      tipo: form.tipo,
+      temDistribuicaoPorLocal: form.temDistribuicaoPorLocal,
       unitLabel: form.unitLabel,
       unitLabelPlural: form.unitLabelPlural,
       defaultQtyPerLocation: parseInt(form.defaultQtyPerLocation) || 500,
@@ -229,6 +256,27 @@ export default function Products() {
               <Label>Nome</Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex: Bolacha de Chopp" />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Tipo de Produto</Label>
+                <Select value={form.tipo} onValueChange={v => setForm({ ...form, tipo: v as TipoProduct })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(tipoLabels) as [TipoProduct, string][]).map(([val, label]) => (
+                      <SelectItem key={val} value={val}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2 justify-end pb-1">
+                <div className="flex items-center gap-2">
+                  <Switch checked={form.temDistribuicaoPorLocal} onCheckedChange={v => setForm({ ...form, temDistribuicaoPorLocal: v })} />
+                  <Label className="text-sm">Distribuição por local</Label>
+                </div>
+              </div>
+            </div>
             <div>
               <Label>Descrição</Label>
               <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} />
@@ -327,7 +375,12 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
         <TableCell>
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </TableCell>
-        <TableCell className="font-medium">{p.name}</TableCell>
+        <TableCell className="font-medium">
+          <div>{p.name}</div>
+          {p.tipo && p.tipo !== "coaster" && (
+            <Badge variant="outline" className="text-[9px] h-4 px-1 mt-0.5">{tipoLabels[p.tipo as TipoProduct] ?? p.tipo}</Badge>
+          )}
+        </TableCell>
         <TableCell className="text-muted-foreground">{p.unitLabelPlural}</TableCell>
         <TableCell>{p.defaultQtyPerLocation?.toLocaleString("pt-BR")}</TableCell>
         <TableCell>{p.irpj}%</TableCell>

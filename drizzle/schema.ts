@@ -25,6 +25,8 @@ export const leadTypeEnum = pgEnum("lead_type", ["anunciante", "restaurante"]);
 export const serviceOrderTypeEnum = pgEnum("service_order_type", ["anunciante", "producao"]);
 export const serviceOrderStatusEnum = pgEnum("service_order_status", ["rascunho", "enviada", "assinada", "execucao", "concluida"]);
 export const termStatusEnum = pgEnum("term_status", ["rascunho", "enviado", "assinado", "vigente", "encerrado"]);
+export const productTypeEnum = pgEnum("product_type", ["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro"]);
+export const productionStatusEnum = pgEnum("production_status", ["pending", "producing", "ready", "shipped"]);
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -374,7 +376,7 @@ export const quotations = pgTable("quotations", {
   clientId: integer("clientId").references(() => clients.id, { onDelete: "cascade" }),
   leadId: integer("leadId"),
   campaignType: varchar("campaignType", { length: 50 }).default("padrao"),
-  coasterVolume: integer("coasterVolume").notNull(),
+  coasterVolume: integer("coasterVolume"),
   networkProfile: varchar("networkProfile", { length: 50 }),
   regions: text("regions"),
   cycles: integer("cycles").default(1),
@@ -776,9 +778,12 @@ export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
+  tipo: productTypeEnum("tipo").default("coaster"),
   unitLabel: varchar("unitLabel", { length: 50 }).notNull().default("unidade"),
   unitLabelPlural: varchar("unitLabelPlural", { length: 50 }).notNull().default("unidades"),
+  temDistribuicaoPorLocal: boolean("temDistribuicaoPorLocal").default(true).notNull(),
   defaultQtyPerLocation: integer("defaultQtyPerLocation").default(500),
+  imagemUrl: text("imagemUrl"),
   irpj: decimal("irpj", { precision: 5, scale: 2 }).default("6.00"),
   comRestaurante: decimal("comRestaurante", { precision: 5, scale: 2 }).default("15.00"),
   comComercial: decimal("comComercial", { precision: 5, scale: 2 }).default("10.00"),
@@ -805,5 +810,66 @@ export const productPricingTiers = pgTable("product_pricing_tiers", {
 
 export type ProductPricingTier = typeof productPricingTiers.$inferSelect;
 export type InsertProductPricingTier = typeof productPricingTiers.$inferInsert;
+
+// ─── Quotation Items (cotação multiproduto) ───────────────────────────────────
+
+export const quotationItems = pgTable("quotation_items", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotationId").notNull().references(() => quotations.id, { onDelete: "cascade" }),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "restrict" }),
+  quantity: integer("quantity").notNull().default(1),
+  quantityPerLocation: integer("quantityPerLocation"),
+  unitCost: decimal("unitCost", { precision: 10, scale: 4 }),
+  unitPrice: decimal("unitPrice", { precision: 10, scale: 4 }),
+  totalPrice: decimal("totalPrice", { precision: 12, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_quotation_items_quotation_id").on(t.quotationId),
+  index("idx_quotation_items_product_id").on(t.productId),
+]);
+
+export type QuotationItem = typeof quotationItems.$inferSelect;
+export type InsertQuotationItem = typeof quotationItems.$inferInsert;
+
+// ─── Campaign Products (campanha multiproduto) ────────────────────────────────
+
+export const campaignProducts = pgTable("campaign_products", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "restrict" }),
+  quantity: integer("quantity").notNull().default(1),
+  quantityPerLocation: integer("quantityPerLocation"),
+  usagePerDay: decimal("usagePerDay", { precision: 6, scale: 2 }),
+  unitPrice: decimal("unitPrice", { precision: 10, scale: 4 }),
+  totalPrice: decimal("totalPrice", { precision: 12, scale: 2 }),
+  customPricingParams: jsonb("customPricingParams"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_campaign_products_campaign_id").on(t.campaignId),
+  index("idx_campaign_products_product_id").on(t.productId),
+]);
+
+export type CampaignProduct = typeof campaignProducts.$inferSelect;
+export type InsertCampaignProduct = typeof campaignProducts.$inferInsert;
+
+// ─── Service Order Items (OS multiproduto) ────────────────────────────────────
+
+export const serviceOrderItems = pgTable("service_order_items", {
+  id: serial("id").primaryKey(),
+  serviceOrderId: integer("serviceOrderId").notNull().references(() => serviceOrders.id, { onDelete: "cascade" }),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "restrict" }),
+  quantity: integer("quantity").notNull().default(1),
+  productionStatus: productionStatusEnum("productionStatus").default("pending").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_service_order_items_order_id").on(t.serviceOrderId),
+  index("idx_service_order_items_product_id").on(t.productId),
+]);
+
+export type ServiceOrderItem = typeof serviceOrderItems.$inferSelect;
+export type InsertServiceOrderItem = typeof serviceOrderItems.$inferInsert;
 
 export * from "../shared/models/auth";

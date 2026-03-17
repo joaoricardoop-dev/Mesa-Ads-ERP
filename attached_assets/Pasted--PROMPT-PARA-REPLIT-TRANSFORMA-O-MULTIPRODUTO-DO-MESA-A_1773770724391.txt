@@ -1,0 +1,664 @@
+ PROMPT PARA REPLIT — TRANSFORMAÇÃO MULTIPRODUTO DO MESA ADS ERP
+ 
+## CONTEXTO DO PROJETO
+ 
+Este é um ERP para a Mesa Ads, uma empresa de mídia indoor que **atualmente opera apenas com um produto: Bolachas de Chopp (coasters)**. Todo o sistema — banco de dados, precificação, cotações, campanhas, ordens de serviço e financeiro — foi construído em torno desse único produto.
+ 
+**A missão agora é transformar a plataforma em um sistema multiproduto**, onde coasters são apenas um dos vários produtos disponíveis (ex: displays de mesa, cardápios patrocinados, totens digitais, adesivos, porta-guardanapos, etc.).
+ 
+---
+ 
+## STACK ATUAL
+ 
+- **Frontend**: React + TypeScript + Vite + Tailwind + shadcn/ui
+- **Backend**: Node.js + Express + tRPC
+- **Banco de Dados**: PostgreSQL + Drizzle ORM
+- **Estrutura**: client/ + server/ + shared/ + drizzle/
+ 
+---
+ 
+## DIAGNÓSTICO: ONDE O SISTEMA ESTÁ ACOPLADO A "COASTERS"
+ 
+### 1. SCHEMA DO BANCO (drizzle/schema.ts)
+ 
+Os seguintes campos estão hardcoded para coasters e precisam ser generalizados:
+ 
+| Tabela | Campos acoplados | Problema |
+|--------|-----------------|----------|
+| `campaigns` | `coastersPerRestaurant`, `usagePerDay`, `daysPerMonth` | Assume que todo produto é coaster distribuído por restaurante |
+| `campaignRestaurants` | `coastersCount`, `usagePerDay` | Alocação fixada em coasters |
+| `quotations` | `coasterVolume` | Volume atrelado a coasters |
+| `quotationRestaurants` | `coasterQuantity` | Quantidade por restaurante fixada em coasters |
+| `activeRestaurants` | `coastersAllocated` | Inventário por restaurante assume coasters |
+| `serviceOrders` | `coasterVolume`, `networkAllocation` | Produção atrelada a coasters |
+| `restaurants` | `coastersAllocated` | Alocação fixa em coasters |
+| `products` | `defaultQtyPerLocation` | Funciona, mas assume distribuição por local |
+| `productPricingTiers` | `custoUnitario`, `frete`, `margem` | Funciona, mas só existe pricing para coasters |
+ 
+### 2. LÓGICA DE PRECIFICAÇÃO (server/db.ts + server/quotationRouter.ts)
+ 
+A função `calcPricing` e toda a lógica de custo usa:
+```
+unitCost = (custoUnitario × artes) + (frete / totalVolume)
+custoPD = productionCost + fixedCommission
+custoBruto = custoPD / (1 - totalVarRate)
+```
+Essa lógica funciona para qualquer produto, MAS está chamada apenas no contexto de coasters. Precisa ser parametrizada por `productId`.
+ 
+### 3. SIMULADOR DE PREÇO (client/src/hooks/useSimulator.ts — 800+ linhas)
+ 
+O simulador é o coração da precificação e está 100% acoplado a coasters:
+- Input: `coastersPerRestaurant`, `usagePerDay`, `daysPerMonth`
+- Impressões = `coastersPerRestaurant × usagePerDay × daysPerMonth`
+- Tabela de markup com 9 cenários fixos para coasters
+- Tabela de desconto por volume de coasters
+- Gráficos de receita baseados em coasters/restaurante
+ 
+### 4. INTERFACE (client/src/pages/ e components/)
+ 
+| Arquivo | Linhas | Problema |
+|---------|--------|----------|
+| `PriceTable.tsx` | ~1106 | Toda a UI do simulador referencia coasters |
+| `Quotations.tsx` | ~1315 | Lista cotações por `coasterVolume` |
+| `QuotationDetail.tsx` | ~1024 | Edição referencia volume de coasters |
+| `Campaigns.tsx` | Muito grande | CRUD de campanhas assume coasters |
+| `CampaignDetail.tsx` | Muito grande | Alocação de coasters por restaurante |
+| `ServiceOrders.tsx` | ~705 | Ordens de produção para coasters |
+| `Products.tsx` | ~497 | Gerenciamento de produto (mais genérico) |
+| `RestaurantAllocationPanel.tsx` | ~550 | Distribui coasters por restaurante |
+| `InputPanel.tsx` | — | Controles do simulador (sliders de coasters) |
+ 
+---
+ 
+## O QUE PRECISA SER FEITO (em ordem de prioridade)
+ 
+### FASE 1: FUNDAÇÃO DO MODELO MULTIPRODUTO
+ 
+#### 1.1 Reestruturar o Schema do Banco
+ 
+**Criar/Modificar tabelas:**
+ 
+```
+products (já existe, expandir):
+  + tipo: enum('coaster', 'display', 'cardapio', 'totem', 'adesivo', 'porta_guardanapo', 'outro')
+  + unidadeMedida: text (ex: "unidade", "m²", "peça")
+  + temDistribuicaoPorLocal: boolean (coasters sim, totens talvez não)
+  + descricao: text
+  + imagemUrl: text
+  + ativo: boolean
+  Manter: defaultQtyPerLocation, irpj, comRestaurante, comComercial
+ 
+productPricingTiers (já existe, manter como está):
+  - Cada produto terá suas próprias faixas de preço
+  - volumeMin, volumeMax, custoUnitario, frete, margem
+ 
+-- NOVA TABELA --
+campaignProducts (junction: campaign ↔ products):
+  + id
+  + campaignId → campaigns
+  + productId → products
+  + quantity (quantidade total deste produto na campanha)
+  + quantityPerLocation (quantidade por ponto, se aplicável)
+  + usagePerDay (se aplicável ao tipo de produto)
+  + unitPrice (preço unitário calculado)
+  + totalPrice (preço total deste item)
+  + customPricingParams: jsonb (parâmetros específicos do produto)
+ 
+-- NOVA TABELA --
+quotationItems (junction: quotation ↔ products):
+  + id
+  + quotationId → quotations
+  + productId → products
+  + quantity (volume deste produto)
+  + quantityPerLocation
+  + unitCost (custo unitário)
+  + unitPrice (preço de venda unitário)
+  + totalPrice
+  + notes: text
+ 
+-- NOVA TABELA --
+serviceOrderItems (junction: serviceOrder ↔ products):
+  + id
+  + serviceOrderId → serviceOrders
+  + productId → products
+  + quantity
+  + productionStatus: enum('pending', 'producing', 'ready', 'shipped')
+```
+ 
+**Modificar tabelas existentes (NÃO remover campos antigos ainda, apenas deprecar):**
+ 
+```
+campaigns:
+  - coastersPerRestaurant → DEPRECAR (mover lógica para campaignProducts)
+  - Manter campos de pricing genéricos (markupPercent, fixedPrice, commissionType)
+ 
+quotations:
+  - coasterVolume → DEPRECAR (agora é a soma dos quotationItems)
+  + totalValue (soma de todos os items)
+ 
+serviceOrders:
+  - coasterVolume → DEPRECAR (agora é a soma dos serviceOrderItems)
+```
+ 
+#### 1.2 Criar CRUD de Produtos Completo
+ 
+A página `Products.tsx` precisa virar um cadastro robusto:
+- Listar todos os produtos com nome, tipo, status (ativo/inativo)
+- Criar/editar produto com todos os campos novos
+- Para CADA produto: gerenciar sua própria tabela de pricing tiers
+- Upload de imagem do produto
+- Definir parâmetros específicos por tipo (coaster tem usagePerDay, display não)
+ 
+### FASE 2: REFATORAR COTAÇÕES E CAMPANHAS PARA MULTIPRODUTO
+ 
+#### 2.1 Cotações Multiproduto
+ 
+Refatorar o fluxo de cotação para suportar múltiplos itens:
+ 
+**Tela de criação/edição de cotação:**
+- Dados do cliente/lead (manter como está)
+- **NOVO: Lista de itens do orçamento**
+  - Botão "Adicionar Produto" → abre modal/drawer para selecionar produto
+  - Para cada item: produto, quantidade, quantidade por local (se aplicável), preço unitário (auto-calculado), preço total
+  - Cada item puxa o pricing tier do respectivo produto
+  - Resumo financeiro: total de todos os itens + impostos + comissões
+- Manter a lógica de alocação por restaurante, mas agora POR PRODUTO que tem `temDistribuicaoPorLocal = true`
+ 
+**API (quotationRouter.ts):**
+- `quotation.create` → aceitar array de `items: [{productId, quantity, quantityPerLocation}]`
+- `quotation.update` → permitir adicionar/remover/editar itens
+- `quotation.addItem` / `quotation.removeItem` / `quotation.updateItem`
+- Cálculo de preço por item usando os tiers do respectivo produto
+ 
+#### 2.2 Campanhas Multiproduto
+ 
+Refatorar campanhas para suportar múltiplos produtos:
+ 
+- Cada campanha pode ter N produtos (via `campaignProducts`)
+- O painel de alocação por restaurante funciona POR PRODUTO
+- A economia mensal (getMonthlyEconomics) calcula receita/custo por produto e totaliza
+ 
+### FASE 3: MOVER SIMULADOR PARA CONFIGURAÇÕES
+ 
+#### 3.1 Remover o Simulador de Preço da Área Principal
+ 
+O simulador de preço (`PriceTable.tsx` + `useSimulator.ts`) deve ser **removido do menu principal / área de operação** e **movido para a área de Configurações**.
+ 
+**Novo local: Configurações → Simulador de Preços**
+ 
+- O simulador vira uma ferramenta de configuração/planejamento, não operacional
+- Permitir simular cenários para QUALQUER produto cadastrado
+- Dropdown para selecionar o produto a simular
+- Os inputs se adaptam ao tipo de produto selecionado:
+  - Coasters: quantidade por local, uso por dia, dias por mês
+  - Display: quantidade por local, duração
+  - Totem: custo fixo, alcance estimado
+- As tabelas de markup, desconto e gráficos se recalculam com base no produto selecionado
+- Os pricing tiers exibidos são os do produto selecionado
+ 
+#### 3.2 Adaptar o useSimulator.ts
+ 
+- Receber `productId` como parâmetro
+- Carregar os pricing tiers do produto selecionado
+- Adaptar os cálculos de impressão conforme o tipo de produto
+- Manter todas as tabelas e gráficos, mas parametrizados
+ 
+### FASE 4: ATUALIZAR ORDENS DE SERVIÇO E FINANCEIRO
+ 
+#### 4.1 Ordens de Serviço Multiproduto
+ 
+- Cada OS pode ter múltiplos itens (via `serviceOrderItems`)
+- Status de produção individual por item
+- Geração de OS a partir de cotação: criar um `serviceOrderItem` para cada `quotationItem`
+ 
+#### 4.2 Relatórios Financeiros
+ 
+- `getMonthlyEconomics` deve iterar por produto dentro de cada campanha
+- Dashboard deve mostrar receita por tipo de produto
+- P&L discriminado por produto
+ 
+---
+ 
+## REGRAS CRÍTICAS
+ 
+1. **NÃO QUEBRAR O QUE FUNCIONA**: Os dados existentes de campanhas com coasters devem continuar funcionando. Use migrações incrementais.
+ 
+2. **BACKWARD COMPATIBILITY**: Onde houver `coasterVolume` ou `coastersPerRestaurant`, manter o campo mas como deprecated. Criar migration que popula as novas tabelas junction com os dados existentes.
+ 
+3. **MIGRATION SCRIPT**: Criar um script de migração que:
+   - Cria as novas tabelas (campaignProducts, quotationItems, serviceOrderItems)
+   - Para cada campanha existente: cria um registro em `campaignProducts` com o produto "Bolacha de Chopp" e os dados atuais
+   - Para cada cotação existente: cria um registro em `quotationItems`
+   - Para cada OS existente: cria um registro em `serviceOrderItems`
+ 
+4. **UI CONSISTENTE**: Manter o design system atual (shadcn/ui + Tailwind). O novo fluxo de "adicionar produto ao orçamento" deve usar Dialog/Drawer do shadcn.
+ 
+5. **PRECIFICAÇÃO POR PRODUTO**: Cada produto tem sua própria tabela de preços (tiers). O cálculo de preço na cotação puxa os tiers do produto específico.
+ 
+6. **O SIMULADOR VAI PARA CONFIGURAÇÕES**: Remover o item "Tabela de Preços" / "Simulador" do menu principal e criar um submenu em Configurações.
+ 
+---
+ 
+## ORDEM DE EXECUÇÃO SUGERIDA
+ 
+```
+1. Criar novas tabelas no schema (campaignProducts, quotationItems, serviceOrderItems)
+2. Expandir tabela products com novos campos (tipo, unidadeMedida, etc.)
+3. Criar migration script para dados existentes
+4. Refatorar Products.tsx para CRUD completo
+5. Refatorar Quotations para multiproduto (adicionar/remover itens)
+6. Refatorar QuotationDetail para exibir itens
+7. Refatorar quotationRouter para suportar items
+8. Refatorar Campaigns para multiproduto
+9. Refatorar CampaignDetail e RestaurantAllocationPanel
+10. Mover simulador para Configurações
+11. Adaptar useSimulator.ts para ser multiproduto
+12. Refatorar ServiceOrders para multiproduto
+13. Atualizar relatórios financeiros
+14. Testar fluxo completo: criar produto → definir preços → criar cotação multiproduto → gerar campanha → gerar OS
+```
+ 
+---
+ 
+## FASE 5: REDESIGN DO FRONTEND — ESPECIFICAÇÃO DETALHADA DE UI
+ 
+### NAVEGAÇÃO ATUAL (DashboardLayout.tsx)
+ 
+O sidebar atual tem estas seções:
+- **Comercial**: Cotações, Simulador, Tabela de Preços, Leads, Contatos, Parceiros
+- **Anunciantes**: /clientes
+- **Campanhas**: /campanhas
+- **Financeiro**: Dashboard, Faturamento, Pagamentos, Custos, Relatórios
+- **Restaurantes**: /restaurantes
+- **Produtos**: /produtos (admin only)
+- **Configurações**: Economia, Produção, Lotes, Termos, Usuários
+ 
+### NOVA NAVEGAÇÃO
+ 
+```
+Comercial
+  ├── Cotações (refatorado para multiproduto)
+  ├── Leads
+  ├── Contatos
+  └── Parceiros
+ 
+Anunciantes → /clientes (manter)
+ 
+Campanhas → /campanhas (refatorado para multiproduto)
+ 
+Financeiro (manter como está)
+ 
+Restaurantes (manter como está)
+ 
+Configurações
+  ├── Produtos & Preços ← MOVIDO de menu principal para cá
+  │     (cadastro de produtos + pricing tiers + simulador)
+  ├── Simulador de Preços ← MOVIDO do Comercial para cá
+  ├── Economia
+  ├── Produção
+  ├── Lotes
+  ├── Termos
+  └── Usuários
+```
+ 
+**Mudanças na navegação:**
+1. REMOVER "Simulador" e "Tabela de Preços" do menu Comercial
+2. MOVER "Produtos" de item standalone para dentro de Configurações
+3. ADICIONAR "Simulador de Preços" dentro de Configurações
+4. O item "Produtos & Preços" em Config engloba: CRUD de produtos + tiers de preço
+ 
+---
+ 
+### 5.1 PÁGINA DE COTAÇÕES (Quotations.tsx) — REDESIGN
+ 
+**Listagem (manter estrutura atual, adicionar colunas):**
+ 
+A tabela atual mostra: Número, Cliente, Volume de Coasters, Valor, Status, Data.
+ 
+**Nova tabela:**
+| Coluna | Descrição |
+|--------|-----------|
+| Número | Manter |
+| Cliente | Manter |
+| Produtos | NOVO — chips/badges com nome de cada produto (ex: "Bolacha ×3000" + "Display ×50") |
+| Valor Total | Soma de todos os itens |
+| Status | Manter (Rascunho, Enviada, Ativa, OS Gerada, WIN, Perdida) |
+| Data | Manter |
+ 
+**Dialog de Criação/Edição — REDESIGN COMPLETO:**
+ 
+Layout em duas seções:
+ 
+```
+┌─────────────────────────────────────────────────┐
+│ NOVA COTAÇÃO                                     │
+├─────────────────────────────────────────────────┤
+│                                                   │
+│  Cliente/Lead: [Select ▼]                        │
+│  Tipo de Campanha: [Select ▼]                    │
+│  Perfil de Rede: [Select ▼]                      │
+│  Regiões: [Multi-select]                         │
+│  Ciclos: [Input]   Bonificada: [Toggle]          │
+│                                                   │
+│  ─── ITENS DO ORÇAMENTO ──────────────────────── │
+│                                                   │
+│  ┌─────────────────────────────────────────────┐ │
+│  │ Produto         Qtd    Qtd/Local  Preço Un. │ │
+│  │ ──────────────────────────────────────────── │ │
+│  │ Bolacha Chopp   3000   500        R$ 0,45   │ │
+│  │ [editar] [remover]                R$ 1.350  │ │
+│  │ ──────────────────────────────────────────── │ │
+│  │ Display Mesa    50     —          R$ 12,00  │ │
+│  │ [editar] [remover]                R$ 600    │ │
+│  │ ──────────────────────────────────────────── │ │
+│  │ Cardápio Patr.  20     —          R$ 25,00  │ │
+│  │ [editar] [remover]                R$ 500    │ │
+│  └─────────────────────────────────────────────┘ │
+│                                                   │
+│  [+ Adicionar Produto]                            │
+│                                                   │
+│  ─── RESUMO FINANCEIRO ──────────────────────── │
+│  Subtotal:           R$ 2.450,00                 │
+│  Impostos (6%):      R$ 147,00                   │
+│  Comissões:          R$ 245,00                   │
+│  TOTAL:              R$ 2.842,00                 │
+│                                                   │
+│  Notas: [textarea]                                │
+│                                                   │
+│  [Cancelar]                     [Salvar Cotação] │
+└─────────────────────────────────────────────────┘
+```
+ 
+**Modal "Adicionar Produto":**
+ 
+```
+┌───────────────────────────────────┐
+│ ADICIONAR PRODUTO AO ORÇAMENTO   │
+├───────────────────────────────────┤
+│                                    │
+│  Produto: [Select ▼]              │
+│  (lista apenas produtos ativos)   │
+│                                    │
+│  Quantidade Total: [___]           │
+│                                    │
+│  Qtd por Local: [___]             │
+│  (aparece só se produto tem       │
+│   temDistribuicaoPorLocal=true)   │
+│                                    │
+│  Faixa de Preço Detectada:        │
+│  5000-5999 un → R$ 0,30/un       │
+│                                    │
+│  Preço Unitário: R$ 0,45          │
+│  (auto-calculado via tiers +      │
+│   markup + comissões)             │
+│                                    │
+│  Preço Total: R$ 2.250,00         │
+│                                    │
+│  Observações: [textarea]           │
+│                                    │
+│  [Cancelar]        [Adicionar]    │
+└───────────────────────────────────┘
+```
+ 
+---
+ 
+### 5.2 PÁGINA DE DETALHE DA COTAÇÃO (QuotationDetail.tsx) — REDESIGN
+ 
+Substituir o campo `coasterVolume` por uma **tabela de itens** com as mesmas colunas do dialog de criação. Permitir editar, adicionar e remover itens inline.
+ 
+Manter:
+- Status workflow (Rascunho → Enviada → Ativa → OS Gerada → WIN)
+- Botões de ação (Gerar OS, Baixar PDF, Assinar)
+- Alocação por restaurante (mas agora com tabs por produto que tem distribuição)
+ 
+**Layout de Alocação por Restaurante (quando há múltiplos produtos distribuíveis):**
+ 
+```
+┌─────────────────────────────────────────────────┐
+│ DISTRIBUIÇÃO POR RESTAURANTE                     │
+├─────────────────────────────────────────────────┤
+│  [Bolacha de Chopp] [Display de Mesa]  ← Tabs   │
+│                                                   │
+│  (conteúdo do RestaurantAllocationPanel          │
+│   filtrado para o produto selecionado na tab)    │
+│                                                   │
+│  Total a distribuir: 3.000 bolachas              │
+│  Distribuídos: 2.500 / 3.000                     │
+│                                                   │
+│  Restaurante      Qtd    Comissão   Status       │
+│  Bar do Zé        500    20%        ✓            │
+│  Boteco da Vila   500    18%        ✓            │
+│  Restaurante X    500    20%        ✓            │
+│  ...                                              │
+│                                                   │
+│  [Distribuir Igualmente]                         │
+└─────────────────────────────────────────────────┘
+```
+ 
+---
+ 
+### 5.3 PÁGINA DE CAMPANHAS (Campaigns.tsx) — REDESIGN
+ 
+**Listagem — adicionar coluna de produtos:**
+ 
+| Coluna atual | Mudança |
+|-------------|---------|
+| Nome | Manter |
+| Cliente | Manter |
+| Status | Manter |
+| `coastersPerRestaurant` | REMOVER → substituir por chips de produtos |
+| Restaurantes Ativos | Manter |
+| Valor | Manter |
+ 
+**Nova coluna "Produtos":** Exibir badges/chips com cada produto da campanha e sua quantidade (ex: "Bolacha ×3000", "Display ×50").
+ 
+**Formulário de criação de campanha:**
+- Remover campo `coastersPerRestaurant` do form principal
+- Adicionar seção "Produtos da Campanha" igual ao da cotação (lista de itens + botão adicionar)
+- Se a campanha foi gerada a partir de uma cotação, pré-popular os itens da cotação
+ 
+---
+ 
+### 5.4 DETALHE DA CAMPANHA (CampaignDetail.tsx) — REDESIGN
+ 
+**Painel de informações:**
+- Substituir "Coasters por Restaurante" por lista de produtos com quantidades
+- Manter campos de pricing genéricos (markup, comissão, etc.)
+ 
+**Painel de Alocação:**
+- Tabs por produto (mesmo padrão da cotação)
+- Cada tab mostra o `RestaurantAllocationPanel` filtrado para aquele produto
+- Label dinâmico: usar `unitLabel` do produto (ex: "bolachas", "displays", "cardápios")
+ 
+**Painel Financeiro:**
+- Breakdown de receita POR PRODUTO dentro da campanha
+- Gráfico de composição: % de receita por produto (pizza chart)
+- Tabela: Produto | Qtd | Custo Unit. | Preço Unit. | Receita | Margem
+ 
+---
+ 
+### 5.5 PÁGINA DE PRODUTOS & PREÇOS (Products.tsx) — REDESIGN COMPLETO
+ 
+**Agora em Configurações → Produtos & Preços**
+ 
+```
+┌─────────────────────────────────────────────────┐
+│ PRODUTOS & PREÇOS                    [+ Novo Produto] │
+├─────────────────────────────────────────────────┤
+│                                                   │
+│  🔍 Buscar produto...                             │
+│                                                   │
+│  ┌─ Bolacha de Chopp ──────────── Ativo ───────┐ │
+│  │  Tipo: Coaster  |  Unidade: bolacha          │ │
+│  │  Qtd padrão/local: 500                       │ │
+│  │  IRPJ: 6%  |  Com. Rest: 20%  |  Com. Com: 10% │ │
+│  │  [▼ Ver Tabela de Preços]  [Editar]  [Simular] │ │
+│  │                                                │ │
+│  │  Faixas de Preço (14 tiers):                  │ │
+│  │  1000-1999  → R$ 0,42/un + R$ 180 frete      │ │
+│  │  2000-2999  → R$ 0,35/un + R$ 220 frete      │ │
+│  │  3000-3999  → R$ 0,32/un + R$ 280 frete      │ │
+│  │  ...                                           │ │
+│  │  [Editar Faixas]  [+ Adicionar Faixa]         │ │
+│  └────────────────────────────────────────────── │ │
+│                                                   │
+│  ┌─ Display de Mesa ───────────── Ativo ───────┐ │
+│  │  Tipo: Display  |  Unidade: display          │ │
+│  │  Sem distribuição por local                   │ │
+│  │  IRPJ: 6%  |  Com. Rest: 15%  |  Com. Com: 10% │ │
+│  │  [▼ Ver Tabela de Preços]  [Editar]  [Simular] │ │
+│  └────────────────────────────────────────────── │ │
+│                                                   │
+│  ┌─ Cardápio Patrocinado ──────── Inativo ─────┐ │
+│  │  ...                                          │ │
+│  └────────────────────────────────────────────── │ │
+└─────────────────────────────────────────────────┘
+```
+ 
+**Dialog "Novo Produto" / "Editar Produto":**
+ 
+```
+┌───────────────────────────────────┐
+│ NOVO PRODUTO                      │
+├───────────────────────────────────┤
+│  Nome: [_______________]           │
+│  Descrição: [textarea]             │
+│  Tipo: [Select ▼]                  │
+│    (coaster|display|cardapio|     │
+│     totem|adesivo|outro)          │
+│                                    │
+│  Unidade (singular): [___]         │
+│  Unidade (plural): [___]          │
+│  (ex: "bolacha" / "bolachas")     │
+│                                    │
+│  Distribuição por local: [Toggle]  │
+│  Qtd padrão por local: [___]      │
+│  (aparece só se toggle ativo)     │
+│                                    │
+│  ── COMISSÕES E IMPOSTOS ──       │
+│  IRPJ (%): [___]                   │
+│  Com. Restaurante (%): [___]       │
+│  Com. Comercial (%): [___]         │
+│                                    │
+│  Imagem: [Upload]                  │
+│  Status: [Ativo ▼]                │
+│                                    │
+│  [Cancelar]     [Salvar Produto]  │
+└───────────────────────────────────┘
+```
+ 
+O botão **[Simular]** em cada card de produto abre o Simulador de Preços já pré-selecionando aquele produto.
+ 
+---
+ 
+### 5.6 SIMULADOR DE PREÇOS (PriceTable.tsx) — EM CONFIGURAÇÕES
+ 
+**Novo local: Configurações → Simulador de Preços**
+ 
+Manter toda a lógica atual mas parametrizar:
+ 
+```
+┌─────────────────────────────────────────────────┐
+│ SIMULADOR DE PREÇOS                              │
+├─────────────────────────────────────────────────┤
+│                                                   │
+│  Produto: [Bolacha de Chopp ▼]  ← NOVO SELETOR  │
+│                                                   │
+│  (ao trocar produto, recarrega tiers e adapta    │
+│   os inputs abaixo conforme o tipo do produto)   │
+│                                                   │
+│  ── PARÂMETROS ──                                │
+│  Volume: [Select tier ▼]                         │
+│  Duração (semanas): [Select ▼]                   │
+│  Forma de Pagamento: [Pix | Boleto | Cartão]    │
+│  Desconto Parceiro: [Toggle]                     │
+│                                                   │
+│  SE produto.temDistribuicaoPorLocal:             │
+│    Qtd por Local: [___]                          │
+│    Uso por Dia: [___]                            │
+│    Dias por Mês: [___]                           │
+│                                                   │
+│  ── TABELA DE PREÇOS ──                          │
+│  (mesma tabela atual, mas usando tiers e labels  │
+│   do produto selecionado)                        │
+│                                                   │
+│  ── ALOCAÇÃO POR RESTAURANTE ──                  │
+│  (RestaurantAllocationPanel, usando unitLabel    │
+│   do produto em vez de "coasters")               │
+│                                                   │
+│  [Modo Apresentação]  [Exportar PDF]  [Resetar] │
+└─────────────────────────────────────────────────┘
+```
+ 
+---
+ 
+### 5.7 ORDENS DE SERVIÇO (ServiceOrders.tsx) — REDESIGN
+ 
+**Listagem — nova coluna "Itens":**
+ 
+Exibir badges dos produtos incluídos na OS (mesmo padrão de chips).
+ 
+**Detalhe da OS:**
+- Seção "Itens da Ordem" com tabela:
+  | Produto | Quantidade | Status Produção | Ações |
+- Cada item tem seu próprio status: Pendente → Produzindo → Pronto → Enviado
+- Progress bar geral: X de Y itens concluídos
+ 
+---
+ 
+### 5.8 RESTAURANT ALLOCATION PANEL — REFATORAR
+ 
+**Arquivo:** `RestaurantAllocationPanel.tsx`
+ 
+Mudanças:
+1. Receber `productId` e `unitLabel` como props
+2. Trocar toda referência hardcoded a "coasters" por `unitLabel` (dinâmico)
+3. O campo de quantidade por restaurante usa `unitLabel` no placeholder
+4. Capacidade e validação baseadas no produto selecionado
+5. Quando usado em contexto multiproduto (cotação/campanha com N produtos), é renderizado dentro de tabs — uma instância por produto distribuível
+ 
+---
+ 
+### 5.9 LABELS DINÂMICOS — REGRA GERAL
+ 
+Em TODO o sistema, onde houver texto hardcoded como "coasters", "bolachas", "bolacha de chopp", substituir por referência ao `unitLabel` / `unitLabelPlural` do produto. Exemplos:
+ 
+| Antes (hardcoded) | Depois (dinâmico) |
+|---|---|
+| "Volume de Coasters" | "Quantidade de {produto.unitLabelPlural}" |
+| "Coasters por Restaurante" | "{produto.unitLabelPlural} por Restaurante" |
+| "500 bolachas" | "{qtd} {produto.unitLabelPlural}" |
+| "Impressões (coasters × uso × dias)" | "Impressões ({produto.unitLabel} × uso × dias)" |
+ 
+---
+ 
+### 5.10 COMPONENTES SHADCN/UI A UTILIZAR
+ 
+Para manter consistência visual, usar estes componentes do shadcn/ui:
+ 
+| Necessidade | Componente |
+|------------|-----------|
+| Lista de itens do orçamento | `Table` com rows editáveis |
+| Adicionar produto | `Dialog` ou `Sheet` (drawer lateral) |
+| Seletor de produto | `Select` com `Command` (searchable) |
+| Tabs de produto na alocação | `Tabs` + `TabsContent` |
+| Chips de produto na listagem | `Badge` com variantes de cor por tipo |
+| Toggle distribuição por local | `Switch` |
+| Status de produção por item | `Badge` com cores (pending=cinza, producing=amarelo, ready=verde, shipped=azul) |
+| Resumo financeiro | `Card` com breakdown |
+| Progress bar da OS | `Progress` |
+ 
+---
+ 
+## RESULTADO ESPERADO
+ 
+Ao final, o sistema deve permitir:
+ 
+1. **Cadastrar múltiplos produtos** (coasters, displays, cardápios, totens, etc.) cada um com sua própria tabela de preços
+2. **Criar orçamentos com múltiplos produtos** — um único orçamento para um cliente pode ter 3.000 bolachas de chopp + 50 displays de mesa + 20 cardápios
+3. **Cada item do orçamento calcula seu preço** individualmente com base nos tiers do respectivo produto
+4. **Campanhas gerenciam múltiplos produtos** com alocação por local quando aplicável
+5. **O simulador de preço fica em Configurações** como ferramenta de planejamento, podendo simular qualquer produto
+6. **Ordens de serviço detalham itens** por produto com status individual
+7. **Financeiro discrimina** receita e custo por tipo de produto
+ 

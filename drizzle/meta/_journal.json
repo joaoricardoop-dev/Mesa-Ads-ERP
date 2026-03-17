@@ -78,6 +78,13 @@
       "when": 1773716680371,
       "tag": "0010_high_darkstar",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773771001087,
+      "tag": "0011_colossal_golden_guardian",
+      "breakpoints": true
     }
   ]
 }

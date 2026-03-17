@@ -213,6 +213,9 @@ export default function Quotations() {
   const [restaurantAllocations, setRestaurantAllocations] = useState<Array<{ restaurantId: number; coasterQuantity: number }>>([]);
   const [addRestaurantId, setAddRestaurantId] = useState<string>("");
 
+  const [addItemOpen, setAddItemOpen] = useState(false);
+  const [addItemForm, setAddItemForm] = useState({ productId: "", quantity: 1000, quantityPerLocation: 500, unitPrice: "", notes: "" });
+
   const utils = trpc.useUtils();
   const { data: quotationsList = [], isLoading } = trpc.quotation.list.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
@@ -280,6 +283,29 @@ export default function Quotations() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
+  const { data: quotationItemsList = [] } = trpc.quotation.listItems.useQuery(
+    { quotationId: editingId! },
+    { enabled: !!editingId }
+  );
+
+  const addItemMutation = trpc.quotation.addItem.useMutation({
+    onSuccess: () => {
+      utils.quotation.listItems.invalidate({ quotationId: editingId! });
+      setAddItemOpen(false);
+      setAddItemForm({ productId: "", quantity: 1000, quantityPerLocation: 500, unitPrice: "", notes: "" });
+      toast.success("Produto adicionado!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const removeItemMutation = trpc.quotation.removeItem.useMutation({
+    onSuccess: () => {
+      utils.quotation.listItems.invalidate({ quotationId: editingId! });
+      toast.success("Item removido.");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
   const signOSMutation = trpc.quotation.signOS.useMutation({
     onSuccess: (data) => {
       utils.quotation.list.invalidate();
@@ -294,8 +320,8 @@ export default function Quotations() {
       toast.error("Selecione um cliente");
       return;
     }
-    if (form.coasterVolume < 1) {
-      toast.error("Volume de bolachas deve ser pelo menos 1");
+    if (form.coasterVolume < 0) {
+      toast.error("Volume inválido");
       return;
     }
     if (!form.productId) {
@@ -524,7 +550,11 @@ export default function Quotations() {
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
-                    <span>{q.coasterVolume.toLocaleString("pt-BR")} un.</span>
+                    {q.coasterVolume ? (
+                      <span>{q.coasterVolume.toLocaleString("pt-BR")} un.</span>
+                    ) : (
+                      <span className="text-muted-foreground/50 text-xs italic">—</span>
+                    )}
                     {q.productName && (
                       <p className="text-[10px] text-muted-foreground/70">{q.productName}</p>
                     )}
@@ -799,6 +829,73 @@ export default function Quotations() {
                 />
               </div>
             </div>
+
+            {editingId && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Itens do Orçamento</p>
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setAddItemOpen(true)}>
+                    <Plus className="w-3 h-3" /> Adicionar Produto
+                  </Button>
+                </div>
+                {quotationItemsList.length === 0 ? (
+                  <div className="text-center py-4 text-xs text-muted-foreground border rounded-lg border-dashed">
+                    Nenhum produto adicionado. Clique em "Adicionar Produto" para começar.
+                  </div>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="text-[11px]">
+                          <TableHead>Produto</TableHead>
+                          <TableHead className="text-right">Qtd</TableHead>
+                          <TableHead className="text-right hidden sm:table-cell">Qtd/Local</TableHead>
+                          <TableHead className="text-right">Preço Un.</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead className="w-8"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {quotationItemsList.map((item) => (
+                          <TableRow key={item.id} className="text-xs">
+                            <TableCell className="font-medium">{item.productName}</TableCell>
+                            <TableCell className="text-right">{item.quantity.toLocaleString("pt-BR")}</TableCell>
+                            <TableCell className="text-right hidden sm:table-cell">
+                              {item.quantityPerLocation ? item.quantityPerLocation.toLocaleString("pt-BR") : "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {item.unitPrice ? formatCurrency(Number(item.unitPrice)) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {item.totalPrice ? formatCurrency(Number(item.totalPrice)) : "—"}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive hover:text-destructive"
+                                onClick={() => removeItemMutation.mutate({ id: item.id })}
+                                disabled={removeItemMutation.isPending}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {quotationItemsList.length > 0 && (
+                      <div className="px-4 py-2 border-t bg-muted/30 text-xs flex justify-between items-center">
+                        <span className="text-muted-foreground">{quotationItemsList.length} produto(s)</span>
+                        <span className="font-semibold">
+                          Total: {formatCurrency(quotationItemsList.reduce((sum, it) => sum + Number(it.totalPrice || 0), 0))}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Valores</p>
             <div className="flex items-center gap-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
@@ -1290,6 +1387,93 @@ export default function Quotations() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adicionar Produto ao Orçamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid gap-2">
+              <Label>Produto *</Label>
+              <Select
+                value={addItemForm.productId}
+                onValueChange={(val) => {
+                  const prod = productsList.find((p: any) => String(p.id) === val);
+                  setAddItemForm((f) => ({ ...f, productId: val, quantityPerLocation: prod?.defaultQtyPerLocation ?? 500 }));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um produto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {productsList.filter((p: any) => p.isActive).map((p: any) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Quantidade Total *</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={addItemForm.quantity}
+                  onChange={(e) => setAddItemForm((f) => ({ ...f, quantity: Number(e.target.value) }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Qtd por Local</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={addItemForm.quantityPerLocation}
+                  onChange={(e) => setAddItemForm((f) => ({ ...f, quantityPerLocation: Number(e.target.value) }))}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Preço Unitário (R$) — deixe em branco para calcular</Label>
+              <Input
+                type="number"
+                step="0.0001"
+                min={0}
+                value={addItemForm.unitPrice}
+                onChange={(e) => setAddItemForm((f) => ({ ...f, unitPrice: e.target.value }))}
+                placeholder="Auto-calculado pelos tiers"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Observações</Label>
+              <Input
+                value={addItemForm.notes}
+                onChange={(e) => setAddItemForm((f) => ({ ...f, notes: e.target.value }))}
+                placeholder="Notas sobre este item (opcional)"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddItemOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (!addItemForm.productId || !editingId) return toast.error("Selecione um produto");
+                addItemMutation.mutate({
+                  quotationId: editingId,
+                  productId: Number(addItemForm.productId),
+                  quantity: addItemForm.quantity,
+                  quantityPerLocation: addItemForm.quantityPerLocation || undefined,
+                  unitPrice: addItemForm.unitPrice || undefined,
+                  notes: addItemForm.notes || undefined,
+                });
+              }}
+              disabled={addItemMutation.isPending || !addItemForm.productId}
+            >
+              {addItemMutation.isPending ? "Adicionando..." : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
