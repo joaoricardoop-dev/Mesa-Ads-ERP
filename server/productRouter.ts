@@ -1,4 +1,4 @@
-import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
+import { protectedProcedure, adminProcedure, internalProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import { products, productPricingTiers } from "../drizzle/schema";
@@ -92,7 +92,7 @@ export const productRouter = router({
         .orderBy(asc(productPricingTiers.volumeMin));
     }),
 
-  upsertTiers: protectedProcedure
+  upsertTiers: internalProcedure
     .input(z.object({
       productId: z.number(),
       tiers: z.array(z.object({

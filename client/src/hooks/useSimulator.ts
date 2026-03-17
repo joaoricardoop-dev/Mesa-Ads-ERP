@@ -337,11 +337,14 @@ function lookupTierCost(tiers: ProductPricingTier[], volume: number): TierLookup
       Math.abs(curr.volumeMin - volume) < Math.abs(prev.volumeMin - volume) ? curr : prev
     );
   }
+  const custoUnit = parseFloat(match.custoUnitario) || 0;
+  const frete = parseFloat(match.frete) || 0;
+  const margem = parseFloat(match.margem) / 100 || 0;
   return {
-    custoUnitario: parseFloat(match.custoUnitario),
-    frete: parseFloat(match.frete),
-    margem: parseFloat(match.margem) / 100,
-    artes: match.artes,
+    custoUnitario: isNaN(custoUnit) ? 0 : custoUnit,
+    frete: isNaN(frete) ? 0 : frete,
+    margem: isNaN(margem) ? 0 : margem,
+    artes: match.artes ?? 1,
   };
 }
 
@@ -355,11 +358,14 @@ export function useSimulator(
 
   useEffect(() => {
     if (productParams) {
+      const irpj = parseFloat(productParams.irpj || "0");
+      const comRest = parseFloat(productParams.comRestaurante || "0");
+      const comCom = parseFloat(productParams.comComercial || "0");
       setInputs(prev => ({
         ...prev,
-        taxRate: parseFloat(productParams.irpj),
-        restaurantCommission: parseFloat(productParams.comRestaurante),
-        sellerCommission: parseFloat(productParams.comComercial),
+        taxRate: isNaN(irpj) ? prev.taxRate : irpj,
+        restaurantCommission: isNaN(comRest) ? prev.restaurantCommission : comRest,
+        sellerCommission: isNaN(comCom) ? prev.sellerCommission : comCom,
       }));
     }
   }, [productParams?.irpj, productParams?.comRestaurante, productParams?.comComercial]);
