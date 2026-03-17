@@ -56,6 +56,9 @@ import {
   Handshake,
   Maximize2,
   Minimize2,
+  LayoutGrid,
+  List,
+  ArrowUpDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -287,6 +290,10 @@ export default function Leads() {
   const [collapsedStages, setCollapsedStages] = useState<string[]>(["ganho", "perdido"]);
   const [contactFormOpen, setContactFormOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "" });
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [listSearch, setListSearch] = useState("");
+  const [listSortField, setListSortField] = useState<"stage" | "name" | "updatedAt">("stage");
+  const [listSortDir, setListSortDir] = useState<"asc" | "desc">("asc");
 
   const utils = trpc.useUtils();
 
@@ -761,6 +768,187 @@ export default function Leads() {
     leads: leads.filter((l) => l.stage === stage.key),
   }));
 
+  const stageOrder: Record<string, number> = Object.fromEntries(STAGES.map((s, i) => [s.key, i]));
+
+  const filteredLeads = leads.filter((l) => {
+    if (!listSearch.trim()) return true;
+    const q = listSearch.toLowerCase();
+    return (
+      l.name?.toLowerCase().includes(q) ||
+      l.company?.toLowerCase().includes(q) ||
+      l.contactPhone?.toLowerCase().includes(q) ||
+      l.contactEmail?.toLowerCase().includes(q) ||
+      l.origin?.toLowerCase().includes(q)
+    );
+  });
+
+  const sortedLeads = [...filteredLeads].sort((a, b) => {
+    let cmp = 0;
+    if (listSortField === "stage") {
+      cmp = (stageOrder[a.stage] ?? 99) - (stageOrder[b.stage] ?? 99);
+    } else if (listSortField === "name") {
+      cmp = (a.name || "").localeCompare(b.name || "", "pt-BR");
+    } else if (listSortField === "updatedAt") {
+      cmp = new Date(a.updatedAt || 0).getTime() - new Date(b.updatedAt || 0).getTime();
+    }
+    return listSortDir === "asc" ? cmp : -cmp;
+  });
+
+  function toggleSort(field: typeof listSortField) {
+    if (listSortField === field) {
+      setListSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setListSortField(field);
+      setListSortDir("asc");
+    }
+  }
+
+  function renderListView() {
+    return (
+      <div className="space-y-3">
+        <div className="relative max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <input
+            value={listSearch}
+            onChange={(e) => setListSearch(e.target.value)}
+            placeholder="Buscar por nome, empresa, telefone..."
+            className="w-full h-8 pl-8 pr-3 text-sm bg-background border border-border rounded-md outline-none focus:ring-2 focus:ring-ring/40"
+          />
+          {listSearch && (
+            <button
+              onClick={() => setListSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="border rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground w-32">
+                  <button className="flex items-center gap-1 hover:text-foreground transition-colors" onClick={() => toggleSort("stage")}>
+                    Estágio
+                    <ArrowUpDown className={`w-3 h-3 ${listSortField === "stage" ? "text-foreground" : "opacity-40"}`} />
+                  </button>
+                </th>
+                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">
+                  <button className="flex items-center gap-1 hover:text-foreground transition-colors" onClick={() => toggleSort("name")}>
+                    Nome / Empresa
+                    <ArrowUpDown className={`w-3 h-3 ${listSortField === "name" ? "text-foreground" : "opacity-40"}`} />
+                  </button>
+                </th>
+                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground hidden sm:table-cell">Telefone</th>
+                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground hidden md:table-cell">Origem</th>
+                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground hidden lg:table-cell">Responsável</th>
+                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">
+                  <button className="flex items-center gap-1 hover:text-foreground transition-colors" onClick={() => toggleSort("updatedAt")}>
+                    Atualizado
+                    <ArrowUpDown className={`w-3 h-3 ${listSortField === "updatedAt" ? "text-foreground" : "opacity-40"}`} />
+                  </button>
+                </th>
+                <th className="px-3 py-2 w-16"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedLeads.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
+                    {listSearch ? "Nenhum lead encontrado para a busca." : "Nenhum lead cadastrado."}
+                  </td>
+                </tr>
+              )}
+              {sortedLeads.map((lead) => {
+                const stage = STAGES.find((s) => s.key === lead.stage);
+                const isSelected = lead.id === selectedLeadId;
+                return (
+                  <tr
+                    key={lead.id}
+                    className={`border-b last:border-0 cursor-pointer transition-colors hover:bg-muted/40 ${isSelected ? "bg-primary/5" : ""}`}
+                    onClick={() => { setSelectedLeadId(lead.id); setIsEditing(false); }}
+                  >
+                    <td className="px-3 py-2.5">
+                      {stage && (
+                        <Badge variant="outline" className={`text-[9px] h-4 px-1.5 font-medium ${stage.color}`}>
+                          {stage.label}
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="font-medium text-xs leading-tight">{lead.name}</div>
+                      {lead.company && (
+                        <div className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[200px]">{lead.company}</div>
+                      )}
+                      {lead.convertedToId && (
+                        <Badge className="text-[9px] h-3.5 px-1 mt-0.5 bg-emerald-500/20 text-emerald-500 border-emerald-500/30">
+                          Convertido
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 hidden sm:table-cell text-[11px] text-muted-foreground">
+                      {lead.contactPhone || "—"}
+                    </td>
+                    <td className="px-3 py-2.5 hidden md:table-cell">
+                      {lead.origin ? (
+                        <Badge variant="secondary" className="text-[9px] h-4 px-1.5">{lead.origin}</Badge>
+                      ) : <span className="text-[11px] text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 hidden lg:table-cell">
+                      {(lead.assignedToFirstName || lead.createdByFirstName) ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                            <span className="text-[9px] font-bold text-primary">
+                              {(lead.assignedToFirstName || lead.createdByFirstName || "?")[0]}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-muted-foreground truncate max-w-[90px]">
+                            {lead.assignedToFirstName || lead.createdByFirstName}
+                          </span>
+                        </div>
+                      ) : <span className="text-[11px] text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-[11px] text-muted-foreground whitespace-nowrap">
+                      {formatDate(lead.updatedAt)}
+                    </td>
+                    <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-0.5 justify-end">
+                        <button
+                          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
+                          disabled={lead.stage === "novo"}
+                          onClick={() => moveStage(lead.id, lead.stage, "prev")}
+                          title="Voltar estágio"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
+                          disabled={lead.stage === "perdido"}
+                          onClick={() => moveStage(lead.id, lead.stage, "next")}
+                          title="Avançar estágio"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {sortedLeads.length > 0 && (
+          <p className="text-[11px] text-muted-foreground">
+            {sortedLeads.length} lead{sortedLeads.length !== 1 ? "s" : ""}
+            {listSearch && ` encontrado${sortedLeads.length !== 1 ? "s" : ""} para "${listSearch}"`}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   function renderLeadForm(data: LeadFormData, setData: (d: LeadFormData) => void) {
     return (
       <div className="grid gap-3">
@@ -993,18 +1181,40 @@ export default function Leads() {
       }
     >
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeadType)}>
-        <TabsList>
-          <TabsTrigger value="anunciante" className="gap-1.5">
-            <Building2 className="w-3.5 h-3.5" />
-            Anunciantes
-          </TabsTrigger>
-          <TabsTrigger value="restaurante" className="gap-1.5">
-            <UtensilsCrossed className="w-3.5 h-3.5" />
-            Restaurantes
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between gap-2">
+          <TabsList>
+            <TabsTrigger value="anunciante" className="gap-1.5">
+              <Building2 className="w-3.5 h-3.5" />
+              Anunciantes
+            </TabsTrigger>
+            <TabsTrigger value="restaurante" className="gap-1.5">
+              <UtensilsCrossed className="w-3.5 h-3.5" />
+              Restaurantes
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="flex items-center rounded-md border border-border overflow-hidden">
+            <button
+              onClick={() => setViewMode("kanban")}
+              className={`flex items-center gap-1.5 px-2.5 h-8 text-xs transition-colors ${viewMode === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+              title="Visão Kanban"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Kanban</span>
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`flex items-center gap-1.5 px-2.5 h-8 text-xs transition-colors border-l border-border ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+              title="Visão em Lista"
+            >
+              <List className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Lista</span>
+            </button>
+          </div>
+        </div>
 
         <TabsContent value={activeTab} className="mt-4">
+          {viewMode === "list" ? renderListView() : (
           <div className="overflow-x-auto pb-4 -mx-2 px-2">
             <div className="inline-flex gap-3">
               {leadsByStage.map((column) => {
@@ -1182,6 +1392,7 @@ export default function Leads() {
               })}
             </div>
           </div>
+          )}
         </TabsContent>
       </Tabs>
 
