@@ -107,12 +107,11 @@ export default function PriceTable() {
           artes: t.artes,
         };
       }
-      setCustosVolume(prev => {
-        const merged = { ...DEFAULT_CUSTOS_VOLUME };
-        Object.keys(newCustos).forEach(k => { merged[Number(k)] = newCustos[Number(k)]; });
-        return merged;
-      });
+      setCustosVolume({ ...DEFAULT_CUSTOS_VOLUME, ...newCustos });
+    } else {
+      setCustosVolume(DEFAULT_CUSTOS_VOLUME);
     }
+    setVolumeIdx(0);
   }, [productTiers]);
 
   useEffect(() => {

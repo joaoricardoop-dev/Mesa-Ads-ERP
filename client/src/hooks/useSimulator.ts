@@ -308,8 +308,20 @@ export function useSimulator(
   selectedBudget?: BudgetOption | null,
   restaurantCommissionRate?: number,
   productTiers?: ProductTier[],
+  productParams?: ProductParams,
 ) {
   const [inputs, setInputs] = useState<SimulatorInputs>(loadInputs);
+
+  useEffect(() => {
+    if (productParams) {
+      setInputs(prev => ({
+        ...prev,
+        taxRate: parseFloat(productParams.irpj),
+        restaurantCommission: parseFloat(productParams.comRestaurante),
+        sellerCommission: parseFloat(productParams.comComercial),
+      }));
+    }
+  }, [productParams?.irpj, productParams?.comRestaurante, productParams?.comComercial]);
 
   useEffect(() => {
     saveInputs(inputs);

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useSimulator, type BudgetOption, type ProductTier, loadSavedBudgetId } from "@/hooks/useSimulator";
+import { useSimulator, type BudgetOption, type ProductTier, type ProductParams, loadSavedBudgetId } from "@/hooks/useSimulator";
 import { useRestaurantAllocation, type AllocationEntry } from "@/hooks/useRestaurantAllocation";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -190,14 +190,19 @@ export default function QuotationPreview() {
   );
 
   const tiersForSimulator = typedProductTiers.length > 0 ? typedProductTiers : undefined;
-  const simulatorBase = useSimulator(selectedBudget, undefined, tiersForSimulator);
+  const paramsForSimulator: ProductParams | undefined = selectedProduct ? {
+    irpj: selectedProduct.irpj,
+    comRestaurante: selectedProduct.comRestaurante,
+    comComercial: selectedProduct.comComercial,
+  } : undefined;
+  const simulatorBase = useSimulator(selectedBudget, undefined, tiersForSimulator, paramsForSimulator);
   const totalCoasters = simulatorBase.inputs.coastersPerRestaurant * simulatorBase.inputs.activeRestaurants;
 
   const allocation = useRestaurantAllocation(restaurantsForAllocation, totalCoasters);
 
   const allocCommission = allocation.isValid ? allocation.weightedCommission : undefined;
 
-  const simulator = useSimulator(selectedBudget, allocCommission, tiersForSimulator);
+  const simulator = useSimulator(selectedBudget, allocCommission, tiersForSimulator, paramsForSimulator);
   const pr = simulator.perRestaurant;
   const ue = simulator.unitEconomics;
   const inputs = simulator.inputs;
