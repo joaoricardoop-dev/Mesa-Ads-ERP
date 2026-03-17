@@ -1,0 +1,477 @@
+OBJETIVO
+Criar uma nova seção "Orçamento" dentro do menu Comercial do sidebar. Essa seção é o novo ponto central para criar orçamentos multiproduto para clientes. Ela substitui o fluxo atual de criação de cotação (que hoje é um dialog simples com campo coasterVolume para um produto só) por uma experiência completa de montagem de orçamento com múltiplos produtos, cálculo de preço em tempo real e resumo financeiro.
+
+CONTEXTO TÉCNICO
+Stack
+
+Frontend: React + TypeScript + Vite + Tailwind + shadcn/ui
+Backend: Node.js + Express + tRPC
+Banco: PostgreSQL + Drizzle ORM
+Roteamento: Wouter
+State: React Query + useState
+
+Fluxo Atual de Cotação (o que existe hoje)
+A cotação hoje é criada via um Dialog simples dentro de Quotations.tsx com estes campos:
+
+Cliente (select)
+Produto (select — mas só 1 produto por cotação)
+Volume de Bolachas (number input — hardcoded para coasters)
+Tipo de Campanha (padrão/premium/exclusivo)
+Perfil de Rede, Regiões, Ciclos
+Bonificada (toggle), Desconto Parceiro (toggle)
+Preço Unitário e Valor Total (inputs manuais)
+Validade, Observações
+
+Problema: O preço é digitado manualmente. A lógica de cálculo automático só existe no Simulador (PriceTable.tsx), que é uma tela separada. O usuário precisa ir no simulador, calcular o preço, anotar, e depois voltar para a cotação e digitar. E só aceita 1 produto.
+Lógica de Precificação Atual (PriceTable.tsx)
+O cálculo de preço funciona assim:
+1. Seleciona volume → busca tier de preço (custoGPC, frete, margem, artes)
+2. Seleciona duração em semanas (4, 8, 12... 52)
+3. Calcula preço base:
+   denominador = 1 - margem - (irpj% + comRestaurante% + comComercial%)
+   custoTotal = (custoGPC × artes × volume) + frete
+   precoUnit4sem = custoTotal / denominador / volume
+
+4. Escala por períodos:
+   nPeriodos = semanas / 4
+   precoSemDesconto = precoTotal4sem × nPeriodos
+
+5. Aplica descontos sequenciais:
+   - Desconto por duração (3% a 25% conforme semanas)
+   - Ajuste de pagamento (Pix +5%, Boleto 0%, Cartão 0%)
+   - Desconto parceiro (-10% se aplicável)
+
+6. Resultado:
+   precoFinal, precoMensal, precoUnitario, margemLiquida, lucroPorUnidade
+   + decomposição: custoGPC, frete/un, IRPJ, comRest, comCom, margem
+Premissas padrão: IRPJ 6%, Com. Restaurante 15%, Com. Comercial 10%
+Descontos por duração:
+
+4 sem: 0% | 8 sem: 3% | 12 sem: 5% | 16 sem: 7% | 20 sem: 9%
+24 sem: 11% | 28 sem: 13% | 32 sem: 15% | 36 sem: 17%
+40 sem: 19% | 44 sem: 21% | 48 sem: 23% | 52 sem: 25%
+
+
+O QUE CRIAR
+1. NOVA ROTA E MENU
+No sidebar (DashboardLayout.tsx):
+Adicionar dentro do grupo Comercial, ANTES de "Cotações":
+Comercial
+  ├── Orçamento ← NOVO (ícone: Calculator ou FileText)
+  ├── Cotações
+  ├── Leads
+  ├── Contatos
+  └── Parceiros
+Rota: /comercial/orcamento
+Componente: BudgetCreator.tsx (nova página)
+
+2. PÁGINA "ORÇAMENTO" — BudgetCreator.tsx
+Esta é uma página full-width (não um dialog) com layout em duas colunas no desktop e coluna única no mobile.
+┌──────────────────────────────────────────────────────────────────┐
+│ NOVO ORÇAMENTO                                    [Limpar Tudo] │
+├────────────────────────────────┬─────────────────────────────────┤
+│                                │                                 │
+│  COLUNA ESQUERDA               │  COLUNA DIREITA                 │
+│  (Configuração do Orçamento)   │  (Resumo e Preview)             │
+│                                │                                 │
+│  ┌──────────────────────────┐  │  ┌───────────────────────────┐  │
+│  │ DADOS DO CLIENTE         │  │  │ RESUMO DO ORÇAMENTO       │  │
+│  │ Cliente: [Select ▼]      │  │  │                           │  │
+│  │ Lead: [Select ▼]         │  │  │ Cliente: Empresa X        │  │
+│  │ (um ou outro)            │  │  │ Duração: 24 semanas       │  │
+│  │                          │  │  │ Pagamento: Pix            │  │
+│  │ Tipo: [padrão ▼]        │  │  │                           │  │
+│  │ Perfil: [___]            │  │  │ ─── ITENS ─────────────── │  │
+│  │ Regiões: [___]           │  │  │                           │  │
+│  │ Ciclos: [1]              │  │  │ 1. Bolacha de Chopp       │  │
+│  │ Bonificada: [toggle]     │  │  │    5.000 un × R$ 0,38     │  │
+│  │ Desc. Parceiro: [toggle] │  │  │    = R$ 1.900,00          │  │
+│  │ Parceiro: [Select ▼]     │  │  │                           │  │
+│  └──────────────────────────┘  │  │ 2. Display de Mesa        │  │
+│                                │  │    30 un × R$ 15,00       │  │
+│  ┌──────────────────────────┐  │  │    = R$ 450,00            │  │
+│  │ PARÂMETROS DE PREÇO      │  │  │                           │  │
+│  │ Duração: [24 sem ▼]      │  │  │ ─── FINANCEIRO ────────── │  │
+│  │ Pagamento: [Pix|Bol|Car] │  │  │                           │  │
+│  │                          │  │  │ Subtotal:    R$ 2.350,00  │  │
+│  │ Premissas (editáveis):   │  │  │ Desc Prazo:  - R$ 258,50  │  │
+│  │ IRPJ: [6] %              │  │  │ Desc Parc.:  - R$ 209,15  │  │
+│  │ Com. Rest.: [15] %       │  │  │ Aj. Pgto:    + R$ 104,58  │  │
+│  │ Com. Comerc.: [10] %     │  │  │                           │  │
+│  └──────────────────────────┘  │  │ ══════════════════════════ │  │
+│                                │  │ TOTAL:       R$ 1.986,93  │  │
+│  ┌──────────────────────────┐  │  │ Mensal:      R$ 331,16    │  │
+│  │ ITENS DO ORÇAMENTO       │  │  │ Margem:      32,4%        │  │
+│  │                          │  │  │                           │  │
+│  │ ┌── Item 1 ───────────┐ │  │  │ ─── DECOMPOSIÇÃO ──────── │  │
+│  │ │ Produto: [Select ▼] │ │  │  │                           │  │
+│  │ │ Bolacha de Chopp     │ │  │  │ [Gráfico de barras        │  │
+│  │ │                      │ │  │  │  empilhadas mostrando      │  │
+│  │ │ Volume: [5000 ▼]    │ │  │  │  composição do preço       │  │
+│  │ │ (tiers do produto)   │ │  │  │  por item:                │  │
+│  │ │                      │ │  │  │  Custo | Frete | IRPJ |   │  │
+│  │ │ Custo unit: R$ 0,27  │ │  │  │  ComRest | ComCom |      │  │
+│  │ │ + Frete: R$ 0,07/un  │ │  │  │  Margem ]                │  │
+│  │ │ = Custo total: R$0,34│ │  │  │                           │  │
+│  │ │                      │ │  │  └───────────────────────────┘  │
+│  │ │ Preço venda: R$ 0,38 │ │  │                                 │
+│  │ │ Subtotal: R$ 1.900   │ │  │  ┌───────────────────────────┐  │
+│  │ │            [Remover]  │ │  │  │ AÇÕES                     │  │
+│  │ └──────────────────────┘ │  │  │                           │  │
+│  │                          │  │  │ [Gerar Cotação]           │  │
+│  │ ┌── Item 2 ───────────┐ │  │  │  → Cria cotação com       │  │
+│  │ │ Produto: [Select ▼] │ │  │  │    todos os itens e       │  │
+│  │ │ Display de Mesa      │ │  │  │    preços calculados      │  │
+│  │ │                      │ │  │  │                           │  │
+│  │ │ Volume: [30]         │ │  │  │ [Exportar PDF]            │  │
+│  │ │ (input livre, sem    │ │  │  │  → PDF do orçamento       │  │
+│  │ │  tiers pra display)  │ │  │  │    para enviar ao cliente │  │
+│  │ │                      │ │  │  │                           │  │
+│  │ │ Custo unit: R$ 8,00  │ │  │  │ [Salvar Rascunho]        │  │
+│  │ │ Preço venda: R$15,00 │ │  │  │  → Salva para continuar  │  │
+│  │ │ Subtotal: R$ 450     │ │  │  │    depois                │  │
+│  │ │            [Remover]  │ │  │  │                           │  │
+│  │ └──────────────────────┘ │  │  └───────────────────────────┘  │
+│  │                          │  │                                 │
+│  │ [+ Adicionar Produto]    │  │                                 │
+│  │                          │  │                                 │
+│  └──────────────────────────┘  │                                 │
+│                                │                                 │
+│  ┌──────────────────────────┐  │                                 │
+│  │ ALOCAÇÃO POR RESTAURANTE │  │                                 │
+│  │ (aparece quando há item  │  │                                 │
+│  │  com distribuição local) │  │                                 │
+│  │                          │  │                                 │
+│  │ [Bolacha] [Display] tabs │  │                                 │
+│  │                          │  │                                 │
+│  │ (RestaurantAllocation    │  │                                 │
+│  │  Panel com labels        │  │                                 │
+│  │  dinâmicos por produto)  │  │                                 │
+│  └──────────────────────────┘  │                                 │
+│                                │                                 │
+│  Notas: [textarea]             │                                 │
+│  Validade: [date picker]       │                                 │
+│                                │                                 │
+└────────────────────────────────┴─────────────────────────────────┘
+
+3. COMPORTAMENTO DE CADA SEÇÃO
+3.1 Dados do Cliente
+
+Select searchable de clientes existentes OU leads
+Se selecionar lead, desabilita cliente e vice-versa
+Manter os mesmos campos auxiliares: tipo campanha, perfil de rede, regiões, ciclos
+Toggle bonificada: se ativo, todos os preços viram R$ 0,00
+Toggle desconto parceiro: aplica -10% no total final
+Se desconto parceiro ativo, aparece select de parceiro
+
+3.2 Parâmetros de Preço
+
+Duração em semanas: Select com opções 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52
+Forma de pagamento: Toggle group (Pix +5% | Boleto 0% | Cartão 0%)
+Premissas editáveis: IRPJ%, Com. Restaurante%, Com. Comercial% — com defaults do produto selecionado mas editáveis
+Estes parâmetros se aplicam a TODOS os itens do orçamento (são globais)
+
+3.3 Itens do Orçamento (CORE da funcionalidade)
+Cada item é um Card colapsável com:
+Ao adicionar item (botão [+ Adicionar Produto]):
+
+Aparece um novo card com Select de Produto (lista apenas produtos ativos da tabela products)
+Ao selecionar o produto:
+
+Carrega os productPricingTiers do produto via tRPC product.listTiers(productId)
+Se o produto tem tiers: mostra Select de Volume com as faixas disponíveis (ex: "1000-1999", "2000-2999", etc.)
+Se o produto NÃO tem tiers: mostra Input de Quantidade livre + Input de Custo Unitário manual
+Carrega as premissas padrão do produto (irpj, comRestaurante, comComercial) nos campos de premissas
+
+
+Cálculo automático em tempo real (ao selecionar volume ou digitar quantidade):
+
+   // Busca tier que contém o volume selecionado
+   tier = tiers.find(t => volume >= t.volumeMin && volume <= t.volumeMax)
+
+   // Custo unitário
+   custoUnit = (tier.custoGPC × tier.artes) + (tier.frete / volume)
+
+   // Preço de venda unitário (usando premissas globais do orçamento)
+   denominador = 1 - tier.margem - (irpj + comRest + comCom) / 100
+   precoVendaUnit4sem = ((tier.custoGPC × tier.artes × volume) + tier.frete) / denominador / volume
+
+   // Escala por duração
+   nPeriodos = semanasGlobal / 4
+   precoVendaTotal = precoVendaUnit4sem × volume × nPeriodos
+
+   // Aplica descontos globais (prazo + pagamento + parceiro)
+   // ... mesma lógica do PriceTable.tsx
+
+Exibição no card do item:
+
+Nome do produto + badge do tipo
+Volume/Quantidade selecionado
+Custo unitário (readonly, calculado)
+Frete por unidade (readonly, calculado)
+Preço de venda unitário (readonly, calculado — ou editável para override)
+Subtotal do item (readonly, calculado)
+Botão [Remover] para excluir o item
+
+
+Permitir override de preço: O preço de venda calculado é sugerido, mas o usuário pode clicar num ícone de "editar" e digitar um preço manual. Nesse caso, mostrar um badge "Preço personalizado" e recalcular a margem baseada no preço manual.
+
+Validações:
+
+Não permitir adicionar o mesmo produto duas vezes
+Mínimo 1 item para gerar cotação
+Se bonificada, todos os preços são zerados automaticamente
+
+3.4 Resumo do Orçamento (Coluna Direita — STICKY)
+A coluna direita deve ter position: sticky; top: 1rem para acompanhar o scroll.
+Conteúdo:
+
+Cabeçalho: Nome do cliente, duração, forma de pagamento
+Lista de itens: Para cada item: nome do produto, qtd × preço = subtotal
+Bloco financeiro:
+
+Subtotal (soma dos subtotais dos itens antes de descontos)
+Desconto por prazo (%) — valor
+Desconto parceiro (%) — valor (se aplicável)
+Ajuste pagamento (%) — valor
+TOTAL FINAL (destaque em negrito/tamanho maior)
+Valor mensal (total / nPeriodos)
+Margem líquida estimada (%)
+
+
+Gráfico de decomposição: Barra empilhada horizontal mostrando, para o total do orçamento, quanto é: custo de produção | frete | IRPJ | com. restaurante | com. comercial | margem
+
+3.5 Alocação por Restaurante
+
+Aparece APENAS se pelo menos 1 item tem temDistribuicaoPorLocal = true no produto
+Se múltiplos produtos distribuíveis: mostrar Tabs — uma tab por produto
+Cada tab renderiza o RestaurantAllocationPanel existente, mas passando:
+
+productId do item
+unitLabel / unitLabelPlural do produto para labels dinâmicos
+totalQuantity do item para validação de distribuição
+
+
+Manter funcionalidades existentes: buscar restaurante, adicionar, definir quantidade por local, comissão, distribuir igualmente
+
+3.6 Ações (Coluna Direita, abaixo do resumo)
+[Gerar Cotação] (botão primário, destaque):
+
+Cria uma nova cotação no banco via quotation.create
+Para cada item do orçamento, cria um quotationItem (tabela nova do prompt anterior)
+O campo coasterVolume da cotação recebe a soma total de todos os itens (backward compatibility)
+O campo totalValue recebe o total final calculado
+O campo unitPrice recebe o preço unitário médio ponderado
+Redireciona para /comercial/cotacoes/:id (detalhe da cotação criada)
+Toast de sucesso: "Cotação QOT-2026-XXXX criada com sucesso"
+
+[Exportar PDF] (botão secundário):
+
+Gera um PDF do orçamento com:
+
+Dados do cliente
+Lista de itens com preços
+Resumo financeiro
+Validade
+Espaço para assinatura
+
+
+Usar a mesma lógica de PDF que já existe no PriceTable.tsx (jsPDF)
+
+[Salvar Rascunho] (botão outline):
+
+Salva como cotação com status "rascunho"
+Permite voltar depois e continuar editando
+Redireciona para a lista de cotações
+
+
+4. BACKEND — NOVAS ROTAS tRPC
+Adicionar ao quotationRouter.ts:
+typescript// Criar cotação multiproduto a partir do orçamento
+budgetCreate: comercialProcedure
+  .input(z.object({
+    clientId: z.number().optional(),
+    leadId: z.number().optional(),
+    campaignType: z.string().default("padrao"),
+    networkProfile: z.string().optional(),
+    regions: z.string().optional(),
+    cycles: z.number().default(1),
+    isBonificada: z.boolean().default(false),
+    hasPartnerDiscount: z.boolean().default(false),
+    partnerId: z.number().nullable().optional(),
+    validUntil: z.string().optional(),
+    notes: z.string().optional(),
+    // Parâmetros globais de preço
+    durationWeeks: z.number(),
+    paymentMethod: z.enum(["pix", "boleto", "cartao"]),
+    irpj: z.number(),
+    comissaoRestaurante: z.number(),
+    comissaoComercial: z.number(),
+    // Array de itens
+    items: z.array(z.object({
+      productId: z.number(),
+      quantity: z.number(),
+      quantityPerLocation: z.number().optional(),
+      unitCost: z.number(),      // custo unitário calculado
+      unitPrice: z.number(),     // preço de venda unitário
+      totalPrice: z.number(),    // subtotal do item
+      isCustomPrice: z.boolean().default(false), // se preço foi override manual
+      notes: z.string().optional(),
+    })),
+    // Total
+    totalValue: z.number(),
+  }))
+  .mutation(async ({ input, ctx }) => {
+    // 1. Gerar quotationNumber (QOT-YYYY-NNNN)
+    // 2. Inserir na tabela quotations
+    // 3. Para cada item: inserir na tabela quotationItems
+    // 4. Retornar quotation criada com ID
+  })
+IMPORTANTE: Este endpoint depende da tabela quotationItems do prompt anterior de multiproduto. Se essa tabela ainda não existir, criar junto.
+
+5. HOOK CUSTOMIZADO — useBudgetCalculator.ts
+Criar um novo hook React que encapsula toda a lógica de cálculo:
+typescript// client/src/hooks/useBudgetCalculator.ts
+
+interface BudgetItem {
+  id: string;                    // UUID temporário para React key
+  productId: number;
+  productName: string;
+  productType: string;
+  unitLabel: string;
+  unitLabelPlural: string;
+  hasLocationDistribution: boolean;
+
+  // Pricing
+  quantity: number;
+  quantityPerLocation: number | null;
+  tier: PricingTier | null;      // tier selecionado
+  unitCost: number;              // custo unitário (auto)
+  freightPerUnit: number;        // frete por unidade (auto)
+  unitPrice: number;             // preço de venda unitário (auto ou override)
+  isCustomPrice: boolean;        // se preço foi editado manualmente
+  subtotal: number;              // quantity × unitPrice (antes descontos globais)
+  margin: number;                // margem deste item (%)
+}
+
+interface BudgetState {
+  items: BudgetItem[];
+  globalParams: {
+    durationWeeks: number;
+    paymentMethod: "pix" | "boleto" | "cartao";
+    irpj: number;
+    comissaoRestaurante: number;
+    comissaoComercial: number;
+    isBonificada: boolean;
+    hasPartnerDiscount: boolean;
+  };
+}
+
+interface BudgetSummary {
+  subtotal: number;              // soma dos subtotais dos itens
+  discountDuration: number;      // valor do desconto por prazo
+  discountDurationPercent: number;
+  discountPartner: number;       // valor do desconto parceiro
+  discountPartnerPercent: number;
+  paymentAdjustment: number;     // ajuste por forma de pagamento
+  paymentAdjustmentPercent: number;
+  total: number;                 // total final
+  monthly: number;               // total / nPeriodos
+  netMargin: number;             // margem líquida %
+  decomposition: {               // para o gráfico
+    custoProducao: number;
+    frete: number;
+    irpj: number;
+    comRestaurante: number;
+    comComercial: number;
+    margem: number;
+  };
+}
+
+// Hook retorna:
+function useBudgetCalculator() {
+  return {
+    items: BudgetItem[];
+    summary: BudgetSummary;
+    globalParams: BudgetState["globalParams"];
+
+    // Actions
+    addItem: (productId: number) => void;
+    removeItem: (itemId: string) => void;
+    updateItemQuantity: (itemId: string, quantity: number) => void;
+    updateItemPrice: (itemId: string, price: number) => void;  // override manual
+    resetItemPrice: (itemId: string) => void;  // volta pro calculado
+    setDuration: (weeks: number) => void;
+    setPaymentMethod: (method: string) => void;
+    setPremissa: (key: string, value: number) => void;
+    setBonificada: (value: boolean) => void;
+    setPartnerDiscount: (value: boolean) => void;
+    clearAll: () => void;
+  }
+}
+A lógica de cálculo dentro do hook deve replicar exatamente o que o PriceTable.tsx faz, mas parametrizado para múltiplos produtos. Reusar as constantes DEFAULT_DESCONTOS_PRAZO e DEFAULT_PAGAMENTO do PriceTable.
+
+6. COMPONENTES A CRIAR
+ComponenteArquivoDescriçãoBudgetCreatorclient/src/pages/BudgetCreator.tsxPágina principal do orçamentoBudgetItemCardclient/src/components/budget/BudgetItemCard.tsxCard de cada item do orçamentoBudgetSummaryPanelclient/src/components/budget/BudgetSummaryPanel.tsxColuna direita com resumo stickyBudgetDecompositionChartclient/src/components/budget/BudgetDecompositionChart.tsxGráfico de decomposição (Recharts)AddProductDialogclient/src/components/budget/AddProductDialog.tsxModal para selecionar produtouseBudgetCalculatorclient/src/hooks/useBudgetCalculator.tsHook com toda a lógica de cálculo
+
+7. INTEGRAÇÃO COM COTAÇÕES EXISTENTES
+Quando o usuário clicar em [Gerar Cotação], a cotação criada deve aparecer normalmente na lista de /comercial/cotacoes e ser editável no QuotationDetail.tsx.
+Para isso:
+
+O campo quotations.productId recebe o productId do PRIMEIRO item (backward compatibility)
+O campo quotations.coasterVolume recebe a soma de todos os volumes (backward compatibility)
+Os itens individuais ficam na tabela quotationItems
+Na lista de cotações, a coluna "Produtos" mostra badges de cada item
+
+Também adicionar na página de Cotações:
+
+Um botão [+ Novo Orçamento] no topo da lista que redireciona para /comercial/orcamento
+O botão antigo de "Nova Cotação" (dialog simples) pode ser mantido como "Cotação Rápida" para criação express de produto único, ou removido
+
+
+8. RESPONSIVIDADE
+Desktop (>1024px): Layout duas colunas (60/40)
+Tablet (768-1024px): Layout duas colunas (55/45)
+Mobile (<768px): Coluna única, resumo aparece no topo como accordion colapsável
+
+9. COMPONENTES SHADCN/UI A UTILIZAR
+ElementoComponenteLayout duas colunasdiv com grid grid-cols-1 lg:grid-cols-5 gap-6 (3+2)Cards de itemCard + CardHeader + CardContent do shadcnSelect de produtoSelect ou Combobox (Command + Popover) para buscaSelect de volume/tierSelect com options geradas dos tiersToggle pagamentoToggleGroup com 3 opçõesToggle bonificadaSwitchInputs numéricosInput type="number" com formatação BRLResumo stickyCard com className="sticky top-4"Gráfico decomposiçãoBarChart do Recharts (horizontal stacked)Tabs de alocaçãoTabs + TabsList + TabsTrigger + TabsContentBotão gerar cotaçãoButton variant="default" size="lg"Botão PDFButton variant="outline"Toast de sucessosonner toastBadge de produtoBadge com cor por tipo de produto
+
+10. ORDEM DE IMPLEMENTAÇÃO
+1. Criar tabela quotationItems no schema se ainda não existir
+2. Criar hook useBudgetCalculator.ts com toda a lógica de cálculo
+3. Criar componente BudgetItemCard.tsx
+4. Criar componente BudgetSummaryPanel.tsx + BudgetDecompositionChart.tsx
+5. Criar componente AddProductDialog.tsx
+6. Criar página BudgetCreator.tsx montando tudo
+7. Adicionar rota /comercial/orcamento no App.tsx
+8. Adicionar item "Orçamento" no sidebar (DashboardLayout.tsx)
+9. Criar endpoint budgetCreate no quotationRouter.ts
+10. Integrar botão [Gerar Cotação] com o endpoint
+11. Adicionar botão [+ Novo Orçamento] na página de Cotações
+12. Testar fluxo completo: selecionar cliente → adicionar 2+ produtos → calcular → gerar cotação → verificar na lista
+
+11. EXEMPLO DE FLUXO DO USUÁRIO
+
+Usuário clica em Comercial → Orçamento no sidebar
+Seleciona cliente "Cervejaria Bohemia"
+Define duração 24 semanas, pagamento Pix
+Clica [+ Adicionar Produto]
+Seleciona "Bolacha de Chopp", escolhe tier 5000 unidades
+Sistema calcula automaticamente: custo R$ 0,30/un, preço venda R$ 0,52/un, subtotal R$ 2.600
+Clica [+ Adicionar Produto] de novo
+Seleciona "Display de Mesa", digita 30 unidades a custo R$ 8,00/un
+Sistema calcula: preço venda R$ 18,50/un, subtotal R$ 555
+Na coluna direita, o Resumo atualiza em tempo real:
+
+Subtotal: R$ 3.155,00
+Desc. prazo (11%): -R$ 347,05
+Aj. Pix (+5%): +R$ 140,40
+Total: R$ 2.948,35
+Mensal: R$ 491,39
+Margem: 28,7%
+
+
+Usuário confere, clica [Gerar Cotação]
+Sistema cria cotação QOT-2026-0042, redireciona para o detalhe
+Na lista de cotações, aparece com badges: "Bolacha ×5000" + "Display ×30"

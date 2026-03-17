@@ -47,6 +47,7 @@ import QuotationSign from "./pages/QuotationSign";
 import Products from "./pages/Products";
 import Partners from "./pages/Partners";
 import PartnerDetail from "./pages/PartnerDetail";
+import BudgetCreator from "./pages/BudgetCreator";
 
 function AnuncianteRouter() {
   return (
@@ -75,6 +76,7 @@ function Router() {
       <Route path="/portal" component={AnunciantePortal} />
       <Route path="/comercial/simulador" component={Home} />
       <Route path="/comercial/tabela-precos" component={PriceTable} />
+      <Route path="/comercial/orcamento" component={BudgetCreator} />
       <Route path="/comercial/cotacoes/:id" component={QuotationDetail} />
       <Route path="/comercial/cotacoes" component={Quotations} />
       <Route path="/comercial/leads" component={Leads} />

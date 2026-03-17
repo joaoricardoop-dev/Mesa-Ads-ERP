@@ -117,6 +117,7 @@ const NAV_ENTRIES: NavEntry[] = [
     icon: DollarSign,
     label: "Comercial",
     items: [
+      { icon: FileText, label: "Orçamento", path: "/comercial/orcamento" },
       { icon: ClipboardList, label: "Cotações", path: "/comercial/cotacoes" },
       { icon: Users, label: "Leads", path: "/comercial/leads" },
       { icon: UserPlus, label: "Contatos", path: "/comercial/contatos" },
