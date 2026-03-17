@@ -324,7 +324,6 @@ export default function PriceTable() {
         setSelectedLeadId(leadIdParam);
         if (!clientIdParam) setSelectedClientId("none");
       }
-      setShowCotacaoDialog(true);
     }
   }, [searchString]);
 
@@ -565,7 +564,7 @@ export default function PriceTable() {
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportPdf}>
             <Download className="w-3.5 h-3.5" /> Exportar PDF
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => { setCotacaoNotes(""); setSelectedClientId("none"); setSelectedLeadId("none"); setCotacaoVolume(volume); setShowCotacaoDialog(true); }}>
+          <Button size="sm" className="gap-1.5" onClick={() => { setCotacaoNotes(""); const params = new URLSearchParams(window.location.search); if (!params.get("clientId")) setSelectedClientId("none"); if (!params.get("leadId")) setSelectedLeadId("none"); setCotacaoVolume(volume); setShowCotacaoDialog(true); }}>
             <Rocket className="w-3.5 h-3.5" /> Criar Cotação
           </Button>
         </div>
