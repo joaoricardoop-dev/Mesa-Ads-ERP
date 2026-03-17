@@ -1324,7 +1324,7 @@ export default function Leads() {
       <Sheet open={!!selectedLeadId} onOpenChange={(open) => { if (!open) { setSelectedLeadId(null); setIsEditing(false); setContactFormOpen(false); setContactForm({ name: "", email: "", phone: "" }); } }}>
         <SheetContent
           style={{ width: panelWidth, maxWidth: "95vw" }}
-          className="w-full overflow-y-auto px-5 pt-5"
+          className="w-full overflow-hidden p-0 flex flex-col"
         >
           {/* Drag handle */}
           <div
@@ -1336,8 +1336,8 @@ export default function Leads() {
 
           {selectedLead.data && (
             <>
-              <SheetHeader className="pb-0">
-                <div className="flex items-center justify-between gap-2 mb-1">
+              <SheetHeader className="shrink-0 px-5 pt-5 pb-4 border-b gap-2">
+                <div className="flex items-center justify-between gap-2">
                   <SheetTitle className="flex items-center gap-2 text-base min-w-0">
                     {selectedLead.data.type === "anunciante" ? (
                       <Building2 className="w-4 h-4 shrink-0 text-muted-foreground" />
@@ -1356,7 +1356,7 @@ export default function Leads() {
                     {panelWidth > 448 ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
                   </Button>
                 </div>
-                <Separator className="mb-3" />
+                <Separator />
                 <div className="flex items-center gap-2 flex-wrap">
                   {!isEditing && selectedLead.data.type === "anunciante" && (
                     <Button
@@ -1417,7 +1417,7 @@ export default function Leads() {
                 </div>
               </SheetHeader>
 
-              <div className="mt-8 space-y-8">
+              <div className="flex-1 overflow-y-auto px-5 pt-6 pb-6 space-y-8">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Estágio</span>
