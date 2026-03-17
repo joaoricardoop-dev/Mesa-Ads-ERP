@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Tag, X } from "lucide-react";
 
 type TipoProduct = "coaster" | "display" | "cardapio" | "totem" | "adesivo" | "porta_guardanapo" | "outro";
 
@@ -42,6 +42,22 @@ const tipoLabels: Record<TipoProduct, string> = {
   porta_guardanapo: "Porta-Guardanapo",
   outro: "Outro",
 };
+
+const CATEGORY_COLORS: { value: string; label: string; dot: string; badge: string }[] = [
+  { value: "gray",   label: "Cinza",    dot: "bg-gray-400",   badge: "bg-gray-100 text-gray-700 border-gray-300" },
+  { value: "blue",   label: "Azul",     dot: "bg-blue-500",   badge: "bg-blue-50 text-blue-700 border-blue-300" },
+  { value: "green",  label: "Verde",    dot: "bg-green-500",  badge: "bg-green-50 text-green-700 border-green-300" },
+  { value: "purple", label: "Roxo",     dot: "bg-purple-500", badge: "bg-purple-50 text-purple-700 border-purple-300" },
+  { value: "red",    label: "Vermelho", dot: "bg-red-500",    badge: "bg-red-50 text-red-700 border-red-300" },
+  { value: "orange", label: "Laranja",  dot: "bg-orange-500", badge: "bg-orange-50 text-orange-700 border-orange-300" },
+  { value: "yellow", label: "Amarelo",  dot: "bg-yellow-400", badge: "bg-yellow-50 text-yellow-700 border-yellow-300" },
+  { value: "teal",   label: "Teal",     dot: "bg-teal-500",   badge: "bg-teal-50 text-teal-700 border-teal-300" },
+  { value: "pink",   label: "Rosa",     dot: "bg-pink-500",   badge: "bg-pink-50 text-pink-700 border-pink-300" },
+];
+
+function colorStyles(colorValue: string | null | undefined) {
+  return CATEGORY_COLORS.find(c => c.value === colorValue) ?? CATEGORY_COLORS[0];
+}
 
 interface TierForm {
   volumeMin: string;
@@ -58,6 +74,7 @@ interface ProductForm {
   name: string;
   description: string;
   tipo: TipoProduct;
+  categoryId: string;
   temDistribuicaoPorLocal: boolean;
   unitLabel: string;
   unitLabelPlural: string;
@@ -72,6 +89,7 @@ const emptyProduct: ProductForm = {
   name: "",
   description: "",
   tipo: "coaster",
+  categoryId: "",
   temDistribuicaoPorLocal: true,
   unitLabel: "unidade",
   unitLabelPlural: "unidades",
@@ -82,9 +100,18 @@ const emptyProduct: ProductForm = {
   isActive: true,
 };
 
+interface CategoryForm {
+  name: string;
+  color: string;
+  description: string;
+}
+
+const emptyCategoryForm: CategoryForm = { name: "", color: "gray", description: "" };
+
 export default function Products() {
   const utils = trpc.useUtils();
   const { data: productsList = [], isLoading } = trpc.product.list.useQuery();
+  const { data: categoriesList = [] } = trpc.product.listCategories.useQuery();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -94,6 +121,11 @@ export default function Products() {
   const [tiersProductId, setTiersProductId] = useState<number | null>(null);
   const [tiersForm, setTiersForm] = useState<TierForm[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+
+  const [catDialogOpen, setCatDialogOpen] = useState(false);
+  const [catForm, setCatForm] = useState<CategoryForm>(emptyCategoryForm);
+  const [catEditingId, setCatEditingId] = useState<number | null>(null);
+  const [catDeleteConfirm, setCatDeleteConfirm] = useState<number | null>(null);
 
   const createMutation = trpc.product.create.useMutation({
     onSuccess: () => { utils.product.list.invalidate(); setDialogOpen(false); toast.success("Produto criado"); },
@@ -115,6 +147,21 @@ export default function Products() {
     onError: (e) => toast.error(e.message),
   });
 
+  const createCatMutation = trpc.product.createCategory.useMutation({
+    onSuccess: () => { utils.product.listCategories.invalidate(); setCatDialogOpen(false); toast.success("Categoria criada"); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateCatMutation = trpc.product.updateCategory.useMutation({
+    onSuccess: () => { utils.product.listCategories.invalidate(); utils.product.list.invalidate(); setCatDialogOpen(false); toast.success("Categoria atualizada"); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteCatMutation = trpc.product.deleteCategory.useMutation({
+    onSuccess: () => { utils.product.listCategories.invalidate(); utils.product.list.invalidate(); setCatDeleteConfirm(null); toast.success("Categoria excluída"); },
+    onError: (e) => toast.error(e.message),
+  });
+
   function openCreate() {
     setEditingId(null);
     setForm(emptyProduct);
@@ -127,6 +174,7 @@ export default function Products() {
       name: p.name,
       description: p.description || "",
       tipo: (p.tipo as TipoProduct) || "coaster",
+      categoryId: p.categoryId ? String(p.categoryId) : "",
       temDistribuicaoPorLocal: p.temDistribuicaoPorLocal ?? true,
       unitLabel: p.unitLabel,
       unitLabelPlural: p.unitLabelPlural,
@@ -140,10 +188,12 @@ export default function Products() {
   }
 
   function handleSave() {
+    const categoryId = form.categoryId ? parseInt(form.categoryId) : null;
     const payload = {
       name: form.name,
       description: form.description || undefined,
       tipo: form.tipo,
+      categoryId,
       temDistribuicaoPorLocal: form.temDistribuicaoPorLocal,
       unitLabel: form.unitLabel,
       unitLabelPlural: form.unitLabelPlural,
@@ -192,6 +242,27 @@ export default function Products() {
     setTiersForm(prev => prev.map((t, i) => i === idx ? { ...t, [field]: val } : t));
   }
 
+  function openCatCreate() {
+    setCatEditingId(null);
+    setCatForm(emptyCategoryForm);
+    setCatDialogOpen(true);
+  }
+
+  function openCatEdit(cat: any) {
+    setCatEditingId(cat.id);
+    setCatForm({ name: cat.name, color: cat.color || "gray", description: cat.description || "" });
+    setCatDialogOpen(true);
+  }
+
+  function handleSaveCat() {
+    if (!catForm.name.trim()) return;
+    if (catEditingId) {
+      updateCatMutation.mutate({ id: catEditingId, name: catForm.name, color: catForm.color, description: catForm.description || undefined });
+    } else {
+      createCatMutation.mutate({ name: catForm.name, color: catForm.color, description: catForm.description || undefined });
+    }
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -204,10 +275,36 @@ export default function Products() {
             Gerencie os produtos e suas faixas de precificação
           </p>
         </div>
-        <Button onClick={openCreate} size="sm">
-          <Plus className="h-4 w-4 mr-1" /> Novo Produto
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={openCatCreate}>
+            <Tag className="h-4 w-4 mr-1" /> Categorias
+          </Button>
+          <Button onClick={openCreate} size="sm">
+            <Plus className="h-4 w-4 mr-1" /> Novo Produto
+          </Button>
+        </div>
       </div>
+
+      {/* Categories overview */}
+      {categoriesList.length > 0 && (
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs text-muted-foreground font-medium">Categorias:</span>
+          {categoriesList.map((cat: any) => {
+            const cs = colorStyles(cat.color);
+            return (
+              <button
+                key={cat.id}
+                onClick={() => openCatEdit(cat)}
+                className={`inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border font-medium transition-opacity hover:opacity-80 ${cs.badge}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${cs.dot}`} />
+                {cat.name}
+                <Pencil className="h-2.5 w-2.5 opacity-60" />
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Carregando...</div>
@@ -220,6 +317,7 @@ export default function Products() {
               <TableRow>
                 <TableHead className="w-8"></TableHead>
                 <TableHead>Nome</TableHead>
+                <TableHead>Categoria</TableHead>
                 <TableHead>Unidade</TableHead>
                 <TableHead>Qtd Padrão/Ponto</TableHead>
                 <TableHead>IRPJ</TableHead>
@@ -234,6 +332,7 @@ export default function Products() {
                 <ProductRow
                   key={p.id}
                   product={p}
+                  categories={categoriesList}
                   expanded={expandedId === p.id}
                   onToggle={() => setExpandedId(expandedId === p.id ? null : p.id)}
                   onEdit={() => openEdit(p)}
@@ -246,6 +345,7 @@ export default function Products() {
         </div>
       )}
 
+      {/* Product dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -270,12 +370,34 @@ export default function Products() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-2 justify-end pb-1">
-                <div className="flex items-center gap-2">
-                  <Switch checked={form.temDistribuicaoPorLocal} onCheckedChange={v => setForm({ ...form, temDistribuicaoPorLocal: v })} />
-                  <Label className="text-sm">Distribuição por local</Label>
-                </div>
+              <div>
+                <Label>Categoria</Label>
+                <Select value={form.categoryId || "none"} onValueChange={v => setForm({ ...form, categoryId: v === "none" ? "" : v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sem categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">Sem categoria</span>
+                    </SelectItem>
+                    {categoriesList.map((cat: any) => {
+                      const cs = colorStyles(cat.color);
+                      return (
+                        <SelectItem key={cat.id} value={String(cat.id)}>
+                          <span className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${cs.dot}`} />
+                            {cat.name}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={form.temDistribuicaoPorLocal} onCheckedChange={v => setForm({ ...form, temDistribuicaoPorLocal: v })} />
+              <Label className="text-sm">Distribuição por local</Label>
             </div>
             <div>
               <Label>Descrição</Label>
@@ -323,6 +445,7 @@ export default function Products() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete product dialog */}
       <Dialog open={deleteConfirm !== null} onOpenChange={() => setDeleteConfirm(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -352,12 +475,130 @@ export default function Products() {
         onUpdateRow={updateTierRow}
         saving={upsertTiersMutation.isPending}
       />
+
+      {/* Categories management dialog */}
+      <Dialog open={catDialogOpen} onOpenChange={(v) => { if (!v) { setCatEditingId(null); setCatForm(emptyCategoryForm); } setCatDialogOpen(v); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-4 w-4" />
+              {catEditingId ? "Editar Categoria" : "Nova Categoria"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Existing categories list */}
+            {!catEditingId && categoriesList.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Categorias existentes</Label>
+                <div className="border rounded-md divide-y max-h-48 overflow-y-auto">
+                  {categoriesList.map((cat: any) => {
+                    const cs = colorStyles(cat.color);
+                    return (
+                      <div key={cat.id} className="flex items-center justify-between px-3 py-2">
+                        <span className="flex items-center gap-2 text-sm">
+                          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cs.dot}`} />
+                          <span className="font-medium">{cat.name}</span>
+                          {cat.description && <span className="text-muted-foreground text-xs truncate max-w-32">{cat.description}</span>}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openCatEdit(cat)}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => setCatDeleteConfirm(cat.id)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="border-t pt-3">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">Nova categoria</Label>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <Label>Nome da categoria</Label>
+              <Input
+                value={catForm.name}
+                onChange={e => setCatForm({ ...catForm, name: e.target.value })}
+                placeholder="Ex: Bebidas, Alimentação, Entretenimento..."
+              />
+            </div>
+
+            <div>
+              <Label>Cor</Label>
+              <div className="flex flex-wrap gap-2 mt-1.5">
+                {CATEGORY_COLORS.map(c => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setCatForm({ ...catForm, color: c.value })}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
+                      catForm.color === c.value
+                        ? `${c.badge} ring-2 ring-offset-1 ring-current`
+                        : "border-border bg-background text-muted-foreground hover:border-foreground/30"
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label>Descrição <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Input
+                value={catForm.description}
+                onChange={e => setCatForm({ ...catForm, description: e.target.value })}
+                placeholder="Breve descrição da categoria"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCatDialogOpen(false)}>
+              {catEditingId ? "Cancelar" : "Fechar"}
+            </Button>
+            <Button
+              onClick={handleSaveCat}
+              disabled={!catForm.name.trim() || createCatMutation.isPending || updateCatMutation.isPending}
+            >
+              {catEditingId ? "Salvar" : "Criar Categoria"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete category confirm */}
+      <Dialog open={catDeleteConfirm !== null} onOpenChange={() => setCatDeleteConfirm(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir categoria</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Ao excluir, os produtos desta categoria ficarão sem categoria (não serão excluídos).
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCatDeleteConfirm(null)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => catDeleteConfirm && deleteCatMutation.mutate({ id: catDeleteConfirm })}
+              disabled={deleteCatMutation.isPending}
+            >
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTiers }: {
+function ProductRow({ product: p, categories, expanded, onToggle, onEdit, onDelete, onEditTiers }: {
   product: any;
+  categories: any[];
   expanded: boolean;
   onToggle: () => void;
   onEdit: () => void;
@@ -369,6 +610,9 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
     { enabled: expanded }
   );
 
+  const cat = categories.find((c: any) => c.id === p.categoryId);
+  const cs = cat ? colorStyles(cat.color) : null;
+
   return (
     <>
       <TableRow className="cursor-pointer hover:bg-muted/50" onClick={onToggle}>
@@ -379,6 +623,16 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
           <div>{p.name}</div>
           {p.tipo && p.tipo !== "coaster" && (
             <Badge variant="outline" className="text-[9px] h-4 px-1 mt-0.5">{tipoLabels[p.tipo as TipoProduct] ?? p.tipo}</Badge>
+          )}
+        </TableCell>
+        <TableCell>
+          {cat && cs ? (
+            <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border font-medium ${cs.badge}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${cs.dot}`} />
+              {cat.name}
+            </span>
+          ) : (
+            <span className="text-muted-foreground text-xs">—</span>
           )}
         </TableCell>
         <TableCell className="text-muted-foreground">{p.unitLabelPlural}</TableCell>
@@ -404,7 +658,7 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={9} className="bg-muted/30 p-4">
+          <TableCell colSpan={10} className="bg-muted/30 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold">Faixas de Precificação ({tiers.length})</h3>
               <Button size="sm" variant="outline" onClick={onEditTiers}>

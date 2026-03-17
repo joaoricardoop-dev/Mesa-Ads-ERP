@@ -772,6 +772,20 @@ export const contacts = pgTable("contacts", {
 export type Contact = typeof contacts.$inferSelect;
 export type InsertContact = typeof contacts.$inferInsert;
 
+// ─── Product Categories ────────────────────────────────────────────────────────
+
+export const productCategories = pgTable("product_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  color: varchar("color", { length: 30 }).default("gray"),
+  description: text("description"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ProductCategory = typeof productCategories.$inferSelect;
+export type InsertProductCategory = typeof productCategories.$inferInsert;
+
 // ─── Products (biblioteca de produtos) ────────────────────────────────────────
 
 export const products = pgTable("products", {
@@ -779,6 +793,7 @@ export const products = pgTable("products", {
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
   tipo: productTypeEnum("tipo").default("coaster"),
+  categoryId: integer("categoryId").references(() => productCategories.id, { onDelete: "set null" }),
   unitLabel: varchar("unitLabel", { length: 50 }).notNull().default("unidade"),
   unitLabelPlural: varchar("unitLabelPlural", { length: 50 }).notNull().default("unidades"),
   temDistribuicaoPorLocal: boolean("temDistribuicaoPorLocal").default(true).notNull(),
