@@ -1296,74 +1296,72 @@ export default function Leads() {
         <SheetContent className="w-full sm:max-w-md overflow-y-auto px-5 pt-6">
           {selectedLead.data && (
             <>
-              <SheetHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <SheetTitle className="flex items-center gap-2 text-base">
-                    {selectedLead.data.type === "anunciante" ? (
-                      <Building2 className="w-4 h-4 shrink-0" />
-                    ) : (
-                      <UtensilsCrossed className="w-4 h-4 shrink-0" />
-                    )}
-                    <span className="truncate">{selectedLead.data.name}</span>
-                  </SheetTitle>
-                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    {!isEditing && selectedLead.data.type === "anunciante" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1 text-primary border-primary/30 hover:bg-primary/10"
-                        onClick={() => {
-                          const lead = selectedLead.data!;
-                          const clientId = lead.client_id || (lead.convertedToId ? lead.convertedToId : undefined);
-                          const params = new URLSearchParams();
-                          params.set("leadId", String(lead.id));
-                          if (clientId) params.set("clientId", String(clientId));
-                          navigate(`/comercial/tabela-precos?${params.toString()}`);
-                        }}
-                      >
-                        <FileText className="w-3 h-3" />
-                        Cotação
-                      </Button>
-                    )}
-                    {!isEditing && !isConverted && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
-                        onClick={() => {
-                          if (selectedLead.data!.client_id) {
-                            markLeadConverted.mutate({
-                              id: selectedLead.data!.id,
-                              stage: "ganho",
-                              convertedToId: selectedLead.data!.client_id,
-                              convertedToType: "anunciante",
-                            });
-                            setShowConfetti(true);
-                            setTimeout(() => setShowConfetti(false), 3000);
-                            toast.success("Oportunidade convertida!");
-                          } else if (selectedLead.data!.type === "restaurante") {
-                            handleConvertRestaurant();
-                          } else {
-                            handleConvertAnunciante();
-                          }
-                        }}
-                      >
-                        <ArrowRightCircle className="w-3 h-3" />
-                        Converter
-                      </Button>
-                    )}
-                    {isConverted && (
-                      <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30 text-[10px]">
-                        Convertido
-                      </Badge>
-                    )}
-                    {!isEditing && (
-                      <Button variant="outline" size="sm" className="gap-1" onClick={startEditing}>
-                        <Pencil className="w-3 h-3" />
-                        Editar
-                      </Button>
-                    )}
-                  </div>
+              <SheetHeader className="pb-2 space-y-2">
+                <SheetTitle className="flex items-center gap-2 text-base">
+                  {selectedLead.data.type === "anunciante" ? (
+                    <Building2 className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <UtensilsCrossed className="w-4 h-4 shrink-0" />
+                  )}
+                  <span className="truncate">{selectedLead.data.name}</span>
+                </SheetTitle>
+                <div className="flex items-center gap-1.5">
+                  {!isEditing && selectedLead.data.type === "anunciante" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 text-primary border-primary/30 hover:bg-primary/10"
+                      onClick={() => {
+                        const lead = selectedLead.data!;
+                        const clientId = lead.client_id || (lead.convertedToId ? lead.convertedToId : undefined);
+                        const params = new URLSearchParams();
+                        params.set("leadId", String(lead.id));
+                        if (clientId) params.set("clientId", String(clientId));
+                        navigate(`/comercial/tabela-precos?${params.toString()}`);
+                      }}
+                    >
+                      <FileText className="w-3 h-3" />
+                      Cotação
+                    </Button>
+                  )}
+                  {!isEditing && !isConverted && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
+                      onClick={() => {
+                        if (selectedLead.data!.client_id) {
+                          markLeadConverted.mutate({
+                            id: selectedLead.data!.id,
+                            stage: "ganho",
+                            convertedToId: selectedLead.data!.client_id,
+                            convertedToType: "anunciante",
+                          });
+                          setShowConfetti(true);
+                          setTimeout(() => setShowConfetti(false), 3000);
+                          toast.success("Oportunidade convertida!");
+                        } else if (selectedLead.data!.type === "restaurante") {
+                          handleConvertRestaurant();
+                        } else {
+                          handleConvertAnunciante();
+                        }
+                      }}
+                    >
+                      <ArrowRightCircle className="w-3 h-3" />
+                      Converter
+                    </Button>
+                  )}
+                  {isConverted && (
+                    <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30 text-[10px]">
+                      Convertido
+                    </Badge>
+                  )}
+                  {!isEditing && (
+                    <Button variant="outline" size="sm" className="gap-1" onClick={startEditing}>
+                      <Pencil className="w-3 h-3" />
+                      Editar
+                    </Button>
+                  )}
                 </div>
               </SheetHeader>
 
