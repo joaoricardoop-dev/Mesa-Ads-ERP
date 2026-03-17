@@ -125,7 +125,7 @@ export function BudgetPricingDialog({
         semanas: s,
         descPerc: DESCONTOS_PRAZO[s] ?? 0,
         precoTotal: c.precoComDescDuracao,
-        precoUnit: c.precoUnit4sem,
+        precoUnit: pricingInput.volume > 0 ? c.precoComDescDuracao / pricingInput.volume : 0,
         isCurrent: s === semanas,
       };
     });
