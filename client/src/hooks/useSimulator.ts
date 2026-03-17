@@ -93,7 +93,7 @@ export interface ScenarioData {
   annualTotal: number;
 }
 
-export interface ProductTier {
+export interface ProductPricingTier {
   volumeMin: number;
   volumeMax: number | null;
   custoUnitario: string;
@@ -101,6 +101,8 @@ export interface ProductTier {
   margem: string;
   artes: number;
 }
+
+export type ProductTier = ProductPricingTier;
 
 export interface ProductParams {
   irpj: string;

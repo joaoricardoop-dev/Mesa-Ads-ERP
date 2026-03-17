@@ -83,6 +83,15 @@ export const productRouter = router({
         .orderBy(asc(productPricingTiers.volumeMin));
     }),
 
+  getTiers: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      return db.select().from(productPricingTiers)
+        .where(eq(productPricingTiers.productId, input.productId))
+        .orderBy(asc(productPricingTiers.volumeMin));
+    }),
+
   upsertTiers: adminProcedure
     .input(z.object({
       productId: z.number(),
