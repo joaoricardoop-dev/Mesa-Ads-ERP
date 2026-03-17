@@ -229,53 +229,59 @@ export default function QuotationDetail() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto">
-        <div className="border-b border-border/20 bg-card/30 px-4 lg:px-6 py-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+
+        {/* ── Top Header ── */}
+        <div className="border-b border-border/20 bg-card/50 px-4 lg:px-6 py-3 sticky top-0 z-10 backdrop-blur-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/comercial/cotacoes")}>
                 <ArrowLeft className="w-4 h-4" />
               </Button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-bold tracking-tight">{quotation.quotationNumber}</h1>
-                  <Badge variant="outline" className={STATUS_CONFIG[status]?.className || ""}>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-bold tracking-tight">{quotation.quotationNumber}</span>
+                  <Badge variant="outline" className={`text-[11px] ${STATUS_CONFIG[status]?.className || ""}`}>
                     {STATUS_CONFIG[status]?.label || status}
                   </Badge>
                   {quotation.isBonificada && (
-                    <Badge variant="outline" className="bg-amber-500/20 text-amber-500 border-amber-500/30">
-                      Bonificada
-                    </Badge>
+                    <Badge variant="outline" className="text-[11px] bg-amber-500/20 text-amber-500 border-amber-500/30">Bonificada</Badge>
                   )}
                 </div>
-                {quotation.quotationName && (
-                  <p className="text-xs text-muted-foreground mt-0.5">{quotation.quotationName}</p>
-                )}
+                <p className="text-xs text-muted-foreground truncate leading-tight mt-0.5">
+                  {quotation.clientName || quotation.leadName || "—"}
+                  {(quotation.clientCompany || quotation.leadCompany) && ` · ${quotation.clientCompany || quotation.leadCompany}`}
+                  {quotation.totalValue && !quotation.isBonificada && Number(quotation.totalValue) > 0
+                    ? ` · ${formatCurrency(Number(quotation.totalValue))}`
+                    : quotation.isBonificada ? " · Bonificada" : ""}
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               {!isTerminal && (
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={openEdit}>
+                <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={openEdit}>
                   <Pencil className="w-3.5 h-3.5" /> Editar
                 </Button>
               )}
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => duplicateMutation.mutate({ id: quotationId })}>
+              <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => duplicateMutation.mutate({ id: quotationId })}>
                 <Copy className="w-3.5 h-3.5" /> Duplicar
               </Button>
               {!isTerminal && (
-                <Button variant="outline" size="sm" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => { setLossReason(""); setLossOpen(true); }}>
+                <Button variant="outline" size="sm" className="gap-1.5 h-8 text-destructive hover:text-destructive" onClick={() => { setLossReason(""); setLossOpen(true); }}>
                   <XCircle className="w-3.5 h-3.5" /> Perdida
                 </Button>
               )}
-              <Button variant="outline" size="sm" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => setDeleteOpen(true)}>
+              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-destructive hover:text-destructive" onClick={() => setDeleteOpen(true)}>
                 <Trash2 className="w-3.5 h-3.5" /> Excluir
               </Button>
             </div>
           </div>
         </div>
 
-        <div className="p-4 lg:p-6 space-y-6 max-w-5xl mx-auto">
+        <div className="p-4 lg:p-6 space-y-4 max-w-5xl mx-auto">
+
+          {/* ── Workflow stepper ── */}
           {!isTerminal && status !== "perdida" && (
-            <div className="bg-card border border-border/30 rounded-xl p-4">
+            <div className="bg-card border border-border/30 rounded-xl p-3">
               <div className="flex items-center gap-1">
                 {WORKFLOW_STEPS.map((step, i) => {
                   const isActive = step === status;
@@ -283,22 +289,22 @@ export default function QuotationDetail() {
                   const isPast = i < currentStepIndex;
                   return (
                     <div key={step} className="flex items-center flex-1">
-                      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg flex-1 text-xs font-medium transition-all ${
+                      <div className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg flex-1 text-xs font-medium transition-all ${
                         isActive ? "bg-primary/20 text-primary border border-primary/30" :
                         isDone ? "bg-emerald-500/10 text-emerald-400" :
                         "bg-muted/30 text-muted-foreground"
                       }`}>
                         {isDone && !isActive ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
                         ) : (
-                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
                             isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                           }`}>{i + 1}</span>
                         )}
-                        <span className="hidden sm:inline">{STATUS_CONFIG[step].label}</span>
+                        <span className="hidden sm:inline truncate">{STATUS_CONFIG[step].label}</span>
                       </div>
                       {i < WORKFLOW_STEPS.length - 1 && (
-                        <div className={`w-4 h-px mx-1 ${isPast ? "bg-emerald-400" : "bg-border/30"}`} />
+                        <div className={`w-3 h-px mx-0.5 ${isPast ? "bg-emerald-400" : "bg-border/30"}`} />
                       )}
                     </div>
                   );
@@ -307,337 +313,291 @@ export default function QuotationDetail() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 space-y-4">
-              <div className="bg-card border border-border/30 rounded-xl p-5 space-y-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2">
-                  <Building2 className="w-3.5 h-3.5" /> {quotation.clientId ? "Cliente" : "Lead"}
-                </h3>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold">{quotation.clientName || quotation.leadName || "—"}</p>
-                  {(quotation.clientCompany || quotation.leadCompany) && <p className="text-xs text-muted-foreground">{quotation.clientCompany || quotation.leadCompany}</p>}
+          {/* ── Main content: 3/5 left + 2/5 right ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+            {/* ══ LEFT COLUMN: Context + Products + Notes ══ */}
+            <div className="lg:col-span-3 space-y-4">
+
+              {/* Client compact row */}
+              <div className="bg-card border border-border/30 rounded-xl px-4 py-3 flex items-center gap-3">
+                <Building2 className="w-4 h-4 text-primary shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold leading-tight truncate">
+                    {quotation.clientName || quotation.leadName || "—"}
+                  </p>
+                  {(quotation.clientCompany || quotation.leadCompany) && (
+                    <p className="text-xs text-muted-foreground truncate">{quotation.clientCompany || quotation.leadCompany}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Badge variant="outline" className="text-[10px]">{quotation.clientId ? "Cliente" : "Lead"}</Badge>
+                  {(quotation as any).partnerName && (
+                    <Badge variant="outline" className="text-[10px] border-green-500/40 text-green-500">
+                      Parceiro: {(quotation as any).partnerName}
+                    </Badge>
+                  )}
                 </div>
               </div>
 
-              {(quotation as any).partnerName && (
-                <div className="bg-card border border-green-500/30 rounded-xl p-5 space-y-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-green-500 flex items-center gap-2">
-                    <Building2 className="w-3.5 h-3.5" /> Parceiro
+              {/* Products table — main content */}
+              <div className="bg-card border border-border/30 rounded-xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-border/20 flex items-center justify-between">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <Package className="w-3.5 h-3.5" /> Produtos do Orçamento
                   </h3>
-                  <p className="text-sm font-semibold">{(quotation as any).partnerName}</p>
-                </div>
-              )}
-
-              <div className="bg-card border border-border/30 rounded-xl p-5 space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Package className="w-3.5 h-3.5" /> Detalhes da Campanha
-                </h3>
-                <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-                  <span className="text-muted-foreground">Tipo</span>
-                  <span className="capitalize">{quotation.campaignType || "padrão"}</span>
-                  <span className="text-muted-foreground">Ciclos</span>
-                  <span>{quotation.cycles || 1}</span>
-                  {quotation.networkProfile && (<><span className="text-muted-foreground">Rede</span><span>{quotation.networkProfile}</span></>)}
-                  {quotation.regions && (<><span className="text-muted-foreground">Regiões</span><span>{quotation.regions}</span></>)}
-                  <span className="text-muted-foreground">Produção</span>
-                  <span>{quotation.includesProduction ? "Inclusa" : "Não inclusa"}</span>
-                </div>
-              </div>
-
-              {/* ── Produtos do Orçamento ── */}
-              <div className="bg-card border border-border/30 rounded-xl p-5 space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Package className="w-3.5 h-3.5" /> Produtos
                   {quotationItemsList.length > 0 && (
-                    <span className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded font-normal">
+                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
                       {quotationItemsList.length} {quotationItemsList.length === 1 ? "item" : "itens"}
                     </span>
                   )}
-                </h3>
+                </div>
+
                 {quotationItemsList.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="rounded-lg border border-border/30 overflow-hidden">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-muted/40 text-muted-foreground">
-                            <th className="text-left p-2 pl-3 font-medium">Produto</th>
-                            <th className="text-right p-2 font-medium">Volume</th>
-                            <th className="text-right p-2 font-medium">Preço/un.</th>
-                            <th className="text-right p-2 pr-3 font-medium">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {quotationItemsList.map((item) => (
-                            <tr key={item.id} className="border-t border-border/20">
-                              <td className="p-2 pl-3">
-                                <p className="font-medium">{item.productName}</p>
-                                {item.notes && (
-                                  <p className="text-[10px] text-muted-foreground leading-tight">{item.notes}</p>
-                                )}
-                              </td>
-                              <td className="p-2 text-right font-mono text-muted-foreground">
-                                {Number(item.quantity).toLocaleString("pt-BR")}
-                              </td>
-                              <td className="p-2 text-right font-mono text-muted-foreground">
-                                {item.unitPrice && Number(item.unitPrice) > 0 ? `R$ ${Number(item.unitPrice).toFixed(4)}` : "—"}
-                              </td>
-                              <td className="p-2 pr-3 text-right font-mono font-semibold">
-                                {quotation.isBonificada ? (
-                                  <span className="text-amber-500">Bonif.</span>
-                                ) : item.totalPrice && Number(item.totalPrice) > 0 ? (
-                                  formatCurrency(Number(item.totalPrice))
-                                ) : "—"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        {quotationItemsList.length > 1 && !quotation.isBonificada && (
-                          <tfoot>
-                            <tr className="border-t-2 border-border/40 bg-muted/20">
-                              <td colSpan={3} className="p-2 pl-3 text-xs font-semibold text-muted-foreground">
-                                Volume total
-                              </td>
-                              <td className="p-2 pr-3 text-right font-mono text-xs font-semibold text-muted-foreground">
-                                {quotationItemsList.reduce((s, i) => s + Number(i.quantity), 0).toLocaleString("pt-BR")} un.
-                              </td>
-                            </tr>
-                          </tfoot>
-                        )}
-                      </table>
-                    </div>
-                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/30 text-xs text-muted-foreground">
+                        <th className="text-left px-4 py-2 font-medium">Produto</th>
+                        <th className="text-right px-4 py-2 font-medium">Volume</th>
+                        <th className="text-right px-4 py-2 font-medium">Preço/un.</th>
+                        <th className="text-right px-4 py-2 font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {quotationItemsList.map((item) => (
+                        <tr key={item.id} className="border-t border-border/20 hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-3">
+                            <p className="font-medium">{item.productName}</p>
+                            {item.notes && (
+                              <p className="text-xs text-muted-foreground leading-tight mt-0.5">{item.notes}</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono">
+                            {Number(item.quantity).toLocaleString("pt-BR")} un.
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">
+                            {item.unitPrice && Number(item.unitPrice) > 0
+                              ? `R$ ${Number(item.unitPrice).toFixed(4)}`
+                              : "—"}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-semibold">
+                            {quotation.isBonificada ? (
+                              <span className="text-amber-500 text-xs">Bonif.</span>
+                            ) : item.totalPrice && Number(item.totalPrice) > 0 ? (
+                              formatCurrency(Number(item.totalPrice))
+                            ) : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-border/40 bg-muted/10">
+                        <td colSpan={2} className="px-4 py-2.5 text-xs text-muted-foreground">
+                          {quotationItemsList.length > 1
+                            ? `${quotationItemsList.length} produtos · ${quotationItemsList.reduce((s, i) => s + Number(i.quantity), 0).toLocaleString("pt-BR")} un. total`
+                            : `${Number(quotationItemsList[0]?.quantity || 0).toLocaleString("pt-BR")} un.`}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">Total</td>
+                        <td className="px-4 py-2.5 text-right font-mono font-bold text-primary">
+                          {quotation.isBonificada
+                            ? <span className="text-amber-500">R$ 0,00</span>
+                            : quotation.totalValue ? formatCurrency(Number(quotation.totalValue)) : "—"}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 ) : (
-                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                  <div className="px-4 py-4 space-y-1">
                     {quotation.productName && (
-                      <>
+                      <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Produto</span>
                         <span className="font-medium">{quotation.productName}</span>
-                      </>
+                      </div>
                     )}
-                    <span className="text-muted-foreground">Volume</span>
-                    <span className="font-mono font-medium">{quotation.coasterVolume.toLocaleString("pt-BR")} un.</span>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Volume</span>
+                      <span className="font-mono">{quotation.coasterVolume.toLocaleString("pt-BR")} un.</span>
+                    </div>
+                    <div className="flex justify-between text-sm pt-1 border-t border-border/20 mt-2">
+                      <span className="text-muted-foreground">Total</span>
+                      <span className={`font-mono font-bold ${quotation.isBonificada ? "text-amber-500" : "text-primary"}`}>
+                        {quotation.isBonificada ? "R$ 0,00 (Bonificada)" : quotation.totalValue ? formatCurrency(Number(quotation.totalValue)) : "—"}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
 
-              <div className="bg-card border border-border/30 rounded-xl p-5 space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <DollarSign className="w-3.5 h-3.5" /> Valores
-                </h3>
-                {quotation.isBonificada ? (
-                  <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded-lg border border-amber-500/30">
-                    <span className="text-sm font-semibold text-amber-500">Campanha Bonificada</span>
-                    <span className="font-mono font-bold text-amber-500 ml-auto">R$ 0,00</span>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-                    {quotationItemsList.length <= 1 && (
-                      <>
-                        <span className="text-muted-foreground">Unitário</span>
-                        <span className="font-mono">{quotation.unitPrice && Number(quotation.unitPrice) > 0 ? `R$ ${Number(quotation.unitPrice).toFixed(4)}` : "—"}</span>
-                      </>
-                    )}
-                    <span className="text-muted-foreground font-semibold">Total</span>
-                    <span className="font-mono font-bold text-primary">{quotation.totalValue ? formatCurrency(Number(quotation.totalValue)) : "—"}</span>
-                  </div>
-                )}
-              </div>
-
-              {quotation.validUntil && (
-                <div className="bg-card border border-border/30 rounded-xl p-5 space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5" /> Validade
-                  </h3>
-                  <p className="text-sm flex items-center gap-2">
-                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                    {new Date(quotation.validUntil + "T00:00:00").toLocaleDateString("pt-BR")}
-                  </p>
-                </div>
-              )}
-
+              {/* Observações */}
               {quotation.notes && (
-                <div className="bg-card border border-border/30 rounded-xl p-5 space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Observações</h3>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{quotation.notes}</p>
+                <div className="bg-card border border-border/30 rounded-xl px-4 py-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Observações</h3>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{quotation.notes}</p>
                 </div>
               )}
             </div>
 
+            {/* ══ RIGHT COLUMN: Workflow action + Campaign metadata ══ */}
             <div className="lg:col-span-2 space-y-4">
+
+              {/* Workflow action card — contextual */}
               {status === "rascunho" && (
-                <div className="bg-card border border-blue-500/30 rounded-xl p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <Send className="w-4 h-4 text-blue-400" /> Enviar Cotação
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-1">Revise os dados e envie a cotação ao cliente.</p>
-                    </div>
-                    <Button
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "enviada" })}
-                      disabled={statusChangeMutation.isPending}
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      {statusChangeMutation.isPending ? "Enviando..." : "Marcar como Enviada"}
-                    </Button>
+                <div className="bg-card border border-blue-500/30 rounded-xl p-4 space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Send className="w-4 h-4 text-blue-400" /> Próximo passo
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">Revise os dados e envie a cotação ao cliente.</p>
                   </div>
+                  <Button
+                    className="w-full gap-1.5"
+                    onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "enviada" })}
+                    disabled={statusChangeMutation.isPending}
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    {statusChangeMutation.isPending ? "Enviando..." : "Marcar como Enviada"}
+                  </Button>
                 </div>
               )}
 
               {status === "enviada" && (
-                <div className="bg-card border border-primary/30 rounded-xl p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <Play className="w-4 h-4 text-primary" /> Ativar Cotação
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-1">O cliente aceitou? Ative para seguir o fluxo operacional.</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "rascunho" })}
-                        disabled={statusChangeMutation.isPending}
-                      >
-                        <Undo2 className="w-3.5 h-3.5" />
-                        Voltar p/ Rascunho
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="gap-1.5 bg-primary hover:bg-primary/90"
-                        onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "ativa" })}
-                        disabled={statusChangeMutation.isPending}
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        {statusChangeMutation.isPending ? "Ativando..." : "Ativar Cotação"}
-                      </Button>
-                    </div>
+                <div className="bg-card border border-primary/30 rounded-xl p-4 space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Play className="w-4 h-4 text-primary" /> Aguardando Resposta
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">O cliente aceitou? Ative para seguir o fluxo.</p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      className="w-full gap-1.5 bg-primary hover:bg-primary/90"
+                      onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "ativa" })}
+                      disabled={statusChangeMutation.isPending}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {statusChangeMutation.isPending ? "Ativando..." : "Ativar Cotação"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full gap-1.5"
+                      onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "rascunho" })}
+                      disabled={statusChangeMutation.isPending}
+                    >
+                      <Undo2 className="w-3.5 h-3.5" /> Voltar p/ Rascunho
+                    </Button>
                   </div>
                 </div>
               )}
 
               {status === "ativa" && (
-                <div className="bg-card border border-amber-500/30 rounded-xl p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-amber-400" /> Gerar Ordem de Serviço
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-1">Gere a OS Anunciante para formalizar o contrato.</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "enviada" })}
-                        disabled={statusChangeMutation.isPending}
-                      >
-                        <Undo2 className="w-3.5 h-3.5" />
-                        Voltar p/ Enviada
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="gap-1.5 bg-amber-600 hover:bg-amber-700"
-                        onClick={() => { setOsForm({ description: "", paymentTerms: "" }); setOsBatchIds([]); setOsDialogOpen(true); }}
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        Gerar OS
-                      </Button>
-                    </div>
+                <div className="bg-card border border-amber-500/30 rounded-xl p-4 space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-amber-400" /> Cliente Aceitou
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">Formalize o contrato gerando a OS Anunciante.</p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      className="w-full gap-1.5 bg-amber-600 hover:bg-amber-700"
+                      onClick={() => { setOsForm({ description: "", paymentTerms: "" }); setOsBatchIds([]); setOsDialogOpen(true); }}
+                    >
+                      <FileText className="w-3.5 h-3.5" /> Gerar OS
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full gap-1.5"
+                      onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "enviada" })}
+                      disabled={statusChangeMutation.isPending}
+                    >
+                      <Undo2 className="w-3.5 h-3.5" /> Voltar p/ Enviada
+                    </Button>
                   </div>
                 </div>
               )}
 
               {status === "os_gerada" && (
-                <div className="bg-card border border-amber-500/30 rounded-xl p-5 space-y-5">
-                  <div className="flex items-center justify-between">
+                <div className="bg-card border border-amber-500/30 rounded-xl p-4 space-y-4">
+                  <div className="flex items-start justify-between">
                     <div>
                       <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <Store className="w-4 h-4 text-amber-400" /> Alocação de Restaurantes e Assinatura
+                        <Store className="w-4 h-4 text-amber-400" /> OS Gerada
                       </h3>
-                      <p className="text-xs text-muted-foreground mt-1">Aloque os restaurantes, baixe o PDF da OS e assine para converter em campanha.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Aloque restaurantes e assine para converter.</p>
                     </div>
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      className="gap-1.5 shrink-0"
+                      className="gap-1 text-xs text-muted-foreground h-7"
                       onClick={() => statusChangeMutation.mutate({ id: quotationId, status: "ativa" })}
                       disabled={statusChangeMutation.isPending}
                     >
-                      <Undo2 className="w-3.5 h-3.5" />
-                      Voltar p/ Ativa
+                      <Undo2 className="w-3 h-3" /> Voltar p/ Ativa
                     </Button>
                   </div>
 
                   {os && (
-                    <div className="bg-background/50 rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground">OS Anunciante</p>
-                          <p className="text-sm font-bold">{os.orderNumber}</p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5"
-                          onClick={() => {
-                            generateOSPdf({
-                              orderNumber: os.orderNumber,
-                              quotationNumber: quotation.quotationNumber,
-                              clientName: quotation.clientName || "Anunciante",
-                              clientCompany: quotation.clientCompany || undefined,
-                              coasterVolume: quotation.coasterVolume,
-                              totalValue: quotation.totalValue || os.totalValue || undefined,
-                              paymentTerms: os.paymentTerms || undefined,
-                              periodStart: os.periodStart || undefined,
-                              periodEnd: os.periodEnd || undefined,
-                              description: os.description || undefined,
-                              restaurants: allocatedRestaurants.map((r: any) => ({
-                                name: r.restaurantName || `Restaurante #${r.restaurantId}`,
-                                coasterQuantity: r.coasterQuantity,
-                              })),
-                            });
-                          }}
-                        >
-                          <Download className="w-3.5 h-3.5" /> Baixar PDF
-                        </Button>
+                    <div className="flex items-center justify-between bg-background/50 rounded-lg px-3 py-2">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">OS</p>
+                        <p className="text-sm font-bold">{os.orderNumber}</p>
                       </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 h-8"
+                        onClick={() => {
+                          generateOSPdf({
+                            orderNumber: os.orderNumber,
+                            quotationNumber: quotation.quotationNumber,
+                            clientName: quotation.clientName || "Anunciante",
+                            clientCompany: quotation.clientCompany || undefined,
+                            coasterVolume: quotation.coasterVolume,
+                            totalValue: quotation.totalValue || os.totalValue || undefined,
+                            paymentTerms: os.paymentTerms || undefined,
+                            periodStart: os.periodStart || undefined,
+                            periodEnd: os.periodEnd || undefined,
+                            description: os.description || undefined,
+                            restaurants: allocatedRestaurants.map((r: any) => ({
+                              name: r.restaurantName || `Restaurante #${r.restaurantId}`,
+                              coasterQuantity: r.coasterQuantity,
+                            })),
+                          });
+                        }}
+                      >
+                        <Download className="w-3.5 h-3.5" /> PDF
+                      </Button>
                     </div>
                   )}
 
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Restaurantes Alocados ({allocatedRestaurants.length})</p>
-                    </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Restaurantes ({allocatedRestaurants.length})
+                    </p>
                     {allocatedRestaurants.length > 0 && (
                       <div className="space-y-1">
                         {allocatedRestaurants.map((r: any) => (
-                          <div key={r.id} className="flex items-center justify-between bg-background/50 rounded-lg px-3 py-2">
-                            <div className="flex items-center gap-2">
+                          <div key={r.id} className="flex items-center justify-between bg-background/50 rounded px-2 py-1.5">
+                            <div className="flex items-center gap-1.5">
                               <MapPin className="w-3 h-3 text-muted-foreground" />
-                              <span className="text-sm">{r.restaurantName || `#${r.restaurantId}`}</span>
+                              <span className="text-xs">{r.restaurantName || `#${r.restaurantId}`}</span>
                             </div>
-                            <span className="text-xs font-mono text-muted-foreground">{r.coasterQuantity} un. • Com. {r.commissionPercent}%</span>
+                            <span className="text-[10px] font-mono text-muted-foreground">{r.coasterQuantity} un. · {r.commissionPercent}%</span>
                           </div>
                         ))}
                       </div>
                     )}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <Select value={addRestaurantId} onValueChange={setAddRestaurantId}>
-                        <SelectTrigger className="flex-1 bg-background border-border/30 h-9 text-sm">
-                          <SelectValue placeholder="Selecione restaurante" />
+                        <SelectTrigger className="flex-1 bg-background border-border/30 h-8 text-xs">
+                          <SelectValue placeholder="Adicionar restaurante..." />
                         </SelectTrigger>
                         <SelectContent>
                           {activeRestaurantsList
                             .filter((r) => !allocatedRestaurants.find((a: any) => a.restaurantId === r.id))
                             .map((r) => (
                               <SelectItem key={r.id} value={String(r.id)}>
-                                {r.name} <span className="text-muted-foreground ml-1">({r.commissionPercent}%)</span>
+                                {r.name} <span className="text-muted-foreground">({r.commissionPercent}%)</span>
                               </SelectItem>
                             ))}
                         </SelectContent>
@@ -645,7 +605,7 @@ export default function QuotationDetail() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-9"
+                        className="h-8 px-2"
                         disabled={!addRestaurantId}
                         onClick={() => {
                           if (!addRestaurantId) return;
@@ -664,80 +624,147 @@ export default function QuotationDetail() {
 
                   {quotation.publicToken && (
                     <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
-                      <Link2 className="w-4 h-4 text-emerald-400" />
-                      <span className="text-xs font-medium text-emerald-400 flex-1">Link de assinatura ativo</span>
+                      <Link2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-xs font-medium text-emerald-400 flex-1 truncate">Link ativo</span>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-7 gap-1 text-xs"
+                        className="h-6 gap-1 text-[10px] px-2"
                         onClick={() => {
-                          const baseUrl = window.location.origin;
-                          const url = `${baseUrl}/cotacao/assinar/${quotation.publicToken}`;
+                          const url = `${window.location.origin}/cotacao/assinar/${quotation.publicToken}`;
                           navigator.clipboard.writeText(url);
                           toast.success("Link copiado!");
                         }}
                       >
-                        <Copy className="w-3 h-3" /> Copiar Link
+                        <Copy className="w-2.5 h-2.5" /> Copiar
                       </Button>
                     </div>
                   )}
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-border/20">
+                  <div className="flex flex-col gap-2 pt-1 border-t border-border/20">
                     <Button
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={() => { let ids: number[] = []; try { if (os?.batchSelectionJson) ids = JSON.parse(os.batchSelectionJson); } catch {} if (!Array.isArray(ids)) ids = []; const validBatchIds = new Set(batchesList.map((b: any) => b.id)); ids = ids.filter(id => validBatchIds.has(id)); setSigningLinkBatchIds(ids); setGeneratedSigningUrl(""); setSigningLinkDialogOpen(true); }}
+                      className="w-full gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                      onClick={() => {
+                        let ids: number[] = [];
+                        try { if (os?.batchSelectionJson) ids = JSON.parse(os.batchSelectionJson); } catch {}
+                        if (!Array.isArray(ids)) ids = [];
+                        const validBatchIds = new Set(batchesList.map((b: any) => b.id));
+                        ids = ids.filter(id => validBatchIds.has(id));
+                        setSignForm({ batchIds: ids, signatureUrl: "" });
+                        setSignDialogOpen(true);
+                      }}
                       disabled={allocatedRestaurants.length === 0}
                     >
-                      <Send className="w-4 h-4" />
-                      Enviar para Assinatura
+                      <CheckCircle2 className="w-4 h-4" /> Assinar OS e Criar Campanha
                     </Button>
                     <Button
-                      className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
-                      onClick={() => { let ids: number[] = []; try { if (os?.batchSelectionJson) ids = JSON.parse(os.batchSelectionJson); } catch {} if (!Array.isArray(ids)) ids = []; const validBatchIds = new Set(batchesList.map((b: any) => b.id)); ids = ids.filter(id => validBatchIds.has(id)); setSignForm({ batchIds: ids, signatureUrl: "" }); setSignDialogOpen(true); }}
+                      variant="outline"
+                      className="w-full gap-1.5"
+                      onClick={() => {
+                        let ids: number[] = [];
+                        try { if (os?.batchSelectionJson) ids = JSON.parse(os.batchSelectionJson); } catch {}
+                        if (!Array.isArray(ids)) ids = [];
+                        const validBatchIds = new Set(batchesList.map((b: any) => b.id));
+                        ids = ids.filter(id => validBatchIds.has(id));
+                        setSigningLinkBatchIds(ids);
+                        setGeneratedSigningUrl("");
+                        setSigningLinkDialogOpen(true);
+                      }}
                       disabled={allocatedRestaurants.length === 0}
                     >
-                      <CheckCircle2 className="w-4 h-4" />
-                      Assinar OS e Criar Campanha
+                      <Send className="w-4 h-4" /> Enviar para Assinatura
                     </Button>
                   </div>
                 </div>
               )}
 
               {status === "win" && (
-                <div className="bg-card border border-emerald-500/30 rounded-xl p-5 space-y-3">
+                <div className="bg-card border border-emerald-500/30 rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-semibold flex items-center gap-2 text-emerald-400">
                     <CheckCircle2 className="w-4 h-4" /> Cotação Convertida
                   </h3>
-                  <p className="text-sm text-muted-foreground">Esta cotação foi convertida em campanha com sucesso.</p>
-                  <Button variant="outline" size="sm" onClick={() => navigate("/campanhas")}>
+                  <p className="text-sm text-muted-foreground">Convertida em campanha com sucesso.</p>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/campanhas")}>
                     Ver Campanhas
                   </Button>
                 </div>
               )}
 
               {status === "perdida" && (
-                <div className="bg-card border border-destructive/30 rounded-xl p-5 space-y-3">
+                <div className="bg-card border border-destructive/30 rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-semibold flex items-center gap-2 text-destructive">
                     <XCircle className="w-4 h-4" /> Cotação Perdida
                   </h3>
-                  {quotation.lossReason && <p className="text-sm text-muted-foreground">Motivo: {quotation.lossReason}</p>}
+                  {quotation.lossReason && (
+                    <p className="text-xs text-muted-foreground">Motivo: {quotation.lossReason}</p>
+                  )}
                 </div>
               )}
 
+              {/* Campaign metadata */}
+              <div className="bg-card border border-border/30 rounded-xl p-4 space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5" /> Configurações
+                </h3>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground text-xs">Tipo</span>
+                    <span className="capitalize text-xs font-medium">{quotation.campaignType || "padrão"}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground text-xs">Ciclos</span>
+                    <span className="text-xs font-medium">{quotation.cycles || 1}</span>
+                  </div>
+                  {quotation.networkProfile && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground text-xs">Rede</span>
+                      <span className="text-xs font-medium">{quotation.networkProfile}</span>
+                    </div>
+                  )}
+                  {quotation.regions && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground text-xs">Regiões</span>
+                      <span className="text-xs font-medium">{quotation.regions}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground text-xs">Produção</span>
+                    <span className="text-xs font-medium">{quotation.includesProduction ? "Inclusa" : "Não inclusa"}</span>
+                  </div>
+                  {quotationItemsList.length <= 1 && quotation.unitPrice && Number(quotation.unitPrice) > 0 && (
+                    <div className="flex justify-between items-center pt-1 border-t border-border/20 mt-1">
+                      <span className="text-muted-foreground text-xs">Preço/un.</span>
+                      <span className="text-xs font-mono">R$ {Number(quotation.unitPrice).toFixed(4)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Validity */}
+              {quotation.validUntil && (
+                <div className="bg-card border border-border/30 rounded-xl px-4 py-2.5 flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-xs text-muted-foreground">Válido até</span>
+                  <span className="text-xs font-medium ml-auto">
+                    {new Date(quotation.validUntil + "T00:00:00").toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+              )}
+
+              {/* Restaurants (non-os_gerada statuses) */}
               {allocatedRestaurants.length > 0 && status !== "os_gerada" && (
-                <div className="bg-card border border-border/30 rounded-xl p-5 space-y-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <div className="bg-card border border-border/30 rounded-xl p-4 space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     <Store className="w-3.5 h-3.5" /> Restaurantes ({allocatedRestaurants.length})
                   </h3>
                   <div className="space-y-1">
                     {allocatedRestaurants.map((r: any) => (
-                      <div key={r.id} className="flex items-center justify-between bg-background/50 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2">
+                      <div key={r.id} className="flex items-center justify-between bg-background/50 rounded px-2 py-1.5">
+                        <div className="flex items-center gap-1.5">
                           <MapPin className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-sm">{r.restaurantName || `#${r.restaurantId}`}</span>
+                          <span className="text-xs">{r.restaurantName || `#${r.restaurantId}`}</span>
                         </div>
-                        <span className="text-xs font-mono text-muted-foreground">{r.coasterQuantity} un.</span>
+                        <span className="text-[10px] font-mono text-muted-foreground">{r.coasterQuantity} un.</span>
                       </div>
                     ))}
                   </div>
