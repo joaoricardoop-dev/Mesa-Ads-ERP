@@ -1442,20 +1442,35 @@ export default function Leads() {
                   </>
                 )}
 
-                {selectedLead.data?.partnerName && (
-                  <>
-                    <Separator />
-                    <div className="space-y-2">
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Parceiro</span>
-                      <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-500/5 border border-green-500/20">
-                        <Handshake className="w-4 h-4 text-green-500 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-green-500">{selectedLead.data.partnerName}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
+                <Separator />
+                <div className="space-y-3">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Parceiro</span>
+                  <Select
+                    value={selectedLead.data.partnerId ? String(selectedLead.data.partnerId) : "none"}
+                    onValueChange={(v) => {
+                      const val = v === "none" ? null : Number(v);
+                      updateMutation.mutate({ id: selectedLead.data!.id, partnerId: val });
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Selecionar parceiro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— Sem parceiro</SelectItem>
+                      {(partnersList.data || []).filter((p: any) => p.status === "active").map((p: any) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.name}{p.company ? ` (${p.company})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedLead.data?.partnerName && (
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <Handshake className="w-3 h-3 text-green-500" />
+                      <span className="text-green-500">{selectedLead.data.partnerName}</span>
+                    </p>
+                  )}
+                </div>
 
                 {leadQuotations.data && leadQuotations.data.length > 0 && (
                   <>
