@@ -594,6 +594,7 @@ export default function Quotations() {
                               numRestaurants: numRest,
                               coastersPerRestaurant: numRest > 0 ? Math.round(q.coasterVolume / numRest) : q.coasterVolume,
                               contractDuration: duration,
+                              semanas: (q.cycles || 1) * 4,
                               pricePerRestaurant: pricePerRest,
                               monthlyTotal,
                               contractTotal: totalContractValue,
