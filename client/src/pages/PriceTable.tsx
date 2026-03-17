@@ -80,14 +80,14 @@ export default function PriceTable() {
 
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const { data: productsList = [] } = trpc.product.list.useQuery();
-  const { data: productTiers = [], refetch: refetchTiers } = trpc.product.listTiers.useQuery(
+  const { data: productTiers = [], refetch: refetchTiers } = trpc.product.getTiers.useQuery(
     { productId: selectedProductId! },
     { enabled: selectedProductId !== null }
   );
-  const selectedProduct = productsList.find((p: any) => p.id === selectedProductId);
+  const selectedProduct = productsList.find((p) => p.id === selectedProductId);
   const upsertTiersMutation = trpc.product.upsertTiers.useMutation({
     onSuccess: () => { refetchTiers(); toast.success("Faixas salvas!"); },
-    onError: (err: any) => toast.error(`Erro: ${err.message}`),
+    onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
   useEffect(() => {
@@ -107,12 +107,14 @@ export default function PriceTable() {
           artes: t.artes,
         };
       }
-      setCustosVolume({ ...DEFAULT_CUSTOS_VOLUME, ...newCustos });
-    } else {
+      setCustosVolume(newCustos);
+    } else if (!selectedProductId) {
       setCustosVolume(DEFAULT_CUSTOS_VOLUME);
+    } else {
+      setCustosVolume({});
     }
     setVolumeIdx(0);
-  }, [productTiers]);
+  }, [productTiers, selectedProductId]);
 
   useEffect(() => {
     if (selectedProduct) {
@@ -126,7 +128,7 @@ export default function PriceTable() {
 
   const volumes = useMemo(() => {
     if (productTiers.length > 0) {
-      return productTiers.map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b);
+      return productTiers.map((t) => t.volumeMin).sort((a, b) => a - b);
     }
     return VOLUMES;
   }, [productTiers]);
@@ -146,13 +148,13 @@ export default function PriceTable() {
         margem: (d.margem * 100).toFixed(2),
         artes: d.artes,
       };
-    }).filter(Boolean) as any[];
+    }).filter((t): t is NonNullable<typeof t> => t !== null);
     upsertTiersMutation.mutate({ productId: selectedProductId, tiers });
   };
 
   const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
   const restaurantsForAllocation = useMemo(
-    () => restaurantsList.map((r: any) => ({
+    () => restaurantsList.map((r) => ({
       id: r.id,
       name: r.name,
       neighborhood: r.neighborhood,
@@ -200,13 +202,15 @@ export default function PriceTable() {
     const precoTotalBase4sem = denominador > 0 ? custoTotal4sem / denominador : 0;
     const precoUnit4sem = volume > 0 ? precoTotalBase4sem / volume : 0;
 
-    const precoUnit1000 = (() => {
-      const d = custosVolume[1000];
-      const ct = d.custoGPC * d.artes * 1000 + d.frete;
+    const smallestVolume = volumes.length > 0 ? volumes[0] : 1000;
+    const precoUnitSmallest = (() => {
+      const d = custosVolume[smallestVolume];
+      if (!d) return precoUnit4sem;
+      const ct = d.custoGPC * d.artes * smallestVolume + d.frete;
       const den = 1 - d.margem - totalDeducoesPerc;
-      return den > 0 ? ct / den / 1000 : 0;
+      return den > 0 ? ct / den / smallestVolume : 0;
     })();
-    const descontoQuantidade = precoUnit1000 > 0 && volume > 1000 ? 1 - (precoUnit4sem / precoUnit1000) : 0;
+    const descontoQuantidade = precoUnitSmallest > 0 && volume > smallestVolume ? 1 - (precoUnit4sem / precoUnitSmallest) : 0;
 
     const nPeriodos = semanas / 4;
     const precoSemDesconto = precoTotalBase4sem * nPeriodos;
@@ -217,7 +221,7 @@ export default function PriceTable() {
 
     const precoUnitComDesc = volume > 0 ? precoFinal / (volume * nPeriodos) : 0;
     const precoMensal = nPeriodos > 0 ? precoFinal / nPeriodos : 0;
-    const descCombinado = precoUnit1000 > 0 ? 1 - (precoUnitComDesc / precoUnit1000) : 0;
+    const descCombinado = precoUnitSmallest > 0 ? 1 - (precoUnitComDesc / precoUnitSmallest) : 0;
 
     const custoTotalPeriodo = custoTotal4sem * nPeriodos;
 
@@ -251,7 +255,7 @@ export default function PriceTable() {
 
     return {
       totalDeducoesPerc, denominador, custoProducao, custoTotal4sem, custoTotalPeriodo,
-      precoTotalBase4sem, precoUnit4sem, precoUnit1000, descontoQuantidade,
+      precoTotalBase4sem, precoUnit4sem, precoUnitSmallest, descontoQuantidade,
       nPeriodos, precoSemDesconto, precoComDescDuracao, precoFinal, precoUnitComDesc, precoMensal, descCombinado,
       descParcPerc,
       valorIRPJ, valorComRest, valorComCom, totalDeducoesValor,
@@ -287,9 +291,11 @@ export default function PriceTable() {
           artes: t.artes,
         };
       }
-      setCustosVolume({ ...DEFAULT_CUSTOS_VOLUME, ...newCustos });
-    } else {
+      setCustosVolume(newCustos);
+    } else if (!selectedProductId) {
       setCustosVolume(DEFAULT_CUSTOS_VOLUME);
+    } else {
+      setCustosVolume({});
     }
   };
 
@@ -325,7 +331,7 @@ export default function PriceTable() {
   const setRestaurantsMutation = trpc.quotation.setRestaurants.useMutation();
 
   const createMutation = trpc.quotation.create.useMutation({
-    onSuccess: async (created: any) => {
+    onSuccess: async (created) => {
       if (allocation.hasAllocations && allocation.allocations.length > 0) {
         try {
           await setRestaurantsMutation.mutateAsync({
@@ -334,8 +340,9 @@ export default function PriceTable() {
               .filter(a => a.coasters > 0)
               .map(a => ({ restaurantId: a.restaurantId, coasterQuantity: a.coasters })),
           });
-        } catch (err: any) {
-          toast.error(`Cotação criada, mas erro ao salvar restaurantes: ${err.message}`);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Erro desconhecido";
+          toast.error(`Cotação criada, mas erro ao salvar restaurantes: ${msg}`);
         }
       }
       utils.quotation.list.invalidate();
@@ -343,7 +350,7 @@ export default function PriceTable() {
       setShowCotacaoDialog(false);
       setTimeout(() => navigate("/comercial/cotacoes"), 600);
     },
-    onError: (err: any) => toast.error(`Erro: ${err.message}`),
+    onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
   const handleCreateCotacao = () => {
@@ -528,7 +535,7 @@ export default function PriceTable() {
               <SelectValue placeholder="Selecione um produto" />
             </SelectTrigger>
             <SelectContent>
-              {productsList.map((p: any) => (
+              {productsList.map((p) => (
                 <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
               ))}
             </SelectContent>
@@ -956,7 +963,7 @@ export default function PriceTable() {
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
-                  {(clientsList as any[]).filter((c: any) => c.status === "active").map((c: any) => (
+                  {clientsList.filter((c) => c.status === "active").map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>{c.company || c.name} {c.cnpj ? `(${c.cnpj})` : ""}</SelectItem>
                   ))}
                 </SelectContent>
@@ -969,7 +976,7 @@ export default function PriceTable() {
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
-                  {(leadsList as any[]).map((l: any) => (
+                  {leadsList.map((l) => (
                     <SelectItem key={l.id} value={String(l.id)}>{l.company || l.name}</SelectItem>
                   ))}
                 </SelectContent>

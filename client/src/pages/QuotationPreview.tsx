@@ -124,12 +124,12 @@ export default function QuotationPreview() {
   const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
   const { data: leadsList = [] } = trpc.lead.list.useQuery({ type: "anunciante" });
   const { data: productsList = [] } = trpc.product.list.useQuery();
-  const { data: rawProductTiers = [] } = trpc.product.listTiers.useQuery(
+  const { data: rawProductTiers = [] } = trpc.product.getTiers.useQuery(
     { productId: selectedProductId! },
     { enabled: selectedProductId !== null }
   );
-  const selectedProduct = productsList.find((p: any) => p.id === selectedProductId);
-  const typedProductTiers: ProductTier[] = rawProductTiers.map((t: any) => ({
+  const selectedProduct = productsList.find((p) => p.id === selectedProductId);
+  const typedProductTiers: ProductTier[] = rawProductTiers.map((t) => ({
     volumeMin: t.volumeMin,
     volumeMax: t.volumeMax,
     custoUnitario: t.custoUnitario,
@@ -147,7 +147,7 @@ export default function QuotationPreview() {
 
   useEffect(() => {
     if (selectedLeadId !== "none" && leadsList.length > 0 && selectedClientId === "none") {
-      const lead = leadsList.find((l: any) => l.id === parseInt(selectedLeadId));
+      const lead = leadsList.find((l) => l.id === parseInt(selectedLeadId));
       if (lead?.convertedToId && lead.convertedToType === "anunciante") {
         setSelectedClientId(String(lead.convertedToId));
       }
@@ -250,7 +250,7 @@ export default function QuotationPreview() {
     onError: (err) => toast.error(`Erro ao criar cotação: ${err.message}`),
   });
 
-  const selectedLead = leadsList.find((l: any) => l.id === parseInt(selectedLeadId));
+  const selectedLead = leadsList.find((l) => l.id === parseInt(selectedLeadId));
 
   const handleExportPdf = () => {
     if (selectedClientId === "none" && selectedLeadId === "none") { toast.error("Selecione um cliente ou lead antes de exportar"); return; }
@@ -372,7 +372,7 @@ export default function QuotationPreview() {
                         <SelectValue placeholder="Selecione um produto" />
                       </SelectTrigger>
                       <SelectContent>
-                        {productsList.map((p: any) => (
+                        {productsList.map((p) => (
                           <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -409,7 +409,7 @@ export default function QuotationPreview() {
                       onValueChange={(v) => {
                         setSelectedLeadId(v);
                         if (v !== "none") {
-                          const lead = leadsList.find((l: any) => l.id === parseInt(v));
+                          const lead = leadsList.find((l) => l.id === parseInt(v));
                           if (lead?.convertedToId && lead.convertedToType === "anunciante") {
                             setSelectedClientId(String(lead.convertedToId));
                           }
@@ -421,7 +421,7 @@ export default function QuotationPreview() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">— Nenhum lead</SelectItem>
-                        {leadsList.map((l: any) => (
+                        {leadsList.map((l) => (
                           <SelectItem key={l.id} value={String(l.id)}>
                             {l.name}{l.company ? ` (${l.company})` : ""}
                           </SelectItem>

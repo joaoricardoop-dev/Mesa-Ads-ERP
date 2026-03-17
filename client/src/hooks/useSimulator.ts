@@ -291,19 +291,35 @@ export function calcPricing(
   };
 }
 
-function lookupTierCost(tiers: ProductTier[], volume: number): { custoUnitario: number; frete: number } | null {
+interface TierLookupResult {
+  custoUnitario: number;
+  frete: number;
+  margem: number;
+  artes: number;
+}
+
+function lookupTierCost(tiers: ProductPricingTier[], volume: number): TierLookupResult | null {
   if (tiers.length === 0) return null;
   const sorted = [...tiers].sort((a, b) => a.volumeMin - b.volumeMin);
+  let match: ProductPricingTier | undefined;
   for (const t of sorted) {
     const max = t.volumeMax ?? Infinity;
     if (volume >= t.volumeMin && volume <= max) {
-      return { custoUnitario: parseFloat(t.custoUnitario), frete: parseFloat(t.frete) };
+      match = t;
+      break;
     }
   }
-  const closest = sorted.reduce((prev, curr) =>
-    Math.abs(curr.volumeMin - volume) < Math.abs(prev.volumeMin - volume) ? curr : prev
-  );
-  return { custoUnitario: parseFloat(closest.custoUnitario), frete: parseFloat(closest.frete) };
+  if (!match) {
+    match = sorted.reduce((prev, curr) =>
+      Math.abs(curr.volumeMin - volume) < Math.abs(prev.volumeMin - volume) ? curr : prev
+    );
+  }
+  return {
+    custoUnitario: parseFloat(match.custoUnitario),
+    frete: parseFloat(match.frete),
+    margem: parseFloat(match.margem) / 100,
+    artes: match.artes,
+  };
 }
 
 export function useSimulator(
@@ -336,21 +352,29 @@ export function useSimulator(
     []
   );
 
+  const tierLookup = useMemo<TierLookupResult | null>(() => {
+    if (productTiers && productTiers.length > 0) {
+      const totalCoasters = inputs.coastersPerRestaurant * inputs.activeRestaurants;
+      return lookupTierCost(productTiers, totalCoasters);
+    }
+    return null;
+  }, [productTiers, inputs.coastersPerRestaurant, inputs.activeRestaurants]);
+
   const effectiveUnitCost = useMemo(() => {
     if (selectedBudget && selectedBudget.items.length > 0) {
       const totalCoasters =
         inputs.coastersPerRestaurant * inputs.activeRestaurants;
       return interpolateUnitCost(selectedBudget.items, totalCoasters);
     }
-    if (productTiers && productTiers.length > 0) {
+    if (tierLookup) {
       const totalCoasters = inputs.coastersPerRestaurant * inputs.activeRestaurants;
-      const tier = lookupTierCost(productTiers, totalCoasters);
-      if (tier) return tier.custoUnitario;
+      const fretePerUnit = totalCoasters > 0 ? tierLookup.frete / totalCoasters : 0;
+      return (tierLookup.custoUnitario * tierLookup.artes) + fretePerUnit;
     }
     return inputs.batchCost / inputs.batchSize;
   }, [
     selectedBudget,
-    productTiers,
+    tierLookup,
     inputs.coastersPerRestaurant,
     inputs.activeRestaurants,
     inputs.batchCost,
