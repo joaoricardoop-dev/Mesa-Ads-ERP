@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "FzBKqv2NAFzcmqelaIcCI"
+uri = "file://backlog-mesa-ads.xlsx"
+type = "table"
+title = "Backlog Mesa Ads — Histórico de Alterações"
