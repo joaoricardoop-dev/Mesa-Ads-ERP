@@ -386,7 +386,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
     } else {
       y = drawInfoRow(doc, "Distribuição:", "A definir", y, margin);
     }
-    y = drawInfoRow(doc, "Duração:", `${data.contractDuration} ${data.contractDuration === 1 ? "período" : "períodos"} de 4 semanas`, y, margin);
+    y = drawInfoRow(doc, "Duração:", `${data.contractDuration} ${data.contractDuration === 1 ? "mês" : "meses"}`, y, margin);
     if (data.includesProduction) {
       y = drawInfoRow(doc, "Produção:", "Inclusa no valor", y, margin);
     }
