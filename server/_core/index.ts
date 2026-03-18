@@ -52,9 +52,9 @@ async function startServer() {
       return res.status(403).json({ error: "Forbidden" });
     }
     try {
-      const { db } = await import("../db");
-      const { products, productPricingTiers } = await import("../../drizzle/schema");
+      const { getDb } = await import("../db");
       const { sql } = await import("drizzle-orm");
+      const db = await getDb();
 
       const devProducts = [
         { id: 1, name: "Bolacha de Chopp", tipo: "coaster" as const, description: "Porta-copos publicitários para bares e restaurantes", isActive: true, defaultSemanas: 12, categoryId: null },
