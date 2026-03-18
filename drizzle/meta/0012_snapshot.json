@@ -3275,6 +3275,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "defaultSemanas": {
+          "name": "defaultSemanas",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 12
         }
       },
       "indexes": {},
@@ -3577,13 +3584,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "campaignType": {
-          "name": "campaignType",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'padrao'"
-        },
         "coasterVolume": {
           "name": "coasterVolume",
           "type": "integer",
@@ -3723,6 +3723,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "manualDiscountPercent": {
+          "name": "manualDiscountPercent",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0'"
         }
       },
       "indexes": {
