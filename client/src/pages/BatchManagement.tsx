@@ -33,7 +33,9 @@ import {
   Trophy,
   ShoppingBag,
   Music,
+  FileDown,
 } from "lucide-react";
+import { generateBatchesPdf } from "@/lib/generate-batches-pdf";
 
 const EVENT_INDICATORS = [
   { pattern: "Black Friday", icon: ShoppingBag, color: "text-amber-400 bg-amber-500/15 border-amber-500/30", label: "Black Friday" },
@@ -104,18 +106,38 @@ export default function BatchManagement() {
       title="Batches de Veiculação"
       description="Períodos de 4 semanas para campanhas — 13 batches por ciclo (início em 15 de abril)"
       actions={
-        <Button
-          variant="outline"
-          onClick={() => {
-            if (confirm(`Regenerar todos os batches de ${selectedYear}? Batches com campanhas atribuídas não serão afetados.`)) {
-              regenerateMutation.mutate({ year: selectedYear });
-            }
-          }}
-          disabled={regenerateMutation.isPending}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${regenerateMutation.isPending ? "animate-spin" : ""}`} />
-          Regenerar {selectedYear}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (batches.length === 0) {
+                toast.error("Nenhum batch para exportar.");
+                return;
+              }
+              try {
+                generateBatchesPdf(batches, selectedYear);
+                toast.success("PDF gerado com sucesso!");
+              } catch {
+                toast.error("Erro ao gerar PDF.");
+              }
+            }}
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            Exportar PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (confirm(`Regenerar todos os batches de ${selectedYear}? Batches com campanhas atribuídas não serão afetados.`)) {
+                regenerateMutation.mutate({ year: selectedYear });
+              }
+            }}
+            disabled={regenerateMutation.isPending}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${regenerateMutation.isPending ? "animate-spin" : ""}`} />
+            Regenerar {selectedYear}
+          </Button>
+        </div>
       }
     >
       <div className="flex items-center gap-4 mb-2">
