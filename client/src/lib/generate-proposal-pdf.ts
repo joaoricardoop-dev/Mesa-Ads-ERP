@@ -471,8 +471,8 @@ export function generateProposalPdf(data: ProposalPDFData) {
     doc.setTextColor(...GRAY);
     doc.setFontSize(9);
     doc.setFont(FONT_NAME, "normal");
-    doc.text("Valor por período / restaurante", margin + 10, y + 12);
-    doc.text("Investimento por período (total)", margin + 10, y + 26);
+    doc.text("Valor mensal por restaurante", margin + 10, y + 12);
+    doc.text("Investimento mensal total", margin + 10, y + 26);
     doc.text("Valor total do contrato", margin + 10, y + 40);
 
     doc.setTextColor(...BLACK);
@@ -812,7 +812,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
     margin + threeBoxWidth + paymentBoxGap, y, threeBoxWidth,
     "📄", "Boleto Bancário",
     `Parcelado em ${data.contractDuration}x`,
-    fmtCurrency(boletoParcela) + "/per.",
+    fmtCurrency(boletoParcela) + "/mês",
     `${data.contractDuration}x de ${fmtCurrency(boletoParcela)}`,
     false,
   );
