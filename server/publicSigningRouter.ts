@@ -1,7 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import { getDb } from "./db";
-import { quotations, clients, serviceOrders, quotationRestaurants, activeRestaurants, campaigns, campaignHistory, campaignRestaurants, campaignBatches, campaignBatchAssignments } from "../drizzle/schema";
+import { quotations, clients, leads, serviceOrders, quotationRestaurants, activeRestaurants, campaigns, campaignHistory, campaignRestaurants, campaignBatches, campaignBatchAssignments } from "../drizzle/schema";
 import { eq, inArray, asc, sql } from "drizzle-orm";
 
 async function getDatabase() {
@@ -148,6 +148,44 @@ export function setupPublicSigningRoutes(app: express.Express) {
         return res.status(400).json({ error: "Nenhum restaurante alocado" });
       }
 
+      // Resolve clientId — cotações criadas via lead podem não ter clientId direto
+      let resolvedClientId = quotation[0].clientId;
+      if (!resolvedClientId && quotation[0].leadId) {
+        const [lead] = await db
+          .select({ id: leads.id, name: leads.name, company: leads.company, cnpj: leads.cnpj, contactEmail: leads.contactEmail, contactPhone: leads.contactPhone })
+          .from(leads)
+          .where(eq(leads.id, quotation[0].leadId));
+        if (lead) {
+          // Procura cliente existente pelo e-mail do lead
+          if (lead.contactEmail) {
+            const [existing] = await db
+              .select({ id: clients.id })
+              .from(clients)
+              .where(eq(clients.contactEmail, lead.contactEmail))
+              .limit(1);
+            if (existing) resolvedClientId = existing.id;
+          }
+          // Se ainda não achou, cria um cliente a partir do lead
+          if (!resolvedClientId) {
+            const [newClient] = await db.insert(clients).values({
+              name: lead.name || lead.company || "Cliente",
+              company: lead.company,
+              cnpj: lead.cnpj,
+              contactEmail: lead.contactEmail,
+              contactPhone: lead.contactPhone,
+              status: "active",
+            }).returning({ id: clients.id });
+            resolvedClientId = newClient.id;
+          }
+          // Atualiza a cotação com o clientId resolvido
+          await db.update(quotations).set({ clientId: resolvedClientId, updatedAt: new Date() })
+            .where(eq(quotations.id, quotation[0].id));
+        }
+      }
+      if (!resolvedClientId) {
+        return res.status(400).json({ error: "Esta cotação não possui um cliente vinculado. Solicite ao consultor Mesa Ads que vincule um cliente antes de assinar." });
+      }
+
       if (!os[0].batchSelectionJson) {
         return res.status(400).json({ error: "Nenhum período selecionado para esta OS" });
       }
@@ -226,7 +264,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
 
         const [campaign] = await tx.insert(campaigns).values({
           campaignNumber,
-          clientId: quotation[0].clientId,
+          clientId: resolvedClientId,
           name: campaignName,
           startDate: firstBatch.startDate,
           endDate: lastBatch.endDate,
