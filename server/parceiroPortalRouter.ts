@@ -125,10 +125,15 @@ export const parceiroPortalRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
-      const role = input.partnerId !== null ? "parceiro" : "anunciante";
+
+      const [existing] = await db.select().from(users).where(eq(users.id, input.userId)).limit(1);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado." });
+
+      const newRole = input.partnerId !== null ? "parceiro" : existing.role ?? "anunciante";
+
       const [updated] = await db
         .update(users)
-        .set({ partnerId: input.partnerId, role, updatedAt: new Date() })
+        .set({ partnerId: input.partnerId, role: newRole, updatedAt: new Date() })
         .where(eq(users.id, input.userId))
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado." });
@@ -138,7 +143,7 @@ export const parceiroPortalRouter = router({
         const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
         const cu = await clerkClient.users.getUser(input.userId);
         await clerkClient.users.updateUser(input.userId, {
-          publicMetadata: { ...cu.publicMetadata, role, partnerId: input.partnerId },
+          publicMetadata: { ...cu.publicMetadata, role: newRole, partnerId: input.partnerId },
         });
       } catch (err) {
         console.error("Failed to update Clerk metadata for partner link:", err);

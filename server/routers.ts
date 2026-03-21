@@ -215,14 +215,23 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const { createClerkClient } = await import("@clerk/express");
         const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
-        const role = input.partnerId !== null ? "parceiro" : "anunciante";
+
+        const db = await (await import("../db")).getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { users: usersTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+
+        const [existing] = await db.select().from(usersTable).where(eq(usersTable.id, input.userId)).limit(1);
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado." });
+
+        const newRole = input.partnerId !== null ? "parceiro" : existing.role ?? "anunciante";
 
         try {
           const clerkUser = await clerkClient.users.getUser(input.userId);
           await clerkClient.users.updateUser(input.userId, {
             publicMetadata: {
               ...clerkUser.publicMetadata,
-              role,
+              role: newRole,
               partnerId: input.partnerId,
             },
           });
@@ -231,13 +240,9 @@ export const appRouter = router({
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao atualizar parceiro no Clerk." });
         }
 
-        const db = await (await import("../db")).getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-        const { users: usersTable } = await import("../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
         const [updated] = await db
           .update(usersTable)
-          .set({ partnerId: input.partnerId, role, updatedAt: new Date() })
+          .set({ partnerId: input.partnerId, role: newRole, updatedAt: new Date() })
           .where(eq(usersTable.id, input.userId))
           .returning();
         if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado." });

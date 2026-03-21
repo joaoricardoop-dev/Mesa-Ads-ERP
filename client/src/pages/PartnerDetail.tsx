@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -145,12 +146,18 @@ export default function PartnerDetail() {
     notes: "",
   });
 
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "admin";
+
   const utils = trpc.useUtils();
   const { data: partner, isLoading } = trpc.partner.get.useQuery({ id: partnerId }, { enabled: partnerId > 0 });
   const { data: partnerLeads = [] } = trpc.partner.getLeads.useQuery({ partnerId }, { enabled: partnerId > 0 });
   const { data: partnerQuotations = [] } = trpc.partner.getQuotations.useQuery({ partnerId }, { enabled: partnerId > 0 });
   const { data: revenueData } = trpc.partner.getRevenue.useQuery({ partnerId }, { enabled: partnerId > 0 });
-  const { data: partnerUsers = [], refetch: refetchUsers } = trpc.parceiroPortal.getUsers.useQuery({ partnerId }, { enabled: partnerId > 0 });
+  const { data: partnerUsers = [], refetch: refetchUsers } = trpc.parceiroPortal.getUsers.useQuery(
+    { partnerId },
+    { enabled: isAdmin && partnerId > 0 },
+  );
 
   const updateMutation = trpc.partner.update.useMutation({
     onSuccess: () => {
@@ -268,7 +275,7 @@ export default function PartnerDetail() {
           <TabsTrigger value="painel" className="text-xs">Painel</TabsTrigger>
           <TabsTrigger value="leads" className="text-xs">Leads ({partnerLeads.length})</TabsTrigger>
           <TabsTrigger value="cotacoes" className="text-xs">Cotações ({partnerQuotations.length})</TabsTrigger>
-          <TabsTrigger value="usuarios" className="text-xs">Usuários ({partnerUsers.length})</TabsTrigger>
+          {isAdmin && <TabsTrigger value="usuarios" className="text-xs">Usuários ({partnerUsers.length})</TabsTrigger>}
           <TabsTrigger value="info" className="text-xs">Informações</TabsTrigger>
         </TabsList>
 
@@ -412,7 +419,7 @@ export default function PartnerDetail() {
           </div>
         </TabsContent>
 
-        <TabsContent value="usuarios" className="mt-4">
+        {isAdmin && <TabsContent value="usuarios" className="mt-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-muted-foreground">Usuários vinculados a este parceiro</h3>
             <Button size="sm" className="gap-2" onClick={() => setInviteOpen(true)}>
@@ -454,7 +461,7 @@ export default function PartnerDetail() {
               </div>
             )}
           </div>
-        </TabsContent>
+        </TabsContent>}
 
         <TabsContent value="info" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
