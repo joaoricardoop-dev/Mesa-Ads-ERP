@@ -285,10 +285,14 @@ export const appRouter = router({
         lastName: z.string().optional(),
         role: z.string().default("comercial"),
         clientId: z.number().nullable().optional(),
+        partnerId: z.number().nullable().optional(),
       }))
       .mutation(async ({ input }) => {
         if (input.role === "anunciante" && !input.clientId) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Anunciantes devem ser vinculados a um cliente." });
+        }
+        if (input.role === "parceiro" && !input.partnerId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Parceiros devem ser vinculados a um parceiro cadastrado." });
         }
 
         const { createClerkClient } = await import("@clerk/express");
@@ -301,6 +305,7 @@ export const appRouter = router({
             publicMetadata: {
               role: input.role,
               clientId: input.role === "anunciante" ? input.clientId : null,
+              partnerId: input.role === "parceiro" ? input.partnerId : null,
               firstName: input.firstName,
               lastName: input.lastName || null,
             },

@@ -81,14 +81,34 @@ export default function ParceiroPortal() {
         <div className="p-3 rounded-xl bg-primary/10">
           <Handshake className="w-6 h-6 text-primary" />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold">Portal do Parceiro</h1>
           {dashboard?.partner && (
-            <p className="text-sm text-muted-foreground">
-              {dashboard.partner.name}
-              {dashboard.partner.company ? ` · ${dashboard.partner.company}` : ""}
-              {" · "}{dashboard.partner.commissionPercent}% comissão
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-0.5">
+              <p className="text-sm text-muted-foreground">
+                {dashboard.partner.name}
+                {dashboard.partner.company ? ` · ${dashboard.partner.company}` : ""}
+              </p>
+              {dashboard.partner.type && (
+                <Badge variant="outline" className={
+                  dashboard.partner.type === "agencia"
+                    ? "text-violet-400 border-violet-500/30 bg-violet-500/10"
+                    : dashboard.partner.type === "indicador"
+                    ? "text-blue-400 border-blue-500/30 bg-blue-500/10"
+                    : "text-amber-400 border-amber-500/30 bg-amber-500/10"
+                }>
+                  {dashboard.partner.type === "agencia" ? "Agência" :
+                   dashboard.partner.type === "indicador" ? "Indicador" :
+                   dashboard.partner.type === "consultor" ? "Consultor" :
+                   dashboard.partner.type}
+                </Badge>
+              )}
+              {dashboard.partner.commissionPercent != null && (
+                <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                  {dashboard.partner.commissionPercent}% comissão
+                </Badge>
+              )}
+            </div>
           )}
         </div>
       </div>

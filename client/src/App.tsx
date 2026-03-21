@@ -48,6 +48,7 @@ import Products from "./pages/Products";
 import Partners from "./pages/Partners";
 import PartnerDetail from "./pages/PartnerDetail";
 import ParceiroPortal from "./pages/ParceiroPortal";
+import ParceiroOnboarding from "./pages/ParceiroOnboarding";
 import BudgetCreator from "./pages/BudgetCreator";
 
 function AnuncianteRouter() {
@@ -422,6 +423,7 @@ function AuthenticatedApp() {
   const isRestaurante = effectiveUser?.role === "restaurante";
   const isParceiro = effectiveUser?.role === "parceiro";
   const needsOnboarding = isAnunciante && effectiveUser?.onboardingComplete === false && !isImpersonating;
+  const needsParceiroOnboarding = isParceiro && effectiveUser?.onboardingComplete === false && !isImpersonating;
 
   const devToolsPanel = (
     <DevToolsPanel
@@ -437,6 +439,15 @@ function AuthenticatedApp() {
     return (
       <>
         <Onboarding userName={effectiveUser?.firstName || null} />
+        {devToolsPanel}
+      </>
+    );
+  }
+
+  if (needsParceiroOnboarding) {
+    return (
+      <>
+        <ParceiroOnboarding userName={effectiveUser?.firstName || null} partnerName={null} />
         {devToolsPanel}
       </>
     );

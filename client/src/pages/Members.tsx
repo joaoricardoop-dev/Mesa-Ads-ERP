@@ -52,6 +52,7 @@ import {
   Ban,
   Building2,
   Store,
+  Handshake,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -92,6 +93,11 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof S
     color: "bg-orange-500/20 text-orange-400 border-orange-500/30",
     icon: Shield,
   },
+  parceiro: {
+    label: "Parceiro",
+    color: "bg-violet-500/20 text-violet-400 border-violet-500/30",
+    icon: Handshake,
+  },
 };
 
 export default function Members() {
@@ -110,12 +116,14 @@ export default function Members() {
     lastName: string;
     role: string;
     clientId: number | null;
+    partnerId: number | null;
   }>({
     email: "",
     firstName: "",
     lastName: "",
     role: "comercial",
     clientId: null,
+    partnerId: null,
   });
 
 
@@ -124,6 +132,7 @@ export default function Members() {
   const utils = trpc.useUtils();
   const { data: membersList = [], isLoading } = trpc.members.list.useQuery();
   const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: partnersList = [] } = trpc.partner.list.useQuery();
   const { data: invitationsList = [], isLoading: isLoadingInvitations } = trpc.members.listInvitations.useQuery();
 
   const updateRoleMutation = trpc.members.updateRole.useMutation({
@@ -148,7 +157,7 @@ export default function Members() {
       utils.members.list.invalidate();
       utils.members.listInvitations.invalidate();
       setCreateDialogOpen(false);
-      setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null });
+      setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null, partnerId: null });
       toast.success(`Convite enviado para ${data.email}! O usuário receberá um e-mail para criar sua conta.`);
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -166,7 +175,7 @@ export default function Members() {
 
 
   const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
-  const EXTERNAL_ROLES = ["anunciante", "restaurante"];
+  const EXTERNAL_ROLES = ["anunciante", "restaurante", "parceiro"];
 
   const searchFiltered = membersList.filter(
     (m) =>
@@ -191,7 +200,7 @@ export default function Members() {
       description="Cadastrar, gerenciar papéis e permissões dos usuários da plataforma"
       actions={
         <Button onClick={() => {
-          setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null });
+          setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null, partnerId: null });
           setCreateDialogOpen(true);
         }}>
           <Send className="w-4 h-4 mr-2" />
@@ -699,6 +708,29 @@ export default function Members() {
                 </Select>
                 <p className="text-[11px] text-muted-foreground">
                   O anunciante verá apenas campanhas, cotações e faturas desta empresa.
+                </p>
+              </div>
+            )}
+            {createForm.role === "parceiro" && (
+              <div className="grid gap-2">
+                <Label>Parceiro vinculado</Label>
+                <Select
+                  value={createForm.partnerId?.toString() || ""}
+                  onValueChange={(val) => setCreateForm({ ...createForm, partnerId: val ? parseInt(val) : null })}
+                >
+                  <SelectTrigger className="bg-background border-border/30">
+                    <SelectValue placeholder="Selecione o parceiro..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(partnersList as any[]).map((p: any) => (
+                      <SelectItem key={p.id} value={p.id.toString()}>
+                        {p.name} {p.company ? `(${p.company})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  O parceiro acessa o portal com visibilidade restrita aos seus leads e cotações.
                 </p>
               </div>
             )}

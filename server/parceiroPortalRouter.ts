@@ -144,8 +144,27 @@ export const parceiroPortalRouter = router({
         console.error("Failed to update Clerk metadata for partner link:", err);
       }
 
-      const { passwordHash: _, ...safe } = updated as any;
-      return safe;
+      return {
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        role: updated.role,
+        partnerId: updated.partnerId,
+        isActive: updated.isActive,
+        updatedAt: updated.updatedAt,
+      };
+    }),
+
+  completeOnboarding: parceiroProcedure
+    .input(z.object({}))
+    .mutation(async ({ ctx }) => {
+      const db = await getDatabase();
+      await db
+        .update(users)
+        .set({ onboardingComplete: true, updatedAt: new Date() })
+        .where(eq(users.id, ctx.user.id));
+      return { success: true };
     }),
 
   invitePartnerUser: adminProcedure
