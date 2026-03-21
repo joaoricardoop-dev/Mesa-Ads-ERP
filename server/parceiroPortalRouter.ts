@@ -157,13 +157,31 @@ export const parceiroPortalRouter = router({
     }),
 
   completeOnboarding: parceiroProcedure
-    .input(z.object({}))
-    .mutation(async ({ ctx }) => {
+    .input(z.object({
+      contactName: z.string().optional(),
+      contactPhone: z.string().optional(),
+      contactEmail: z.string().email().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
       const db = await getDatabase();
       await db
         .update(users)
         .set({ onboardingComplete: true, updatedAt: new Date() })
         .where(eq(users.id, ctx.user.id));
+
+      if (ctx.user.partnerId && (input.contactName || input.contactPhone || input.contactEmail)) {
+        const updateFields: Partial<typeof partners.$inferInsert> = {};
+        if (input.contactName) updateFields.contactName = input.contactName;
+        if (input.contactPhone) updateFields.contactPhone = input.contactPhone;
+        if (input.contactEmail) updateFields.contactEmail = input.contactEmail;
+        if (Object.keys(updateFields).length > 0) {
+          await db
+            .update(partners)
+            .set({ ...updateFields, updatedAt: new Date() })
+            .where(eq(partners.id, ctx.user.partnerId));
+        }
+      }
+
       return { success: true };
     }),
 

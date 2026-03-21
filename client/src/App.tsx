@@ -447,7 +447,12 @@ function AuthenticatedApp() {
   if (needsParceiroOnboarding) {
     return (
       <>
-        <ParceiroOnboarding userName={effectiveUser?.firstName || null} partnerName={null} />
+        <ParceiroOnboarding
+          userName={effectiveUser?.firstName || null}
+          userLastName={effectiveUser?.lastName || null}
+          userEmail={effectiveUser?.email || null}
+          partnerName={null}
+        />
         {devToolsPanel}
       </>
     );

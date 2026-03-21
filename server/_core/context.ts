@@ -41,6 +41,7 @@ export async function createContext(
           const role = meta.role || "anunciante";
           const clientId = meta.clientId || null;
           const restaurantId = meta.restaurantId || null;
+          const partnerId = meta.partnerId || null;
 
           const newUser = await authStorage.upsertUser({
             id: clerkUser.id,
@@ -51,6 +52,7 @@ export async function createContext(
             role,
             clientId: clientId ? Number(clientId) : null,
             restaurantId: restaurantId ? Number(restaurantId) : null,
+            partnerId: partnerId ? Number(partnerId) : null,
           });
           user = newUser;
         }

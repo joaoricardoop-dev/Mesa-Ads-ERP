@@ -49,6 +49,7 @@ export async function clerkWebhookHandler(req: Request, res: Response) {
       const role = meta.role || "anunciante";
       const clientId = meta.clientId || null;
       const restaurantId = meta.restaurantId || null;
+      const partnerId = meta.partnerId || null;
 
       const firstName = userData.first_name || meta.firstName || null;
       const lastName = userData.last_name || meta.lastName || null;
@@ -62,6 +63,7 @@ export async function clerkWebhookHandler(req: Request, res: Response) {
         role,
         clientId: clientId ? Number(clientId) : null,
         restaurantId: restaurantId ? Number(restaurantId) : null,
+        partnerId: partnerId ? Number(partnerId) : null,
         ...(isSelfRegistered ? { onboardingComplete: false, selfRegistered: true } : {}),
       });
 

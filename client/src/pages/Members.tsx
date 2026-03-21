@@ -109,6 +109,11 @@ export default function Members() {
   } | null>(null);
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [linkPartnerDialog, setLinkPartnerDialog] = useState<{
+    userId: string;
+    userName: string;
+    currentPartnerId: number | null;
+  } | null>(null);
   const [segment, setSegment] = useState<"internos" | "externos">("internos");
   const [createForm, setCreateForm] = useState<{
     email: string;
@@ -167,6 +172,15 @@ export default function Members() {
     onSuccess: () => {
       utils.members.listInvitations.invalidate();
       toast.success("Convite revogado com sucesso!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const updatePartnerMutation = trpc.members.updatePartner.useMutation({
+    onSuccess: () => {
+      utils.members.list.invalidate();
+      setLinkPartnerDialog(null);
+      toast.success("Vínculo de parceiro atualizado!");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
@@ -332,7 +346,7 @@ export default function Members() {
                     </p>
                   </div>
 
-                  <div>
+                  <div className="flex flex-col gap-1">
                     <Select
                       value={member.role || "comercial"}
                       onValueChange={(role) => {
@@ -353,6 +367,21 @@ export default function Members() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {member.role === "parceiro" && (
+                      <button
+                        className="flex items-center gap-1 text-[10px] text-violet-400 hover:text-violet-300 transition-colors"
+                        onClick={() => setLinkPartnerDialog({
+                          userId: member.id,
+                          userName: [member.firstName, member.lastName].filter(Boolean).join(" ") || member.email || member.id,
+                          currentPartnerId: (member as any).partnerId ?? null,
+                        })}
+                      >
+                        <Handshake className="w-3 h-3" />
+                        {(member as any).partnerId
+                          ? `Parceiro: ${(partnersList as any[]).find((p: any) => p.id === (member as any).partnerId)?.name || `#${(member as any).partnerId}`}`
+                          : "Vincular parceiro"}
+                      </button>
+                    )}
                   </div>
 
                   <div className="hidden md:flex items-center">
@@ -758,6 +787,55 @@ export default function Members() {
       </Dialog>
 
 
+
+      <Dialog open={!!linkPartnerDialog} onOpenChange={(open) => { if (!open) setLinkPartnerDialog(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Vincular Parceiro</DialogTitle>
+            <DialogDescription>
+              Altere o parceiro vinculado ao usuário <strong>{linkPartnerDialog?.userName}</strong>.
+              Deixe em branco para remover o vínculo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <Select
+              value={linkPartnerDialog?.currentPartnerId?.toString() || "none"}
+              onValueChange={(val) => {
+                if (linkPartnerDialog) {
+                  setLinkPartnerDialog({ ...linkPartnerDialog, currentPartnerId: val && val !== "none" ? parseInt(val) : null });
+                }
+              }}
+            >
+              <SelectTrigger className="bg-background border-border/30">
+                <SelectValue placeholder="Selecione o parceiro..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— Sem parceiro</SelectItem>
+                {(partnersList as any[]).map((p: any) => (
+                  <SelectItem key={p.id} value={p.id.toString()}>
+                    {p.name} {p.company ? `(${p.company})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkPartnerDialog(null)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (!linkPartnerDialog) return;
+                updatePartnerMutation.mutate({
+                  userId: linkPartnerDialog.userId,
+                  partnerId: linkPartnerDialog.currentPartnerId,
+                });
+              }}
+              disabled={updatePartnerMutation.isPending}
+            >
+              {updatePartnerMutation.isPending ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </PageContainer>
   );

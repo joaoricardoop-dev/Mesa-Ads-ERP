@@ -156,6 +156,7 @@ export const appRouter = router({
             role: meta?.role || "anunciante",
             isActive: !cu.banned,
             clientId: meta?.clientId ? Number(meta.clientId) : null,
+            partnerId: meta?.partnerId ? Number(meta.partnerId) : null,
             lastLoginAt: cu.lastSignInAt ? new Date(cu.lastSignInAt).toISOString() : null,
             createdAt: cu.createdAt ? new Date(cu.createdAt).toISOString() : null,
             updatedAt: cu.updatedAt ? new Date(cu.updatedAt).toISOString() : null,
@@ -172,6 +173,7 @@ export const appRouter = router({
               profileImageUrl: u.profileImageUrl,
               role: u.role,
               clientId: u.clientId,
+              partnerId: u.partnerId,
               isActive: u.isActive,
             });
           } catch {}
@@ -202,6 +204,44 @@ export const appRouter = router({
         const user = await authStorage.updateUserRole(input.userId, input.role);
         if (!user) return undefined;
         const { passwordHash: _, ...safe } = user;
+        return safe;
+      }),
+
+    updatePartner: adminProcedure
+      .input(z.object({
+        userId: z.string(),
+        partnerId: z.number().nullable(),
+      }))
+      .mutation(async ({ input }) => {
+        const { createClerkClient } = await import("@clerk/express");
+        const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+        const role = input.partnerId !== null ? "parceiro" : "anunciante";
+
+        try {
+          const clerkUser = await clerkClient.users.getUser(input.userId);
+          await clerkClient.users.updateUser(input.userId, {
+            publicMetadata: {
+              ...clerkUser.publicMetadata,
+              role,
+              partnerId: input.partnerId,
+            },
+          });
+        } catch (err: any) {
+          console.error("Failed to update Clerk metadata for partner:", err);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao atualizar parceiro no Clerk." });
+        }
+
+        const db = await (await import("../db")).getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { users: usersTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const [updated] = await db
+          .update(usersTable)
+          .set({ partnerId: input.partnerId, role, updatedAt: new Date() })
+          .where(eq(usersTable.id, input.userId))
+          .returning();
+        if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado." });
+        const { passwordHash: _, ...safe } = updated;
         return safe;
       }),
 

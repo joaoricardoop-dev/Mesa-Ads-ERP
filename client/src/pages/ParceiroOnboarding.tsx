@@ -1,16 +1,27 @@
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Handshake, Check, Loader2 } from "lucide-react";
+import { Handshake, Check, Loader2, User, Phone, Mail } from "lucide-react";
 
 interface ParceiroOnboardingProps {
   userName: string | null;
+  userEmail: string | null;
+  userLastName: string | null;
   partnerName: string | null;
 }
 
-export default function ParceiroOnboarding({ userName, partnerName }: ParceiroOnboardingProps) {
+export default function ParceiroOnboarding({ userName, userEmail, userLastName, partnerName }: ParceiroOnboardingProps) {
   const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    firstName: userName || "",
+    lastName: userLastName || "",
+    contactEmail: userEmail || "",
+    contactPhone: "",
+  });
 
   const completeMutation = trpc.parceiroPortal.completeOnboarding.useMutation({
     onSuccess: () => {
@@ -22,6 +33,15 @@ export default function ParceiroOnboarding({ userName, partnerName }: ParceiroOn
     },
   });
 
+  function handleSubmit() {
+    const contactName = [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(" ");
+    completeMutation.mutate({
+      contactName: contactName || undefined,
+      contactPhone: form.contactPhone.trim() || undefined,
+      contactEmail: form.contactEmail.trim() || undefined,
+    });
+  }
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "hsl(0 0% 4%)" }}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -31,7 +51,7 @@ export default function ParceiroOnboarding({ userName, partnerName }: ParceiroOn
         />
       </div>
 
-      <div className="relative w-full max-w-md px-6 py-12">
+      <div className="relative w-full max-w-md px-6 py-10">
         <div className="text-center mb-8">
           <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-6" />
           <div className="flex items-center justify-center mb-4">
@@ -42,42 +62,78 @@ export default function ParceiroOnboarding({ userName, partnerName }: ParceiroOn
           <h1 className="text-2xl font-bold text-white mb-2">
             {userName ? `Olá, ${userName}!` : "Bem-vindo!"}
           </h1>
-          <p className="text-sm text-[hsl(0,0%,50%)] leading-relaxed">
-            Você foi convidado para o portal de parceiros da mesa.ads.
+          <p className="text-sm leading-relaxed" style={{ color: "hsl(0 0% 50%)" }}>
+            Você foi convidado para o Portal do Parceiro da mesa.ads.
             {partnerName && (
-              <> Você está vinculado à agência <strong className="text-white">{partnerName}</strong>.</>
+              <> Confirme seus dados de contato para ativar seu acesso como <strong className="text-white">{partnerName}</strong>.</>
             )}
           </p>
         </div>
 
         <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-xl p-6 space-y-4 mb-6">
-          <h2 className="text-sm font-semibold text-white">O que você pode fazer no portal:</h2>
-          <ul className="space-y-3">
-            {[
-              "Acompanhar leads e oportunidades indicados",
-              "Visualizar cotações geradas para seus clientes",
-              "Monitorar faturamento e comissão estimada",
-              "Acompanhar campanhas ativas",
-            ].map((item, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm text-[hsl(0,0%,65%)]">
-                <div className="mt-0.5 w-4 h-4 rounded-full bg-[#27d803]/20 flex items-center justify-center flex-shrink-0">
-                  <Check className="w-2.5 h-2.5 text-[#27d803]" />
-                </div>
-                {item}
-              </li>
-            ))}
-          </ul>
+          <h2 className="text-sm font-semibold text-white mb-2">Confirme seus dados de contato</h2>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-[hsl(0,0%,60%)]">Nome</Label>
+              <div className="relative">
+                <User className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-[hsl(0,0%,40%)]" />
+                <Input
+                  value={form.firstName}
+                  onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                  placeholder="Nome"
+                  className="pl-8 h-9 text-sm bg-[hsl(0,0%,10%)] border-[hsl(0,0%,18%)] text-white placeholder:text-[hsl(0,0%,35%)]"
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-[hsl(0,0%,60%)]">Sobrenome</Label>
+              <Input
+                value={form.lastName}
+                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                placeholder="Sobrenome"
+                className="h-9 text-sm bg-[hsl(0,0%,10%)] border-[hsl(0,0%,18%)] text-white placeholder:text-[hsl(0,0%,35%)]"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label className="text-xs text-[hsl(0,0%,60%)]">E-mail</Label>
+            <div className="relative">
+              <Mail className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-[hsl(0,0%,40%)]" />
+              <Input
+                type="email"
+                value={form.contactEmail}
+                onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+                placeholder="seu@email.com"
+                className="pl-8 h-9 text-sm bg-[hsl(0,0%,10%)] border-[hsl(0,0%,18%)] text-white placeholder:text-[hsl(0,0%,35%)]"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label className="text-xs text-[hsl(0,0%,60%)]">WhatsApp / Telefone</Label>
+            <div className="relative">
+              <Phone className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-[hsl(0,0%,40%)]" />
+              <Input
+                value={form.contactPhone}
+                onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
+                placeholder="(11) 99999-9999"
+                className="pl-8 h-9 text-sm bg-[hsl(0,0%,10%)] border-[hsl(0,0%,18%)] text-white placeholder:text-[hsl(0,0%,35%)]"
+              />
+            </div>
+          </div>
         </div>
 
         <Button
           className="w-full bg-[#27d803] hover:bg-[#22c003] text-black font-semibold h-11"
-          onClick={() => completeMutation.mutate({})}
+          onClick={handleSubmit}
           disabled={completeMutation.isPending}
         >
           {completeMutation.isPending ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Acessando...</>
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Ativando acesso...</>
           ) : (
-            <><Check className="w-4 h-4 mr-2" /> Acessar Portal do Parceiro</>
+            <><Check className="w-4 h-4 mr-2" /> Confirmar e Acessar Portal</>
           )}
         </Button>
 
