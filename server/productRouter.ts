@@ -2,7 +2,7 @@ import { protectedProcedure, adminProcedure, internalProcedure, router } from ".
 import { z } from "zod";
 import { getDb } from "./db";
 import { products, productPricingTiers, productCategories } from "../drizzle/schema";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 async function getDatabase() {
@@ -150,6 +150,27 @@ export const productRouter = router({
         .where(eq(productPricingTiers.productId, input.productId))
         .orderBy(asc(productPricingTiers.volumeMin));
     }),
+
+  setPartnerVisibility: adminProcedure
+    .input(z.object({
+      productId: z.number(),
+      visibleToPartners: z.boolean(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const rows = await db
+        .update(products)
+        .set({ visibleToPartners: input.visibleToPartners, updatedAt: new Date() })
+        .where(eq(products.id, input.productId))
+        .returning();
+      if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado" });
+      return rows[0];
+    }),
+
+  listForPartners: adminProcedure.query(async () => {
+    const db = await getDatabase();
+    return db.select().from(products).where(eq(products.isActive, true)).orderBy(asc(products.name));
+  }),
 
   upsertTiers: internalProcedure
     .input(z.object({

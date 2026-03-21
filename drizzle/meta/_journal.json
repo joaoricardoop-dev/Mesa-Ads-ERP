@@ -127,6 +127,13 @@
       "when": 1774243600000,
       "tag": "0017_pricing_modes",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1774300000000,
+      "tag": "0018_partner_product_visibility",
+      "breakpoints": true
     }
   ]
 }

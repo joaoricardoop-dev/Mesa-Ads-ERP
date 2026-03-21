@@ -1,8 +1,8 @@
 import { parceiroProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { partners, leads, quotations, clients, users } from "../drizzle/schema";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { partners, leads, quotations, clients, users, products, productPricingTiers } from "../drizzle/schema";
+import { eq, desc, and, sql, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { authStorage } from "./replit_integrations/auth";
 
@@ -188,6 +188,57 @@ export const parceiroPortalRouter = router({
       }
 
       return { success: true };
+    }),
+
+  getPriceTable: parceiroProcedure
+    .query(async ({ ctx }) => {
+      const partnerId = ctx.user.partnerId;
+      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+
+      const db = await getDatabase();
+
+      const [partner] = await db.select().from(partners).where(eq(partners.id, partnerId)).limit(1);
+      if (!partner) throw new TRPCError({ code: "NOT_FOUND", message: "Parceiro não encontrado." });
+
+      const visibleProducts = await db
+        .select()
+        .from(products)
+        .where(and(eq(products.visibleToPartners, true), eq(products.isActive, true)))
+        .orderBy(asc(products.name));
+
+      const productsWithTiers = await Promise.all(
+        visibleProducts.map(async (p) => {
+          const tiers = await db
+            .select()
+            .from(productPricingTiers)
+            .where(eq(productPricingTiers.productId, p.id))
+            .orderBy(asc(productPricingTiers.volumeMin));
+          return { ...p, tiers };
+        })
+      );
+
+      return {
+        commissionPercent: Number(partner.commissionPercent),
+        products: productsWithTiers,
+      };
+    }),
+
+  updateCommission: parceiroProcedure
+    .input(z.object({
+      commissionPercent: z.number().min(10).max(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const partnerId = ctx.user.partnerId;
+      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+
+      const db = await getDatabase();
+      const [updated] = await db
+        .update(partners)
+        .set({ commissionPercent: input.commissionPercent.toFixed(2), updatedAt: new Date() })
+        .where(eq(partners.id, partnerId))
+        .returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Parceiro não encontrado." });
+      return { commissionPercent: Number(updated.commissionPercent) };
     }),
 
   invitePartnerUser: adminProcedure

@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Tag, X } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Tag, X, Users } from "lucide-react";
 import { SEMANAS_OPTIONS } from "@/hooks/useBudgetCalculator";
 
 type TipoProduct = "coaster" | "display" | "cardapio" | "totem" | "adesivo" | "porta_guardanapo" | "outro";
@@ -365,6 +365,7 @@ export default function Products() {
                 <TableHead>Com. Rest.</TableHead>
                 <TableHead>Com. Com.</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Parceiros</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -692,6 +693,14 @@ function ProductRow({ product: p, categories, expanded, onToggle, onEdit, onDele
     { productId: p.id },
     { enabled: expanded }
   );
+  const utils = trpc.useUtils();
+  const setVisibilityMutation = trpc.product.setPartnerVisibility.useMutation({
+    onSuccess: () => {
+      utils.product.list.invalidate();
+      utils.product.listForPartners.invalidate();
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
 
   const cat = categories.find((c: any) => c.id === p.categoryId);
   const cs = cat ? colorStyles(cat.color) : null;
@@ -728,6 +737,21 @@ function ProductRow({ product: p, categories, expanded, onToggle, onEdit, onDele
             {p.isActive ? "Ativo" : "Inativo"}
           </Badge>
         </TableCell>
+        <TableCell onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={!!p.visibleToPartners}
+              onCheckedChange={(checked) =>
+                setVisibilityMutation.mutate({ productId: p.id, visibleToPartners: checked })
+              }
+              disabled={setVisibilityMutation.isPending}
+              aria-label="Visível para parceiros"
+            />
+            {p.visibleToPartners && (
+              <Users className="w-3.5 h-3.5 text-emerald-400" />
+            )}
+          </div>
+        </TableCell>
         <TableCell className="text-right">
           <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
@@ -741,7 +765,7 @@ function ProductRow({ product: p, categories, expanded, onToggle, onEdit, onDele
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={10} className="bg-muted/30 p-4">
+          <TableCell colSpan={11} className="bg-muted/30 p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold">Entradas de Precificação ({tiers.length})</h3>

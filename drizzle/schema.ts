@@ -807,6 +807,7 @@ export const products = pgTable("products", {
   comComercial: decimal("comComercial", { precision: 5, scale: 2 }).default("10.00"),
   pricingMode: pricingModeEnum("pricingMode").default("cost_based").notNull(),
   entryType: entryTypeEnum("entryType").default("tiers").notNull(),
+  visibleToPartners: boolean("visibleToPartners").default(false).notNull(),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
