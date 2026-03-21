@@ -1,8 +1,8 @@
 import { protectedProcedure, adminProcedure, internalProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { products, productPricingTiers, productCategories } from "../drizzle/schema";
-import { eq, desc, asc, and } from "drizzle-orm";
+import { products, productPricingTiers } from "../drizzle/schema";
+import { eq, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 async function getDatabase() {
@@ -11,51 +11,9 @@ async function getDatabase() {
   return d;
 }
 
+const TIPO_ENUM = ["impressos", "eletronicos", "telas"] as const;
+
 export const productRouter = router({
-  // ── Category CRUD ────────────────────────────────────────────────────────────
-  listCategories: protectedProcedure.query(async () => {
-    const db = await getDatabase();
-    return db.select().from(productCategories).orderBy(asc(productCategories.name));
-  }),
-
-  createCategory: adminProcedure
-    .input(z.object({
-      name: z.string().min(1),
-      color: z.string().optional(),
-      description: z.string().optional(),
-    }))
-    .mutation(async ({ input }) => {
-      const db = await getDatabase();
-      const rows = await db.insert(productCategories).values(input).returning();
-      return rows[0];
-    }),
-
-  updateCategory: adminProcedure
-    .input(z.object({
-      id: z.number(),
-      name: z.string().min(1).optional(),
-      color: z.string().optional(),
-      description: z.string().optional(),
-      isActive: z.boolean().optional(),
-    }))
-    .mutation(async ({ input }) => {
-      const db = await getDatabase();
-      const { id, ...data } = input;
-      const rows = await db.update(productCategories).set(data).where(eq(productCategories.id, id)).returning();
-      if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Categoria não encontrada" });
-      return rows[0];
-    }),
-
-  deleteCategory: adminProcedure
-    .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
-      const db = await getDatabase();
-      await db.update(products).set({ categoryId: null }).where(eq(products.categoryId, input.id));
-      const rows = await db.delete(productCategories).where(eq(productCategories.id, input.id)).returning();
-      if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Categoria não encontrada" });
-      return rows[0];
-    }),
-
   // ── Product CRUD ─────────────────────────────────────────────────────────────
   list: protectedProcedure.query(async () => {
     const db = await getDatabase();
@@ -75,8 +33,7 @@ export const productRouter = router({
     .input(z.object({
       name: z.string().min(1),
       description: z.string().optional(),
-      tipo: z.enum(["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro"]).default("coaster"),
-      categoryId: z.number().int().nullable().optional(),
+      tipo: z.enum(TIPO_ENUM).default("impressos"),
       temDistribuicaoPorLocal: z.boolean().default(true),
       imagemUrl: z.string().optional(),
       unitLabel: z.string().min(1).default("unidade"),
@@ -101,8 +58,7 @@ export const productRouter = router({
       id: z.number(),
       name: z.string().min(1).optional(),
       description: z.string().optional(),
-      tipo: z.enum(["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro"]).optional(),
-      categoryId: z.number().int().nullable().optional(),
+      tipo: z.enum(TIPO_ENUM).optional(),
       temDistribuicaoPorLocal: z.boolean().optional(),
       imagemUrl: z.string().optional(),
       unitLabel: z.string().min(1).optional(),

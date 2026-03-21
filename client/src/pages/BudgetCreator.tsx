@@ -218,7 +218,7 @@ function ClientQualificationCard({ client }: { client: ClientInfo }) {
 
 interface BudgetItemCardProps {
   item: BudgetItemState;
-  productsList: { id: number; name: string; tipo?: string | null; pricingMode?: string | null; entryType?: string | null; defaultSemanas?: number | null }[];
+  productsList: { id: number; name: string; tipo?: string | null; temDistribuicaoPorLocal?: boolean | null; pricingMode?: string | null; entryType?: string | null; defaultSemanas?: number | null }[];
   globalParams: GlobalBudgetParams;
   onUpdate: (id: string, patch: Partial<BudgetItemState>) => void;
   onRemove: (id: string) => void;
@@ -231,7 +231,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
   const [pricingOpen, setPricingOpen] = useState(false);
 
   const selectedProduct = productsList.find((p) => p.id === item.productId);
-  const isCoaster = selectedProduct?.tipo === "coaster";
+  const isCoaster = selectedProduct?.temDistribuicaoPorLocal === true;
   const isPriceBased = item.pricingMode === "price_based";
   const isFixedQty = item.entryType === "fixed_quantities";
 
@@ -651,7 +651,7 @@ export default function BudgetCreator() {
   const leadsList = useMemo(() => (leadsRaw as any[]) ?? [], [leadsRaw]);
 
   const { data: productsRaw } = trpc.product.list.useQuery();
-  const productsList = useMemo(() => (productsRaw ?? []) as { id: number; name: string; defaultSemanas?: number | null; tipo?: string | null; pricingMode?: string | null; entryType?: string | null }[], [productsRaw]);
+  const productsList = useMemo(() => (productsRaw ?? []) as { id: number; name: string; defaultSemanas?: number | null; tipo?: string | null; temDistribuicaoPorLocal?: boolean | null; pricingMode?: string | null; entryType?: string | null }[], [productsRaw]);
 
   const { data: partnersList = [] } = trpc.partner.list.useQuery();
 
