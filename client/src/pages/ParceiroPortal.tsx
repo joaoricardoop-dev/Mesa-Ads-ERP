@@ -71,9 +71,10 @@ function KpiCard({
 
 export default function ParceiroPortal() {
   const [, navigate] = useLocation();
-  const { data: dashboard, isLoading: loadingDash } = trpc.parceiroPortal.getDashboard.useQuery();
-  const { data: leads = [], isLoading: loadingLeads } = trpc.parceiroPortal.getLeads.useQuery();
-  const { data: quotations = [], isLoading: loadingQuotations } = trpc.parceiroPortal.getQuotations.useQuery();
+  const adminPartnerId = (window as any).__IMPERSONATION__?.partnerId as number | undefined;
+  const { data: dashboard, isLoading: loadingDash } = trpc.parceiroPortal.getDashboard.useQuery({ adminPartnerId });
+  const { data: leads = [], isLoading: loadingLeads } = trpc.parceiroPortal.getLeads.useQuery({ adminPartnerId });
+  const { data: quotations = [], isLoading: loadingQuotations } = trpc.parceiroPortal.getQuotations.useQuery({ adminPartnerId });
 
   const recentLeads = leads.slice(0, 5);
   const recentQuotations = quotations.slice(0, 5);

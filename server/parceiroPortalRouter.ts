@@ -11,11 +11,20 @@ async function getDatabase() {
   return d;
 }
 
+function resolvePartnerId(
+  ctx: { user: { role?: string | null; partnerId?: number | null } },
+  adminPartnerId?: number,
+): number {
+  if (ctx.user.role === "admin" && adminPartnerId) return adminPartnerId;
+  if (ctx.user.partnerId) return ctx.user.partnerId;
+  throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+}
+
 export const parceiroPortalRouter = router({
   getDashboard: parceiroProcedure
-    .query(async ({ ctx }) => {
-      const partnerId = ctx.user.partnerId;
-      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+    .input(z.object({ adminPartnerId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const partnerId = resolvePartnerId(ctx, input?.adminPartnerId);
 
       const db = await getDatabase();
 
@@ -62,10 +71,10 @@ export const parceiroPortalRouter = router({
   getLeads: parceiroProcedure
     .input(z.object({
       stage: z.string().optional(),
+      adminPartnerId: z.number().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      const partnerId = ctx.user.partnerId;
-      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+      const partnerId = resolvePartnerId(ctx, input?.adminPartnerId);
 
       const db = await getDatabase();
       const rows = await db
@@ -102,10 +111,9 @@ export const parceiroPortalRouter = router({
     }),
 
   getLeadDetail: parceiroProcedure
-    .input(z.object({ leadId: z.number() }))
+    .input(z.object({ leadId: z.number(), adminPartnerId: z.number().optional() }))
     .query(async ({ ctx, input }) => {
-      const partnerId = ctx.user.partnerId;
-      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+      const partnerId = resolvePartnerId(ctx, input.adminPartnerId);
 
       const db = await getDatabase();
 
@@ -179,9 +187,9 @@ export const parceiroPortalRouter = router({
     }),
 
   getQuotations: parceiroProcedure
-    .query(async ({ ctx }) => {
-      const partnerId = ctx.user.partnerId;
-      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+    .input(z.object({ adminPartnerId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const partnerId = resolvePartnerId(ctx, input?.adminPartnerId);
 
       const db = await getDatabase();
       const rows = await db
@@ -295,9 +303,9 @@ export const parceiroPortalRouter = router({
     }),
 
   getPriceTable: parceiroProcedure
-    .query(async ({ ctx }) => {
-      const partnerId = ctx.user.partnerId;
-      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+    .input(z.object({ adminPartnerId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const partnerId = resolvePartnerId(ctx, input?.adminPartnerId);
 
       const db = await getDatabase();
 

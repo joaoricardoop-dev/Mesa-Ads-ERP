@@ -198,7 +198,8 @@ function InfoRow({
 }
 
 function LeadDetailPanel({ leadId, onClose }: { leadId: number; onClose: () => void }) {
-  const { data: lead, isLoading } = trpc.parceiroPortal.getLeadDetail.useQuery({ leadId });
+  const adminPartnerId = (window as any).__IMPERSONATION__?.partnerId as number | undefined;
+  const { data: lead, isLoading } = trpc.parceiroPortal.getLeadDetail.useQuery({ leadId, adminPartnerId });
 
   if (isLoading) {
     return (
@@ -331,8 +332,9 @@ export default function ParceiroLeads() {
   const [formData, setFormData] = useState<LeadFormData>(emptyForm);
 
   const utils = trpc.useUtils();
+  const adminPartnerId = (window as any).__IMPERSONATION__?.partnerId as number | undefined;
   const { data: leads = [], isLoading } = trpc.parceiroPortal.getLeads.useQuery(
-    stageFilter !== "all" ? { stage: stageFilter } : undefined
+    stageFilter !== "all" ? { stage: stageFilter, adminPartnerId } : { adminPartnerId }
   );
 
   const createMutation = trpc.parceiroPortal.createLead.useMutation({

@@ -172,7 +172,8 @@ function ProductTable({ product, commissionPercent }: ProductTableProps) {
 }
 
 export default function ParceiroTabelaPrecos() {
-  const { data, isLoading, refetch } = trpc.parceiroPortal.getPriceTable.useQuery();
+  const adminPartnerId = (window as any).__IMPERSONATION__?.partnerId as number | undefined;
+  const { data, isLoading, refetch } = trpc.parceiroPortal.getPriceTable.useQuery({ adminPartnerId });
   const updateCommissionMutation = trpc.parceiroPortal.updateCommission.useMutation({
     onSuccess: (res) => {
       toast.success(`Comissão atualizada para ${res.commissionPercent}%`);
