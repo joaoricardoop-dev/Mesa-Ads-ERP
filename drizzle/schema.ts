@@ -27,6 +27,8 @@ export const serviceOrderStatusEnum = pgEnum("service_order_status", ["rascunho"
 export const termStatusEnum = pgEnum("term_status", ["rascunho", "enviado", "assinado", "vigente", "encerrado"]);
 export const productTypeEnum = pgEnum("product_type", ["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro"]);
 export const productionStatusEnum = pgEnum("production_status", ["pending", "producing", "ready", "shipped"]);
+export const pricingModeEnum = pgEnum("pricing_mode", ["cost_based", "price_based"]);
+export const entryTypeEnum = pgEnum("entry_type", ["tiers", "fixed_quantities"]);
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -803,6 +805,8 @@ export const products = pgTable("products", {
   irpj: decimal("irpj", { precision: 5, scale: 2 }).default("6.00"),
   comRestaurante: decimal("comRestaurante", { precision: 5, scale: 2 }).default("15.00"),
   comComercial: decimal("comComercial", { precision: 5, scale: 2 }).default("10.00"),
+  pricingMode: pricingModeEnum("pricingMode").default("cost_based").notNull(),
+  entryType: entryTypeEnum("entryType").default("tiers").notNull(),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -816,10 +820,11 @@ export const productPricingTiers = pgTable("product_pricing_tiers", {
   productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
   volumeMin: integer("volumeMin").notNull(),
   volumeMax: integer("volumeMax"),
-  custoUnitario: decimal("custoUnitario", { precision: 10, scale: 4 }).notNull(),
-  frete: decimal("frete", { precision: 10, scale: 2 }).notNull(),
+  custoUnitario: decimal("custoUnitario", { precision: 10, scale: 4 }).notNull().default("0.0000"),
+  frete: decimal("frete", { precision: 10, scale: 2 }).notNull().default("0.00"),
   margem: decimal("margem", { precision: 5, scale: 2 }).notNull().default("50.00"),
   artes: integer("artes").default(1),
+  precoBase: decimal("precoBase", { precision: 12, scale: 2 }),
 }, (t) => [
   index("idx_product_pricing_tiers_product_id").on(t.productId),
 ]);

@@ -29,7 +29,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PricingTier {
+interface BudgetPricingTier {
   id: number;
   productId: number;
   volumeMin: number;
@@ -38,13 +38,16 @@ interface PricingTier {
   frete: string;
   margem: string;
   artes: number | null;
+  precoBase: string | null;
 }
 
 interface BudgetItemState {
   id: string;
   productId: number | null;
   productName: string;
-  tiers: PricingTier[];
+  pricingMode: "cost_based" | "price_based";
+  entryType: "tiers" | "fixed_quantities";
+  tiers: BudgetPricingTier[];
   hasTiers: boolean;
   volumeIdx: number;
   freeVolume: number;
@@ -64,6 +67,8 @@ function makeBlankItem(defaultSemanas = 12, defaultPremissas = DEFAULT_PREMISSAS
     id: makeItemId(),
     productId: null,
     productName: "",
+    pricingMode: "cost_based",
+    entryType: "tiers",
     tiers: [],
     hasTiers: false,
     volumeIdx: 0,
@@ -76,6 +81,24 @@ function makeBlankItem(defaultSemanas = 12, defaultPremissas = DEFAULT_PREMISSAS
 
 function getItemPricingInput(item: BudgetItemState): ItemPricingInput | null {
   if (!item.productId) return null;
+
+  if (item.pricingMode === "price_based") {
+    if (!item.hasTiers || item.tiers.length === 0) return null;
+    const tier = item.tiers[item.volumeIdx];
+    if (!tier) return null;
+    const precoBase = parseFloat(tier.precoBase ?? "0") || 0;
+    return {
+      volume: tier.volumeMin,
+      custoUnitario: 0,
+      frete: 0,
+      margem: 0,
+      artes: 1,
+      semanas: item.semanas,
+      premissas: item.premissas,
+      precoBase,
+    };
+  }
+
   if (item.hasTiers) {
     const tier = item.tiers[item.volumeIdx];
     if (!tier) return null;
@@ -195,7 +218,7 @@ function ClientQualificationCard({ client }: { client: ClientInfo }) {
 
 interface BudgetItemCardProps {
   item: BudgetItemState;
-  productsList: { id: number; name: string; tipo?: string | null }[];
+  productsList: { id: number; name: string; tipo?: string | null; pricingMode?: string | null; entryType?: string | null; defaultSemanas?: number | null }[];
   globalParams: GlobalBudgetParams;
   onUpdate: (id: string, patch: Partial<BudgetItemState>) => void;
   onRemove: (id: string) => void;
@@ -209,6 +232,8 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
 
   const selectedProduct = productsList.find((p) => p.id === item.productId);
   const isCoaster = selectedProduct?.tipo === "coaster";
+  const isPriceBased = item.pricingMode === "price_based";
+  const isFixedQty = item.entryType === "fixed_quantities";
 
   const { data: tiersRaw, isLoading: tiersLoading } = trpc.product.getTiers.useQuery(
     { productId: item.productId! },
@@ -218,7 +243,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
   useEffect(() => {
     if (tiersRaw !== undefined && item.productId !== null) {
       onUpdateRef.current(item.id, {
-        tiers: tiersRaw as PricingTier[],
+        tiers: tiersRaw as BudgetPricingTier[],
         hasTiers: tiersRaw.length > 0,
         volumeIdx: 0,
       });
@@ -228,8 +253,11 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
   const pricingInput = getItemPricingInput(item);
   const calc = pricingInput ? calcItemPrice(pricingInput) : null;
 
-  const tierLabel = (tier: PricingTier) => {
-    if (tier.volumeMax) {
+  const tierLabel = (tier: BudgetPricingTier) => {
+    if (isFixedQty) {
+      return `${tier.volumeMin.toLocaleString("pt-BR")} un.`;
+    }
+    if (tier.volumeMax && tier.volumeMax !== tier.volumeMin) {
       return `${tier.volumeMin.toLocaleString("pt-BR")} – ${tier.volumeMax.toLocaleString("pt-BR")} un.`;
     }
     return `${tier.volumeMin.toLocaleString("pt-BR")}+ un.`;
@@ -282,6 +310,8 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                 onUpdate(item.id, {
                   productId: pid,
                   productName: prod?.name ?? "",
+                  pricingMode: (prod?.pricingMode as "cost_based" | "price_based") ?? "cost_based",
+                  entryType: (prod?.entryType as "tiers" | "fixed_quantities") ?? "tiers",
                   tiers: [],
                   hasTiers: false,
                   volumeIdx: 0,
@@ -303,12 +333,14 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
           </div>
 
           {item.productId && tiersLoading && (
-            <p className="text-xs text-muted-foreground animate-pulse">Carregando faixas de preço...</p>
+            <p className="text-xs text-muted-foreground animate-pulse">Carregando entradas de preço...</p>
           )}
 
           {item.productId && !tiersLoading && item.hasTiers && item.tiers.length > 0 && (
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Faixa de volume</Label>
+              <Label className="text-xs text-muted-foreground mb-1 block">
+                {isFixedQty ? "Quantidade" : "Faixa de volume"}
+              </Label>
               <Select
                 value={String(item.volumeIdx)}
                 onValueChange={(v) => onUpdate(item.id, { volumeIdx: Number(v) })}
@@ -327,7 +359,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
             </div>
           )}
 
-          {item.productId && !tiersLoading && !item.hasTiers && (
+          {item.productId && !tiersLoading && !item.hasTiers && !isPriceBased && (
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs text-muted-foreground mb-1 block">Quantidade</Label>
@@ -356,26 +388,58 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
           {/* Pricing result strip */}
           {calc && pricingInput && (
             <div className="bg-muted/40 rounded-md p-3 space-y-1.5 text-xs border border-border/30">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-                <span className="text-muted-foreground">Volume</span>
-                <span className="text-right font-medium">{pricingInput.volume.toLocaleString("pt-BR")} un.</span>
-                <span className="text-muted-foreground">Custo/un.</span>
-                <span className="text-right font-mono">{fmtBRL4(pricingInput.custoUnitario)}</span>
-                <span className="text-muted-foreground">Preço/un. base</span>
-                <span className="text-right font-mono font-semibold text-primary">{fmtBRL4(calc.precoUnit4sem)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between font-semibold">
-                <span className="text-muted-foreground">Total {item.semanas}sem</span>
-                <span className={isBonificada ? "line-through text-muted-foreground" : ""}>
-                  {fmtBRL(calc.precoComDescDuracao)}
-                </span>
-              </div>
-              {calc.descPrazoPerc > 0 && !isBonificada && (
-                <div className="flex justify-between text-[10px] text-amber-600 dark:text-amber-400">
-                  <span>Desc. prazo incluso ({(calc.descPrazoPerc * 100).toFixed(0)}%)</span>
-                  <span>−{fmtBRL(calc.descPrazoVal)}</span>
-                </div>
+              {isPriceBased ? (
+                <>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                    <span className="text-muted-foreground">Quantidade</span>
+                    <span className="text-right font-medium">{pricingInput.volume.toLocaleString("pt-BR")} un.</span>
+                    <span className="text-muted-foreground">Preço Base (4sem)</span>
+                    <span className="text-right font-mono font-semibold text-primary">{fmtBRL(pricingInput.precoBase ?? 0)}</span>
+                    {calc.receitaLiquidaGPC !== undefined && (
+                      <>
+                        <span className="text-muted-foreground">Rec. Líquida GPC</span>
+                        <span className="text-right font-mono text-emerald-600 dark:text-emerald-400">{fmtBRL(calc.receitaLiquidaGPC)}</span>
+                      </>
+                    )}
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between font-semibold">
+                    <span className="text-muted-foreground">Total {item.semanas}sem</span>
+                    <span className={isBonificada ? "line-through text-muted-foreground" : ""}>
+                      {fmtBRL(calc.precoComDescDuracao)}
+                    </span>
+                  </div>
+                  {calc.descPrazoPerc > 0 && !isBonificada && (
+                    <div className="flex justify-between text-[10px] text-amber-600 dark:text-amber-400">
+                      <span>Desc. prazo incluso ({(calc.descPrazoPerc * 100).toFixed(0)}%)</span>
+                      <span>−{fmtBRL(calc.descPrazoVal)}</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                    <span className="text-muted-foreground">Volume</span>
+                    <span className="text-right font-medium">{pricingInput.volume.toLocaleString("pt-BR")} un.</span>
+                    <span className="text-muted-foreground">Custo/un.</span>
+                    <span className="text-right font-mono">{fmtBRL4(pricingInput.custoUnitario)}</span>
+                    <span className="text-muted-foreground">Preço/un. base</span>
+                    <span className="text-right font-mono font-semibold text-primary">{fmtBRL4(calc.precoUnit4sem)}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between font-semibold">
+                    <span className="text-muted-foreground">Total {item.semanas}sem</span>
+                    <span className={isBonificada ? "line-through text-muted-foreground" : ""}>
+                      {fmtBRL(calc.precoComDescDuracao)}
+                    </span>
+                  </div>
+                  {calc.descPrazoPerc > 0 && !isBonificada && (
+                    <div className="flex justify-between text-[10px] text-amber-600 dark:text-amber-400">
+                      <span>Desc. prazo incluso ({(calc.descPrazoPerc * 100).toFixed(0)}%)</span>
+                      <span>−{fmtBRL(calc.descPrazoVal)}</span>
+                    </div>
+                  )}
+                </>
               )}
               {isBonificada && (
                 <div className="text-right text-green-600 dark:text-green-400 font-semibold text-[11px]">
@@ -385,8 +449,8 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
             </div>
           )}
 
-          {/* Abrir Precificador button */}
-          {item.productId && !tiersLoading && (
+          {/* Abrir Precificador button — only for cost_based products */}
+          {item.productId && !tiersLoading && !isPriceBased && (
             <Button
               variant="outline"
               size="sm"
@@ -405,7 +469,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
           open={pricingOpen}
           onClose={() => setPricingOpen(false)}
           productName={item.productName}
-          tiers={item.tiers}
+          tiers={item.tiers as Parameters<typeof CoasterPricingDialog>[0]["tiers"]}
           initialVolumeIdx={item.volumeIdx}
           initialSemanas={item.semanas}
           initialPremissas={item.premissas}
@@ -587,7 +651,7 @@ export default function BudgetCreator() {
   const leadsList = useMemo(() => (leadsRaw as any[]) ?? [], [leadsRaw]);
 
   const { data: productsRaw } = trpc.product.list.useQuery();
-  const productsList = useMemo(() => (productsRaw ?? []) as { id: number; name: string; defaultSemanas?: number; tipo?: string | null }[], [productsRaw]);
+  const productsList = useMemo(() => (productsRaw ?? []) as { id: number; name: string; defaultSemanas?: number | null; tipo?: string | null; pricingMode?: string | null; entryType?: string | null }[], [productsRaw]);
 
   const { data: partnersList = [] } = trpc.partner.list.useQuery();
 

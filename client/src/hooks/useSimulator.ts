@@ -100,6 +100,7 @@ export interface ProductPricingTier {
   frete: string;
   margem: string;
   artes: number;
+  precoBase?: string | null;
 }
 
 export type ProductTier = ProductPricingTier;
@@ -108,6 +109,7 @@ export interface ProductParams {
   irpj: string;
   comRestaurante: string;
   comComercial: string;
+  pricingMode?: string | null;
 }
 
 const STORAGE_KEY = "mesa-ads-simulator-inputs";
@@ -355,6 +357,8 @@ export function useSimulator(
 ) {
   const [inputs, setInputs] = useState<SimulatorInputs>(loadInputs);
 
+  const isPriceBased = productParams?.pricingMode === "price_based";
+
   useEffect(() => {
     if (productParams) {
       const irpj = parseFloat(productParams.irpj || "0");
@@ -383,11 +387,26 @@ export function useSimulator(
   const activeTiers = productTiers && productTiers.length > 0 ? productTiers : DEFAULT_PRODUCT_TIERS;
 
   const tierLookup = useMemo<TierLookupResult | null>(() => {
+    if (isPriceBased) return null;
     const totalCoasters = inputs.coastersPerRestaurant * inputs.activeRestaurants;
     return lookupTierCost(activeTiers, totalCoasters);
-  }, [activeTiers, inputs.coastersPerRestaurant, inputs.activeRestaurants]);
+  }, [activeTiers, inputs.coastersPerRestaurant, inputs.activeRestaurants, isPriceBased]);
+
+  const priceBasedTier = useMemo<ProductPricingTier | null>(() => {
+    if (!isPriceBased || !productTiers || productTiers.length === 0) return null;
+    const totalCoasters = inputs.coastersPerRestaurant * inputs.activeRestaurants;
+    const sorted = [...productTiers].sort((a, b) => a.volumeMin - b.volumeMin);
+    let match = sorted[0];
+    for (const tier of sorted) {
+      if (totalCoasters >= tier.volumeMin) match = tier;
+    }
+    return match;
+  }, [isPriceBased, productTiers, inputs.coastersPerRestaurant, inputs.activeRestaurants]);
 
   const effectiveUnitCost = useMemo(() => {
+    if (isPriceBased) {
+      return 0;
+    }
     if (selectedBudget && selectedBudget.items.length > 0) {
       const totalCoasters =
         inputs.coastersPerRestaurant * inputs.activeRestaurants;
@@ -400,6 +419,7 @@ export function useSimulator(
     }
     return inputs.batchCost / inputs.batchSize;
   }, [
+    isPriceBased,
     selectedBudget,
     tierLookup,
     inputs.coastersPerRestaurant,
@@ -411,6 +431,34 @@ export function useSimulator(
   const perRestaurant = useMemo<PerRestaurantMetrics>(() => {
     const impressions =
       inputs.coastersPerRestaurant * inputs.usagePerDay * inputs.daysPerMonth;
+
+    if (isPriceBased && priceBasedTier) {
+      const precoBase = parseFloat(priceBasedTier.precoBase ?? "0") || 0;
+      const totalCoasters = inputs.coastersPerRestaurant * inputs.activeRestaurants;
+      const sellingPricePerUnit = totalCoasters > 0 ? precoBase / totalCoasters : 0;
+      const sellingPrice = inputs.coastersPerRestaurant * sellingPricePerUnit;
+      const taxRate = inputs.taxRate / 100;
+      const comRest = (restaurantCommissionRate ?? inputs.restaurantCommission) / 100;
+      const comCom = inputs.sellerCommission / 100;
+      const receitaLiquidaGPC = sellingPrice * (1 - taxRate - comRest - comCom);
+      return {
+        impressions,
+        unitProductionCost: 0,
+        productionCost: 0,
+        restaurantCommission: sellingPrice * comRest,
+        agencyCommission: 0,
+        custoPD: 0,
+        sellerCommissionValue: sellingPrice * comCom,
+        taxValue: sellingPrice * taxRate,
+        custoBruto: 0,
+        totalCosts: sellingPrice * (taxRate + comRest + comCom),
+        markupValue: receitaLiquidaGPC,
+        sellingPrice,
+        grossProfit: receitaLiquidaGPC,
+        grossMargin: sellingPrice > 0 ? receitaLiquidaGPC / sellingPrice : 0,
+      };
+    }
+
     const unitProductionCost = effectiveUnitCost;
     const productionCost = inputs.coastersPerRestaurant * unitProductionCost;
 
@@ -423,7 +471,7 @@ export function useSimulator(
       unitProductionCost,
       ...pricing,
     };
-  }, [inputs, effectiveUnitCost, restaurantCommissionRate]);
+  }, [inputs, effectiveUnitCost, restaurantCommissionRate, isPriceBased, priceBasedTier]);
 
   const markupTable = useMemo<MarkupTableRow[]>(() => {
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;

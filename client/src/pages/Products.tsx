@@ -67,9 +67,32 @@ interface TierForm {
   frete: string;
   margem: string;
   artes: string;
+  precoBase: string;
 }
 
-const emptyTier: TierForm = { volumeMin: "", volumeMax: "", custoUnitario: "", frete: "", margem: "50.00", artes: "1" };
+const emptyTier: TierForm = { volumeMin: "", volumeMax: "", custoUnitario: "", frete: "", margem: "50.00", artes: "1", precoBase: "" };
+
+type PricingMode = "cost_based" | "price_based";
+type EntryType = "tiers" | "fixed_quantities";
+
+interface ProductListItem {
+  id: number;
+  name: string;
+  tipo?: string | null;
+  pricingMode?: PricingMode | null;
+  entryType?: EntryType | null;
+  irpj?: string | null;
+  comRestaurante?: string | null;
+  comComercial?: string | null;
+  defaultSemanas?: number | null;
+  isActive?: boolean | null;
+  description?: string | null;
+  categoryId?: number | null;
+  unitLabel?: string | null;
+  unitLabelPlural?: string | null;
+  defaultQtyPerLocation?: number | null;
+  temDistribuicaoPorLocal?: boolean | null;
+}
 
 interface ProductForm {
   name: string;
@@ -84,6 +107,8 @@ interface ProductForm {
   irpj: string;
   comRestaurante: string;
   comComercial: string;
+  pricingMode: PricingMode;
+  entryType: EntryType;
   isActive: boolean;
 }
 
@@ -100,6 +125,8 @@ const emptyProduct: ProductForm = {
   irpj: "6.00",
   comRestaurante: "15.00",
   comComercial: "10.00",
+  pricingMode: "cost_based",
+  entryType: "tiers",
   isActive: true,
 };
 
@@ -122,6 +149,7 @@ export default function Products() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [tiersDialogOpen, setTiersDialogOpen] = useState(false);
   const [tiersProductId, setTiersProductId] = useState<number | null>(null);
+  const [tiersProduct, setTiersProduct] = useState<ProductListItem | null>(null);
   const [tiersForm, setTiersForm] = useState<TierForm[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
@@ -146,7 +174,7 @@ export default function Products() {
   });
 
   const upsertTiersMutation = trpc.product.upsertTiers.useMutation({
-    onSuccess: () => { utils.product.listTiers.invalidate(); setTiersDialogOpen(false); toast.success("Faixas de preço atualizadas"); },
+    onSuccess: () => { utils.product.listTiers.invalidate(); setTiersDialogOpen(false); toast.success("Entradas de preço atualizadas"); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -186,6 +214,8 @@ export default function Products() {
       irpj: p.irpj || "6.00",
       comRestaurante: p.comRestaurante || "15.00",
       comComercial: p.comComercial || "10.00",
+      pricingMode: (p.pricingMode as PricingMode) || "cost_based",
+      entryType: (p.entryType as EntryType) || "tiers",
       isActive: p.isActive,
     });
     setDialogOpen(true);
@@ -206,6 +236,8 @@ export default function Products() {
       irpj: form.irpj,
       comRestaurante: form.comRestaurante,
       comComercial: form.comComercial,
+      pricingMode: form.pricingMode,
+      entryType: form.entryType,
       isActive: form.isActive,
     };
     if (editingId) {
@@ -215,22 +247,26 @@ export default function Products() {
     }
   }
 
-  function openTiersEditor(productId: number) {
-    setTiersProductId(productId);
+  function openTiersEditor(product: ProductListItem) {
+    setTiersProductId(product.id);
+    setTiersProduct(product);
     setTiersDialogOpen(true);
   }
 
   function handleSaveTiers() {
-    if (!tiersProductId) return;
+    if (!tiersProductId || !tiersProduct) return;
+    const isPriceBased = tiersProduct.pricingMode === "price_based";
+    const isFixedQty = tiersProduct.entryType === "fixed_quantities";
     const tiers = tiersForm
       .filter(t => t.volumeMin.trim() !== "")
       .map(t => ({
         volumeMin: parseInt(t.volumeMin),
-        volumeMax: t.volumeMax.trim() === "" ? null : parseInt(t.volumeMax),
-        custoUnitario: t.custoUnitario,
-        frete: t.frete,
-        margem: t.margem,
-        artes: parseInt(t.artes) || 1,
+        volumeMax: isFixedQty ? parseInt(t.volumeMin) : (t.volumeMax.trim() === "" ? null : parseInt(t.volumeMax)),
+        custoUnitario: isPriceBased ? "0.0000" : t.custoUnitario,
+        frete: isPriceBased ? "0.00" : t.frete,
+        margem: isPriceBased ? "0.00" : t.margem,
+        artes: isPriceBased ? 1 : (parseInt(t.artes) || 1),
+        precoBase: isPriceBased ? (t.precoBase.trim() || null) : null,
       }));
     upsertTiersMutation.mutate({ productId: tiersProductId, tiers });
   }
@@ -342,7 +378,7 @@ export default function Products() {
                   onToggle={() => setExpandedId(expandedId === p.id ? null : p.id)}
                   onEdit={() => openEdit(p)}
                   onDelete={() => setDeleteConfirm(p.id)}
-                  onEditTiers={() => openTiersEditor(p.id)}
+                  onEditTiers={() => openTiersEditor(p)}
                 />
               ))}
             </TableBody>
@@ -451,6 +487,32 @@ export default function Products() {
                 <Input value={form.comComercial} onChange={e => setForm({ ...form, comComercial: e.target.value })} />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Tipo de Entrada</Label>
+                <Select value={form.entryType} onValueChange={v => setForm({ ...form, entryType: v as EntryType })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tiers">Faixas de volume</SelectItem>
+                    <SelectItem value="fixed_quantities">Quantidades exatas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Modo de Cálculo</Label>
+                <Select value={form.pricingMode} onValueChange={v => setForm({ ...form, pricingMode: v as PricingMode })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cost_based">Baseado em Custo</SelectItem>
+                    <SelectItem value="price_based">Baseado em Preço</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <Switch checked={form.isActive} onCheckedChange={v => setForm({ ...form, isActive: v })} />
               <Label>Produto ativo</Label>
@@ -487,6 +549,7 @@ export default function Products() {
         open={tiersDialogOpen}
         onOpenChange={setTiersDialogOpen}
         productId={tiersProductId}
+        product={tiersProduct}
         tiers={tiersForm}
         setTiers={setTiersForm}
         onSave={handleSaveTiers}
@@ -680,35 +743,53 @@ function ProductRow({ product: p, categories, expanded, onToggle, onEdit, onDele
         <TableRow>
           <TableCell colSpan={10} className="bg-muted/30 p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold">Faixas de Precificação ({tiers.length})</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">Entradas de Precificação ({tiers.length})</h3>
+                <Badge variant="outline" className="text-[10px]">{p.entryType === "fixed_quantities" ? "Quantidades Exatas" : "Faixas de Volume"}</Badge>
+                <Badge variant="outline" className="text-[10px]">{p.pricingMode === "price_based" ? "Baseado em Preço" : "Baseado em Custo"}</Badge>
+              </div>
               <Button size="sm" variant="outline" onClick={onEditTiers}>
-                <Pencil className="h-3 w-3 mr-1" /> Editar Faixas
+                <Pencil className="h-3 w-3 mr-1" /> Editar Entradas
               </Button>
             </div>
             {tiers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma faixa cadastrada</p>
+              <p className="text-sm text-muted-foreground">Nenhuma entrada cadastrada</p>
             ) : (
               <div className="border rounded-md overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Volume Mín</TableHead>
-                      <TableHead>Volume Máx</TableHead>
-                      <TableHead>Custo Unit.</TableHead>
-                      <TableHead>Frete</TableHead>
-                      <TableHead>Margem</TableHead>
-                      <TableHead>Artes</TableHead>
+                      <TableHead>{p.entryType === "fixed_quantities" ? "Quantidade" : "Volume Mín"}</TableHead>
+                      {p.entryType !== "fixed_quantities" && <TableHead>Volume Máx</TableHead>}
+                      {p.pricingMode === "price_based" ? (
+                        <TableHead>Preço Base</TableHead>
+                      ) : (
+                        <>
+                          <TableHead>Custo Unit.</TableHead>
+                          <TableHead>Frete</TableHead>
+                          <TableHead>Margem</TableHead>
+                          <TableHead>Artes</TableHead>
+                        </>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {tiers.map((t: any) => (
                       <TableRow key={t.id}>
                         <TableCell>{t.volumeMin.toLocaleString("pt-BR")}</TableCell>
-                        <TableCell>{t.volumeMax ? t.volumeMax.toLocaleString("pt-BR") : "—"}</TableCell>
-                        <TableCell className="font-mono">R$ {Number(t.custoUnitario).toFixed(4)}</TableCell>
-                        <TableCell className="font-mono">R$ {Number(t.frete).toFixed(2)}</TableCell>
-                        <TableCell>{t.margem}%</TableCell>
-                        <TableCell>{t.artes}</TableCell>
+                        {p.entryType !== "fixed_quantities" && (
+                          <TableCell>{t.volumeMax ? t.volumeMax.toLocaleString("pt-BR") : "—"}</TableCell>
+                        )}
+                        {p.pricingMode === "price_based" ? (
+                          <TableCell className="font-mono">R$ {Number(t.precoBase || 0).toFixed(2)}</TableCell>
+                        ) : (
+                          <>
+                            <TableCell className="font-mono">R$ {Number(t.custoUnitario).toFixed(4)}</TableCell>
+                            <TableCell className="font-mono">R$ {Number(t.frete).toFixed(2)}</TableCell>
+                            <TableCell>{t.margem}%</TableCell>
+                            <TableCell>{t.artes}</TableCell>
+                          </>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -725,10 +806,11 @@ function ProductRow({ product: p, categories, expanded, onToggle, onEdit, onDele
   );
 }
 
-function TiersDialog({ open, onOpenChange, productId, tiers, setTiers, onSave, onAddRow, onRemoveRow, onUpdateRow, saving }: {
+function TiersDialog({ open, onOpenChange, productId, product, tiers, setTiers, onSave, onAddRow, onRemoveRow, onUpdateRow, saving }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   productId: number | null;
+  product: any | null;
   tiers: TierForm[];
   setTiers: (t: TierForm[]) => void;
   onSave: () => void;
@@ -760,31 +842,51 @@ function TiersDialog({ open, onOpenChange, productId, tiers, setTiers, onSave, o
       frete: String(t.frete),
       margem: String(t.margem),
       artes: String(t.artes || 1),
+      precoBase: t.precoBase !== null && t.precoBase !== undefined ? String(t.precoBase) : "",
     })));
   }, [open, existingTiers, productId, setTiers]);
 
   const inputCls = "h-8 text-xs font-mono px-2";
+  const isPriceBased = product?.pricingMode === "price_based";
+  const isFixedQty = product?.entryType === "fixed_quantities";
+
+  const addLabel = isFixedQty ? "Adicionar Quantidade" : "Adicionar Faixa";
+  const emptyLabel = isFixedQty
+    ? `Nenhuma entrada. Clique em "${addLabel}" para começar.`
+    : `Nenhuma faixa. Clique em "${addLabel}" para começar.`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar Faixas de Precificação</DialogTitle>
+          <DialogTitle>Entradas de Preço</DialogTitle>
         </DialogHeader>
+        {product && (
+          <div className="flex gap-2 text-xs text-muted-foreground">
+            <Badge variant="outline">{isFixedQty ? "Quantidades Exatas" : "Faixas de Volume"}</Badge>
+            <Badge variant="outline">{isPriceBased ? "Baseado em Preço" : "Baseado em Custo"}</Badge>
+          </div>
+        )}
         <div className="space-y-3">
           {tiers.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma faixa. Clique em "Adicionar Faixa" para começar.</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">{emptyLabel}</p>
           ) : (
             <div className="border rounded-md overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-24">Vol. Mín</TableHead>
-                    <TableHead className="w-24">Vol. Máx</TableHead>
-                    <TableHead className="w-28">Custo Unit. (R$)</TableHead>
-                    <TableHead className="w-24">Frete (R$)</TableHead>
-                    <TableHead className="w-20">Margem (%)</TableHead>
-                    <TableHead className="w-16">Artes</TableHead>
+                    <TableHead className="w-28">{isFixedQty ? "Quantidade" : "Vol. Mín"}</TableHead>
+                    {!isFixedQty && <TableHead className="w-24">Vol. Máx</TableHead>}
+                    {isPriceBased ? (
+                      <TableHead className="w-32">Preço Base (R$)</TableHead>
+                    ) : (
+                      <>
+                        <TableHead className="w-28">Custo Unit. (R$)</TableHead>
+                        <TableHead className="w-24">Frete (R$)</TableHead>
+                        <TableHead className="w-20">Margem (%)</TableHead>
+                        <TableHead className="w-16">Artes</TableHead>
+                      </>
+                    )}
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -792,11 +894,19 @@ function TiersDialog({ open, onOpenChange, productId, tiers, setTiers, onSave, o
                   {tiers.map((t, idx) => (
                     <TableRow key={idx}>
                       <TableCell><Input className={inputCls} value={t.volumeMin} onChange={e => onUpdateRow(idx, "volumeMin", e.target.value)} /></TableCell>
-                      <TableCell><Input className={inputCls} value={t.volumeMax} onChange={e => onUpdateRow(idx, "volumeMax", e.target.value)} placeholder="∞" /></TableCell>
-                      <TableCell><Input className={inputCls} value={t.custoUnitario} onChange={e => onUpdateRow(idx, "custoUnitario", e.target.value)} /></TableCell>
-                      <TableCell><Input className={inputCls} value={t.frete} onChange={e => onUpdateRow(idx, "frete", e.target.value)} /></TableCell>
-                      <TableCell><Input className={inputCls} value={t.margem} onChange={e => onUpdateRow(idx, "margem", e.target.value)} /></TableCell>
-                      <TableCell><Input className={inputCls} value={t.artes} onChange={e => onUpdateRow(idx, "artes", e.target.value)} /></TableCell>
+                      {!isFixedQty && (
+                        <TableCell><Input className={inputCls} value={t.volumeMax} onChange={e => onUpdateRow(idx, "volumeMax", e.target.value)} placeholder="∞" /></TableCell>
+                      )}
+                      {isPriceBased ? (
+                        <TableCell><Input className={inputCls} value={t.precoBase} onChange={e => onUpdateRow(idx, "precoBase", e.target.value)} placeholder="0.00" /></TableCell>
+                      ) : (
+                        <>
+                          <TableCell><Input className={inputCls} value={t.custoUnitario} onChange={e => onUpdateRow(idx, "custoUnitario", e.target.value)} /></TableCell>
+                          <TableCell><Input className={inputCls} value={t.frete} onChange={e => onUpdateRow(idx, "frete", e.target.value)} /></TableCell>
+                          <TableCell><Input className={inputCls} value={t.margem} onChange={e => onUpdateRow(idx, "margem", e.target.value)} /></TableCell>
+                          <TableCell><Input className={inputCls} value={t.artes} onChange={e => onUpdateRow(idx, "artes", e.target.value)} /></TableCell>
+                        </>
+                      )}
                       <TableCell>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onRemoveRow(idx)}>
                           <Trash2 className="h-3.5 w-3.5" />
@@ -809,13 +919,13 @@ function TiersDialog({ open, onOpenChange, productId, tiers, setTiers, onSave, o
             </div>
           )}
           <Button variant="outline" size="sm" onClick={onAddRow}>
-            <Plus className="h-3 w-3 mr-1" /> Adicionar Faixa
+            <Plus className="h-3 w-3 mr-1" /> {addLabel}
           </Button>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={onSave} disabled={saving}>
-            {saving ? "Salvando..." : "Salvar Faixas"}
+            {saving ? "Salvando..." : "Salvar Entradas"}
           </Button>
         </DialogFooter>
       </DialogContent>

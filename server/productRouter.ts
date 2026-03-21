@@ -86,6 +86,8 @@ export const productRouter = router({
       irpj: z.string().default("6.00"),
       comRestaurante: z.string().default("15.00"),
       comComercial: z.string().default("10.00"),
+      pricingMode: z.enum(["cost_based", "price_based"]).default("cost_based"),
+      entryType: z.enum(["tiers", "fixed_quantities"]).default("tiers"),
       isActive: z.boolean().default(true),
     }))
     .mutation(async ({ input }) => {
@@ -110,6 +112,8 @@ export const productRouter = router({
       irpj: z.string().optional(),
       comRestaurante: z.string().optional(),
       comComercial: z.string().optional(),
+      pricingMode: z.enum(["cost_based", "price_based"]).optional(),
+      entryType: z.enum(["tiers", "fixed_quantities"]).optional(),
       isActive: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
@@ -154,10 +158,11 @@ export const productRouter = router({
         id: z.number().optional(),
         volumeMin: z.number().int().min(0),
         volumeMax: z.number().int().nullable(),
-        custoUnitario: z.string(),
-        frete: z.string(),
+        custoUnitario: z.string().default("0.0000"),
+        frete: z.string().default("0.00"),
         margem: z.string().default("50.00"),
         artes: z.number().int().default(1),
+        precoBase: z.string().nullable().optional(),
       })),
     }))
     .mutation(async ({ input }) => {
@@ -174,6 +179,7 @@ export const productRouter = router({
               frete: t.frete,
               margem: t.margem,
               artes: t.artes,
+              precoBase: t.precoBase ?? null,
             }))
           );
         }

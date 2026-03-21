@@ -90,6 +90,8 @@ export default function PriceTable() {
     () => productsList.find((p) => p.id === selectedProductId),
     [productsList, selectedProductId]
   );
+  const isPriceBasedProduct = selectedProduct?.pricingMode === "price_based";
+  const isFixedQtyProduct = selectedProduct?.entryType === "fixed_quantities";
   const upsertTiersMutation = trpc.product.upsertTiers.useMutation({
     onSuccess: () => { refetchTiers(); toast.success("Faixas salvas!"); },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -575,6 +577,160 @@ export default function PriceTable() {
         </div>
       }
     >
+      {isPriceBasedProduct ? (
+        productTiers.length === 0 ? (
+          <div className="rounded-lg border border-border/40 bg-muted/20 p-6 text-center text-sm text-muted-foreground">
+            <p className="font-medium text-foreground mb-1">Nenhuma entrada de preço cadastrada</p>
+            <p>Adicione entradas de preço no cadastro do produto para visualizar a tabela.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-1 space-y-4">
+              <Section title="Inputs" icon={Package}>
+                <div className="space-y-5">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1.5"><Package className="w-3 h-3" /> {isFixedQtyProduct ? "Quantidade" : "Entrada de Preço"}</Label>
+                    <Select value={String(volumeIdx)} onValueChange={(v) => setVolumeIdx(parseInt(v))}>
+                      <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {productTiers.map((tier, idx) => (
+                          <SelectItem key={tier.id} value={String(idx)}>
+                            {isFixedQtyProduct
+                              ? `${tier.volumeMin.toLocaleString("pt-BR")} un.`
+                              : tier.volumeMax
+                                ? `${tier.volumeMin.toLocaleString("pt-BR")} – ${tier.volumeMax.toLocaleString("pt-BR")}`
+                                : `${tier.volumeMin.toLocaleString("pt-BR")}+`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs flex items-center justify-between">
+                      <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Semanas</span>
+                      <span className="font-mono font-bold text-primary">{semanas}</span>
+                    </Label>
+                    <Slider min={0} max={SEMANAS.length - 1} step={1} value={[semanaIdx]} onValueChange={([v]) => setSemanaIdx(v)} />
+                    <div className="flex justify-between text-[10px] text-muted-foreground font-mono"><span>4</span><span>52</span></div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1.5"><CreditCard className="w-3 h-3" /> Pagamento</Label>
+                    <Select value={formaPagamento} onValueChange={setFormaPagamento}>
+                      <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pix">Pix {pagamentoConfig.pix > 0 && `(-${pagamentoConfig.pix}%)`}</SelectItem>
+                        <SelectItem value="boleto">Boleto</SelectItem>
+                        <SelectItem value="cartao">Cartão {pagamentoConfig.cartao > 0 && `(+${pagamentoConfig.cartao}%)`}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1.5"><Handshake className="w-3 h-3" /> Desconto Parceiro</Label>
+                    <Button
+                      variant={descontoParceiro ? "default" : "outline"}
+                      size="sm"
+                      className={`w-full gap-1.5 h-9 text-sm ${descontoParceiro ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}`}
+                      onClick={() => setDescontoParceiro(!descontoParceiro)}
+                    >
+                      <Handshake className="w-3.5 h-3.5" />
+                      {descontoParceiro ? "Parceiro ativo (−10%)" : "Ativar desconto parceiro (−10%)"}
+                    </Button>
+                  </div>
+                </div>
+              </Section>
+
+              {(() => {
+                const tier = productTiers[Math.min(volumeIdx, productTiers.length - 1)];
+                if (!tier) return null;
+                const precoBase4sem = parseFloat(tier.precoBase ?? "0") || 0;
+                const irpj = premissas.irpj / 100;
+                const comRest = premissas.comissaoRestaurante / 100;
+                const comCom = premissas.comissaoComercial / 100;
+                const receitaLiquidaGPC = precoBase4sem * (1 - irpj - comRest - comCom);
+                return (
+                  <Section title="Receita Líquida GPC" icon={TrendingUp}>
+                    <div className="space-y-2">
+                      <EconRow label="Preço Base (4sem)" value={formatCurrency(precoBase4sem)} bold />
+                      <EconRow label="IRPJ" value={`${premissas.irpj}% = ${formatCurrency(precoBase4sem * irpj)}`} />
+                      <EconRow label="Com. Restaurante" value={`${premissas.comissaoRestaurante}% = ${formatCurrency(precoBase4sem * comRest)}`} />
+                      <EconRow label="Com. Comercial" value={`${premissas.comissaoComercial}% = ${formatCurrency(precoBase4sem * comCom)}`} />
+                      <EconRow label="Rec. Líquida GPC (4sem)" value={formatCurrency(receitaLiquidaGPC)} bold accent />
+                    </div>
+                  </Section>
+                );
+              })()}
+            </div>
+
+            <div className="lg:col-span-2 space-y-4">
+              {(() => {
+                const tier = productTiers[Math.min(volumeIdx, productTiers.length - 1)];
+                if (!tier) return null;
+                const precoBase4sem = parseFloat(tier.precoBase ?? "0") || 0;
+                const irpj = premissas.irpj / 100;
+                const comRest = premissas.comissaoRestaurante / 100;
+                const comCom = premissas.comissaoComercial / 100;
+                const receitaLiquidaGPC4sem = precoBase4sem * (1 - irpj - comRest - comCom);
+                const nPeriodos = semanas / 4;
+                const precoSemDescDuracao = precoBase4sem * nPeriodos;
+                const precoComDescDuracao = precoSemDescDuracao * (1 - descPrazo);
+                const precoAntesDescParceiro = precoComDescDuracao * (1 + ajustePag);
+                const descParcPerc = descontoParceiro ? 0.10 : 0;
+                const precoFinal = precoAntesDescParceiro * (1 - descParcPerc);
+                const receitaLiquidaGPCTotal = receitaLiquidaGPC4sem * nPeriodos * (1 - descPrazo) * (1 + ajustePag) * (1 - descParcPerc);
+
+                const tabelaDuracao = SEMANAS.map((s) => {
+                  const mult = s / 4;
+                  const pSemDesc = precoBase4sem * mult;
+                  const dsc = (descontosPrazo[s] || 0) / 100;
+                  const pComDesc = pSemDesc * (1 - dsc);
+                  const pFinal = pComDesc * (1 + ajustePag) * (1 - descParcPerc);
+                  const recLiq = receitaLiquidaGPC4sem * mult * (1 - dsc) * (1 + ajustePag) * (1 - descParcPerc);
+                  return { semanas: s, desconto: dsc, precoSemDesconto: pSemDesc, precoComDesconto: pComDesc, precoFinal: pFinal, receitaLiquidaGPC: recLiq };
+                });
+
+                return (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <KpiCard label="Preço Total" value={formatCurrency(precoFinal)} sub={`${semanas} sem • ${pagLabel}${descontoParceiro ? " • parceiro" : ""}`} variant="primary" icon={DollarSign} />
+                      <KpiCard label="Preço Base (4sem)" value={formatCurrency(precoBase4sem)} sub="por período sem desconto" icon={TrendingUp} />
+                      <KpiCard label="Rec. Líquida GPC" value={formatCurrency(receitaLiquidaGPCTotal)} sub={`${semanas} sem após deduções`} icon={PieChart} />
+                    </div>
+
+                    <Section title="Tabela por Duração" icon={BarChart3}>
+                      <div className="overflow-x-auto -mx-3 px-3">
+                        <table className="w-full text-xs min-w-[480px]">
+                          <thead>
+                            <tr className="border-b border-border/20">
+                              <th className="text-left p-2.5 font-medium text-muted-foreground">Duração</th>
+                              <th className="text-right p-2.5 font-medium text-muted-foreground">S/ Desc.</th>
+                              <th className="text-center p-2.5 font-medium text-muted-foreground">Desc. Prazo</th>
+                              <th className="text-right p-2.5 font-medium text-muted-foreground">Preço Final</th>
+                              <th className="text-right p-2.5 font-medium text-muted-foreground text-emerald-600 dark:text-emerald-400">Rec. Líq. GPC</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tabelaDuracao.map((row) => (
+                              <tr key={row.semanas} className={`border-b border-border/10 transition-colors ${row.semanas === semanas ? "bg-primary/10" : "hover:bg-muted/20"}`}>
+                                <td className="p-2.5 font-medium">{row.semanas} sem</td>
+                                <td className="p-2.5 text-right font-mono text-muted-foreground">{formatCurrency(row.precoSemDesconto)}</td>
+                                <td className="p-2.5 text-center">
+                                  {row.desconto > 0 ? <span className="text-emerald-400 font-mono text-xs font-semibold">-{(row.desconto * 100).toFixed(0)}%</span> : <span className="text-muted-foreground text-xs">—</span>}
+                                </td>
+                                <td className="p-2.5 text-right font-mono font-semibold text-primary">{formatCurrency(row.precoFinal)}</td>
+                                <td className="p-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400">{formatCurrency(row.receitaLiquidaGPC)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Section>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 space-y-4">
           <Section title="Inputs" icon={Package}>
@@ -923,6 +1079,7 @@ export default function PriceTable() {
           </Section>
         </div>
       </div>
+      )}
 
       <Dialog open={showCotacaoDialog} onOpenChange={setShowCotacaoDialog}>
         <DialogContent className="sm:max-w-md">

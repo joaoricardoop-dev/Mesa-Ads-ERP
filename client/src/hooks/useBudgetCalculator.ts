@@ -28,6 +28,7 @@ export interface ItemPricingInput {
   artes: number;
   semanas: number;
   premissas: ItemPremissas;
+  precoBase?: number;
 }
 
 /** Parâmetros globais que se aplicam ao orçamento inteiro */
@@ -50,6 +51,8 @@ export interface ItemCalcResult {
   descPrazoVal: number;
   precoComDescDuracao: number;
   semanas: number;
+  isPriceBased: boolean;
+  receitaLiquidaGPC?: number;
 }
 
 export interface BudgetTotals {
@@ -66,10 +69,38 @@ export interface BudgetTotals {
 // ─── Calculation ───────────────────────────────────────────────────────────────
 
 export function calcItemPrice(input: ItemPricingInput): ItemCalcResult {
-  const { volume, custoUnitario, frete, margem, artes, semanas, premissas } = input;
+  const { volume, custoUnitario, frete, margem, artes, semanas, premissas, precoBase } = input;
   const irpj = premissas.irpj / 100;
   const comRest = premissas.comissaoRestaurante / 100;
   const comCom = premissas.comissaoComercial / 100;
+
+  const isPriceBased = precoBase !== undefined && precoBase > 0;
+
+  if (isPriceBased) {
+    const nPeriodos = semanas / 4;
+    const precoSemDesconto = precoBase * nPeriodos;
+    const descPrazoPerc = (DESCONTOS_PRAZO[semanas] ?? 0) / 100;
+    const descPrazoVal = precoSemDesconto * descPrazoPerc;
+    const precoComDescDuracao = precoSemDesconto - descPrazoVal;
+    const precoUnit4sem = volume > 0 ? precoBase / volume : 0;
+    const receitaLiquidaGPC = precoBase * (1 - irpj - comRest - comCom);
+
+    return {
+      denominador: 1 - irpj - comRest - comCom,
+      custoTotal4sem: 0,
+      precoTotalBase4sem: precoBase,
+      precoUnit4sem,
+      nPeriodos,
+      custoPorUnidade: 0,
+      precoSemDesconto,
+      descPrazoPerc,
+      descPrazoVal,
+      precoComDescDuracao,
+      semanas,
+      isPriceBased: true,
+      receitaLiquidaGPC,
+    };
+  }
 
   const denominador = 1 - margem - irpj - comRest - comCom;
   const custoTotal4sem = custoUnitario * artes * volume + frete;
@@ -98,6 +129,7 @@ export function calcItemPrice(input: ItemPricingInput): ItemCalcResult {
     descPrazoVal,
     precoComDescDuracao,
     semanas,
+    isPriceBased: false,
   };
 }
 
