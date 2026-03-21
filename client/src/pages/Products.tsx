@@ -344,8 +344,8 @@ export default function Products() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {SEMANAS_OPTIONS.map(o => (
-                      <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>
+                    {SEMANAS_OPTIONS.map(weeks => (
+                      <SelectItem key={weeks} value={String(weeks)}>{weeks} semanas</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
