@@ -138,6 +138,7 @@ async function startServer() {
 
           const clientId = meta.clientId || null;
           const restaurantId = meta.restaurantId || null;
+          const partnerId = meta.partnerId || null;
           user = await authStorage.upsertUser({
             id: clerkUser.id,
             email: clerkUser.emailAddresses?.[0]?.emailAddress || null,
@@ -147,6 +148,7 @@ async function startServer() {
             role,
             clientId: clientId ? Number(clientId) : null,
             restaurantId: restaurantId ? Number(restaurantId) : null,
+            partnerId: partnerId ? Number(partnerId) : null,
             onboardingComplete: !isSelfRegistered,
             selfRegistered: isSelfRegistered,
           });

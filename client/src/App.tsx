@@ -47,6 +47,7 @@ import QuotationSign from "./pages/QuotationSign";
 import Products from "./pages/Products";
 import Partners from "./pages/Partners";
 import PartnerDetail from "./pages/PartnerDetail";
+import ParceiroPortal from "./pages/ParceiroPortal";
 import BudgetCreator from "./pages/BudgetCreator";
 
 function AnuncianteRouter() {
@@ -65,6 +66,16 @@ function RestauranteRouter() {
       <Route path="/" component={RestaurantePortal} />
       <Route path="/portal" component={RestaurantePortal} />
       <Route component={RestaurantePortal} />
+    </Switch>
+  );
+}
+
+function ParceiroRouter() {
+  return (
+    <Switch>
+      <Route path="/" component={ParceiroPortal} />
+      <Route path="/portal" component={ParceiroPortal} />
+      <Route component={ParceiroPortal} />
     </Switch>
   );
 }
@@ -409,6 +420,7 @@ function AuthenticatedApp() {
   const isImpersonating = impersonation !== null && user && INTERNAL_ROLES.includes(user.role || "");
   const isAnunciante = effectiveUser?.role === "anunciante";
   const isRestaurante = effectiveUser?.role === "restaurante";
+  const isParceiro = effectiveUser?.role === "parceiro";
   const needsOnboarding = isAnunciante && effectiveUser?.onboardingComplete === false && !isImpersonating;
 
   const devToolsPanel = (
@@ -446,6 +458,17 @@ function AuthenticatedApp() {
       <div className="h-screen flex overflow-hidden">
         <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)}>
           <RestauranteRouter />
+        </DashboardLayout>
+        {devToolsPanel}
+      </div>
+    );
+  }
+
+  if (isParceiro) {
+    return (
+      <div className="h-screen flex overflow-hidden">
+        <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)}>
+          <ParceiroRouter />
         </DashboardLayout>
         {devToolsPanel}
       </div>

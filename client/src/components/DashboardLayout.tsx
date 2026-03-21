@@ -111,6 +111,10 @@ const RESTAURANTE_NAV_ENTRIES: NavEntry[] = [
   { icon: UtensilsCrossed, label: "Meu Portal", path: "/" },
 ];
 
+const PARCEIRO_NAV_ENTRIES: NavEntry[] = [
+  { icon: Handshake, label: "Meu Portal", path: "/" },
+];
+
 const NAV_ENTRIES: NavEntry[] = [
   { icon: BarChart3, label: "Dashboard", path: "/" },
   {
@@ -282,7 +286,7 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0 px-2 py-2">
             <SidebarMenu>
-              {(user.role === "anunciante" ? ANUNCIANTE_NAV_ENTRIES : user.role === "restaurante" ? RESTAURANTE_NAV_ENTRIES : NAV_ENTRIES).map((entry) => {
+              {(user.role === "anunciante" ? ANUNCIANTE_NAV_ENTRIES : user.role === "restaurante" ? RESTAURANTE_NAV_ENTRIES : user.role === "parceiro" ? PARCEIRO_NAV_ENTRIES : NAV_ENTRIES).map((entry) => {
                 const userRole = user.role || "";
                 const canSee = (item: { adminOnly?: boolean; allowedRoles?: string[] }) => {
                   if (item.adminOnly && userRole !== "admin") return false;

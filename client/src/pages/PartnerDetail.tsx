@@ -37,6 +37,8 @@ import {
   Tag,
   Pencil,
   Hash,
+  UserPlus,
+  Send,
 } from "lucide-react";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -108,6 +110,8 @@ export default function PartnerDetail() {
   const partnerId = match ? parseInt(params!.id) : 0;
 
   const [editOpen, setEditOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ email: "", firstName: "", lastName: "" });
   const [editForm, setEditForm] = useState({
     name: "",
     company: "",
@@ -126,12 +130,23 @@ export default function PartnerDetail() {
   const { data: partnerLeads = [] } = trpc.partner.getLeads.useQuery({ partnerId }, { enabled: partnerId > 0 });
   const { data: partnerQuotations = [] } = trpc.partner.getQuotations.useQuery({ partnerId }, { enabled: partnerId > 0 });
   const { data: revenueData } = trpc.partner.getRevenue.useQuery({ partnerId }, { enabled: partnerId > 0 });
+  const { data: partnerUsers = [], refetch: refetchUsers } = trpc.parceiroPortal.getUsers.useQuery({ partnerId }, { enabled: partnerId > 0 });
 
   const updateMutation = trpc.partner.update.useMutation({
     onSuccess: () => {
       utils.partner.get.invalidate({ id: partnerId });
       setEditOpen(false);
       toast.success("Parceiro atualizado!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const inviteMutation = trpc.parceiroPortal.invitePartnerUser.useMutation({
+    onSuccess: () => {
+      setInviteOpen(false);
+      setInviteForm({ email: "", firstName: "", lastName: "" });
+      toast.success("Convite enviado com sucesso!");
+      refetchUsers();
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
@@ -233,6 +248,7 @@ export default function PartnerDetail() {
           <TabsTrigger value="painel" className="text-xs">Painel</TabsTrigger>
           <TabsTrigger value="leads" className="text-xs">Leads ({partnerLeads.length})</TabsTrigger>
           <TabsTrigger value="cotacoes" className="text-xs">Cotações ({partnerQuotations.length})</TabsTrigger>
+          <TabsTrigger value="usuarios" className="text-xs">Usuários ({partnerUsers.length})</TabsTrigger>
           <TabsTrigger value="info" className="text-xs">Informações</TabsTrigger>
         </TabsList>
 
@@ -376,6 +392,50 @@ export default function PartnerDetail() {
           </div>
         </TabsContent>
 
+        <TabsContent value="usuarios" className="mt-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-muted-foreground">Usuários vinculados a este parceiro</h3>
+            <Button size="sm" className="gap-2" onClick={() => setInviteOpen(true)}>
+              <UserPlus className="w-4 h-4" /> Convidar Usuário
+            </Button>
+          </div>
+          <div className="rounded-xl border bg-card overflow-hidden">
+            {partnerUsers.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground text-sm">
+                Nenhum usuário vinculado. Convide um usuário para dar acesso ao portal do parceiro.
+              </div>
+            ) : (
+              <div className="divide-y divide-border/20">
+                {partnerUsers.map((u: any) => (
+                  <div key={u.id} className="flex items-center justify-between p-4">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {u.firstName || u.email}
+                        {u.lastName ? ` ${u.lastName}` : ""}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{u.email || "—"}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-primary/10 text-primary border-primary/30"
+                      >
+                        parceiro
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${u.isActive ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-red-500/10 text-red-400 border-red-500/30"}`}
+                      >
+                        {u.isActive ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
         <TabsContent value="info" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-xl border bg-card p-5 space-y-1">
@@ -405,6 +465,56 @@ export default function PartnerDetail() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convidar Usuário do Parceiro</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              O usuário receberá um convite por e-mail e terá acesso ao portal do parceiro com a comissão configurada.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Nome *</Label>
+                <Input
+                  value={inviteForm.firstName}
+                  onChange={(e) => setInviteForm({ ...inviteForm, firstName: e.target.value })}
+                  placeholder="Nome"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Sobrenome</Label>
+                <Input
+                  value={inviteForm.lastName}
+                  onChange={(e) => setInviteForm({ ...inviteForm, lastName: e.target.value })}
+                  placeholder="Sobrenome"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>E-mail *</Label>
+              <Input
+                type="email"
+                value={inviteForm.email}
+                onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                placeholder="usuario@empresa.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancelar</Button>
+            <Button
+              className="gap-2"
+              disabled={inviteMutation.isPending || !inviteForm.email.trim() || !inviteForm.firstName.trim()}
+              onClick={() => inviteMutation.mutate({ email: inviteForm.email, firstName: inviteForm.firstName, lastName: inviteForm.lastName || undefined, partnerId })}
+            >
+              {inviteMutation.isPending ? "Enviando..." : <><Send className="w-4 h-4" /> Enviar Convite</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
