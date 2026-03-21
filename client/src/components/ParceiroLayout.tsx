@@ -1,5 +1,5 @@
 import { useClerk } from "@clerk/clerk-react";
-import { LogOut, LayoutDashboard, Tag } from "lucide-react";
+import { LogOut, LayoutDashboard, Tag, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLocation } from "wouter";
@@ -10,17 +10,18 @@ interface ParceiroLayoutProps {
   children: React.ReactNode;
 }
 
+const NAV_ITEMS = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/leads", label: "Meus Leads", icon: Users },
+  { href: "/tabela-precos", label: "Tabela de Preços", icon: Tag },
+];
+
 export function ParceiroLayout({ user, children }: ParceiroLayoutProps) {
   const { signOut } = useClerk();
   const { theme } = useTheme();
   const [location, navigate] = useLocation();
 
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "Parceiro";
-
-  const navItems = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/tabela-precos", label: "Tabela de Preços", icon: Tag },
-  ];
 
   const isActive = (href: string) => {
     if (href === "/") return location === "/" || location === "/portal";
@@ -34,13 +35,13 @@ export function ParceiroLayout({ user, children }: ParceiroLayoutProps) {
           <img
             src={theme === "dark" ? "/logo-white.png" : "/logo-black.png"}
             alt="mesa.ads"
-            className="h-5"
+            className="h-5 shrink-0"
           />
           <span className="text-xs text-muted-foreground border-l border-border/30 pl-3 hidden sm:block">Portal do Parceiro</span>
         </div>
 
         <nav className="flex items-center gap-1 flex-1">
-          {navItems.map(({ href, label, icon: Icon }) => (
+          {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
             <button
               key={href}
               onClick={() => navigate(href)}
@@ -69,6 +70,23 @@ export function ParceiroLayout({ user, children }: ParceiroLayoutProps) {
           </Button>
         </div>
       </header>
+
+      <nav className="sm:hidden flex items-center gap-1 px-4 py-2 border-b border-border/30 bg-card overflow-x-auto">
+        {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+          <button
+            key={href}
+            onClick={() => navigate(href)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors shrink-0 ${
+              isActive(href)
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
+      </nav>
 
       <main className="flex-1 overflow-auto">
         {children}

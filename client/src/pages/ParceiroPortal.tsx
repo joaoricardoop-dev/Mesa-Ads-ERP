@@ -1,8 +1,9 @@
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
 import type { LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DollarSign,
   Users,
@@ -11,6 +12,7 @@ import {
   Clock,
   CheckCircle2,
   Handshake,
+  Plus,
 } from "lucide-react";
 
 const QUOTATION_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -112,6 +114,11 @@ export default function ParceiroPortal() {
             </div>
           )}
         </div>
+        <Link href="/leads">
+          <Button className="gap-2 shrink-0">
+            <Plus className="w-4 h-4" /> Indicar Lead
+          </Button>
+        </Link>
       </div>
 
       {loadingDash ? (
@@ -156,9 +163,9 @@ export default function ParceiroPortal() {
             <h2 className="font-semibold text-sm flex items-center gap-2">
               <Users className="w-4 h-4 text-primary" /> Últimos Leads
             </h2>
-            {leads.length > 5 && (
-              <span className="text-xs text-muted-foreground">{leads.length} no total</span>
-            )}
+            <Link href="/leads" className="text-xs text-primary hover:underline">
+              Ver todos
+            </Link>
           </div>
           {loadingLeads ? (
             <div className="p-8 text-center text-muted-foreground text-sm">Carregando...</div>

@@ -51,6 +51,7 @@ import PartnerDetail from "./pages/PartnerDetail";
 import ParceiroPortal from "./pages/ParceiroPortal";
 import ParceiroOnboarding from "./pages/ParceiroOnboarding";
 import ParceiroTabelaPrecos from "./pages/ParceiroTabelaPrecos";
+import ParceiroLeads from "./pages/ParceiroLeads";
 import BudgetCreator from "./pages/BudgetCreator";
 
 function AnuncianteRouter() {
@@ -79,6 +80,7 @@ function ParceiroRouter() {
       <Route path="/" component={ParceiroPortal} />
       <Route path="/portal" component={ParceiroPortal} />
       <Route path="/tabela-precos" component={ParceiroTabelaPrecos} />
+      <Route path="/leads" component={ParceiroLeads} />
       <Route component={ParceiroPortal} />
     </Switch>
   );

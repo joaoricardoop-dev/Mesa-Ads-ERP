@@ -1,10 +1,9 @@
-import { parceiroProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
+import { parceiroProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { partners, leads, quotations, clients, users, products, productPricingTiers } from "../drizzle/schema";
+import { partners, leads, quotations, clients, users, leadInteractions, products, productPricingTiers } from "../drizzle/schema";
 import { eq, desc, and, sql, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { authStorage } from "./replit_integrations/auth";
 
 async function getDatabase() {
   const d = await getDb();
@@ -61,7 +60,10 @@ export const parceiroPortalRouter = router({
     }),
 
   getLeads: parceiroProcedure
-    .query(async ({ ctx }) => {
+    .input(z.object({
+      stage: z.string().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
       const partnerId = ctx.user.partnerId;
       if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
 
@@ -69,9 +71,111 @@ export const parceiroPortalRouter = router({
       const rows = await db
         .select()
         .from(leads)
-        .where(eq(leads.partnerId, partnerId))
+        .where(
+          input?.stage
+            ? and(eq(leads.partnerId, partnerId), eq(leads.stage, input.stage))
+            : eq(leads.partnerId, partnerId)
+        )
         .orderBy(desc(leads.updatedAt));
-      return rows;
+
+      const enriched = await Promise.all(rows.map(async (lead) => {
+        const leadQuotations = await db
+          .select({
+            id: quotations.id,
+            quotationNumber: quotations.quotationNumber,
+            totalValue: quotations.totalValue,
+            status: quotations.status,
+            createdAt: quotations.createdAt,
+          })
+          .from(quotations)
+          .where(eq(quotations.leadId, lead.id))
+          .orderBy(desc(quotations.createdAt))
+          .limit(1);
+        return {
+          ...lead,
+          latestQuotation: leadQuotations[0] || null,
+          hasQuotation: leadQuotations.length > 0,
+        };
+      }));
+
+      return enriched;
+    }),
+
+  getLeadDetail: parceiroProcedure
+    .input(z.object({ leadId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const partnerId = ctx.user.partnerId;
+      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+
+      const db = await getDatabase();
+
+      const [lead] = await db
+        .select()
+        .from(leads)
+        .where(and(eq(leads.id, input.leadId), eq(leads.partnerId, partnerId)))
+        .limit(1);
+
+      if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado ou sem permissão." });
+
+      const stageHistory = await db
+        .select()
+        .from(leadInteractions)
+        .where(and(eq(leadInteractions.leadId, lead.id), eq(leadInteractions.type, "stage_change")))
+        .orderBy(desc(leadInteractions.createdAt));
+
+      const leadQuotations = await db
+        .select({
+          id: quotations.id,
+          quotationNumber: quotations.quotationNumber,
+          quotationName: quotations.quotationName,
+          coasterVolume: quotations.coasterVolume,
+          cycles: quotations.cycles,
+          totalValue: quotations.totalValue,
+          status: quotations.status,
+          createdAt: quotations.createdAt,
+          updatedAt: quotations.updatedAt,
+          productId: quotations.productId,
+          productName: products.name,
+        })
+        .from(quotations)
+        .leftJoin(products, eq(quotations.productId, products.id))
+        .where(eq(quotations.leadId, lead.id))
+        .orderBy(desc(quotations.createdAt));
+
+      return {
+        ...lead,
+        stageHistory,
+        quotations: leadQuotations,
+      };
+    }),
+
+  createLead: parceiroProcedure
+    .input(z.object({
+      name: z.string().min(1, "Nome é obrigatório"),
+      company: z.string().optional(),
+      cnpj: z.string().optional(),
+      contactName: z.string().optional(),
+      contactPhone: z.string().optional(),
+      contactEmail: z.string().optional(),
+      city: z.string().optional(),
+      state: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const partnerId = ctx.user.partnerId;
+      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+
+      const db = await getDatabase();
+
+      const [created] = await db.insert(leads).values({
+        ...input,
+        type: "anunciante",
+        origin: "parceiro",
+        stage: "novo",
+        partnerId,
+      }).returning();
+
+      return created;
     }),
 
   getQuotations: parceiroProcedure
