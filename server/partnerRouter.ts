@@ -1,4 +1,4 @@
-import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
+import { comercialProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import { partners, leads, quotations, campaigns, clients } from "../drizzle/schema";
@@ -12,7 +12,7 @@ async function getDatabase() {
 }
 
 export const partnerRouter = router({
-  list: protectedProcedure
+  list: comercialProcedure
     .input(z.object({
       status: z.enum(["active", "inactive"]).optional(),
       type: z.enum(["agencia", "indicador", "consultor"]).optional(),
@@ -48,7 +48,7 @@ export const partnerRouter = router({
       return result;
     }),
 
-  get: protectedProcedure
+  get: comercialProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const db = await getDatabase();
@@ -114,7 +114,7 @@ export const partnerRouter = router({
       return { success: true };
     }),
 
-  getLeads: protectedProcedure
+  getLeads: comercialProcedure
     .input(z.object({ partnerId: z.number() }))
     .query(async ({ input }) => {
       const db = await getDatabase();
@@ -129,7 +129,7 @@ export const partnerRouter = router({
       return rows.rows as any[];
     }),
 
-  getQuotations: protectedProcedure
+  getQuotations: comercialProcedure
     .input(z.object({ partnerId: z.number() }))
     .query(async ({ input }) => {
       const db = await getDatabase();
@@ -153,7 +153,7 @@ export const partnerRouter = router({
       return rows;
     }),
 
-  getRevenue: protectedProcedure
+  getRevenue: comercialProcedure
     .input(z.object({ partnerId: z.number() }))
     .query(async ({ input }) => {
       const db = await getDatabase();

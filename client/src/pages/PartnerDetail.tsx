@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
+import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
   Building2,
@@ -40,6 +41,25 @@ import {
   UserPlus,
   Send,
 } from "lucide-react";
+
+interface PartnerLead {
+  id: number;
+  name: string;
+  company: string | null;
+  type: string | null;
+  stage: string | null;
+  createdAt: string | null;
+}
+
+interface PartnerUser {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  role: string | null;
+  isActive: boolean | null;
+  createdAt: Date | null;
+}
 
 const TYPE_LABELS: Record<string, string> = {
   agencia: "Agência",
@@ -76,7 +96,7 @@ function formatDate(d: string | null | undefined) {
   }
 }
 
-function InfoRow({ label, value, icon: Icon }: { label: string; value: string | null | undefined; icon?: any }) {
+function InfoRow({ label, value, icon: Icon }: { label: string; value: string | null | undefined; icon?: LucideIcon }) {
   return (
     <div className="flex items-start gap-3 py-2">
       {Icon && <Icon className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />}
@@ -88,7 +108,7 @@ function InfoRow({ label, value, icon: Icon }: { label: string; value: string | 
   );
 }
 
-function KpiCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: string | number; color: string }) {
+function KpiCard({ icon: Icon, label, value, color }: { icon: LucideIcon; label: string; value: string | number; color: string }) {
   return (
     <div className="rounded-xl border bg-card p-4">
       <div className="flex items-center gap-3">
@@ -324,8 +344,8 @@ export default function PartnerDetail() {
               </div>
             ) : (
               <div className="divide-y divide-border/20">
-                {partnerLeads.map((lead: any) => {
-                  const stageCfg = STAGE_LABELS[lead.stage] || { label: lead.stage, color: "bg-gray-500/10 text-gray-400" };
+                {(partnerLeads as PartnerLead[]).map((lead) => {
+                  const stageCfg = STAGE_LABELS[lead.stage ?? ""] || { label: lead.stage ?? "—", color: "bg-gray-500/10 text-gray-400" };
                   return (
                     <div
                       key={lead.id}
@@ -406,7 +426,7 @@ export default function PartnerDetail() {
               </div>
             ) : (
               <div className="divide-y divide-border/20">
-                {partnerUsers.map((u: any) => (
+                {(partnerUsers as PartnerUser[]).map((u) => (
                   <div key={u.id} className="flex items-center justify-between p-4">
                     <div>
                       <p className="text-sm font-medium">
@@ -548,7 +568,7 @@ export default function PartnerDetail() {
               </div>
               <div className="space-y-2">
                 <Label>Tipo</Label>
-                <Select value={editForm.type} onValueChange={(v: any) => setEditForm({ ...editForm, type: v })}>
+                <Select value={editForm.type} onValueChange={(v) => setEditForm({ ...editForm, type: v as typeof editForm.type })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -593,7 +613,7 @@ export default function PartnerDetail() {
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select value={editForm.status} onValueChange={(v: any) => setEditForm({ ...editForm, status: v })}>
+                <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as typeof editForm.status })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

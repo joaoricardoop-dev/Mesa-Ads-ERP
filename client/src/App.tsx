@@ -6,6 +6,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
+import { ParceiroLayout } from "./components/ParceiroLayout";
 import DevToolsPanel from "./components/DevToolsPanel";
 import { useAuth } from "./hooks/use-auth";
 import { SignIn, SignUp, useClerk } from "@clerk/clerk-react";
@@ -482,12 +483,12 @@ function AuthenticatedApp() {
 
   if (isParceiro) {
     return (
-      <div className="h-screen flex overflow-hidden">
-        <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)}>
+      <>
+        <ParceiroLayout user={effectiveUser}>
           <ParceiroRouter />
-        </DashboardLayout>
+        </ParceiroLayout>
         {devToolsPanel}
-      </div>
+      </>
     );
   }
 

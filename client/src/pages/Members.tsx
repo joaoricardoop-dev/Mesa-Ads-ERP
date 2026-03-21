@@ -373,12 +373,12 @@ export default function Members() {
                         onClick={() => setLinkPartnerDialog({
                           userId: member.id,
                           userName: [member.firstName, member.lastName].filter(Boolean).join(" ") || member.email || member.id,
-                          currentPartnerId: (member as any).partnerId ?? null,
+                          currentPartnerId: member.partnerId ?? null,
                         })}
                       >
                         <Handshake className="w-3 h-3" />
-                        {(member as any).partnerId
-                          ? `Parceiro: ${(partnersList as any[]).find((p: any) => p.id === (member as any).partnerId)?.name || `#${(member as any).partnerId}`}`
+                        {member.partnerId
+                          ? `Parceiro: ${partnersList.find((p) => p.id === member.partnerId)?.name || `#${member.partnerId}`}`
                           : "Vincular parceiro"}
                       </button>
                     )}

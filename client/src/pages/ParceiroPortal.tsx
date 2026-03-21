@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
+import type { LucideIcon } from "lucide-react";
 import {
   DollarSign,
   Users,
@@ -44,7 +45,7 @@ function KpiCard({
   sub,
   color,
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   value: string | number;
   sub?: string;
