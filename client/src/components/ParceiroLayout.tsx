@@ -1,13 +1,16 @@
 import { useClerk } from "@clerk/clerk-react";
-import { LogOut, LayoutDashboard, Tag, Users } from "lucide-react";
+import { LogOut, LayoutDashboard, Tag, Users, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLocation } from "wouter";
 import type { User } from "@shared/models/auth";
+import type { Impersonation } from "@/App";
 
 interface ParceiroLayoutProps {
   user: User | null;
   children: React.ReactNode;
+  impersonation?: Impersonation;
+  onExitImpersonation?: () => void;
 }
 
 const NAV_ITEMS = [
@@ -16,7 +19,7 @@ const NAV_ITEMS = [
   { href: "/tabela-precos", label: "Tabela de Preços", icon: Tag },
 ];
 
-export function ParceiroLayout({ user, children }: ParceiroLayoutProps) {
+export function ParceiroLayout({ user, children, impersonation, onExitImpersonation }: ParceiroLayoutProps) {
   const { signOut } = useClerk();
   const { theme } = useTheme();
   const [location, navigate] = useLocation();
@@ -30,6 +33,23 @@ export function ParceiroLayout({ user, children }: ParceiroLayoutProps) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {impersonation && (
+        <div className="flex items-center justify-between px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 shrink-0">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-medium text-amber-400">
+              Visualizando como <span className="font-bold">{impersonation.name}</span> — Parceiro
+            </span>
+          </div>
+          <button
+            onClick={onExitImpersonation}
+            className="text-xs px-3 py-1 rounded-md bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors font-medium"
+          >
+            Voltar para minha visão
+          </button>
+        </div>
+      )}
+
       <header className="h-14 border-b border-border/30 bg-card flex items-center px-6 shrink-0 z-10 gap-6">
         <div className="flex items-center gap-3 shrink-0">
           <img
@@ -59,15 +79,17 @@ export function ParceiroLayout({ user, children }: ParceiroLayoutProps) {
 
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-sm text-muted-foreground hidden sm:block">{displayName}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2 text-muted-foreground hover:text-foreground"
-            onClick={() => signOut()}
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Sair</span>
-          </Button>
+          {!impersonation && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-foreground"
+              onClick={() => signOut()}
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Sair</span>
+            </Button>
+          )}
         </div>
       </header>
 

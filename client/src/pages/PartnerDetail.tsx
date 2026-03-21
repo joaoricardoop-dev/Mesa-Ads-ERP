@@ -41,6 +41,7 @@ import {
   Hash,
   UserPlus,
   Send,
+  Eye,
 } from "lucide-react";
 
 interface PartnerLead {
@@ -258,9 +259,29 @@ export default function PartnerDetail() {
             </div>
           </div>
         </div>
-        <Button variant="outline" size="sm" className="gap-2" onClick={openEdit}>
-          <Pencil className="w-4 h-4" /> Editar
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-amber-400 border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-300"
+              onClick={() => {
+                const imp = {
+                  role: "parceiro" as const,
+                  partnerId: partner.id,
+                  name: partner.name,
+                };
+                (window as any).__IMPERSONATION__ = imp;
+                window.dispatchEvent(new CustomEvent("impersonation-change", { detail: imp }));
+              }}
+            >
+              <Eye className="w-4 h-4" /> Visualizar como parceiro
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="gap-2" onClick={openEdit}>
+            <Pencil className="w-4 h-4" /> Editar
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -305,6 +305,7 @@ export type Impersonation = {
   role: string;
   clientId?: number;
   restaurantId?: number;
+  partnerId?: number;
   name: string;
 } | null;
 
@@ -420,6 +421,7 @@ function AuthenticatedApp() {
       role: impersonation.role,
       ...(impersonation.clientId ? { clientId: impersonation.clientId } : {}),
       ...(impersonation.restaurantId ? { restaurantId: impersonation.restaurantId } : {}),
+      ...(impersonation.partnerId ? { partnerId: impersonation.partnerId } : {}),
     };
   }
 
@@ -488,7 +490,11 @@ function AuthenticatedApp() {
   if (isParceiro) {
     return (
       <>
-        <ParceiroLayout user={effectiveUser}>
+        <ParceiroLayout
+          user={effectiveUser}
+          impersonation={impersonation}
+          onExitImpersonation={() => setImpersonation(null)}
+        >
           <ParceiroRouter />
         </ParceiroLayout>
         {devToolsPanel}

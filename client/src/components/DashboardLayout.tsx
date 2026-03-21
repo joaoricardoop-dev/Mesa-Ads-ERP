@@ -534,7 +534,7 @@ function DashboardLayoutContent({
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-amber-400" />
               <span className="text-xs font-medium text-amber-400">
-                Visualizando como <span className="font-bold">{impersonation.name}</span> — {impersonation.role === "restaurante" ? "Restaurante" : "Anunciante"}
+                Visualizando como <span className="font-bold">{impersonation.name}</span> — {impersonation.role === "restaurante" ? "Restaurante" : impersonation.role === "parceiro" ? "Parceiro" : "Anunciante"}
               </span>
             </div>
             <button
