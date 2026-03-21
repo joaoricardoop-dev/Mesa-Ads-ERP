@@ -218,7 +218,7 @@ export const appRouter = router({
         const { createClerkClient } = await import("@clerk/express");
         const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
 
-        const db = await (await import("../db")).getDb();
+        const db = await (await import("./db")).getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
         const { users: usersTable } = await import("../drizzle/schema");
         const { eq } = await import("drizzle-orm");
