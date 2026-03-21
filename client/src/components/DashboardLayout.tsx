@@ -75,6 +75,7 @@ import {
   Layers,
   Eye,
   Package,
+  ChevronsUpDown,
   type LucideIcon,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -233,6 +234,41 @@ function DashboardLayoutContent({
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
+  const ACTIVE_RESTAURANT_KEY = "active-restaurant-id";
+  const isRestaurante = user.role === "restaurante";
+
+  const [activeRestaurantId, setActiveRestaurantId] = useState<number | null>(() => {
+    if (!isRestaurante) return null;
+    const stored = localStorage.getItem(ACTIVE_RESTAURANT_KEY);
+    if (stored) {
+      const id = parseInt(stored, 10);
+      if (!isNaN(id)) {
+        (window as any).__ACTIVE_RESTAURANT_ID__ = id;
+        return id;
+      }
+    }
+    if (user.restaurantId) {
+      (window as any).__ACTIVE_RESTAURANT_ID__ = user.restaurantId;
+      return user.restaurantId;
+    }
+    return null;
+  });
+
+  const { data: myRestaurants = [] } = trpc.restaurantePortal.myRestaurants.useQuery(undefined, {
+    enabled: isRestaurante,
+  });
+
+  const hasMultipleRestaurants = isRestaurante && myRestaurants.length > 1;
+
+  const handleRestaurantSwitch = (restaurantId: number) => {
+    setActiveRestaurantId(restaurantId);
+    localStorage.setItem(ACTIVE_RESTAURANT_KEY, String(restaurantId));
+    (window as any).__ACTIVE_RESTAURANT_ID__ = restaurantId;
+    queryClient.invalidateQueries();
+  };
+
+  const activeRestaurant = myRestaurants.find((r: any) => r.id === activeRestaurantId) || myRestaurants[0];
+
   const activeLabel = findActiveLabel(location);
 
   useEffect(() => {
@@ -283,6 +319,35 @@ function DashboardLayoutContent({
               )}
             </div>
           </SidebarHeader>
+
+          {hasMultipleRestaurants && !isCollapsed && (
+            <div className="px-3 py-2 border-b border-border/20">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent/50 transition-colors text-left focus:outline-none border border-border/30 bg-background">
+                    <UtensilsCrossed className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-xs font-medium truncate flex-1">
+                      {activeRestaurant?.name || "Selecionar restaurante"}
+                    </span>
+                    <ChevronsUpDown className="w-3 h-3 text-muted-foreground shrink-0" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="start">
+                  {myRestaurants.map((r: any) => (
+                    <DropdownMenuItem
+                      key={r.id}
+                      className={`cursor-pointer text-xs gap-2 ${r.id === activeRestaurantId ? "bg-primary/10 text-primary" : ""}`}
+                      onClick={() => handleRestaurantSwitch(r.id)}
+                    >
+                      <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{r.name}</span>
+                      {r.id === activeRestaurantId && <span className="ml-auto text-[10px] text-primary">ativo</span>}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
 
           <SidebarContent className="gap-0 px-2 py-2">
             <SidebarMenu>

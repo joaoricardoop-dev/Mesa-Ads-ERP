@@ -58,6 +58,10 @@ const trpcClient = trpc.createClient({
             headers.set("x-impersonate-restaurant-id", String(impersonation.restaurantId));
           }
         }
+        const activeRestaurantId = (window as any).__ACTIVE_RESTAURANT_ID__;
+        if (activeRestaurantId) {
+          headers.set("x-active-restaurant-id", String(activeRestaurantId));
+        }
         return globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",

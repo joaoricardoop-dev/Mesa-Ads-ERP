@@ -888,4 +888,20 @@ export const serviceOrderItems = pgTable("service_order_items", {
 export type ServiceOrderItem = typeof serviceOrderItems.$inferSelect;
 export type InsertServiceOrderItem = typeof serviceOrderItems.$inferInsert;
 
+// ─── User ↔ Restaurant (multi-access junction) ───────────────────────────────
+
+export const userRestaurants = pgTable("user_restaurants", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  restaurantId: integer("restaurant_id").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("idx_user_restaurants_user_id").on(t.userId),
+  index("idx_user_restaurants_restaurant_id").on(t.restaurantId),
+  unique("uq_user_restaurant").on(t.userId, t.restaurantId),
+]);
+
+export type UserRestaurant = typeof userRestaurants.$inferSelect;
+export type InsertUserRestaurant = typeof userRestaurants.$inferInsert;
+
 export * from "../shared/models/auth";

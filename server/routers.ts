@@ -327,6 +327,102 @@ export const appRouter = router({
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err?.message || "Erro ao convidar usuário." });
         }
       }),
+
+    listUserRestaurants: adminProcedure
+      .input(z.object({ userId: z.string() }))
+      .query(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { userRestaurants, activeRestaurants } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const rows = await db
+          .select({
+            id: userRestaurants.id,
+            restaurantId: userRestaurants.restaurantId,
+            restaurantName: activeRestaurants.name,
+            createdAt: userRestaurants.createdAt,
+          })
+          .from(userRestaurants)
+          .innerJoin(activeRestaurants, eq(userRestaurants.restaurantId, activeRestaurants.id))
+          .where(eq(userRestaurants.userId, input.userId));
+        return rows;
+      }),
+
+    linkRestaurant: adminProcedure
+      .input(z.object({ userId: z.string(), restaurantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { userRestaurants } = await import("../drizzle/schema");
+        const { and, eq } = await import("drizzle-orm");
+        const existing = await db
+          .select()
+          .from(userRestaurants)
+          .where(and(eq(userRestaurants.userId, input.userId), eq(userRestaurants.restaurantId, input.restaurantId)))
+          .limit(1);
+        if (existing.length > 0) return existing[0];
+        const [row] = await db.insert(userRestaurants).values({
+          userId: input.userId,
+          restaurantId: input.restaurantId,
+        }).returning();
+        return row;
+      }),
+
+    unlinkRestaurant: adminProcedure
+      .input(z.object({ userId: z.string(), restaurantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { userRestaurants } = await import("../drizzle/schema");
+        const { and, eq } = await import("drizzle-orm");
+        await db.delete(userRestaurants).where(
+          and(eq(userRestaurants.userId, input.userId), eq(userRestaurants.restaurantId, input.restaurantId))
+        );
+        return { success: true };
+      }),
+
+    listRestaurantUsers: adminProcedure
+      .input(z.object({ restaurantId: z.number() }))
+      .query(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { userRestaurants } = await import("../drizzle/schema");
+        const { users } = await import("../shared/models/auth");
+        const { eq } = await import("drizzle-orm");
+        const rows = await db
+          .select({
+            id: userRestaurants.id,
+            userId: userRestaurants.userId,
+            userEmail: users.email,
+            userFirstName: users.firstName,
+            userLastName: users.lastName,
+            createdAt: userRestaurants.createdAt,
+          })
+          .from(userRestaurants)
+          .innerJoin(users, eq(userRestaurants.userId, users.id))
+          .where(eq(userRestaurants.restaurantId, input.restaurantId));
+        return rows;
+      }),
+
+    listAllRestauranteUsers: adminProcedure.query(async () => {
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return [];
+      const { users } = await import("../shared/models/auth");
+      const { eq } = await import("drizzle-orm");
+      const rows = await db.select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        restaurantId: users.restaurantId,
+      }).from(users).where(eq(users.role, "restaurante"));
+      return rows;
+    }),
   }),
 
   // ─── CNPJ Lookup ────────────────────────────────────────────────────────
@@ -711,6 +807,19 @@ export const appRouter = router({
           role: "restaurante",
           updatedAt: new Date(),
         }).where(eq(users.id, input.userId)).returning();
+
+        try {
+          const { userRestaurants } = await import("../drizzle/schema");
+          const { and } = await import("drizzle-orm");
+          const existingLink = await db.select().from(userRestaurants).where(
+            and(eq(userRestaurants.userId, input.userId), eq(userRestaurants.restaurantId, input.restaurantId))
+          ).limit(1);
+          if (existingLink.length === 0) {
+            await db.insert(userRestaurants).values({ userId: input.userId, restaurantId: input.restaurantId });
+          }
+        } catch (err) {
+          console.error("Failed to insert into user_restaurants:", err);
+        }
 
         try {
           const { createClerkClient } = await import("@clerk/express");
@@ -1629,6 +1738,41 @@ export const appRouter = router({
       const user = ctx.user;
       if (!user || !user.restaurantId) return null;
       return getActiveRestaurant(user.restaurantId);
+    }),
+
+    myRestaurants: restauranteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user) return [];
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return [];
+      const { userRestaurants, activeRestaurants } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const linked = await db
+        .select({
+          id: activeRestaurants.id,
+          name: activeRestaurants.name,
+          logoUrl: activeRestaurants.logoUrl,
+          city: activeRestaurants.city,
+          state: activeRestaurants.state,
+        })
+        .from(userRestaurants)
+        .innerJoin(activeRestaurants, eq(userRestaurants.restaurantId, activeRestaurants.id))
+        .where(eq(userRestaurants.userId, user.id));
+
+      const primary = user.restaurantId
+        ? await db
+            .select({ id: activeRestaurants.id, name: activeRestaurants.name, logoUrl: activeRestaurants.logoUrl, city: activeRestaurants.city, state: activeRestaurants.state })
+            .from(activeRestaurants)
+            .where(eq(activeRestaurants.id, user.restaurantId))
+            .limit(1)
+        : [];
+
+      const allMap = new Map<number, typeof linked[0]>();
+      for (const r of [...primary, ...linked]) {
+        allMap.set(r.id, r);
+      }
+      return Array.from(allMap.values());
     }),
 
     myCampaigns: restauranteProcedure.query(async ({ ctx }) => {

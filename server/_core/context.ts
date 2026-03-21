@@ -80,6 +80,31 @@ export async function createContext(
     }
   }
 
+  if (user && user.role === "restaurante") {
+    const activeRestaurantId = opts.req.headers["x-active-restaurant-id"];
+    if (activeRestaurantId) {
+      const requestedId = parseInt(String(activeRestaurantId), 10);
+      if (!isNaN(requestedId)) {
+        try {
+          const { getDb } = await import("../db");
+          const db = await getDb();
+          if (db) {
+            const { userRestaurants } = await import("../../drizzle/schema");
+            const { and, eq } = await import("drizzle-orm");
+            const link = await db
+              .select()
+              .from(userRestaurants)
+              .where(and(eq(userRestaurants.userId, user.id), eq(userRestaurants.restaurantId, requestedId)))
+              .limit(1);
+            if (link.length > 0) {
+              user = { ...user, restaurantId: requestedId };
+            }
+          }
+        } catch {}
+      }
+    }
+  }
+
   return {
     req: opts.req,
     res: opts.res,
