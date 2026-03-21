@@ -888,6 +888,25 @@ export const serviceOrderItems = pgTable("service_order_items", {
 export type ServiceOrderItem = typeof serviceOrderItems.$inferSelect;
 export type InsertServiceOrderItem = typeof serviceOrderItems.$inferInsert;
 
+// ─── CRM Notifications ───────────────────────────────────────────────────────
+
+export const crmNotifications = pgTable("crm_notifications", {
+  id: serial("id").primaryKey(),
+  eventType: varchar("eventType", { length: 50 }).notNull(),
+  leadId: integer("leadId").references(() => leads.id, { onDelete: "cascade" }),
+  partnerId: integer("partnerId").references(() => partners.id, { onDelete: "set null" }),
+  message: text("message").notNull(),
+  readAt: timestamp("readAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_crm_notifications_lead_id").on(t.leadId),
+  index("idx_crm_notifications_read_at").on(t.readAt),
+  index("idx_crm_notifications_created_at").on(t.createdAt),
+]);
+
+export type CrmNotification = typeof crmNotifications.$inferSelect;
+export type InsertCrmNotification = typeof crmNotifications.$inferInsert;
+
 // ─── User ↔ Restaurant (multi-access junction) ───────────────────────────────
 
 export const userRestaurants = pgTable("user_restaurants", {

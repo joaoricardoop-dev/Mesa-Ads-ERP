@@ -78,6 +78,7 @@ import {
   ChevronsUpDown,
   type LucideIcon,
 } from "lucide-react";
+import { NotificationBell } from "./NotificationPanel";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
@@ -549,12 +550,15 @@ function DashboardLayoutContent({
             {isMobile && <SidebarTrigger className="h-8 w-8 rounded-lg" />}
             <span className="text-sm font-medium text-muted-foreground">{activeLabel}</span>
           </div>
-          <button
-            onClick={toggleTheme}
-            className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
-          >
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell isAdmin={user.role === "admin"} />
+            <button
+              onClick={toggleTheme}
+              className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
+            >
+              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
         <main className="flex-1 overflow-hidden">{children}</main>
       </SidebarInset>

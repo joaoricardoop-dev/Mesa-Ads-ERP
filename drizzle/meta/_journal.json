@@ -113,6 +113,13 @@
       "when": 1774113000000,
       "tag": "0015_users_partner_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1774200000000,
+      "tag": "0016_crm_notifications",
+      "breakpoints": true
     }
   ]
 }

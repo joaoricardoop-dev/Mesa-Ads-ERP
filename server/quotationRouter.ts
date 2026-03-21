@@ -5,6 +5,7 @@ import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotati
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
+import { createCrmNotification } from "./notificationRouter";
 
 const MONTH_NAMES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -247,6 +248,29 @@ export const quotationRouter = router({
         productId: input.productId,
         partnerId: input.partnerId ?? null,
       }).returning();
+
+      if (created.partnerId) {
+        const [partner] = await db.select({ name: partners.name }).from(partners).where(eq(partners.id, created.partnerId)).limit(1);
+        const partnerLabel = partner?.name || `Parceiro #${created.partnerId}`;
+        await createCrmNotification(db, {
+          eventType: "quotation_created",
+          leadId: created.leadId ?? null,
+          partnerId: created.partnerId,
+          message: `Cotação ${quotationNumber} gerada para lead de ${partnerLabel}: ${entityName}`,
+        });
+      } else if (created.leadId) {
+        const [leadRow] = await db.select({ partnerId: leads.partnerId, company: leads.company, name: leads.name }).from(leads).where(eq(leads.id, created.leadId)).limit(1);
+        if (leadRow?.partnerId) {
+          const [partner] = await db.select({ name: partners.name }).from(partners).where(eq(partners.id, leadRow.partnerId)).limit(1);
+          const partnerLabel = partner?.name || `Parceiro #${leadRow.partnerId}`;
+          await createCrmNotification(db, {
+            eventType: "quotation_created",
+            leadId: created.leadId,
+            partnerId: leadRow.partnerId,
+            message: `Cotação ${quotationNumber} gerada para lead de ${partnerLabel}: ${entityName}`,
+          });
+        }
+      }
 
       return created;
     }),

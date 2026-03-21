@@ -1,10 +1,11 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { leads, leadInteractions, clients } from "../drizzle/schema";
+import { leads, leadInteractions, clients, partners } from "../drizzle/schema";
 import { users } from "../shared/models/auth";
 import { eq, desc, and, ne, sql, or, ilike } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { createCrmNotification } from "./notificationRouter";
 
 async function getDatabase() {
   const d = await getDb();
@@ -146,6 +147,19 @@ export const leadRouter = router({
         createdBy: ctx.user?.id || null,
         assignedTo: input.assignedTo || ctx.user?.id || null,
       }).returning();
+
+      if (created.partnerId) {
+        const [partner] = await db.select({ name: partners.name }).from(partners).where(eq(partners.id, created.partnerId)).limit(1);
+        const leadLabel = created.company || created.name;
+        const partnerLabel = partner?.name || `Parceiro #${created.partnerId}`;
+        await createCrmNotification(db, {
+          eventType: "lead_created",
+          leadId: created.id,
+          partnerId: created.partnerId,
+          message: `Novo lead indicado por ${partnerLabel}: ${leadLabel}`,
+        });
+      }
+
       return created;
     }),
 
@@ -221,6 +235,25 @@ export const leadRouter = router({
         type: "note",
         content: `Estágio alterado para: ${input.stage}`,
       });
+
+      const leadLabel = updated.company || updated.name;
+      if (updated.partnerId) {
+        const [partner] = await db.select({ name: partners.name }).from(partners).where(eq(partners.id, updated.partnerId)).limit(1);
+        const partnerLabel = partner?.name || `Parceiro #${updated.partnerId}`;
+        await createCrmNotification(db, {
+          eventType: "stage_changed",
+          leadId: updated.id,
+          partnerId: updated.partnerId,
+          message: `Lead ${leadLabel} (${partnerLabel}) avançou para: ${input.stage}`,
+        });
+      } else {
+        await createCrmNotification(db, {
+          eventType: "stage_changed",
+          leadId: updated.id,
+          partnerId: null,
+          message: `Lead ${leadLabel} avançou para: ${input.stage}`,
+        });
+      }
 
       return updated;
     }),
