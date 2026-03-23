@@ -167,9 +167,8 @@ function CampaignDetail({ campaign, onBack }: { campaign: any; onBack: () => voi
         <span className="text-foreground/80 truncate max-w-xs">{campaign.name}</span>
       </div>
 
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border border-primary/20 p-6">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl pointer-events-none" />
-        <div className="relative z-10">
+      <div className="rounded-2xl border bg-card p-6">
+        <div>
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <div className="flex items-center gap-2 mb-2">
