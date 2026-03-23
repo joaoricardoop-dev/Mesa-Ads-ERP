@@ -674,11 +674,18 @@ export default function CampaignDetail() {
       : `Batches ${campaignBatchList[0].batchNumber}–${campaignBatchList[campaignBatchList.length - 1].batchNumber}`
     : null;
 
-  const slaDays = (campaign as any).proposalSignedAt && ["briefing", "design", "aprovacao"].includes(campaign.status)
-    ? Math.floor((Date.now() - new Date((campaign as any).proposalSignedAt).getTime()) / (1000 * 60 * 60 * 24))
-    : null;
+  const proposalSignedAt = (campaign as any).proposalSignedAt ? new Date((campaign as any).proposalSignedAt) : null;
+  const producaoEnteredAt = (campaign as any).producaoEnteredAt ? new Date((campaign as any).producaoEnteredAt) : null;
+  const slaActive = proposalSignedAt !== null && ["briefing", "design", "aprovacao"].includes(campaign.status);
+  const slaResolved = proposalSignedAt !== null && producaoEnteredAt !== null && !["briefing", "design", "aprovacao"].includes(campaign.status);
+  const slaDays = slaActive
+    ? Math.floor((Date.now() - proposalSignedAt.getTime()) / (1000 * 60 * 60 * 24))
+    : slaResolved
+      ? Math.floor((producaoEnteredAt!.getTime() - proposalSignedAt.getTime()) / (1000 * 60 * 60 * 24))
+      : null;
   const slaColor = slaDays === null ? "" : slaDays <= 3 ? "text-emerald-400" : slaDays <= 5 ? "text-yellow-400" : "text-red-400";
   const slaLabel = slaDays === null ? "" : slaDays === 0 ? "Hoje" : `${slaDays} dia${slaDays !== 1 ? "s" : ""}`;
+  const showSlaBadge = slaDays !== null && (slaActive || slaResolved);
 
   const daysElapsed = campaign.status === "active" || campaign.status === "paused"
     ? Math.max(0, Math.floor((Date.now() - new Date(batchStartDate).getTime()) / (1000 * 60 * 60 * 24)))
@@ -721,11 +728,13 @@ export default function CampaignDetail() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {slaDays !== null && (
-                <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md border ${slaDays > 5 ? "bg-red-500/10 border-red-500/30" : slaDays > 3 ? "bg-yellow-500/10 border-yellow-500/30" : "bg-emerald-500/10 border-emerald-500/30"}`}>
+              {showSlaBadge && (
+                <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md border ${slaDays! > 5 ? "bg-red-500/10 border-red-500/30" : slaDays! > 3 ? "bg-yellow-500/10 border-yellow-500/30" : "bg-emerald-500/10 border-emerald-500/30"}`}>
                   <Clock className="w-3 h-3 shrink-0" />
-                  <span className={`font-semibold ${slaColor}`}>SLA: {slaLabel}</span>
-                  {slaDays > 5 && <AlertTriangle className="w-3 h-3 text-red-400" />}
+                  <span className={`font-semibold ${slaColor}`}>
+                    SLA: {slaResolved ? `${slaLabel} (concluído)` : slaLabel}
+                  </span>
+                  {slaDays! > 5 && <AlertTriangle className="w-3 h-3 text-red-400" />}
                 </div>
               )}
               {campaign.status === "quotation" && (
@@ -779,9 +788,7 @@ export default function CampaignDetail() {
                 </Button>
               )}
               {campaign.status === "distribuicao" && (
-                <Button size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs h-8" onClick={() => setConfirmAction("completeDistribution")}>
-                  <Play className="w-3.5 h-3.5" /> Iniciar Veiculação
-                </Button>
+                <span className="text-xs text-muted-foreground italic">Configure o período abaixo para iniciar veiculação</span>
               )}
               {campaign.status === "veiculacao" && (
                 <Button size="sm" className="gap-1.5 text-xs h-8" variant="outline" onClick={() => setConfirmAction("finalize")}>
@@ -1032,6 +1039,10 @@ export default function CampaignDetail() {
                 <Eye className="w-5 h-5 text-emerald-400" />
                 <h3 className="text-sm font-semibold text-emerald-400">Veiculação em Andamento</h3>
               </div>
+              <div className="flex items-center gap-2 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
+                <Camera className="w-4 h-4 shrink-0" />
+                <span><strong>Lembrete:</strong> Registre fotos semanais de cada restaurante — são obrigatórias para comprovação da veiculação. Uma foto por semana por restaurante.</span>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <MiniStat label="Início" value={(campaign as any).veiculacaoStartDate ? new Date((campaign as any).veiculacaoStartDate).toLocaleDateString("pt-BR") : "—"} />
                 <MiniStat label="Fim" value={(campaign as any).veiculacaoEndDate ? new Date((campaign as any).veiculacaoEndDate).toLocaleDateString("pt-BR") : "—"} />
@@ -1040,7 +1051,7 @@ export default function CampaignDetail() {
               </div>
 
               <div className="border-t border-border/20 pt-4 space-y-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Adicionar Comprovante</h4>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Adicionar Comprovante Fotográfico</h4>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div className="space-y-1.5">
                     <Label className="text-xs">Semana</Label>

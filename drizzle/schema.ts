@@ -147,6 +147,7 @@ export const campaigns = pgTable("campaigns", {
   isBonificada: boolean("isBonificada").default(false).notNull(),
   productId: integer("productId").references(() => products.id, { onDelete: "set null" }),
   proposalSignedAt: timestamp("proposalSignedAt"),
+  producaoEnteredAt: timestamp("producaoEnteredAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [

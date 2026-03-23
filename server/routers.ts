@@ -1428,7 +1428,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const campaign = await getCampaign(input.id);
         if (!campaign) throw new Error("Campanha não encontrada");
-        await updateCampaign(input.id, { status: "producao" } as any);
+        await updateCampaign(input.id, { status: "producao", producaoEnteredAt: new Date() } as any);
         await addCampaignHistory(input.id, "design_approved", "Design aprovado — campanha em produção gráfica");
 
         const { getDb: getDatabase } = await import("./db");
