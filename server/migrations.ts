@@ -26,6 +26,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_visible_to_partners_to_products",
     sql: `ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "visibleToPartners" boolean DEFAULT false NOT NULL;`,
   },
+  {
+    name: "add_new_product_type_enum_values",
+    sql: `ALTER TYPE product_type ADD VALUE IF NOT EXISTS 'impressos'; ALTER TYPE product_type ADD VALUE IF NOT EXISTS 'eletronicos'; ALTER TYPE product_type ADD VALUE IF NOT EXISTS 'telas';`,
+  },
 ];
 
 export async function runMigrations() {

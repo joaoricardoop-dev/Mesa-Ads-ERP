@@ -11,7 +11,7 @@ async function getDatabase() {
   return d;
 }
 
-const TIPO_ENUM = ["impressos", "eletronicos", "telas"] as const;
+const TIPO_ENUM = ["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro", "impressos", "eletronicos", "telas"] as const;
 
 export const productRouter = router({
   // ── Product CRUD ─────────────────────────────────────────────────────────────
