@@ -167,45 +167,45 @@ function CampaignDetail({ campaign, onBack }: { campaign: any; onBack: () => voi
         <span className="text-foreground/80 truncate max-w-xs">{campaign.name}</span>
       </div>
 
-      <div className="rounded-2xl border bg-card p-6">
-        <div>
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className={`w-2 h-2 rounded-full ${meta.dot} ring-4 ${meta.dot.replace("bg-", "ring-")}/20`} />
-                <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  {meta.label}
-                </span>
-              </div>
-              <h2 className="text-2xl font-bold leading-tight">{campaign.name}</h2>
+      <div className="flex items-stretch gap-4 pb-6 border-b">
+        <div className={`w-1 rounded-full shrink-0 ${meta.dot}`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+            <div className="min-w-0">
+              <p className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 ${meta.dot.replace("bg-", "text-")}`}>
+                {meta.label}
+              </p>
+              <h2 className="text-xl font-bold leading-snug">{campaign.name}</h2>
               {campaign.campaignNumber && (
-                <p className="text-sm font-mono text-muted-foreground mt-1">{campaign.campaignNumber}</p>
+                <p className="text-xs font-mono text-muted-foreground mt-1">{campaign.campaignNumber}</p>
               )}
             </div>
             {campaign.isBonificada && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <Sparkles className="w-3.5 h-3.5" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                <Sparkles className="w-3 h-3" />
                 Bonificada
               </span>
             )}
           </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/5">
+          <div className="flex items-center gap-6 flex-wrap text-sm">
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Bolachas</p>
-              <p className="text-xl font-bold">{campaign.coasterVolume?.toLocaleString("pt-BR") ?? "—"}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Bolachas</p>
+              <p className="font-semibold">{campaign.coasterVolume?.toLocaleString("pt-BR") ?? "—"}</p>
             </div>
+            <div className="w-px h-6 bg-border" />
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Início</p>
-              <p className="text-base font-semibold">{fmtDate(campaign.startDate)}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Início</p>
+              <p className="font-semibold">{fmtDate(campaign.startDate)}</p>
             </div>
+            <div className="w-px h-6 bg-border" />
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Veiculação</p>
-              <p className="text-base font-semibold">{fmtDate(campaign.veiculacaoStartDate)}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Veiculação</p>
+              <p className="font-semibold">{fmtDate(campaign.veiculacaoStartDate)}</p>
             </div>
+            <div className="w-px h-6 bg-border" />
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Término</p>
-              <p className="text-base font-semibold">{fmtDate(campaign.endDate)}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Término</p>
+              <p className="font-semibold">{fmtDate(campaign.endDate)}</p>
             </div>
           </div>
         </div>
@@ -423,46 +423,36 @@ export default function AnunciantePortal() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto p-6 space-y-6">
 
-        <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-background p-6 md:p-8">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/3 rounded-full translate-y-1/2 -translate-x-1/4 blur-2xl pointer-events-none" />
-          <div className="relative z-10">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">Portal do Anunciante</p>
-                <h1 className="text-2xl md:text-3xl font-bold">{profile.company || profile.name}</h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Bem-vindo, {user?.firstName || profile.name}
-                </p>
-              </div>
-              {activeCampaigns.length > 0 && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-semibold text-emerald-400">
-                    {activeCampaigns.length} campanha{activeCampaigns.length !== 1 ? "s" : ""} ativa{activeCampaigns.length !== 1 ? "s" : ""}
-                  </span>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 pb-6 border-b">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Portal do Anunciante</p>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{profile.company || profile.name}</h1>
+            <p className="text-sm text-muted-foreground mt-1">Olá, {user?.firstName || profile.name}</p>
+          </div>
+          <div className="flex items-center gap-5 sm:gap-7 flex-wrap">
+            <div>
+              <p className="text-2xl font-bold tabular-nums">{campaigns.length}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Campanhas</p>
+            </div>
+            <div className="w-px h-7 bg-border hidden sm:block" />
+            <div>
+              <p className="text-2xl font-bold tabular-nums">{quotations.length}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Cotações</p>
+            </div>
+            <div className="w-px h-7 bg-border hidden sm:block" />
+            <div>
+              <p className="text-2xl font-bold tabular-nums">{pendingInvoices.length}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Faturas pendentes</p>
+            </div>
+            {totalInvoiced > 0 && (
+              <>
+                <div className="w-px h-7 bg-border hidden sm:block" />
+                <div>
+                  <p className="text-2xl font-bold tabular-nums">{fmt(totalInvoiced)}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Total faturado</p>
                 </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/5">
-              <div>
-                <p className="text-3xl font-bold">{campaigns.length}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Campanhas</p>
-              </div>
-              <div>
-                <p className="text-3xl font-bold">{quotations.length}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Cotações</p>
-              </div>
-              <div>
-                <p className="text-3xl font-bold">{pendingInvoices.length}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Faturas pendentes</p>
-              </div>
-              <div>
-                <p className="text-3xl font-bold">{totalInvoiced > 0 ? (totalInvoiced / 1000).toFixed(0) + "k" : "—"}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Total faturado (R$)</p>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
 
