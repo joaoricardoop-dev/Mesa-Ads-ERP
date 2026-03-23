@@ -102,10 +102,10 @@ export function calcItemPrice(input: ItemPricingInput): ItemCalcResult {
     };
   }
 
-  const denominador = 1 - margem - irpj - comRest;
+  const denominador = 1 - margem - irpj - comRest - comCom;
   const custoTotal4sem = custoUnitario * artes * volume + frete;
-  const precoTotalBase4sem = denominador > 0 && custoTotal4sem > 0 && comCom < 1
-    ? (custoTotal4sem / denominador) / (1 - comCom)
+  const precoTotalBase4sem = denominador > 0 && custoTotal4sem > 0
+    ? custoTotal4sem / denominador
     : 0;
   const precoUnit4sem = volume > 0 ? precoTotalBase4sem / volume : 0;
 
