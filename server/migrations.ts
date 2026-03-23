@@ -6,6 +6,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_quotation_period_start",
     sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "periodStart" date; ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "batchWeeks" integer DEFAULT 4;`,
   },
+  {
+    name: "add_billing_mode_to_partners",
+    sql: `DO $$ BEGIN CREATE TYPE billing_mode AS ENUM ('bruto', 'liquido'); EXCEPTION WHEN duplicate_object THEN NULL; END $$; ALTER TABLE partners ADD COLUMN IF NOT EXISTS "billingMode" billing_mode NOT NULL DEFAULT 'bruto';`,
+  },
 ];
 
 export async function runMigrations() {
