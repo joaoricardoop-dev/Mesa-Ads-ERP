@@ -164,15 +164,20 @@ export async function listCampaigns() {
       budgetId: campaigns.budgetId,
       isBonificada: campaigns.isBonificada,
       productId: campaigns.productId,
+      quotationId: campaigns.quotationId,
       createdAt: campaigns.createdAt,
       updatedAt: campaigns.updatedAt,
       clientName: clients.name,
       clientCompany: clients.company,
       productName: products.name,
+      quotationTotalValue: quotations.totalValue,
+      quotationCoasterVolume: quotations.coasterVolume,
+      quotationUnitPrice: quotations.unitPrice,
     })
     .from(campaigns)
     .leftJoin(clients, eq(campaigns.clientId, clients.id))
     .leftJoin(products, eq(campaigns.productId, products.id))
+    .leftJoin(quotations, eq(campaigns.quotationId, quotations.id))
     .orderBy(desc(campaigns.createdAt));
   return result;
 }

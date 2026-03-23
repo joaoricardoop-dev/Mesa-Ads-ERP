@@ -409,6 +409,20 @@ export default function Campaigns() {
       (c.clientName || "").toLowerCase().includes(search.toLowerCase())
   );
 
+  function effectivePricing(c: typeof campaignsList[0]) {
+    const base = calcCampaignPricing(c);
+    const qTotal = (c as any).quotationTotalValue ? parseFloat((c as any).quotationTotalValue) : null;
+    if (qTotal !== null && qTotal > 0) {
+      const totalCostsContract = base.totalCosts * c.activeRestaurants * c.contractDuration;
+      const contractProfit = qTotal - totalCostsContract;
+      const grossMargin = qTotal > 0 ? (contractProfit / qTotal) * 100 : 0;
+      const monthlyRevenue = qTotal / (c.contractDuration || 1);
+      const monthlyProfit = contractProfit / (c.contractDuration || 1);
+      return { ...base, contractTotal: qTotal, contractProfit, grossMargin, monthlyRevenue, monthlyProfit, fromQuotation: true };
+    }
+    return { ...base, fromQuotation: false };
+  }
+
   const activeCount = campaignsList.filter((c) => ["active", "producao", "transito", "executar", "veiculacao"].includes(c.status)).length;
   const totals = useMemo(() => {
     let totalContract = 0;
@@ -416,7 +430,7 @@ export default function Campaigns() {
     let totalMonthly = 0;
     for (const c of campaignsList) {
       if ((c as any).isBonificada) continue;
-      const p = calcCampaignPricing(c);
+      const p = effectivePricing(c);
       totalContract += p.contractTotal;
       totalProfit += p.contractProfit;
       totalMonthly += p.monthlyRevenue;
@@ -482,7 +496,7 @@ export default function Campaigns() {
           ) : (
             filtered.map((c) => {
               const isBonificada = (c as any).isBonificada;
-              const pricing = isBonificada ? null : calcCampaignPricing(c);
+              const pricing = isBonificada ? null : effectivePricing(c);
 
               return (
                 <div key={c.id} className="bg-card border border-border/30 rounded-lg overflow-hidden">
@@ -515,12 +529,14 @@ export default function Campaigns() {
                         ) : pricing && (
                           <>
                             <div className="text-right">
-                              <p className="text-xs text-muted-foreground">Contrato</p>
+                              <p className="text-xs text-muted-foreground">
+                                Contrato{pricing.fromQuotation && <span className="ml-1 text-violet-400 text-[10px]">cotação</span>}
+                              </p>
                               <p className="font-mono font-semibold">{formatCurrency(pricing.contractTotal)}</p>
                             </div>
                             <div className="text-right">
                               <p className="text-xs text-muted-foreground">Lucro</p>
-                              <p className="font-mono font-semibold text-emerald-400">{formatCurrency(pricing.contractProfit)}</p>
+                              <p className={`font-mono font-semibold ${pricing.contractProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{formatCurrency(pricing.contractProfit)}</p>
                             </div>
                             <div className="text-right">
                               <p className="text-xs text-muted-foreground">Margem</p>
