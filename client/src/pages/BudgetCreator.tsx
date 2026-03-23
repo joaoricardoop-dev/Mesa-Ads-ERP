@@ -11,7 +11,7 @@ import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
 import { Separator } from "../components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group";
-import { Trash2, Plus, Calculator, RotateCcw, ExternalLink, Building2, Mail, Phone, MapPin, Tag, PackagePlus, Pencil } from "lucide-react";
+import { Trash2, Plus, Calculator, RotateCcw, ExternalLink, Building2, Mail, Phone, MapPin, Tag, PackagePlus, Pencil, ChevronRight, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { BudgetPricingDialog, type PricingDialogImportResult } from "../components/BudgetPricingDialog";
 import { CoasterPricingDialog } from "../components/CoasterPricingDialog";
@@ -154,66 +154,63 @@ function ClientQualificationCard({ client }: { client: ClientInfo }) {
       : client.address,
     client.neighborhood,
     client.city && client.state ? `${client.city}/${client.state}` : client.city,
-    client.cep,
   ].filter(Boolean);
 
   return (
-    <Card className="border border-border/40 bg-muted/20">
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div>
-            <p className="text-sm font-semibold leading-tight">{client.company || client.name}</p>
-            {client.razaoSocial && client.razaoSocial !== client.company && (
-              <p className="text-xs text-muted-foreground">{client.razaoSocial}</p>
-            )}
-          </div>
-          <div className="flex gap-1 flex-shrink-0">
-            {client.status === "active" && (
-              <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                Ativo
-              </Badge>
-            )}
-            {client.segment && (
-              <Badge variant="outline" className="text-[9px] px-1.5 h-4">
-                {client.segment}
-              </Badge>
-            )}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          {client.cnpj && (
-            <div className="flex items-center gap-1 col-span-2">
-              <Building2 className="h-3 w-3 shrink-0" />
-              <span className="font-mono">{client.cnpj}</span>
-            </div>
-          )}
-          {client.contactEmail && (
-            <div className="flex items-center gap-1">
-              <Mail className="h-3 w-3 shrink-0" />
-              <span className="truncate">{client.contactEmail}</span>
-            </div>
-          )}
-          {client.contactPhone && (
-            <div className="flex items-center gap-1">
-              <Phone className="h-3 w-3 shrink-0" />
-              <span>{client.contactPhone}</span>
-            </div>
-          )}
-          {addressParts.length > 0 && (
-            <div className="flex items-start gap-1 col-span-2">
-              <MapPin className="h-3 w-3 shrink-0 mt-0.5" />
-              <span>{addressParts.join(" · ")}</span>
-            </div>
-          )}
-          {client.instagram && (
-            <div className="flex items-center gap-1">
-              <Tag className="h-3 w-3 shrink-0" />
-              <span>{client.instagram}</span>
-            </div>
+    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold leading-tight truncate">{client.company || client.name}</p>
+          {client.razaoSocial && client.razaoSocial !== client.company && (
+            <p className="text-[11px] text-muted-foreground truncate">{client.razaoSocial}</p>
           )}
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex gap-1 flex-shrink-0">
+          {client.status === "active" && (
+            <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+              Ativo
+            </Badge>
+          )}
+          {client.segment && (
+            <Badge variant="outline" className="text-[9px] px-1.5 h-4">
+              {client.segment}
+            </Badge>
+          )}
+        </div>
+      </div>
+      <div className="space-y-1 text-[11px] text-muted-foreground">
+        {client.cnpj && (
+          <div className="flex items-center gap-1.5">
+            <Building2 className="h-3 w-3 shrink-0" />
+            <span className="font-mono">{client.cnpj}</span>
+          </div>
+        )}
+        {client.contactEmail && (
+          <div className="flex items-center gap-1.5">
+            <Mail className="h-3 w-3 shrink-0" />
+            <span className="truncate">{client.contactEmail}</span>
+          </div>
+        )}
+        {client.contactPhone && (
+          <div className="flex items-center gap-1.5">
+            <Phone className="h-3 w-3 shrink-0" />
+            <span>{client.contactPhone}</span>
+          </div>
+        )}
+        {addressParts.length > 0 && (
+          <div className="flex items-start gap-1.5">
+            <MapPin className="h-3 w-3 shrink-0 mt-0.5" />
+            <span className="leading-tight">{addressParts.join(" · ")}</span>
+          </div>
+        )}
+        {client.instagram && (
+          <div className="flex items-center gap-1.5">
+            <Tag className="h-3 w-3 shrink-0" />
+            <span>{client.instagram}</span>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -227,6 +224,8 @@ interface BudgetItemCardProps {
   onRemove: (id: string) => void;
   index: number;
 }
+
+const SEMANAS_OPTIONS = [4, 8, 12, 16, 20, 24];
 
 function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, index }: BudgetItemCardProps) {
   const onUpdateRef = useRef(onUpdate);
@@ -259,6 +258,13 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
 
   const tierLabel = (tier: BudgetPricingTier) => {
     if (isFixedQty) {
+      return `${(tier.volumeMin / 1000).toFixed(0)}k`;
+    }
+    return `${(tier.volumeMin / 1000).toFixed(0)}k+`;
+  };
+
+  const tierLabelFull = (tier: BudgetPricingTier) => {
+    if (isFixedQty) {
       return `${tier.volumeMin.toLocaleString("pt-BR")} un.`;
     }
     if (tier.volumeMax && tier.volumeMax !== tier.volumeMin) {
@@ -279,32 +285,44 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
   }, [onUpdate, item.id]);
 
   const isBonificada = globalParams.isBonificada;
+  const usePillTiers = item.hasTiers && item.tiers.length > 0 && item.tiers.length <= 8;
 
   return (
     <>
-      <Card className="border border-border/40">
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Produto {index + 1}
-            </span>
-            <div className="flex items-center gap-1">
-              {item.productId && (
-                <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                  {item.semanas}sem · {(item.semanas / 4).toFixed(0)}p
-                </Badge>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                onClick={() => onRemove(item.id)}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
+      <Card className="border border-border/40 overflow-hidden">
+        {/* Card header stripe */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-muted/30 border-b border-border/20">
+          <div className="flex items-center gap-2">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">
+              {index + 1}
             </div>
+            <span className="text-xs font-medium text-muted-foreground">
+              {item.isCustomProduct
+                ? "Produto Personalizado"
+                : item.productName
+                  ? item.productName
+                  : "Selecione um produto"}
+            </span>
           </div>
+          <div className="flex items-center gap-1">
+            {item.productId && !item.isCustomProduct && (
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-mono">
+                {item.semanas}sem
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 text-muted-foreground hover:text-destructive"
+              onClick={() => onRemove(item.id)}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
 
+        <CardContent className="p-4 space-y-3">
+          {/* Product selector */}
           {item.isCustomProduct ? (
             <div className="space-y-2">
               <div className="flex items-center gap-2 p-3 bg-violet-50 dark:bg-violet-950/20 rounded-md border border-violet-200 dark:border-violet-800/40">
@@ -313,7 +331,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                   <p className="text-sm font-medium text-violet-800 dark:text-violet-200 truncate">
                     {item.customValues?.customProductName || "Produto Personalizado"}
                   </p>
-                  <p className="text-xs text-violet-600 dark:text-violet-400">Projeto Sob Medida</p>
+                  <p className="text-[11px] text-violet-600 dark:text-violet-400">Projeto Sob Medida</p>
                 </div>
                 <Button
                   variant="ghost"
@@ -334,62 +352,93 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
               </Button>
             </div>
           ) : (
-            <div>
-              <Select
-                value={item.productId ? String(item.productId) : ""}
-                onValueChange={(v) => {
-                  if (v === "__custom__") {
-                    setCustomDialogOpen(true);
-                    return;
-                  }
-                  const pid = Number(v);
-                  const prod = productsList.find((p) => p.id === pid);
-                  const prodPremissas: ItemPremissas = {
-                    irpj: parseFloat(prod?.irpj ?? "") || DEFAULT_PREMISSAS.irpj,
-                    comissaoRestaurante: parseFloat(prod?.comRestaurante ?? "") || DEFAULT_PREMISSAS.comissaoRestaurante,
-                    comissaoComercial: parseFloat(prod?.comComercial ?? "") || DEFAULT_PREMISSAS.comissaoComercial,
-                  };
-                  onUpdate(item.id, {
-                    productId: pid,
-                    productName: prod?.name ?? "",
-                    pricingMode: (prod?.pricingMode as "cost_based" | "price_based") ?? "cost_based",
-                    entryType: (prod?.entryType as "tiers" | "fixed_quantities") ?? "tiers",
-                    tiers: [],
-                    hasTiers: false,
-                    volumeIdx: 0,
-                    semanas: prod?.defaultSemanas ?? 12,
-                    isCustomProduct: false,
-                    customValues: undefined,
-                    premissas: prodPremissas,
-                  });
-                }}
-              >
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Selecionar produto..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {productsList.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                  <Separator className="my-1" />
-                  <SelectItem value="__custom__" className="text-violet-600 dark:text-violet-400 font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <PackagePlus className="h-3.5 w-3.5" />
-                      Produto Personalizado (Sob Medida)
-                    </div>
+            <Select
+              value={item.productId ? String(item.productId) : ""}
+              onValueChange={(v) => {
+                if (v === "__custom__") {
+                  setCustomDialogOpen(true);
+                  return;
+                }
+                const pid = Number(v);
+                const prod = productsList.find((p) => p.id === pid);
+                const prodPremissas: ItemPremissas = {
+                  irpj: parseFloat(prod?.irpj ?? "") || DEFAULT_PREMISSAS.irpj,
+                  comissaoRestaurante: parseFloat(prod?.comRestaurante ?? "") || DEFAULT_PREMISSAS.comissaoRestaurante,
+                  comissaoComercial: parseFloat(prod?.comComercial ?? "") || DEFAULT_PREMISSAS.comissaoComercial,
+                };
+                onUpdate(item.id, {
+                  productId: pid,
+                  productName: prod?.name ?? "",
+                  pricingMode: (prod?.pricingMode as "cost_based" | "price_based") ?? "cost_based",
+                  entryType: (prod?.entryType as "tiers" | "fixed_quantities") ?? "tiers",
+                  tiers: [],
+                  hasTiers: false,
+                  volumeIdx: 0,
+                  semanas: prod?.defaultSemanas ?? 12,
+                  isCustomProduct: false,
+                  customValues: undefined,
+                  premissas: prodPremissas,
+                });
+              }}
+            >
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Selecionar produto..." />
+              </SelectTrigger>
+              <SelectContent>
+                {productsList.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    {p.name}
                   </SelectItem>
-                </SelectContent>
-              </Select>
+                ))}
+                <Separator className="my-1" />
+                <SelectItem value="__custom__" className="text-violet-600 dark:text-violet-400 font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <PackagePlus className="h-3.5 w-3.5" />
+                    Produto Personalizado (Sob Medida)
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Loading tiers */}
+          {!item.isCustomProduct && item.productId && tiersLoading && (
+            <p className="text-xs text-muted-foreground animate-pulse">Carregando faixas de preço...</p>
+          )}
+
+          {/* Volume tier chips (pill buttons) */}
+          {!item.isCustomProduct && item.productId && !tiersLoading && usePillTiers && (
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">
+                {isFixedQty ? "Quantidade" : "Volume"}
+              </Label>
+              <div className="flex flex-wrap gap-1.5">
+                {item.tiers.map((tier, idx) => (
+                  <button
+                    key={tier.id}
+                    type="button"
+                    onClick={() => onUpdate(item.id, { volumeIdx: idx })}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                      item.volumeIdx === idx
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-background text-muted-foreground border-border/50 hover:border-primary/40 hover:text-foreground"
+                    }`}
+                    title={tierLabelFull(tier)}
+                  >
+                    {tierLabel(tier)}
+                  </button>
+                ))}
+              </div>
+              {item.tiers[item.volumeIdx] && (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {tierLabelFull(item.tiers[item.volumeIdx])}
+                </p>
+              )}
             </div>
           )}
 
-          {!item.isCustomProduct && item.productId && tiersLoading && (
-            <p className="text-xs text-muted-foreground animate-pulse">Carregando entradas de preço...</p>
-          )}
-
-          {!item.isCustomProduct && item.productId && !tiersLoading && item.hasTiers && item.tiers.length > 0 && (
+          {/* Volume dropdown for many tiers */}
+          {!item.isCustomProduct && item.productId && !tiersLoading && item.hasTiers && item.tiers.length > 8 && (
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">
                 {isFixedQty ? "Quantidade" : "Faixa de volume"}
@@ -404,7 +453,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                 <SelectContent>
                   {item.tiers.map((tier, idx) => (
                     <SelectItem key={tier.id} value={String(idx)}>
-                      {tierLabel(tier)}
+                      {tierLabelFull(tier)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -412,6 +461,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
             </div>
           )}
 
+          {/* Free quantity entry */}
           {!item.isCustomProduct && item.productId && !tiersLoading && !item.hasTiers && !isPriceBased && (
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -438,7 +488,30 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
             </div>
           )}
 
-          {/* Custom product summary strip */}
+          {/* Duration chips */}
+          {!item.isCustomProduct && item.productId && (
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Duração</Label>
+              <div className="flex gap-1.5 flex-wrap">
+                {SEMANAS_OPTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => onUpdate(item.id, { semanas: s })}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                      item.semanas === s
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-background text-muted-foreground border-border/50 hover:border-primary/40 hover:text-foreground"
+                    }`}
+                  >
+                    {s}sem
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Custom product summary */}
           {item.isCustomProduct && item.customValues && (
             <div className="bg-violet-50/60 dark:bg-violet-950/10 rounded-md p-3 space-y-1.5 text-xs border border-violet-200/60 dark:border-violet-800/30">
               <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
@@ -455,11 +528,11 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                     <span className="text-right font-mono">{fmtBRL(parseFloat(item.customValues.customFinalPrice) || 0)}</span>
                   </>
                 )}
-                <span className="text-muted-foreground">Comissão Restaurante</span>
+                <span className="text-muted-foreground">Com. Restaurante</span>
                 <span className="text-right font-mono">{item.customValues.customRestaurantCommission}%</span>
-                <span className="text-muted-foreground">Comissão Parceiro</span>
+                <span className="text-muted-foreground">Com. Parceiro</span>
                 <span className="text-right font-mono">{item.customValues.customPartnerCommission}%</span>
-                <span className="text-muted-foreground">Comissão Vendedor</span>
+                <span className="text-muted-foreground">Com. Vendedor</span>
                 <span className="text-right font-mono">{item.customValues.customSellerCommission}%</span>
               </div>
               <Separator />
@@ -536,7 +609,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
             </div>
           )}
 
-          {/* Abrir Precificador button — only for cost_based products */}
+          {/* Abrir Precificador button */}
           {!item.isCustomProduct && item.productId && !tiersLoading && !isPriceBased && (
             <Button
               variant="outline"
@@ -699,9 +772,9 @@ function BudgetSummaryPanel({ items, globalParams, clientName, onGerarCotacao, i
               </div>
 
               <Separator />
-              <div className="flex justify-between font-bold text-base">
+              <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
-                <span className="font-mono">
+                <span className="font-mono text-primary">
                   {globalParams.isBonificada ? "R$ 0,00" : fmtBRL(totals.total)}
                 </span>
               </div>
@@ -711,7 +784,7 @@ function BudgetSummaryPanel({ items, globalParams, clientName, onGerarCotacao, i
             </>
           ) : (
             <div className="py-8 text-center text-muted-foreground text-xs">
-              Adicione produtos para ver o resumo
+              Adicione produtos ao centro para ver o resumo
             </div>
           )}
         </CardContent>
@@ -724,11 +797,11 @@ function BudgetSummaryPanel({ items, globalParams, clientName, onGerarCotacao, i
         size="lg"
       >
         <Calculator className="h-4 w-4 mr-2" />
-        {isGenerating ? "Gerando cotação..." : "Gerar Cotação"}
+        {isGenerating ? "Gerando..." : "Gerar Cotação"}
       </Button>
       {hasItems && (
         <p className="text-[11px] text-muted-foreground text-center leading-tight">
-          Cria cotação com {itemCalcs.length} {itemCalcs.length === 1 ? "produto" : "produtos"} e preços calculados
+          {itemCalcs.length} {itemCalcs.length === 1 ? "produto" : "produtos"} · preços calculados
         </p>
       )}
     </div>
@@ -920,7 +993,6 @@ export default function BudgetCreator() {
           agencyCommissionPercent: agencyCommissionPercent || null,
         });
 
-        // discountRatio applies the global payment + partner discounts to each item proportionally
         const discountRatio = totals.subtotalPostDuration > 0 ? totals.total / totals.subtotalPostDuration : 1;
 
         for (const { item, input, calc } of itemCalcs) {
@@ -955,10 +1027,10 @@ export default function BudgetCreator() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 flex-shrink-0">
+      <div className="flex items-center justify-between px-6 py-3.5 border-b border-border/30 flex-shrink-0">
         <div>
-          <h1 className="text-xl font-bold">Novo Orçamento</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Montagem multiproduto com cálculo automático de preços</p>
+          <h1 className="text-lg font-bold tracking-tight">Novo Orçamento</h1>
+          <p className="text-xs text-muted-foreground">Montagem multiproduto com cálculo automático de preços</p>
         </div>
         <Button variant="outline" size="sm" onClick={clearAll} className="gap-1.5">
           <RotateCcw className="h-3.5 w-3.5" />
@@ -966,47 +1038,46 @@ export default function BudgetCreator() {
         </Button>
       </div>
 
-      {/* ── Body: 2 colunas ── */}
+      {/* ── Body: 3 colunas ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* ── Coluna Esquerda (rolável) ── */}
-        <div className="flex-1 min-w-0 overflow-y-auto p-6 space-y-5 border-r border-border/20">
+        {/* ── Coluna Esquerda — Configurações (rolável) ── */}
+        <div className="w-64 xl:w-72 flex-shrink-0 overflow-y-auto border-r border-border/20 bg-muted/10">
+          <div className="p-4 space-y-5">
 
-          {/* ── Dados do Cliente ── */}
-          <section>
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Dados do Cliente</h2>
-            <Card className="border border-border/40">
-              <CardContent className="p-4 space-y-3">
+            {/* ── Cliente / Lead ── */}
+            <section className="space-y-3">
+              <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Cliente</h2>
 
-                {/* Cliente / Lead */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Cliente (anunciante)</Label>
-                    <Select
-                      value={clientId ? String(clientId) : ""}
-                      onValueChange={(v) => { setClientId(Number(v)); setLeadId(null); }}
-                    >
-                      <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="Selecionar cliente..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clientsList.map((c) => (
-                          <SelectItem key={c.id} value={String(c.id)}>
-                            {c.company || c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Anunciante</Label>
+                  <Select
+                    value={clientId ? String(clientId) : ""}
+                    onValueChange={(v) => { setClientId(Number(v)); setLeadId(null); }}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Selecionar cliente..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientsList.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.company || c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {!clientId && (
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1 block">Lead</Label>
                     <Select
                       value={leadId ? String(leadId) : ""}
                       onValueChange={(v) => { setLeadId(Number(v)); setClientId(null); }}
-                      disabled={!!clientId}
                     >
-                      <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder={clientId ? "—" : "Selecionar lead..."} />
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Selecionar lead..." />
                       </SelectTrigger>
                       <SelectContent>
                         {leadsList.map((l: any) => (
@@ -1017,17 +1088,38 @@ export default function BudgetCreator() {
                       </SelectContent>
                     </Select>
                   </div>
+                )}
+              </div>
+
+              {selectedClient && (
+                <ClientQualificationCard client={selectedClient} />
+              )}
+            </section>
+
+            <Separator />
+
+            {/* ── Parâmetros ── */}
+            <section className="space-y-3">
+              <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Parâmetros</h2>
+
+              <div className="space-y-2.5">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Forma de pagamento</Label>
+                  <ToggleGroup
+                    type="single"
+                    value={formaPagamento}
+                    onValueChange={(v) => { if (v) setFormaPagamento(v as typeof formaPagamento); }}
+                    className="justify-start gap-1"
+                  >
+                    <ToggleGroupItem value="pix" className="h-7 text-[11px] px-2.5 flex-1">Pix −5%</ToggleGroupItem>
+                    <ToggleGroupItem value="boleto" className="h-7 text-[11px] px-2.5 flex-1">Boleto</ToggleGroupItem>
+                    <ToggleGroupItem value="cartao" className="h-7 text-[11px] px-2.5 flex-1">Cartão</ToggleGroupItem>
+                  </ToggleGroup>
                 </div>
 
-                {/* Qualificação do cliente */}
-                {selectedClient && (
-                  <ClientQualificationCard client={selectedClient} />
-                )}
-
-                {/* Configurações da proposta */}
-                <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Desconto manual (%)</Label>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Desc. manual (%)</Label>
                     <Input
                       type="number"
                       min={0}
@@ -1035,41 +1127,37 @@ export default function BudgetCreator() {
                       step={0.5}
                       value={descontoManual || ""}
                       onChange={(e) => setDescontoManual(Math.min(20, Math.max(0, parseFloat(e.target.value) || 0)))}
-                      className="h-9 text-sm"
+                      className="h-8 text-xs"
                       placeholder="0"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Comissão de Agência (%)</Label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.5}
-                        value={agencyCommissionPercent}
-                        onChange={(e) => setAgencyCommissionPercent(e.target.value)}
-                        className="h-9 text-sm pr-7"
-                        placeholder="0"
-                      />
-                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-                    </div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Com. Agência (%)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={agencyCommissionPercent}
+                      onChange={(e) => setAgencyCommissionPercent(e.target.value)}
+                      className="h-8 text-xs"
+                      placeholder="0"
+                    />
                   </div>
                 </div>
 
-                {/* Switches */}
-                <div className="flex items-center gap-6 pt-1">
-                  <div className="flex items-center gap-2">
-                    <Switch id="bonificada" checked={isBonificada} onCheckedChange={setIsBonificada} />
-                    <Label htmlFor="bonificada" className="text-sm cursor-pointer text-amber-600 dark:text-amber-400">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="bonificada" className="text-xs cursor-pointer text-amber-600 dark:text-amber-400">
                       Bonificada
                     </Label>
+                    <Switch id="bonificada" checked={isBonificada} onCheckedChange={setIsBonificada} />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Switch id="desc-parceiro" checked={descontoParceiro} onCheckedChange={setDescontoParceiro} />
-                    <Label htmlFor="desc-parceiro" className="text-sm cursor-pointer text-green-600 dark:text-green-400">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="desc-parceiro" className="text-xs cursor-pointer text-green-600 dark:text-green-400">
                       Desc. Parceiro (−10%)
                     </Label>
+                    <Switch id="desc-parceiro" checked={descontoParceiro} onCheckedChange={setDescontoParceiro} />
                   </div>
                 </div>
 
@@ -1080,7 +1168,7 @@ export default function BudgetCreator() {
                       value={partnerId ? String(partnerId) : ""}
                       onValueChange={(v) => setPartnerId(Number(v))}
                     >
-                      <SelectTrigger className="h-9 text-sm">
+                      <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="Selecionar parceiro..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1093,48 +1181,49 @@ export default function BudgetCreator() {
                     </Select>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </section>
+              </div>
+            </section>
 
-          {/* ── Parâmetros de Preço (globais) ── */}
-          <section>
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              Parâmetros Globais
-            </h2>
-            <Card className="border border-border/40">
-              <CardContent className="p-4">
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-2 block">Forma de pagamento</Label>
-                  <ToggleGroup
-                    type="single"
-                    value={formaPagamento}
-                    onValueChange={(v) => { if (v) setFormaPagamento(v as typeof formaPagamento); }}
-                    className="justify-start"
-                  >
-                    <ToggleGroupItem value="pix" className="h-9 text-xs px-4">Pix (−5%)</ToggleGroupItem>
-                    <ToggleGroupItem value="boleto" className="h-9 text-xs px-4">Boleto</ToggleGroupItem>
-                    <ToggleGroupItem value="cartao" className="h-9 text-xs px-4">Cartão</ToggleGroupItem>
-                  </ToggleGroup>
-                  <p className="text-[10px] text-muted-foreground mt-2">
-                    Duração e premissas são configuradas individualmente por produto no Precificador.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
+            <Separator />
 
-          {/* ── Itens do Orçamento ── */}
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Itens do Orçamento
+            {/* ── Observações ── */}
+            <section className="space-y-2">
+              <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Observações</h2>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Observações adicionais para o cliente..."
+                className="text-xs min-h-[72px] resize-none"
+              />
+            </section>
+          </div>
+        </div>
+
+        {/* ── Coluna Central — Itens do Orçamento ── */}
+        <div className="flex-1 min-w-0 overflow-y-auto p-5">
+          <div className="max-w-2xl mx-auto space-y-4">
+            {/* Section header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold">Itens do Orçamento</h2>
                 {items.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 text-[10px] font-normal">{items.length}</Badge>
+                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{items.length}</Badge>
                 )}
-              </h2>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addNewItem}
+                className="gap-1.5 text-xs h-8"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Adicionar Produto
+              </Button>
             </div>
-            <div className="space-y-2">
+
+            {/* Product cards */}
+            <div className="space-y-3">
               {items.map((item, idx) => (
                 <BudgetItemCard
                   key={item.id}
@@ -1146,32 +1235,19 @@ export default function BudgetCreator() {
                   index={idx}
                 />
               ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={addNewItem}
-                className="w-full border-dashed gap-1.5 text-muted-foreground hover:text-foreground"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Adicionar Produto
-              </Button>
             </div>
-          </section>
 
-          {/* ── Observações ── */}
-          <section>
-            <Label className="text-xs text-muted-foreground mb-2 block">Observações</Label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Observações adicionais para o cliente..."
-              className="text-sm min-h-[80px] resize-none"
-            />
-          </section>
+            {/* Empty state helper */}
+            {items.length === 1 && !items[0].productId && !items[0].isCustomProduct && (
+              <div className="text-center py-4 text-xs text-muted-foreground">
+                Selecione um produto acima para começar. Você pode adicionar múltiplos produtos.
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* ── Coluna Direita (painel de resumo) ── */}
-        <div className="w-80 xl:w-96 flex-shrink-0 overflow-y-auto p-6">
+        {/* ── Coluna Direita — Resumo ── */}
+        <div className="w-72 xl:w-80 flex-shrink-0 overflow-y-auto border-l border-border/20 p-5">
           <BudgetSummaryPanel
             items={items}
             globalParams={globalParams}
