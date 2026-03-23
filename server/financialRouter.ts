@@ -249,7 +249,10 @@ export const financialRouter = router({
       campaignId: z.number(),
       amount: z.string(),
       dueDate: z.string(),
+      issueDate: z.string().optional(),
       paymentMethod: z.string().optional(),
+      installmentNumber: z.number().int().optional(),
+      installmentTotal: z.number().int().optional(),
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -267,15 +270,23 @@ export const financialRouter = router({
       const seqNum = Number(countResult[0]?.count || 0) + 1;
       const invoiceNumber = `FAT-${year}-${String(seqNum).padStart(4, "0")}`;
 
+      const issueDate = input.issueDate || new Date().toISOString().split("T")[0];
+
+      let notes = input.notes || "";
+      if (input.installmentNumber && input.installmentTotal) {
+        const parcelaLine = `Parcela ${input.installmentNumber}/${input.installmentTotal}`;
+        notes = notes ? `${parcelaLine}\n${notes}` : parcelaLine;
+      }
+
       const [created] = await db.insert(invoices).values({
         campaignId: input.campaignId,
         clientId: campaign[0].clientId,
         invoiceNumber,
         amount: input.amount,
-        issueDate: new Date().toISOString().split("T")[0],
+        issueDate,
         dueDate: input.dueDate,
         paymentMethod: input.paymentMethod,
-        notes: input.notes,
+        notes: notes || undefined,
       }).returning();
 
       return created;

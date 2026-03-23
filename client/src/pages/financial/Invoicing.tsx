@@ -16,9 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
-import { Plus, Check, X } from "lucide-react";
+import { Plus, Check, X, Building2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -48,9 +50,14 @@ export default function Invoicing() {
   const [payDialogId, setPayDialogId] = useState<number | null>(null);
   const [payDate, setPayDate] = useState("");
 
+  const today = new Date().toISOString().split("T")[0];
   const [newCampaignId, setNewCampaignId] = useState<string>("");
   const [newAmount, setNewAmount] = useState("");
+  const [newIssueDate, setNewIssueDate] = useState(today);
   const [newDueDate, setNewDueDate] = useState("");
+  const [newPaymentMethod, setNewPaymentMethod] = useState("");
+  const [newInstallmentNumber, setNewInstallmentNumber] = useState("");
+  const [newNotes, setNewNotes] = useState("");
 
   const utils = trpc.useUtils();
   const { data: invoiceList, isLoading } = trpc.financial.listInvoices.useQuery(
@@ -58,13 +65,22 @@ export default function Invoicing() {
   );
   const { data: campaignsForInvoice } = trpc.financial.campaignsForInvoice.useQuery();
 
+  function resetForm() {
+    setNewCampaignId("");
+    setNewAmount("");
+    setNewIssueDate(today);
+    setNewDueDate("");
+    setNewPaymentMethod("");
+    setNewInstallmentNumber("");
+    setNewNotes("");
+  }
+
   const createMutation = trpc.financial.createInvoice.useMutation({
     onSuccess: () => {
       utils.financial.listInvoices.invalidate();
+      utils.financial.dashboard.invalidate();
       setDialogOpen(false);
-      setNewCampaignId("");
-      setNewAmount("");
-      setNewDueDate("");
+      resetForm();
       toast.success("Fatura criada com sucesso");
     },
     onError: (err) => toast.error(err.message),
@@ -87,15 +103,22 @@ export default function Invoicing() {
     },
   });
 
+  const selectedCamp = (campaignsForInvoice || []).find((c) => String(c.id) === newCampaignId);
+
   const handleCreate = () => {
-    if (!newCampaignId || !newAmount || !newDueDate) {
-      toast.error("Preencha todos os campos");
+    if (!newCampaignId || !newAmount || !newDueDate || !newIssueDate) {
+      toast.error("Preencha campanha, valor e datas");
       return;
     }
     createMutation.mutate({
       campaignId: parseInt(newCampaignId),
       amount: newAmount,
+      issueDate: newIssueDate,
       dueDate: newDueDate,
+      paymentMethod: newPaymentMethod || undefined,
+      installmentNumber: newInstallmentNumber ? parseInt(newInstallmentNumber) : undefined,
+      installmentTotal: selectedCamp?.cycles && selectedCamp.cycles > 1 ? selectedCamp.cycles : undefined,
+      notes: newNotes || undefined,
     });
   };
 
@@ -111,13 +134,15 @@ export default function Invoicing() {
               Nova Fatura
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Nova Fatura</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
+
+              {/* Campanha */}
               <div>
-                <Label>Campanha</Label>
+                <Label>Campanha <span className="text-destructive">*</span></Label>
                 <Select
                   value={newCampaignId}
                   onValueChange={(v) => {
@@ -125,6 +150,7 @@ export default function Invoicing() {
                     const camp = (campaignsForInvoice || []).find((c) => String(c.id) === v);
                     if (camp?.invoiceAmount != null) {
                       setNewAmount(camp.invoiceAmount.toFixed(2));
+                      if (camp.cycles > 1) setNewInstallmentNumber("1");
                     }
                   }}
                 >
@@ -134,47 +160,117 @@ export default function Invoicing() {
                   <SelectContent>
                     {(campaignsForInvoice || []).map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name} — {c.clientName}
+                        {c.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {newCampaignId && (() => {
-                  const camp = (campaignsForInvoice || []).find((c) => String(c.id) === newCampaignId);
-                  if (!camp || !camp.invoiceAmount) return null;
-                  return (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {camp.cycles > 1
-                        ? `${camp.cycles}x de ${formatCurrency(camp.invoiceAmount)}`
-                        : `À vista: ${formatCurrency(camp.invoiceAmount)}`}
-                    </p>
-                  );
-                })()}
               </div>
+
+              {/* Cliente (leitura) */}
+              {selectedCamp && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/40 border border-border/50">
+                  <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{selectedCamp.clientName}</p>
+                    {selectedCamp.invoiceAmount && (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedCamp.cycles > 1
+                          ? `Contrato: ${selectedCamp.cycles}x de ${formatCurrency(selectedCamp.invoiceAmount)}`
+                          : `Contrato à vista: ${formatCurrency(selectedCamp.invoiceAmount)}`}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <Separator />
+
+              {/* Datas lado a lado */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Data de Emissão <span className="text-destructive">*</span></Label>
+                  <Input
+                    type="date"
+                    value={newIssueDate}
+                    onChange={(e) => setNewIssueDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Data de Vencimento <span className="text-destructive">*</span></Label>
+                  <Input
+                    type="date"
+                    value={newDueDate}
+                    onChange={(e) => setNewDueDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Valor e Parcela lado a lado */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Valor (R$) <span className="text-destructive">*</span></Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={newAmount}
+                    onChange={(e) => setNewAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>
+                    Parcela nº
+                    {selectedCamp?.cycles && selectedCamp.cycles > 1
+                      ? ` (de ${selectedCamp.cycles})`
+                      : ""}
+                  </Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max={selectedCamp?.cycles || 999}
+                    placeholder={selectedCamp?.cycles ? `1–${selectedCamp.cycles}` : "—"}
+                    value={newInstallmentNumber}
+                    onChange={(e) => setNewInstallmentNumber(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Forma de pagamento */}
               <div>
-                <Label>Valor (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="0,00"
-                  value={newAmount}
-                  onChange={(e) => setNewAmount(e.target.value)}
+                <Label>Forma de Pagamento</Label>
+                <Select value={newPaymentMethod} onValueChange={setNewPaymentMethod}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="pix">Pix</SelectItem>
+                    <SelectItem value="cartao">Cartão de Crédito</SelectItem>
+                    <SelectItem value="transferencia">Transferência Bancária</SelectItem>
+                    <SelectItem value="cheque">Cheque</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Observações */}
+              <div>
+                <Label>Observações</Label>
+                <Textarea
+                  placeholder="Informações adicionais sobre esta fatura..."
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                  rows={2}
+                  className="resize-none"
                 />
               </div>
-              <div>
-                <Label>Data de Vencimento</Label>
-                <Input
-                  type="date"
-                  value={newDueDate}
-                  onChange={(e) => setNewDueDate(e.target.value)}
-                />
-              </div>
+
               <Button
                 className="w-full"
                 onClick={handleCreate}
                 disabled={createMutation.isPending}
               >
-                {createMutation.isPending ? "Criando..." : "Criar Fatura"}
+                {createMutation.isPending ? "Criando..." : "Emitir Fatura"}
               </Button>
             </div>
           </DialogContent>
