@@ -295,6 +295,8 @@ export const quotationRouter = router({
       hasPartnerDiscount: z.boolean().optional(),
       productId: z.number().nullable().optional(),
       partnerId: z.number().nullable().optional(),
+      periodStart: z.string().nullable().optional(),
+      batchWeeks: z.number().int().min(1).optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();

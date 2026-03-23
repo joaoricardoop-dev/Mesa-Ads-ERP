@@ -397,6 +397,8 @@ export const quotations = pgTable("quotations", {
   hasPartnerDiscount: boolean("hasPartnerDiscount").default(false).notNull(),
   productId: integer("productId").references(() => products.id),
   partnerId: integer("partnerId").references(() => partners.id, { onDelete: "set null" }),
+  periodStart: date("periodStart"),
+  batchWeeks: integer("batchWeeks").default(4),
   createdBy: varchar("createdBy", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

@@ -109,6 +109,8 @@ export default function QuotationDetail() {
     notes: "",
     validUntil: "",
     isBonificada: false,
+    periodStart: "",
+    batchWeeks: 4,
   });
 
   const utils = trpc.useUtils();
@@ -179,6 +181,8 @@ export default function QuotationDetail() {
       notes: quotation.notes || "",
       validUntil: quotation.validUntil || "",
       isBonificada: quotation.isBonificada ?? false,
+      periodStart: (quotation as any).periodStart || "",
+      batchWeeks: (quotation as any).batchWeeks ?? 4,
     });
     setEditOpen(true);
   };
@@ -240,6 +244,8 @@ export default function QuotationDetail() {
         productName: (quotation as any).productName || undefined,
         productUnitLabelPlural: (quotation as any).productUnitLabelPlural || undefined,
         items: proposalItems,
+        periodStart: (quotation as any).periodStart || undefined,
+        batchWeeks: (quotation as any).batchWeeks ?? 4,
       });
       toast.success("PDF da proposta gerado!");
     } catch {
@@ -262,6 +268,8 @@ export default function QuotationDetail() {
       notes: editForm.notes || undefined,
       validUntil: editForm.validUntil || undefined,
       isBonificada: editForm.isBonificada,
+      periodStart: editForm.periodStart || null,
+      batchWeeks: editForm.batchWeeks || 4,
     });
   };
 
@@ -916,6 +924,16 @@ export default function QuotationDetail() {
             <div className="grid gap-2">
               <Label>Validade</Label>
               <Input type="date" value={editForm.validUntil} onChange={(e) => setEditForm({ ...editForm, validUntil: e.target.value })} className="bg-background border-border/30" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Início da Veiculação</Label>
+                <Input type="date" value={editForm.periodStart} onChange={(e) => setEditForm({ ...editForm, periodStart: e.target.value })} className="bg-background border-border/30" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Semanas por Lote</Label>
+                <Input type="number" min={1} max={52} value={editForm.batchWeeks} onChange={(e) => setEditForm({ ...editForm, batchWeeks: Number(e.target.value) })} className="bg-background border-border/30" />
+              </div>
             </div>
             <div className="grid gap-2">
               <Label>Observações</Label>
