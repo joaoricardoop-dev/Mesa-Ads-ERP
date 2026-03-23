@@ -220,8 +220,20 @@ function calcQuotationUnitPrice(params: {
   comRestaurante: number;
   comComercial: number;
   billingMode: "bruto" | "liquido";
+  pricingMode?: "cost_based" | "price_based";
+  precoBaseTier?: number;
 }) {
-  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercial, billingMode } = params;
+  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercial, billingMode, pricingMode = "cost_based", precoBaseTier = 0 } = params;
+
+  if (pricingMode === "price_based") {
+    if (precoBaseTier <= 0) return 0;
+    const grossUpDen = 1 - comComercial - irpj;
+    const precoTotal = billingMode === "bruto" && grossUpDen > 0
+      ? precoBaseTier / grossUpDen
+      : precoBaseTier;
+    return volume > 0 ? precoTotal / volume : 0;
+  }
+
   const denominadorBase = 1 - margem - irpj - comRestaurante;
   const custoTotal = custoUnitario * artes * volume + frete;
   const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
@@ -279,6 +291,7 @@ function CreateQuotationDialog({
     if (!tier) return null;
     const irpj = parseFloat(selectedProduct.irpj ?? "6") / 100;
     const comRestaurante = parseFloat(selectedProduct.comRestaurante ?? "0") / 100;
+    const pricingMode = (selectedProduct.pricingMode ?? "cost_based") as "cost_based" | "price_based";
     const unitPrice = calcQuotationUnitPrice({
       custoUnitario: parseFloat(tier.custoUnitario),
       frete: parseFloat(tier.frete),
@@ -289,6 +302,8 @@ function CreateQuotationDialog({
       comRestaurante,
       comComercial,
       billingMode,
+      pricingMode,
+      precoBaseTier: parseFloat(tier.precoBase ?? "0"),
     });
     const cycles = Math.ceil(semanas / 4);
     const dsc = (DESCONTOS_PRAZO[semanas] ?? 0) / 100;

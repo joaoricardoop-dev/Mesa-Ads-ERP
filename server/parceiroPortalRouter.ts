@@ -421,12 +421,22 @@ export const parceiroPortalRouter = router({
       const comComercialProduto = parseFloat(String(product.comComercial ?? "10")) / 100;
       const comParceiro = Number(partner.commissionPercent) / 100;
       const billingMode = (partner.billingMode ?? "bruto") as "bruto" | "liquido";
-      const denominadorBase = 1 - (parseFloat(String(matchedTier.margem)) / 100) - irpj - comRestaurante - comComercialProduto;
-      const custoTotal = parseFloat(String(matchedTier.custoUnitario)) * (matchedTier.artes ?? 1) * input.volume + parseFloat(String(matchedTier.frete));
-      const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
-      const grossUpDen = 1 - comParceiro - irpj;
-      const precoTotal = billingMode === "bruto" && grossUpDen > 0 ? precoBase / grossUpDen : precoBase;
-      const serverUnitPrice = input.volume > 0 ? precoTotal / input.volume : 0;
+      const pricingMode = product.pricingMode ?? "cost_based";
+
+      let serverUnitPrice: number;
+      if (pricingMode === "price_based") {
+        const precoBaseTier = parseFloat(String(matchedTier.precoBase ?? "0"));
+        const grossUpDen = 1 - comParceiro - irpj;
+        const precoTotal = billingMode === "bruto" && grossUpDen > 0 ? precoBaseTier / grossUpDen : precoBaseTier;
+        serverUnitPrice = input.volume > 0 ? precoTotal / input.volume : 0;
+      } else {
+        const denominadorBase = 1 - (parseFloat(String(matchedTier.margem)) / 100) - irpj - comRestaurante - comComercialProduto;
+        const custoTotal = parseFloat(String(matchedTier.custoUnitario)) * (matchedTier.artes ?? 1) * input.volume + parseFloat(String(matchedTier.frete));
+        const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
+        const grossUpDen = 1 - comParceiro - irpj;
+        const precoTotal = billingMode === "bruto" && grossUpDen > 0 ? precoBase / grossUpDen : precoBase;
+        serverUnitPrice = input.volume > 0 ? precoTotal / input.volume : 0;
+      }
 
       const DESCONTOS_PRAZO: Record<number, number> = {
         4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11, 28: 13, 32: 15, 36: 17, 40: 19, 44: 21, 48: 23, 52: 25,
