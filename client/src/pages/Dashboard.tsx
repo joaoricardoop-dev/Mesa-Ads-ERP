@@ -270,9 +270,16 @@ function SlaAlerts() {
   }, [campaignsQuery.data, soQuery.data]);
 
   const total = staleCampaigns.length + lateFreight.length;
-  if (total === 0) return null;
-
   const stageLabels: Record<string, string> = { briefing: "Briefing", design: "Design", aprovacao: "Aprovação" };
+
+  if (total === 0) {
+    return (
+      <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 flex items-center gap-2">
+        <CheckSquare className="w-4 h-4 text-emerald-400 shrink-0" />
+        <span className="text-sm text-emerald-400 font-medium">Nenhum SLA vencido</span>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-red-500/5 border border-red-500/30 rounded-xl p-4 space-y-3">
