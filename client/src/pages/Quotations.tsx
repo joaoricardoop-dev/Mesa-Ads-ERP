@@ -63,7 +63,15 @@ import {
   Download,
   Store,
   ExternalLink,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 function OSActionButton({ quotationId, quotationNumber, clientName, clientCompany, coasterVolume, totalValue, onSign }: {
   quotationId: number;
@@ -476,7 +484,7 @@ export default function Quotations() {
       actions={
         <Button onClick={() => navigate("/comercial/simulador")} className="gap-2">
           <Plus className="w-4 h-4" />
-          Nova Cotação
+          Novo Orçamento
         </Button>
       }
     >
@@ -560,9 +568,9 @@ export default function Quotations() {
                           <p className="text-[11px] text-muted-foreground font-normal">{q.quotationName}</p>
                         )}
                         <div className="flex items-center gap-2 mt-0.5">
-                          {Number((q as any).itemCount) > 0 && (
+                          {Number(q.itemCount) > 0 && (
                             <span className="text-[10px] text-muted-foreground/70">
-                              {Number((q as any).itemCount)} {Number((q as any).itemCount) === 1 ? "item" : "itens"}
+                              {Number(q.itemCount)} {Number(q.itemCount) === 1 ? "item" : "itens"}
                             </span>
                           )}
                           {q.createdAt && (
@@ -637,160 +645,150 @@ export default function Quotations() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1 flex-wrap">
+                    <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-primary hover:text-primary"
                         onClick={() => navigate(`/comercial/cotacoes/${q.id}`)}
-                        title="Abrir"
+                        title="Abrir cotação"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-emerald-500 hover:text-emerald-400"
-                        onClick={async () => {
-                          try {
-                            const [fetchedRestaurants, fetchedItems] = await Promise.all([
-                              utils.quotation.getRestaurants.fetch({ quotationId: q.id }),
-                              utils.quotation.listItems.fetch({ quotationId: q.id }),
-                            ]);
-                            const numRest = fetchedRestaurants.length;
-                            const duration = q.cycles || 1;
-                            const totalContractValue = Number(q.totalValue || 0);
-                            const monthlyTotal = duration > 0 ? totalContractValue / duration : totalContractValue;
-                            const effectiveNumRest = numRest > 0 ? numRest : 1;
-                            const pricePerRest = monthlyTotal / effectiveNumRest;
-                            const restaurants = fetchedRestaurants.map((r) => ({
-                              name: r.restaurantName || "Restaurante",
-                              neighborhood: r.restaurantAddress || "",
-                              coasters: r.coasterQuantity || 0,
-                            }));
-
-                            // Build multi-product items if the quotation has budget items
-                            const proposalItems = fetchedItems.length > 0
-                              ? fetchedItems.map(item => {
-                                  const semanasMatch = item.notes?.match(/(\d+)sem/);
-                                  const itemSemanas = semanasMatch ? parseInt(semanasMatch[1]) : duration * 4;
-                                  return {
-                                    productName: item.productName,
-                                    volume: Number(item.quantity),
-                                    semanas: itemSemanas,
-                                    unitPrice: Number(item.unitPrice || 0),
-                                    totalPrice: Number(item.totalPrice || 0),
-                                  };
-                                })
-                              : undefined;
-
-                            generateProposalPdf({
-                              clientName: q.clientName || q.leadName || "Cliente",
-                              clientCompany: q.clientCompany || q.leadCompany || undefined,
-                              clientCnpj: q.clientCnpj || q.leadCnpj || undefined,
-                              clientEmail: q.clientEmail || q.leadEmail || undefined,
-                              clientPhone: q.clientPhone || q.leadPhone || undefined,
-                              quotationName: q.quotationName || q.quotationNumber,
-                              coasterVolume: q.coasterVolume,
-                              numRestaurants: numRest,
-                              coastersPerRestaurant: numRest > 0 ? Math.round(q.coasterVolume / numRest) : q.coasterVolume,
-                              contractDuration: duration,
-                              semanas: proposalItems ? undefined : (q.cycles || 1) * 4,
-                              pricePerRestaurant: pricePerRest,
-                              monthlyTotal,
-                              contractTotal: totalContractValue,
-                              includesProduction: q.includesProduction ?? true,
-                              isBonificada: q.isBonificada ?? false,
-                              restaurants,
-                              productName: q.productName || undefined,
-                              productUnitLabelPlural: q.productUnitLabelPlural || undefined,
-                              items: proposalItems,
-                              periodStart: (q as any).periodStart || undefined,
-                              batchWeeks: (q as any).batchWeeks ?? 4,
-                            });
-                            toast.success("PDF da proposta gerado!");
-                          } catch (err) {
-                            toast.error("Erro ao gerar PDF da proposta");
-                          }
-                        }}
-                        title="Exportar Proposta PDF"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </Button>
-                      {q.status === "ativa" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-amber-400 hover:text-amber-300"
-                          onClick={() => {
-                            setOsDialogId(q.id);
-                            setOsForm({ description: "", paymentTerms: "" });
-                            setOsBatchIds([]);
-                          }}
-                          title="Gerar OS"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
                       {q.status === "os_gerada" && (
                         <OSActionButton
                           quotationId={q.id}
                           quotationNumber={q.quotationNumber}
                           clientName={q.clientName || "Anunciante"}
                           clientCompany={q.clientCompany || undefined}
-                          coasterVolume={q.coasterVolume}
+                          coasterVolume={q.coasterVolume ?? 0}
                           totalValue={q.totalValue || undefined}
                           onSign={(savedBatchIds) => {
-                          const validBatchIds = new Set(batchesList.map((b: any) => b.id));
-                          setSignOsDialogId(q.id);
-                          setSignForm({
-                            batchIds: savedBatchIds.filter(id => validBatchIds.has(id)),
-                            signatureUrl: "",
-                          });
-                          setRestaurantAllocations([]);
-                        }} />
-                      )}
-                      {q.status !== "win" && q.status !== "perdida" && q.status !== "os_gerada" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => {
-                            setLossDialogId(q.id);
-                            setLossReason("");
+                            const validBatchIds = new Set(batchesList.map((b: any) => b.id));
+                            setSignOsDialogId(q.id);
+                            setSignForm({
+                              batchIds: savedBatchIds.filter(id => validBatchIds.has(id)),
+                              signatureUrl: "",
+                            });
+                            setRestaurantAllocations([]);
                           }}
-                          title="Marcar Perdida"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                        </Button>
+                        />
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleEdit(q)}
-                        title="Editar"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => duplicateMutation.mutate({ id: q.id })}
-                        title="Duplicar"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteId(q.id)}
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          <DropdownMenuItem
+                            className="gap-2 text-emerald-600 dark:text-emerald-400"
+                            onSelect={async () => {
+                              try {
+                                const [fetchedRestaurants, fetchedItems] = await Promise.all([
+                                  utils.quotation.getRestaurants.fetch({ quotationId: q.id }),
+                                  utils.quotation.listItems.fetch({ quotationId: q.id }),
+                                ]);
+                                const numRest = fetchedRestaurants.length;
+                                const duration = q.cycles || 1;
+                                const totalContractValue = Number(q.totalValue || 0);
+                                const monthlyTotal = duration > 0 ? totalContractValue / duration : totalContractValue;
+                                const pricePerRest = (numRest > 0 ? numRest : 1) > 0 ? monthlyTotal / (numRest > 0 ? numRest : 1) : monthlyTotal;
+                                const restaurants = fetchedRestaurants.map((r) => ({
+                                  name: r.restaurantName || "Restaurante",
+                                  neighborhood: r.restaurantAddress || "",
+                                  coasters: r.coasterQuantity || 0,
+                                }));
+                                const proposalItems = fetchedItems.length > 0
+                                  ? fetchedItems.map(item => {
+                                      const semanasMatch = item.notes?.match(/(\d+)sem/);
+                                      const itemSemanas = semanasMatch ? parseInt(semanasMatch[1]) : duration * 4;
+                                      return {
+                                        productName: item.productName,
+                                        volume: Number(item.quantity),
+                                        semanas: itemSemanas,
+                                        unitPrice: Number(item.unitPrice || 0),
+                                        totalPrice: Number(item.totalPrice || 0),
+                                      };
+                                    })
+                                  : undefined;
+                                generateProposalPdf({
+                                  clientName: q.clientName || q.leadName || "Cliente",
+                                  clientCompany: q.clientCompany || q.leadCompany || undefined,
+                                  clientCnpj: q.clientCnpj || q.leadCnpj || undefined,
+                                  clientEmail: q.clientEmail || q.leadEmail || undefined,
+                                  clientPhone: q.clientPhone || q.leadPhone || undefined,
+                                  quotationName: q.quotationName || q.quotationNumber,
+                                  coasterVolume: q.coasterVolume ?? 0,
+                                  numRestaurants: numRest,
+                                  coastersPerRestaurant: numRest > 0 ? Math.round((q.coasterVolume ?? 0) / numRest) : (q.coasterVolume ?? 0),
+                                  contractDuration: duration,
+                                  semanas: proposalItems ? undefined : (q.cycles || 1) * 4,
+                                  pricePerRestaurant: pricePerRest,
+                                  monthlyTotal,
+                                  contractTotal: totalContractValue,
+                                  includesProduction: q.includesProduction ?? true,
+                                  isBonificada: q.isBonificada ?? false,
+                                  restaurants,
+                                  productName: q.productName || undefined,
+                                  productUnitLabelPlural: q.productUnitLabelPlural || undefined,
+                                  items: proposalItems,
+                                  periodStart: q.periodStart || undefined,
+                                  batchWeeks: q.batchWeeks ?? 4,
+                                });
+                                toast.success("PDF da proposta gerado!");
+                              } catch {
+                                toast.error("Erro ao gerar PDF da proposta");
+                              }
+                            }}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Exportar Proposta PDF
+                          </DropdownMenuItem>
+                          {q.status === "ativa" && (
+                            <DropdownMenuItem
+                              className="gap-2 text-amber-600 dark:text-amber-400"
+                              onSelect={() => {
+                                setOsDialogId(q.id);
+                                setOsForm({ description: "", paymentTerms: "" });
+                                setOsBatchIds([]);
+                              }}
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              Gerar Ordem de Serviço
+                            </DropdownMenuItem>
+                          )}
+                          {q.status !== "win" && q.status !== "perdida" && q.status !== "os_gerada" && (
+                            <DropdownMenuItem
+                              className="gap-2 text-destructive"
+                              onSelect={() => {
+                                setLossDialogId(q.id);
+                                setLossReason("");
+                              }}
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              Marcar como Perdida
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="gap-2" onSelect={() => handleEdit(q)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onSelect={() => duplicateMutation.mutate({ id: q.id })}>
+                            <Copy className="w-3.5 h-3.5" />
+                            Duplicar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="gap-2 text-destructive focus:text-destructive"
+                            onSelect={() => setDeleteId(q.id)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </TableCell>
                 </TableRow>
