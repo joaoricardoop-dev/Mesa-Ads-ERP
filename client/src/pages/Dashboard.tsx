@@ -14,6 +14,9 @@ import {
   TrendingUp,
   Activity,
   Clock,
+  FileText,
+  Pencil,
+  CheckSquare,
   type LucideIcon,
 } from "lucide-react";
 import { useMemo } from "react";
@@ -28,17 +31,19 @@ interface StatusCardDef {
 
 const STATUS_CARD_DEFS: StatusCardDef[] = [
   { label: "Cotações Ativas", icon: ClipboardList, color: "text-amber-400 bg-amber-500/10", path: "/comercial/cotacoes", statusKey: "quotations_active" },
-  { label: "Em Produção", icon: Factory, color: "text-yellow-400 bg-yellow-500/10", path: "/campanhas", statusKey: "producao" },
-  { label: "Em Trânsito", icon: Truck, color: "text-orange-400 bg-orange-500/10", path: "/campanhas", statusKey: "transito" },
-  { label: "Executar", icon: Play, color: "text-blue-400 bg-blue-500/10", path: "/campanhas", statusKey: "executar" },
+  { label: "Briefing / Design", icon: FileText, color: "text-violet-400 bg-violet-500/10", path: "/campanhas", statusKey: "briefing_design" },
+  { label: "Em Produção Gráf.", icon: Factory, color: "text-yellow-400 bg-yellow-500/10", path: "/campanhas", statusKey: "producao" },
+  { label: "Em Distribuição", icon: Truck, color: "text-orange-400 bg-orange-500/10", path: "/campanhas", statusKey: "distribuicao" },
   { label: "Em Veiculação", icon: Radio, color: "text-emerald-400 bg-emerald-500/10", path: "/campanhas", statusKey: "veiculacao" },
 ];
 
 const PIPELINE_STAGE_DEFS = [
   { label: "Cotação", statusKey: "quotation", color: "bg-amber-500" },
+  { label: "Briefing", statusKey: "briefing", color: "bg-violet-500" },
+  { label: "Design", statusKey: "design", color: "bg-purple-500" },
+  { label: "Aprovação", statusKey: "aprovacao", color: "bg-pink-500" },
   { label: "Produção", statusKey: "producao", color: "bg-yellow-500" },
-  { label: "Trânsito", statusKey: "transito", color: "bg-orange-500" },
-  { label: "Executar", statusKey: "executar", color: "bg-blue-500" },
+  { label: "Distribuição", statusKey: "distribuicao", color: "bg-orange-500" },
   { label: "Veiculação", statusKey: "veiculacao", color: "bg-emerald-500" },
   { label: "Inativa", statusKey: "inativa", color: "bg-muted" },
 ];
@@ -62,7 +67,11 @@ function useStatusCounts() {
     }
 
     counts["quotation"] = campaignStatusCounts["quotation"] || 0;
+    counts["briefing"] = campaignStatusCounts["briefing"] || 0;
+    counts["design"] = campaignStatusCounts["design"] || 0;
+    counts["aprovacao"] = campaignStatusCounts["aprovacao"] || 0;
     counts["producao"] = campaignStatusCounts["producao"] || 0;
+    counts["distribuicao"] = campaignStatusCounts["distribuicao"] || 0;
     counts["transito"] = campaignStatusCounts["transito"] || 0;
     counts["executar"] = campaignStatusCounts["executar"] || 0;
     counts["veiculacao"] = campaignStatusCounts["veiculacao"] || 0;
@@ -70,6 +79,7 @@ function useStatusCounts() {
     counts["active"] = campaignStatusCounts["active"] || 0;
     counts["draft"] = campaignStatusCounts["draft"] || 0;
     counts["completed"] = campaignStatusCounts["completed"] || 0;
+    counts["briefing_design"] = (campaignStatusCounts["briefing"] || 0) + (campaignStatusCounts["design"] || 0) + (campaignStatusCounts["aprovacao"] || 0);
 
     const totalCampaignValue = campaigns.reduce((sum, c) => {
       const price = parseFloat((c as any).fixedPrice || "0");
@@ -77,7 +87,9 @@ function useStatusCounts() {
     }, 0);
 
     const activeCampaigns = campaigns.filter(
-      (c) => c.status === "active" || c.status === "veiculacao" || c.status === "producao" || c.status === "transito" || c.status === "executar"
+      (c) => c.status === "active" || c.status === "veiculacao" || c.status === "producao" ||
+             c.status === "transito" || c.status === "executar" || c.status === "briefing" ||
+             c.status === "design" || c.status === "aprovacao" || c.status === "distribuicao"
     );
 
     return {

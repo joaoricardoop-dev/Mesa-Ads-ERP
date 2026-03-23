@@ -1305,7 +1305,7 @@ export const appRouter = router({
           name: z.string().min(1),
           startDate: z.string(),
           endDate: z.string(),
-          status: z.enum(["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa"]).default("quotation"),
+          status: z.enum(["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa", "briefing", "design", "aprovacao", "distribuicao"]).default("quotation"),
           notes: z.string().optional(),
           coastersPerRestaurant: z.number().int().default(500),
           usagePerDay: z.number().int().default(3),
@@ -1336,7 +1336,7 @@ export const appRouter = router({
           name: z.string().min(1).optional(),
           startDate: z.string().optional(),
           endDate: z.string().optional(),
-          status: z.enum(["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa"]).optional(),
+          status: z.enum(["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa", "briefing", "design", "aprovacao", "distribuicao"]).optional(),
           notes: z.string().optional(),
           coastersPerRestaurant: z.number().int().optional(),
           usagePerDay: z.number().int().optional(),
@@ -1412,14 +1412,14 @@ export const appRouter = router({
     completeBriefing: operacoesProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        await updateCampaign(input.id, { status: "design" } as any);
+        await updateCampaign(input.id, { status: "design" });
         await addCampaignHistory(input.id, "briefing_complete", "Briefing concluído — campanha em produção de design");
       }),
 
     submitDesign: operacoesProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        await updateCampaign(input.id, { status: "aprovacao" } as any);
+        await updateCampaign(input.id, { status: "aprovacao" });
         await addCampaignHistory(input.id, "design_submitted", "Design enviado para aprovação");
       }),
 
@@ -1428,7 +1428,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const campaign = await getCampaign(input.id);
         if (!campaign) throw new Error("Campanha não encontrada");
-        await updateCampaign(input.id, { status: "producao", producaoEnteredAt: new Date() } as any);
+        await updateCampaign(input.id, { status: "producao", producaoEnteredAt: new Date() });
         await addCampaignHistory(input.id, "design_approved", "Design aprovado — campanha em produção gráfica");
 
         const { getDb: getDatabase } = await import("./db");
@@ -1465,7 +1465,7 @@ export const appRouter = router({
         await updateCampaign(input.id, {
           status: "distribuicao",
           materialReceivedDate: new Date().toISOString().split("T")[0],
-        } as any);
+        });
         await addCampaignHistory(input.id, "material_received", "Material recebido — campanha em distribuição");
 
         const { getDb: getDatabase } = await import("./db");
@@ -1506,7 +1506,7 @@ export const appRouter = router({
           status: "veiculacao",
           veiculacaoStartDate: input.veiculacaoStartDate,
           veiculacaoEndDate: input.veiculacaoEndDate,
-        } as any);
+        });
         await addCampaignHistory(input.id, "distribution_complete", `Distribuição concluída — veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`);
 
         try {
@@ -1560,7 +1560,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const { id, ...artData } = input;
-        await updateCampaign(id, { ...artData, status: "producao" } as any);
+        await updateCampaign(id, { ...artData, status: "producao" });
         await addCampaignHistory(id, "art_uploaded", "Arte enviada — campanha em produção");
       }),
 
@@ -1569,7 +1569,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const campaign = await getCampaign(input.id);
         if (!campaign) throw new Error("Campanha não encontrada");
-        await updateCampaign(input.id, { status: "transito" } as any);
+        await updateCampaign(input.id, { status: "transito" });
         await addCampaignHistory(input.id, "production_complete", "Produção concluída — material em trânsito");
 
         const { getDb: getDatabase } = await import("./db");
@@ -1601,7 +1601,7 @@ export const appRouter = router({
     confirmMaterial: operacoesProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        await updateCampaign(input.id, { status: "executar", materialReceivedDate: new Date().toISOString().split("T")[0] } as any);
+        await updateCampaign(input.id, { status: "executar", materialReceivedDate: new Date().toISOString().split("T")[0] });
         await addCampaignHistory(input.id, "material_received", "Material recebido — pronto para execução");
       }),
 
@@ -1616,7 +1616,7 @@ export const appRouter = router({
           status: "veiculacao",
           veiculacaoStartDate: input.veiculacaoStartDate,
           veiculacaoEndDate: input.veiculacaoEndDate,
-        } as any);
+        });
         await addCampaignHistory(input.id, "veiculacao_started", `Veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`);
 
         try {
@@ -1671,7 +1671,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const campaign = await getCampaign(input.id);
         if (!campaign) throw new Error("Campanha não encontrada");
-        await updateCampaign(input.id, { status: "inativa" } as any);
+        await updateCampaign(input.id, { status: "inativa" });
         await addCampaignHistory(input.id, "finalized", "Campanha finalizada e arquivada");
 
         const { getDb: getDatabase } = await import("./db");

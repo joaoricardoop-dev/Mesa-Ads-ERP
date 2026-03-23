@@ -26,7 +26,7 @@ async function generateOrderNumber(db: any, type: "anunciante" | "producao") {
 export const serviceOrderRouter = router({
   list: protectedProcedure
     .input(z.object({
-      type: z.enum(["anunciante", "producao"]).optional(),
+      type: z.enum(["anunciante", "producao", "distribuicao"]).optional(),
       status: z.enum(["rascunho", "enviada", "assinada", "execucao", "concluida"]).optional(),
       campaignId: z.number().optional(),
       clientId: z.number().optional(),
@@ -85,7 +85,7 @@ export const serviceOrderRouter = router({
 
   create: internalProcedure
     .input(z.object({
-      type: z.enum(["anunciante", "producao"]),
+      type: z.enum(["anunciante", "producao", "distribuicao"]),
       campaignId: z.number().optional(),
       clientId: z.number().optional(),
       description: z.string().optional(),
