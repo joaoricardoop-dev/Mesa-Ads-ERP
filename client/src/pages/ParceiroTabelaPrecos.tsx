@@ -28,15 +28,17 @@ function calcUnitPrice(params: {
   volume: number;
   irpj: number;
   comRestaurante: number;
-  comComercial: number;
+  comComercialProduto: number;
+  comParceiro: number;
   billingMode?: "bruto" | "liquido";
 }) {
-  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercial, billingMode = "bruto" } = params;
-  const denominadorBase = 1 - margem - irpj - comRestaurante;
+  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercialProduto, comParceiro, billingMode = "bruto" } = params;
+  const denominadorBase = 1 - margem - irpj - comRestaurante - comComercialProduto;
   const custoTotal = custoUnitario * artes * volume + frete;
   const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
-  const precoTotal = billingMode === "bruto" && comComercial < 1
-    ? precoBase / (1 - comComercial)
+  const grossUpDen = 1 - comParceiro - irpj;
+  const precoTotal = billingMode === "bruto" && grossUpDen > 0
+    ? precoBase / grossUpDen
     : precoBase;
   return volume > 0 ? precoTotal / volume : 0;
 }
@@ -64,7 +66,8 @@ function ProductTable({ product, commissionPercent, billingMode }: ProductTableP
 
   const irpj = parseFloat(product.irpj ?? "6") / 100;
   const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
-  const comComercial = commissionPercent / 100;
+  const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
+  const comParceiro = commissionPercent / 100;
 
   const volumes = useMemo(
     () => tiers.map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
@@ -94,7 +97,8 @@ function ProductTable({ product, commissionPercent, billingMode }: ProductTableP
         volume: smallestVol,
         irpj,
         comRestaurante,
-        comComercial,
+        comComercialProduto,
+        comParceiro,
         billingMode,
       })
     : 0;
@@ -140,7 +144,8 @@ function ProductTable({ product, commissionPercent, billingMode }: ProductTableP
                   volume: vol,
                   irpj,
                   comRestaurante,
-                  comComercial,
+                  comComercialProduto,
+                  comParceiro,
                   billingMode,
                 });
                 const discountVol = baseUnitPrice > 0 && vol > smallestVol ? (1 - unitPrice4sem / baseUnitPrice) : 0;
@@ -351,10 +356,10 @@ export default function ParceiroTabelaPrecos() {
         </p>
         <div className="bg-muted/20 rounded-lg p-3 font-mono text-xs space-y-1">
           <p><span className="text-muted-foreground">Custo total</span> = Custo GPC × Artes × Volume + Frete</p>
-          <p><span className="text-muted-foreground">Denominador base</span> = 1 − Margem − IRPJ − Com. Restaurante</p>
+          <p><span className="text-muted-foreground">Denominador base</span> = 1 − Margem − IRPJ − Com. Restaurante − Com. Interna</p>
           <p><span className="text-muted-foreground">Preço base (4 sem.)</span> = Custo total ÷ Denominador base</p>
           {billingMode === "bruto" ? (
-            <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Preço base ÷ (1 − <span className="text-emerald-400">Com. Comercial ({commissionPercent}%)</span>)</p>
+            <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Preço base ÷ (1 − <span className="text-emerald-400">Sua Com. ({commissionPercent}%)</span> − IRPJ)</p>
           ) : (
             <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Preço base <span className="text-amber-400">(sem gross-up — comissão faturada separadamente)</span></p>
           )}
@@ -370,12 +375,16 @@ export default function ParceiroTabelaPrecos() {
             <span>Com. Restaurante: 15% (por produto)</span>
           </div>
           <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0" />
+            <span>Com. Interna: 10% (por produto)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-            <span>Com. Comercial: <strong>{commissionPercent}%</strong> (sua comissão)</span>
+            <span>Sua com.: <strong>{commissionPercent}%</strong> (gross-up parceiro)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
-            <span>Margem Mesa Ads: 50% (por produto)</span>
+            <span>Margem Mesa Ads: variável (por produto)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />

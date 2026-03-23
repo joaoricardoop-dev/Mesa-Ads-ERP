@@ -296,7 +296,7 @@ export function calcPricing(
 }
 
 const DEFAULT_PRODUCT_TIERS: ProductPricingTier[] = [
-  { volumeMin: 1000,  volumeMax: 1999,  custoUnitario: "0.4190", frete: "80.38",   margem: "50.00", artes: 1 },
+  { volumeMin: 1000,  volumeMax: 1999,  custoUnitario: "0.4190", frete: "80.38",   margem: "49.79", artes: 1 },
   { volumeMin: 2000,  volumeMax: 2999,  custoUnitario: "0.3495", frete: "138.16",  margem: "50.00", artes: 1 },
   { volumeMin: 3000,  volumeMax: 3999,  custoUnitario: "0.3330", frete: "219.03",  margem: "50.00", artes: 1 },
   { volumeMin: 4000,  volumeMax: 4999,  custoUnitario: "0.3248", frete: "299.41",  margem: "50.00", artes: 1 },

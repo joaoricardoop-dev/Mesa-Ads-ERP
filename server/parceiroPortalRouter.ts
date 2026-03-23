@@ -418,12 +418,14 @@ export const parceiroPortalRouter = router({
 
       const irpj = parseFloat(String(product.irpj ?? "6")) / 100;
       const comRestaurante = parseFloat(String(product.comRestaurante ?? "0")) / 100;
-      const comComercial = Number(partner.commissionPercent) / 100;
+      const comComercialProduto = parseFloat(String(product.comComercial ?? "10")) / 100;
+      const comParceiro = Number(partner.commissionPercent) / 100;
       const billingMode = (partner.billingMode ?? "bruto") as "bruto" | "liquido";
-      const denominadorBase = 1 - (parseFloat(String(matchedTier.margem)) / 100) - irpj - comRestaurante;
+      const denominadorBase = 1 - (parseFloat(String(matchedTier.margem)) / 100) - irpj - comRestaurante - comComercialProduto;
       const custoTotal = parseFloat(String(matchedTier.custoUnitario)) * (matchedTier.artes ?? 1) * input.volume + parseFloat(String(matchedTier.frete));
       const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
-      const precoTotal = billingMode === "bruto" && comComercial < 1 ? precoBase / (1 - comComercial) : precoBase;
+      const grossUpDen = 1 - comParceiro - irpj;
+      const precoTotal = billingMode === "bruto" && grossUpDen > 0 ? precoBase / grossUpDen : precoBase;
       const serverUnitPrice = input.volume > 0 ? precoTotal / input.volume : 0;
 
       const DESCONTOS_PRAZO: Record<number, number> = {
