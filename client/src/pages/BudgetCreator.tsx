@@ -11,7 +11,7 @@ import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
 import { Separator } from "../components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group";
-import { Trash2, Plus, Calculator, RotateCcw, ExternalLink, Building2, Mail, Phone, MapPin, Tag, PackagePlus, Pencil, ChevronRight, Layers } from "lucide-react";
+import { Trash2, Plus, Calculator, RotateCcw, ExternalLink, Building2, Mail, Phone, MapPin, Tag, PackagePlus, Pencil, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { BudgetPricingDialog, type PricingDialogImportResult } from "../components/BudgetPricingDialog";
 import { CoasterPricingDialog } from "../components/CoasterPricingDialog";

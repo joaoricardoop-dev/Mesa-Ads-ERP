@@ -458,6 +458,17 @@ export default function Quotations() {
     </TableHead>
   );
 
+  const ALL_STATUS_TABS: Array<{ key: string; label: string }> = [
+    { key: "all", label: "Todas" },
+    { key: "rascunho", label: "Rascunho" },
+    { key: "enviada", label: "Enviada" },
+    { key: "ativa", label: "Ativa" },
+    { key: "os_gerada", label: "OS Gerada" },
+    { key: "win", label: "WIN" },
+    { key: "perdida", label: "Perdida" },
+    { key: "expirada", label: "Expirada" },
+  ];
+
   return (
     <PageContainer
       title="Cotações"
@@ -469,46 +480,41 @@ export default function Quotations() {
         </Button>
       }
     >
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {(["rascunho", "enviada", "ativa", "win", "perdida", "expirada"] as QuotationStatus[]).map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
-            className={`bg-card border rounded-lg p-3 text-left transition-all ${
-              statusFilter === s ? "border-primary ring-1 ring-primary" : "border-border/30 hover:border-border/60"
-            }`}
-          >
-            <p className="text-xs text-muted-foreground">{STATUS_CONFIG[s].label}</p>
-            <p className="text-xl font-bold font-mono">{statusCounts[s] || 0}</p>
-          </button>
-        ))}
+      {/* Status filter tabs */}
+      <div className="flex items-center gap-1 flex-wrap">
+        {ALL_STATUS_TABS.map((tab) => {
+          const count = tab.key === "all" ? quotationsList.length : (statusCounts[tab.key] || 0);
+          const isActive = statusFilter === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setStatusFilter(tab.key)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                isActive
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-background text-muted-foreground border-border/40 hover:border-border hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
+                isActive ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <div className="relative flex-1 sm:max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar cotação..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-card border-border/30"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[160px] bg-card border-border/30">
-            <SelectValue placeholder="Todos Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos Status</SelectItem>
-            <SelectItem value="rascunho">Rascunho</SelectItem>
-            <SelectItem value="enviada">Enviada</SelectItem>
-            <SelectItem value="ativa">Ativa</SelectItem>
-            <SelectItem value="os_gerada">OS Gerada</SelectItem>
-            <SelectItem value="win">WIN</SelectItem>
-            <SelectItem value="perdida">Perdida</SelectItem>
-            <SelectItem value="expirada">Expirada</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Search bar */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por número, nome ou cliente..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 bg-card border-border/30"
+        />
       </div>
 
       <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
