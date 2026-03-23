@@ -134,32 +134,6 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
   doc.line(margin, y, pageWidth - margin, y);
   y += 10;
 
-  if (data.restaurants.length > 0) {
-    doc.setTextColor(13, 13, 13);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("RESTAURANTES", margin, y);
-    y += 8;
-
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(60, 60, 60);
-
-    for (const r of data.restaurants) {
-      if (y > pageHeight - 70) {
-        doc.addPage();
-        y = 20;
-      }
-      doc.text(`• ${r}`, margin + 4, y);
-      y += 5;
-    }
-
-    y += 6;
-    doc.setDrawColor(220, 220, 220);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 10;
-  }
-
   if (y > pageHeight - 60) {
     doc.addPage();
     y = 20;
