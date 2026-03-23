@@ -11,8 +11,8 @@ async function getDatabase() {
   return d;
 }
 
-async function generateOrderNumber(db: any, type: "anunciante" | "producao") {
-  const prefix = type === "anunciante" ? "OS-ANT" : "OS-PROD";
+async function generateOrderNumber(db: any, type: "anunciante" | "producao" | "distribuicao") {
+  const prefix = type === "anunciante" ? "OS-ANT" : type === "distribuicao" ? "OS-DIST" : "OS-PROD";
   const year = new Date().getFullYear();
   const pattern = `${prefix}-${year}-%`;
   const countResult = await db
