@@ -746,6 +746,7 @@ export default function BudgetCreator() {
   const [descontoParceiro, setDescontoParceiro] = useState(false);
   const [partnerId, setPartnerId] = useState<number | null>(null);
   const [descontoManual, setDescontoManual] = useState(0);
+  const [agencyCommissionPercent, setAgencyCommissionPercent] = useState("");
   const [formaPagamento, setFormaPagamento] = useState<"pix" | "boleto" | "cartao">("boleto");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<BudgetItemState[]>(() => [makeBlankItem()]);
@@ -817,6 +818,7 @@ export default function BudgetCreator() {
     setDescontoParceiro(false);
     setPartnerId(null);
     setDescontoManual(0);
+    setAgencyCommissionPercent("");
     setFormaPagamento("boleto");
     setNotes("");
     setItems([makeBlankItem()]);
@@ -892,6 +894,7 @@ export default function BudgetCreator() {
           customRestaurantCommission: cv.customRestaurantCommission,
           customPartnerCommission: cv.customPartnerCommission,
           customSellerCommission: cv.customSellerCommission,
+          agencyCommissionPercent: agencyCommissionPercent || null,
         });
 
         toast.success("Cotação gerada com sucesso!");
@@ -914,6 +917,7 @@ export default function BudgetCreator() {
           hasPartnerDiscount: descontoParceiro,
           productId: firstProductId,
           partnerId: descontoParceiro ? partnerId : null,
+          agencyCommissionPercent: agencyCommissionPercent || null,
         });
 
         // discountRatio applies the global payment + partner discounts to each item proportionally
@@ -1021,18 +1025,36 @@ export default function BudgetCreator() {
                 )}
 
                 {/* Configurações da proposta */}
-                <div className="pt-1">
-                  <Label className="text-xs text-muted-foreground mb-1 block">Desconto manual (%)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={20}
-                    step={0.5}
-                    value={descontoManual || ""}
-                    onChange={(e) => setDescontoManual(Math.min(20, Math.max(0, parseFloat(e.target.value) || 0)))}
-                    className="h-9 text-sm"
-                    placeholder="0"
-                  />
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Desconto manual (%)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={20}
+                      step={0.5}
+                      value={descontoManual || ""}
+                      onChange={(e) => setDescontoManual(Math.min(20, Math.max(0, parseFloat(e.target.value) || 0)))}
+                      className="h-9 text-sm"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Comissão de Agência (%)</Label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.5}
+                        value={agencyCommissionPercent}
+                        onChange={(e) => setAgencyCommissionPercent(e.target.value)}
+                        className="h-9 text-sm pr-7"
+                        placeholder="0"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Switches */}

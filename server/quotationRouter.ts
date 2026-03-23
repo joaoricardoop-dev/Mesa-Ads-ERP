@@ -261,6 +261,7 @@ export const quotationRouter = router({
       customRestaurantCommission: z.string().optional(),
       customPartnerCommission: z.string().optional(),
       customSellerCommission: z.string().optional(),
+      agencyCommissionPercent: z.string().optional().nullable(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -352,6 +353,7 @@ export const quotationRouter = router({
         customRestaurantCommission: input.customRestaurantCommission,
         customPartnerCommission: input.customPartnerCommission,
         customSellerCommission: input.customSellerCommission,
+        agencyCommissionPercent: input.agencyCommissionPercent ?? null,
       }).returning();
 
       if (created.partnerId) {
