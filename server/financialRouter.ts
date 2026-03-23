@@ -36,26 +36,63 @@ export const financialRouter = router({
     const db = await getDatabase();
 
     const now = new Date();
+    const today = now.toISOString().split("T")[0];
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split("T")[0];
     const monthEnd = new Date(currentYear, currentMonth + 1, 0).toISOString().split("T")[0];
+    const next30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    const paidThisMonth = await db
+    // ── Invoice totals by status ───────────────────────────────────────────────
+    const invoicesByStatus = await db
+      .select({
+        status: invoices.status,
+        count: sql<number>`COUNT(*)::int`,
+        total: sql<string>`COALESCE(SUM(amount::numeric), 0)`,
+      })
+      .from(invoices)
+      .groupBy(invoices.status);
+
+    const invByStatus: Record<string, { count: number; total: number }> = {};
+    for (const row of invoicesByStatus) {
+      invByStatus[row.status] = { count: row.count, total: parseFloat(row.total) };
+    }
+
+    // Overdue = emitida past due date
+    const overdueResult = await db
+      .select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)`, count: sql<number>`COUNT(*)::int` })
+      .from(invoices)
+      .where(and(eq(invoices.status, "emitida"), lte(invoices.dueDate, today)));
+
+    // Invoiced this month (emitida + paga issued this month)
+    const invoicedThisMonthResult = await db
+      .select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` })
+      .from(invoices)
+      .where(and(
+        sql`status NOT IN ('cancelada')`,
+        gte(invoices.issueDate, monthStart),
+        lte(invoices.issueDate, monthEnd),
+      ));
+
+    // Received this month (paga)
+    const paidThisMonthResult = await db
       .select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` })
       .from(invoices)
       .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, monthStart), lte(invoices.paymentDate, monthEnd)));
 
-    const overdueTotal = await db
-      .select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` })
-      .from(invoices)
-      .where(and(eq(invoices.status, "emitida"), lte(invoices.dueDate, now.toISOString().split("T")[0])));
+    // ── Pending restaurant payments ─────────────────────────────────────────────
+    const pendingRpResult = await db
+      .select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)`, count: sql<number>`COUNT(*)::int` })
+      .from(restaurantPayments)
+      .where(eq(restaurantPayments.status, "pending"));
 
-    const receivablesResult = await db
-      .select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` })
-      .from(invoices)
-      .where(eq(invoices.status, "emitida"));
+    // ── Active campaigns count ─────────────────────────────────────────────────
+    const activeCampaignsResult = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(campaigns)
+      .where(inArray(campaigns.status, ["active", "veiculacao", "executar", "producao", "transito"]));
 
+    // ── Operational costs totals ──────────────────────────────────────────────
     const costData = await db
       .select({
         totalProduction: sql<string>`COALESCE(SUM("productionCost"::numeric), 0)`,
@@ -63,51 +100,99 @@ export const financialRouter = router({
       })
       .from(operationalCosts);
 
-    const rpTotal = await db
+    const rpPaidTotal = await db
       .select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` })
       .from(restaurantPayments)
-      .where(and(
-        gte(restaurantPayments.createdAt, new Date(currentYear, currentMonth, 1)),
-        lte(restaurantPayments.createdAt, new Date(currentYear, currentMonth + 1, 0))
-      ));
+      .where(eq(restaurantPayments.status, "paid"));
 
-    const monthlyRevenue: { month: string; revenue: number }[] = [];
-    for (let i = 11; i >= 0; i--) {
+    // ── Monthly chart: last 6 months, invoiced vs received ──────────────────
+    const monthlyData: { month: string; invoiced: number; received: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
       const d = new Date(currentYear, currentMonth - i, 1);
       const mStart = d.toISOString().split("T")[0];
       const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split("T")[0];
-      const r = await db
-        .select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` })
-        .from(invoices)
-        .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, mStart), lte(invoices.paymentDate, mEnd)));
-      monthlyRevenue.push({
+      const [inv, rcv] = await Promise.all([
+        db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` })
+          .from(invoices)
+          .where(and(sql`status NOT IN ('cancelada')`, gte(invoices.issueDate, mStart), lte(invoices.issueDate, mEnd))),
+        db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` })
+          .from(invoices)
+          .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, mStart), lte(invoices.paymentDate, mEnd))),
+      ]);
+      monthlyData.push({
         month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-        revenue: parseFloat(r[0]?.total || "0"),
+        invoiced: parseFloat(inv[0]?.total || "0"),
+        received: parseFloat(rcv[0]?.total || "0"),
       });
     }
 
-    const activeCampaigns = await db
-      .select({ count: sql<number>`COUNT(*)` })
-      .from(campaigns)
-      .where(eq(campaigns.status, "quotation"));
+    // ── Upcoming invoices (due in next 30 days, not yet paid) ──────────────
+    const upcomingRows = await db
+      .select({
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        amount: invoices.amount,
+        dueDate: invoices.dueDate,
+        clientId: invoices.clientId,
+        campaignId: invoices.campaignId,
+      })
+      .from(invoices)
+      .where(and(
+        eq(invoices.status, "emitida"),
+        gte(invoices.dueDate, today),
+        lte(invoices.dueDate, next30Days),
+      ))
+      .orderBy(invoices.dueDate);
 
-    const revenue = parseFloat(paidThisMonth[0]?.total || "0");
+    const upcomingCampaignIds = uniqueIds(upcomingRows.map((r) => r.campaignId));
+    const upcomingClientIds = uniqueIds(upcomingRows.map((r) => r.clientId));
+    const upCampMap: Record<number, string> = {};
+    const upCliMap: Record<number, string> = {};
+    if (upcomingCampaignIds.length > 0) {
+      const rows = await db.select({ id: campaigns.id, name: campaigns.name }).from(campaigns).where(inArray(campaigns.id, upcomingCampaignIds));
+      for (const r of rows) upCampMap[r.id] = r.name;
+    }
+    if (upcomingClientIds.length > 0) {
+      const rows = await db.select({ id: clients.id, name: clients.name }).from(clients).where(inArray(clients.id, upcomingClientIds));
+      for (const r of rows) upCliMap[r.id] = r.name;
+    }
+    const upcomingInvoices = upcomingRows.map((r) => ({
+      ...r,
+      campaignName: upCampMap[r.campaignId] || "—",
+      clientName: upCliMap[r.clientId] || "—",
+    }));
+
+    // ── Legacy revenue for old monthly chart ──────────────────────────────
+    const monthlyRevenue = monthlyData.map((m) => ({ month: m.month, revenue: m.received }));
+
+    const revenue = parseFloat(paidThisMonthResult[0]?.total || "0");
+    const invoicedThisMonth = parseFloat(invoicedThisMonthResult[0]?.total || "0");
     const production = parseFloat(costData[0]?.totalProduction || "0");
     const freight = parseFloat(costData[0]?.totalFreight || "0");
-    const restaurantCosts = parseFloat(rpTotal[0]?.total || "0");
+    const restaurantCosts = parseFloat(rpPaidTotal[0]?.total || "0");
     const totalCosts = production + freight + restaurantCosts;
     const margin = revenue - totalCosts;
 
     return {
       revenue,
+      invoicedThisMonth,
       totalCosts,
       margin,
       marginPercent: revenue > 0 ? (margin / revenue) * 100 : 0,
-      overdue: parseFloat(overdueTotal[0]?.total || "0"),
-      receivables: parseFloat(receivablesResult[0]?.total || "0"),
+      overdue: parseFloat(overdueResult[0]?.total || "0"),
+      overdueCount: overdueResult[0]?.count || 0,
+      receivables: invByStatus["emitida"]?.total || 0,
+      receivablesCount: invByStatus["emitida"]?.count || 0,
+      paidTotal: invByStatus["paga"]?.total || 0,
+      pendingRestaurantPayments: parseFloat(pendingRpResult[0]?.total || "0"),
+      pendingRestaurantCount: pendingRpResult[0]?.count || 0,
+      activeCampaigns: activeCampaignsResult[0]?.count || 0,
       costBreakdown: { production, freight, restaurantCosts },
+      invoiceStatusSummary: invByStatus,
       monthlyRevenue,
-      pipeline: Number(activeCampaigns[0]?.count || 0),
+      monthlyData,
+      upcomingInvoices,
+      pipeline: Number(activeCampaignsResult[0]?.count || 0),
     };
   }),
 
