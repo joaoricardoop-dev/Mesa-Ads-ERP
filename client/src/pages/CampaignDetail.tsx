@@ -63,6 +63,11 @@ import {
   Image,
   ArrowRight,
   Gift,
+  Receipt,
+  HandCoins,
+  ExternalLink,
+  Plus,
+  ChevronRight,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -238,6 +243,10 @@ export default function CampaignDetail() {
   const [proofUrl, setProofUrl] = useState("");
   const [proofWeek, setProofWeek] = useState(1);
   const [proofRestaurantId, setProofRestaurantId] = useState<number | null>(null);
+  const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
+  const [invoiceAmount, setInvoiceAmount] = useState("");
+  const [invoiceDueDate, setInvoiceDueDate] = useState("");
+  const [invoiceNotes, setInvoiceNotes] = useState("");
 
   const utils = trpc.useUtils();
   const { data: campaign, isLoading } = trpc.campaign.get.useQuery({ id: campaignId }, { enabled: campaignId > 0 });
@@ -247,6 +256,8 @@ export default function CampaignDetail() {
   const { data: restaurantsList = [] } = trpc.restaurant.list.useQuery();
   const { data: proofsList = [] } = trpc.campaign.getProofs.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignBatchList = [] } = trpc.batch.getCampaignBatches.useQuery({ campaignId }, { enabled: campaignId > 0 });
+  const { data: campaignInvoices = [], refetch: refetchInvoices } = trpc.financial.listInvoices.useQuery({ campaignId }, { enabled: campaignId > 0 });
+  const { data: campaignPayments = [] } = trpc.financial.listPayments.useQuery({ campaignId }, { enabled: campaignId > 0 });
 
   const uploadArtMutation = trpc.campaign.uploadArt.useMutation({
     onSuccess: () => {
@@ -362,6 +373,23 @@ export default function CampaignDetail() {
     },
     onError: (err: any) => toast.error(err.message),
   });
+
+  const createInvoiceMutation = trpc.financial.createInvoice.useMutation({
+    onSuccess: () => {
+      refetchInvoices();
+      setIsInvoiceDialogOpen(false);
+      setInvoiceAmount("");
+      setInvoiceDueDate("");
+      setInvoiceNotes("");
+      toast.success("Fatura emitida com sucesso!");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  function handleCreateInvoice() {
+    if (!invoiceAmount || !invoiceDueDate) { toast.error("Preencha valor e data de vencimento"); return; }
+    createInvoiceMutation.mutate({ campaignId, amount: invoiceAmount, dueDate: invoiceDueDate, notes: invoiceNotes || undefined });
+  }
 
   const handleStatusAction = (action: string) => {
     if (action === "approve") {
@@ -1114,6 +1142,144 @@ export default function CampaignDetail() {
                   </div>
                 </div>
               </div>
+
+              {/* ── FATURAS REAIS ── */}
+              {!campaign.isBonificada && (() => {
+                const totalFaturado = campaignInvoices.filter(i => i.status !== "cancelada").reduce((s, i) => s + parseFloat(i.amount), 0);
+                const totalRecebido = campaignInvoices.filter(i => i.status === "paga").reduce((s, i) => s + parseFloat(i.amount), 0);
+                const totalPendente = campaignInvoices.filter(i => i.status === "emitida").reduce((s, i) => s + parseFloat(i.amount), 0);
+                const invoiceStatusColor: Record<string, string> = {
+                  emitida: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+                  paga: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+                  vencida: "bg-red-500/20 text-red-400 border-red-500/30",
+                  cancelada: "bg-muted/20 text-muted-foreground border-border/30",
+                };
+                const invoiceStatusLabel: Record<string, string> = { emitida: "Emitida", paga: "Paga", vencida: "Vencida", cancelada: "Cancelada" };
+                return (
+                  <div className="bg-card border border-border/30 rounded-lg p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Receipt className="w-4 h-4 text-muted-foreground" />
+                        <h3 className="text-sm font-semibold">Faturas desta Campanha</h3>
+                        {campaignInvoices.length > 0 && (
+                          <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{campaignInvoices.length}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/financeiro/faturamento")}>
+                          Ver todas <ExternalLink className="w-3 h-3" />
+                        </Button>
+                        <Button size="sm" className="text-xs h-7 gap-1" onClick={() => {
+                          setInvoiceAmount(String(p.contractRevenue.toFixed(2)));
+                          const due = new Date(); due.setDate(due.getDate() + 30);
+                          setInvoiceDueDate(due.toISOString().split("T")[0]);
+                          setIsInvoiceDialogOpen(true);
+                        }}>
+                          <Plus className="w-3.5 h-3.5" /> Emitir Fatura
+                        </Button>
+                      </div>
+                    </div>
+
+                    {campaignInvoices.length > 0 && (
+                      <div className="grid grid-cols-3 gap-3 pb-2">
+                        <div className="text-center p-3 rounded-lg bg-muted/5 border border-border/20">
+                          <p className="text-xs text-muted-foreground">Faturado</p>
+                          <p className="font-mono font-semibold text-sm">{formatCurrency(totalFaturado)}</p>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                          <p className="text-xs text-muted-foreground">Recebido</p>
+                          <p className="font-mono font-semibold text-sm text-emerald-400">{formatCurrency(totalRecebido)}</p>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                          <p className="text-xs text-muted-foreground">A Receber</p>
+                          <p className="font-mono font-semibold text-sm text-amber-400">{formatCurrency(totalPendente)}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {campaignInvoices.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground gap-2">
+                        <Receipt className="w-8 h-8 opacity-20" />
+                        <p>Nenhuma fatura emitida para esta campanha</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {campaignInvoices.map((inv) => (
+                          <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg border border-border/20 bg-muted/5">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div>
+                                <p className="text-sm font-medium font-mono">{inv.invoiceNumber}</p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Emitida {inv.issueDate ? inv.issueDate.split("-").reverse().join("/") : "—"}
+                                  {inv.dueDate ? ` · Vence ${inv.dueDate.split("-").reverse().join("/")}` : ""}
+                                  {inv.paymentDate ? ` · Pago ${inv.paymentDate.split("-").reverse().join("/")}` : ""}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <p className="font-mono font-semibold text-sm">{formatCurrency(parseFloat(inv.amount))}</p>
+                              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${invoiceStatusColor[inv.status] || invoiceStatusColor.cancelada}`}>
+                                {invoiceStatusLabel[inv.status] || inv.status}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* ── PAGAMENTOS RESTAURANTES ── */}
+              {!campaign.isBonificada && campaignPayments.length > 0 && (() => {
+                const totalPago = campaignPayments.filter(p => p.status === "paid").reduce((s, p) => s + parseFloat(p.amount), 0);
+                const totalPendente = campaignPayments.filter(p => p.status === "pending").reduce((s, p) => s + parseFloat(p.amount), 0);
+                return (
+                  <div className="bg-card border border-border/30 rounded-lg p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <HandCoins className="w-4 h-4 text-muted-foreground" />
+                        <h3 className="text-sm font-semibold">Pagamentos a Restaurantes</h3>
+                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{campaignPayments.length}</span>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/financeiro/pagamentos")}>
+                        Ver todos <ExternalLink className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="text-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                        <p className="text-xs text-muted-foreground">Pago</p>
+                        <p className="font-mono font-semibold text-sm text-emerald-400">{formatCurrency(totalPago)}</p>
+                      </div>
+                      <div className="text-center p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                        <p className="text-xs text-muted-foreground">Pendente</p>
+                        <p className="font-mono font-semibold text-sm text-orange-400">{formatCurrency(totalPendente)}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      {campaignPayments.slice(0, 5).map((pay) => (
+                        <div key={pay.id} className="flex items-center justify-between p-2.5 rounded-lg border border-border/10 bg-muted/3">
+                          <div>
+                            <p className="text-sm font-medium">{pay.restaurantName}</p>
+                            <p className="text-[11px] text-muted-foreground">{pay.dueDate ? pay.dueDate.split("-").reverse().join("/") : "—"}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <p className="font-mono text-sm">{formatCurrency(parseFloat(pay.amount))}</p>
+                            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${pay.status === "paid" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-orange-500/20 text-orange-400 border-orange-500/30"}`}>
+                              {pay.status === "paid" ? "Pago" : "Pendente"}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {campaignPayments.length > 5 && (
+                        <button className="w-full text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 pt-1" onClick={() => navigate("/financeiro/pagamentos")}>
+                          +{campaignPayments.length - 5} pagamentos <ChevronRight className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </TabsContent>
 
             {/* ─── DISTRIBUIÇÃO ─── */}
@@ -1394,6 +1560,55 @@ export default function CampaignDetail() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* ── EMITIR FATURA DIALOG ── */}
+        <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Receipt className="w-4 h-4" /> Emitir Fatura
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Valor (R$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={invoiceAmount}
+                  onChange={(e) => setInvoiceAmount(e.target.value)}
+                  className="bg-background border-border/30 h-9 text-sm font-mono"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Data de Vencimento</Label>
+                <Input
+                  type="date"
+                  value={invoiceDueDate}
+                  onChange={(e) => setInvoiceDueDate(e.target.value)}
+                  className="bg-background border-border/30 h-9 text-sm"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Observações (opcional)</Label>
+                <Textarea
+                  placeholder="Referência, condições de pagamento..."
+                  value={invoiceNotes}
+                  onChange={(e) => setInvoiceNotes(e.target.value)}
+                  className="bg-background border-border/30 text-sm resize-none"
+                  rows={2}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" size="sm" onClick={() => setIsInvoiceDialogOpen(false)}>Cancelar</Button>
+              <Button size="sm" onClick={handleCreateInvoice} disabled={createInvoiceMutation.isPending}>
+                {createInvoiceMutation.isPending ? "Emitindo..." : "Emitir Fatura"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
