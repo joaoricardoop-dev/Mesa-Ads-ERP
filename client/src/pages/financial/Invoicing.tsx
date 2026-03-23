@@ -118,7 +118,16 @@ export default function Invoicing() {
             <div className="space-y-4 pt-2">
               <div>
                 <Label>Campanha</Label>
-                <Select value={newCampaignId} onValueChange={setNewCampaignId}>
+                <Select
+                  value={newCampaignId}
+                  onValueChange={(v) => {
+                    setNewCampaignId(v);
+                    const camp = (campaignsForInvoice || []).find((c) => String(c.id) === v);
+                    if (camp?.invoiceAmount != null) {
+                      setNewAmount(camp.invoiceAmount.toFixed(2));
+                    }
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a campanha" />
                   </SelectTrigger>
@@ -130,6 +139,19 @@ export default function Invoicing() {
                     ))}
                   </SelectContent>
                 </Select>
+                {newCampaignId && (() => {
+                  const camp = (campaignsForInvoice || []).find((c) => String(c.id) === newCampaignId);
+                  if (!camp) return null;
+                  const method = camp.quotationPaymentMethod === "pix" ? "Pix" : camp.quotationPaymentMethod === "cartao" ? "Cartão" : camp.quotationPaymentMethod === "boleto" ? "Boleto" : camp.quotationPaymentMethod || "—";
+                  if (!camp.invoiceAmount) return null;
+                  return (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {camp.cycles > 1
+                        ? `${camp.cycles}x de ${formatCurrency(camp.invoiceAmount)} · ${method}`
+                        : `À vista: ${formatCurrency(camp.invoiceAmount)} · ${method}`}
+                    </p>
+                  );
+                })()}
               </div>
               <div>
                 <Label>Valor (R$)</Label>

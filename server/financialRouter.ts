@@ -8,6 +8,7 @@ import {
   clients,
   restaurantPayments,
   activeRestaurants,
+  quotations,
 } from "../drizzle/schema";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -563,8 +564,17 @@ export const financialRouter = router({
     const db = await getDatabase();
 
     const rows = await db
-      .select({ id: campaigns.id, name: campaigns.name, clientId: campaigns.clientId, status: campaigns.status })
+      .select({
+        id: campaigns.id,
+        name: campaigns.name,
+        clientId: campaigns.clientId,
+        status: campaigns.status,
+        quotationTotalValue: quotations.totalValue,
+        quotationCycles: quotations.cycles,
+        quotationPaymentMethod: quotations.paymentMethod,
+      })
       .from(campaigns)
+      .leftJoin(quotations, eq(campaigns.quotationId, quotations.id))
       .where(inArray(campaigns.status, ["active", "quotation", "completed", "veiculacao", "executar", "producao", "transito", "paused"]))
       .orderBy(desc(campaigns.createdAt));
 
@@ -575,6 +585,16 @@ export const financialRouter = router({
       for (const c of cliRows) clientMap[c.id] = c.name;
     }
 
-    return rows.map((r) => ({ ...r, clientName: clientMap[r.clientId] || "—" }));
+    return rows.map((r) => {
+      const total = r.quotationTotalValue ? parseFloat(r.quotationTotalValue) : null;
+      const cycles = r.quotationCycles && r.quotationCycles > 0 ? r.quotationCycles : 1;
+      const invoiceAmount = total !== null ? (total / cycles) : null;
+      return {
+        ...r,
+        clientName: clientMap[r.clientId] || "—",
+        invoiceAmount,
+        cycles,
+      };
+    });
   }),
 });
