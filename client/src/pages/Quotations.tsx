@@ -482,7 +482,7 @@ export default function Quotations() {
       title="Cotações"
       description="Gestão de cotações comerciais"
       actions={
-        <Button onClick={() => navigate("/comercial/simulador")} className="gap-2">
+        <Button onClick={() => navigate("/comercial/orcamento")} className="gap-2">
           <Plus className="w-4 h-4" />
           Novo Orçamento
         </Button>
