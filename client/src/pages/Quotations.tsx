@@ -858,42 +858,6 @@ export default function Quotations() {
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Período de Veiculação</p>
-              <div className="bg-background border border-border/30 rounded-lg p-3 max-h-[200px] overflow-y-auto space-y-1">
-                {batchesList.map((batch: any) => (
-                  <label key={batch.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/30 cursor-pointer">
-                    <Checkbox
-                      checked={form.editBatchIds.includes(batch.id)}
-                      onCheckedChange={(checked) => {
-                        const newIds = checked
-                          ? [...form.editBatchIds, batch.id].sort((a, b) => a - b)
-                          : form.editBatchIds.filter(id => id !== batch.id);
-                        const selectedBatches = batchesList
-                          .filter((b: any) => newIds.includes(b.id))
-                          .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
-                        const newPeriodStart = selectedBatches.length > 0 ? selectedBatches[0].startDate : "";
-                        const newCycles = selectedBatches.length || form.cycles;
-                        setForm({ ...form, editBatchIds: newIds, periodStart: newPeriodStart, cycles: newCycles, batchWeeks: 4 });
-                      }}
-                    />
-                    <span className="text-sm font-medium">{batch.name}</span>
-                    <span className="text-xs text-muted-foreground ml-1">{batch.startDate} — {batch.endDate}</span>
-                  </label>
-                ))}
-              </div>
-              {form.editBatchIds.length > 0 && (
-                <p className="text-[10px] text-muted-foreground">
-                  {form.editBatchIds.length} batch(es) — Período: {(() => {
-                    const sel = batchesList
-                      .filter((b: any) => form.editBatchIds.includes(b.id))
-                      .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
-                    return sel.length > 0 ? `${sel[0].startDate} a ${sel[sel.length - 1].endDate}` : "";
-                  })()}
-                </p>
-              )}
-            </div>
-
             {editingId && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -960,6 +924,42 @@ export default function Quotations() {
                 )}
               </div>
             )}
+
+            <div className="grid gap-2">
+              <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Período de Veiculação</p>
+              <div className="bg-background border border-border/30 rounded-lg p-3 max-h-[200px] overflow-y-auto space-y-1">
+                {batchesList.map((batch: any) => (
+                  <label key={batch.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/30 cursor-pointer">
+                    <Checkbox
+                      checked={form.editBatchIds.includes(batch.id)}
+                      onCheckedChange={(checked) => {
+                        const newIds = checked
+                          ? [...form.editBatchIds, batch.id].sort((a, b) => a - b)
+                          : form.editBatchIds.filter(id => id !== batch.id);
+                        const selectedBatches = batchesList
+                          .filter((b: any) => newIds.includes(b.id))
+                          .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+                        const newPeriodStart = selectedBatches.length > 0 ? selectedBatches[0].startDate : "";
+                        const newCycles = selectedBatches.length || form.cycles;
+                        setForm({ ...form, editBatchIds: newIds, periodStart: newPeriodStart, cycles: newCycles, batchWeeks: 4 });
+                      }}
+                    />
+                    <span className="text-sm font-medium">{batch.name}</span>
+                    <span className="text-xs text-muted-foreground ml-1">{batch.startDate} — {batch.endDate}</span>
+                  </label>
+                ))}
+              </div>
+              {form.editBatchIds.length > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  {form.editBatchIds.length} batch(es) — Período: {(() => {
+                    const sel = batchesList
+                      .filter((b: any) => form.editBatchIds.includes(b.id))
+                      .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+                    return sel.length > 0 ? `${sel[0].startDate} a ${sel[sel.length - 1].endDate}` : "";
+                  })()}
+                </p>
+              )}
+            </div>
 
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Valores</p>
             <div className="flex items-center gap-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
