@@ -9,6 +9,7 @@ import {
   Package,
   Store,
   Eye,
+  Handshake,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -159,6 +160,14 @@ export default function KPICards({
         icon={<Banknote className="w-3.5 h-3.5" />}
         accent
         delay={0.35}
+      />
+      <KPICard
+        label="Comissão da Agência"
+        value={formatCurrency(unitEconomics.agencyCommissionMonthly)}
+        sub={`Total contrato: ${formatCurrency(unitEconomics.agencyCommissionContract)}`}
+        icon={<Handshake className="w-3.5 h-3.5" />}
+        accent
+        delay={0.4}
       />
     </div>
   );

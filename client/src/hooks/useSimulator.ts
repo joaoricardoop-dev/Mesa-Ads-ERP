@@ -81,6 +81,8 @@ export interface UnitEconomics {
   monthlyProfit: number;
   annualRevenue: number;
   annualProfit: number;
+  agencyCommissionMonthly: number;
+  agencyCommissionContract: number;
 }
 
 export interface ScenarioData {
@@ -587,6 +589,8 @@ export function useSimulator(
     const sellerCommissionValue = perRestaurant.sellerCommissionValue * inputs.activeRestaurants * inputs.contractDuration;
     const annualRevenue = monthlyRevenue * 12;
     const annualProfit = monthlyTotalProfit * 12;
+    const agencyCommissionMonthly = perRestaurant.agencyCommission * inputs.activeRestaurants;
+    const agencyCommissionContract = agencyCommissionMonthly * inputs.contractDuration;
 
     return {
       contractValue,
@@ -596,6 +600,8 @@ export function useSimulator(
       monthlyProfit: monthlyTotalProfit,
       annualRevenue,
       annualProfit,
+      agencyCommissionMonthly,
+      agencyCommissionContract,
     };
   }, [perRestaurant, inputs]);
 
