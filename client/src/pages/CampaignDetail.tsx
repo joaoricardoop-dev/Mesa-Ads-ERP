@@ -78,9 +78,13 @@ const STATUS_LABELS: Record<string, string> = {
   paused: "Pausada",
   completed: "Concluída",
   archived: "Arquivada",
+  briefing: "Briefing",
+  design: "Design",
+  aprovacao: "Aprovação",
   producao: "Produção",
   transito: "Trânsito",
   executar: "Executar",
+  distribuicao: "Distribuição",
   veiculacao: "Veiculação",
   inativa: "Inativa",
 };
@@ -92,20 +96,25 @@ const STATUS_COLORS: Record<string, string> = {
   paused: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   archived: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  briefing: "bg-sky-500/20 text-sky-400 border-sky-500/30",
+  design: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  aprovacao: "bg-orange-500/20 text-orange-400 border-orange-500/30",
   producao: "bg-amber-500/20 text-amber-400 border-amber-500/30",
   transito: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
   executar: "bg-violet-500/20 text-violet-400 border-violet-500/30",
+  distribuicao: "bg-teal-500/20 text-teal-400 border-teal-500/30",
   veiculacao: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
   inativa: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
 const WORKFLOW_STEPS = [
-  { key: "active", label: "Ativa", step: 1 },
-  { key: "producao", label: "Produção", step: 2 },
-  { key: "transito", label: "Trânsito", step: 3 },
-  { key: "executar", label: "Executar", step: 4 },
-  { key: "veiculacao", label: "Veiculação", step: 5 },
-  { key: "inativa", label: "Inativa", step: 6 },
+  { key: "briefing", label: "Briefing", step: 1 },
+  { key: "design", label: "Design", step: 2 },
+  { key: "aprovacao", label: "Aprovação", step: 3 },
+  { key: "producao", label: "Produção", step: 4 },
+  { key: "distribuicao", label: "Distribuição", step: 5 },
+  { key: "veiculacao", label: "Veiculação", step: 6 },
+  { key: "inativa", label: "Arquivado", step: 7 },
 ];
 
 const HISTORY_LABELS: Record<string, string> = {
@@ -124,6 +133,11 @@ const HISTORY_LABELS: Record<string, string> = {
   veiculacao_started: "Veiculação iniciada",
   finalized: "Campanha finalizada",
   proof_added: "Comprovante adicionado",
+  created_from_quotation: "Campanha criada a partir da cotação",
+  briefing_complete: "Briefing concluído",
+  design_submitted: "Design enviado para aprovação",
+  design_approved: "Design aprovado",
+  distribution_complete: "Distribuição concluída",
 };
 
 const PIE_COLORS = ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
@@ -364,6 +378,62 @@ export default function CampaignDetail() {
     onSuccess: () => utils.campaign.getHistory.invalidate(),
   });
 
+  const completeBriefingMutation = trpc.campaign.completeBriefing.useMutation({
+    onSuccess: () => {
+      utils.campaign.get.invalidate();
+      utils.campaign.getHistory.invalidate();
+      utils.campaign.list.invalidate();
+      setConfirmAction(null);
+      toast.success("Briefing concluído! Campanha em produção de design.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const submitDesignMutation = trpc.campaign.submitDesign.useMutation({
+    onSuccess: () => {
+      utils.campaign.get.invalidate();
+      utils.campaign.getHistory.invalidate();
+      utils.campaign.list.invalidate();
+      setConfirmAction(null);
+      toast.success("Design enviado para aprovação!");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const approveDesignMutation = trpc.campaign.approveDesign.useMutation({
+    onSuccess: () => {
+      utils.campaign.get.invalidate();
+      utils.campaign.getHistory.invalidate();
+      utils.campaign.list.invalidate();
+      setConfirmAction(null);
+      toast.success("Design aprovado! OS de produção gerada — campanha em produção gráfica.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const receiveMaterialMutation = trpc.campaign.receiveMaterial.useMutation({
+    onSuccess: () => {
+      utils.campaign.get.invalidate();
+      utils.campaign.getHistory.invalidate();
+      utils.campaign.list.invalidate();
+      setConfirmAction(null);
+      toast.success("Material recebido! OS de distribuição gerada — campanha em distribuição.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const completeDistributionMutation = trpc.campaign.completeDistribution.useMutation({
+    onSuccess: () => {
+      utils.campaign.get.invalidate();
+      utils.campaign.getHistory.invalidate();
+      utils.campaign.list.invalidate();
+      setVeiculacaoStart("");
+      setVeiculacaoEnd("");
+      toast.success("Distribuição concluída! Veiculação iniciada.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   const setRestaurantsMutation = trpc.campaign.setRestaurants.useMutation({
     onSuccess: () => {
       utils.campaign.getRestaurants.invalidate();
@@ -413,6 +483,14 @@ export default function CampaignDetail() {
       updateMutation.mutate({ id: campaignId, status: "active" });
       addHistoryMutation.mutate({ campaignId, action: "reactivated", details: "Campanha reativada" });
       toast.success("Campanha reativada.");
+    } else if (action === "completeBriefing") {
+      completeBriefingMutation.mutate({ id: campaignId });
+    } else if (action === "submitDesign") {
+      submitDesignMutation.mutate({ id: campaignId });
+    } else if (action === "approveDesign") {
+      approveDesignMutation.mutate({ id: campaignId });
+    } else if (action === "receiveMaterial") {
+      receiveMaterialMutation.mutate({ id: campaignId });
     } else if (action === "completeProduction") {
       completeProductionMutation.mutate({ id: campaignId });
     } else if (action === "confirmMaterial") {
@@ -596,6 +674,12 @@ export default function CampaignDetail() {
       : `Batches ${campaignBatchList[0].batchNumber}–${campaignBatchList[campaignBatchList.length - 1].batchNumber}`
     : null;
 
+  const slaDays = (campaign as any).proposalSignedAt && ["briefing", "design", "aprovacao"].includes(campaign.status)
+    ? Math.floor((Date.now() - new Date((campaign as any).proposalSignedAt).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const slaColor = slaDays === null ? "" : slaDays <= 3 ? "text-emerald-400" : slaDays <= 5 ? "text-yellow-400" : "text-red-400";
+  const slaLabel = slaDays === null ? "" : slaDays === 0 ? "Hoje" : `${slaDays} dia${slaDays !== 1 ? "s" : ""}`;
+
   const daysElapsed = campaign.status === "active" || campaign.status === "paused"
     ? Math.max(0, Math.floor((Date.now() - new Date(batchStartDate).getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -637,6 +721,13 @@ export default function CampaignDetail() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              {slaDays !== null && (
+                <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md border ${slaDays > 5 ? "bg-red-500/10 border-red-500/30" : slaDays > 3 ? "bg-yellow-500/10 border-yellow-500/30" : "bg-emerald-500/10 border-emerald-500/30"}`}>
+                  <Clock className="w-3 h-3 shrink-0" />
+                  <span className={`font-semibold ${slaColor}`}>SLA: {slaLabel}</span>
+                  {slaDays > 5 && <AlertTriangle className="w-3 h-3 text-red-400" />}
+                </div>
+              )}
               {campaign.status === "quotation" && (
                 <>
                   <Button size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs h-8" onClick={() => setConfirmAction("approve")}>
@@ -646,6 +737,21 @@ export default function CampaignDetail() {
                     <Archive className="w-3.5 h-3.5" /> Arquivar
                   </Button>
                 </>
+              )}
+              {campaign.status === "briefing" && (
+                <Button size="sm" className="gap-1.5 bg-sky-600 hover:bg-sky-700 text-xs h-8" onClick={() => setConfirmAction("completeBriefing")}>
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Briefing Concluído
+                </Button>
+              )}
+              {campaign.status === "design" && (
+                <Button size="sm" className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-xs h-8" onClick={() => setConfirmAction("submitDesign")}>
+                  <ArrowRight className="w-3.5 h-3.5" /> Enviar para Aprovação
+                </Button>
+              )}
+              {campaign.status === "aprovacao" && (
+                <Button size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs h-8" onClick={() => setConfirmAction("approveDesign")}>
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Aprovar Design
+                </Button>
               )}
               {campaign.status === "active" && (
                 <>
@@ -663,13 +769,18 @@ export default function CampaignDetail() {
                 </Button>
               )}
               {campaign.status === "producao" && (
-                <Button size="sm" className="gap-1.5 bg-cyan-600 hover:bg-cyan-700 text-xs h-8" onClick={() => setConfirmAction("completeProduction")}>
-                  <Truck className="w-3.5 h-3.5" /> Concluir Produção
+                <Button size="sm" className="gap-1.5 bg-teal-600 hover:bg-teal-700 text-xs h-8" onClick={() => setConfirmAction("receiveMaterial")}>
+                  <Package className="w-3.5 h-3.5" /> Material Recebido
                 </Button>
               )}
               {campaign.status === "transito" && (
-                <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-xs h-8" onClick={() => setConfirmAction("confirmMaterial")}>
+                <Button size="sm" className="gap-1.5 bg-teal-600 hover:bg-teal-700 text-xs h-8" onClick={() => setConfirmAction("confirmMaterial")}>
                   <CheckSquare className="w-3.5 h-3.5" /> Confirmar Recebimento
+                </Button>
+              )}
+              {campaign.status === "distribuicao" && (
+                <Button size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-xs h-8" onClick={() => setConfirmAction("completeDistribution")}>
+                  <Play className="w-3.5 h-3.5" /> Iniciar Veiculação
                 </Button>
               )}
               {campaign.status === "veiculacao" && (
@@ -724,6 +835,62 @@ export default function CampaignDetail() {
             </div>
           )}
 
+          {campaign.status === "briefing" && (
+            <div className="bg-card border border-sky-500/30 rounded-lg p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-sky-400" />
+                <h3 className="text-sm font-semibold text-sky-400">Briefing</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Proposta assinada em {(campaign as any).proposalSignedAt ? new Date((campaign as any).proposalSignedAt).toLocaleDateString("pt-BR") : "—"}.
+                Colete todas as informações necessárias para iniciar a produção do design.
+                O SLA máximo do briefing à produção é de <strong className="text-foreground">5 dias</strong>.
+              </p>
+              {slaDays !== null && slaDays > 5 && (
+                <div className="flex items-center gap-2 p-2 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>SLA em atraso! {slaDays} dias desde a assinatura da proposta.</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {campaign.status === "design" && (
+            <div className="bg-card border border-purple-500/30 rounded-lg p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Image className="w-5 h-5 text-purple-400" />
+                <h3 className="text-sm font-semibold text-purple-400">Produção de Design</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                O design do material publicitário está sendo produzido. Ao finalizar a arte, envie para aprovação do cliente.
+              </p>
+              {slaDays !== null && slaDays > 5 && (
+                <div className="flex items-center gap-2 p-2 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>SLA em atraso! {slaDays} dias desde a assinatura da proposta.</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {campaign.status === "aprovacao" && (
+            <div className="bg-card border border-orange-500/30 rounded-lg p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Eye className="w-5 h-5 text-orange-400" />
+                <h3 className="text-sm font-semibold text-orange-400">Aprovação do Design</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                O design foi enviado para aprovação do cliente. Ao receber a aprovação, clique em "Aprovar Design" para gerar a OS de produção.
+              </p>
+              {slaDays !== null && slaDays > 5 && (
+                <div className="flex items-center gap-2 p-2 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>SLA em atraso! {slaDays} dias desde a assinatura da proposta.</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {campaign.status === "active" && (
             <div className="bg-card border border-border/30 rounded-lg p-5 space-y-4">
               <div className="flex items-center gap-2">
@@ -768,10 +935,10 @@ export default function CampaignDetail() {
             <div className="bg-card border border-amber-500/30 rounded-lg p-5 space-y-3">
               <div className="flex items-center gap-2">
                 <Package className="w-5 h-5 text-amber-400" />
-                <h3 className="text-sm font-semibold text-amber-400">Produção em Andamento</h3>
+                <h3 className="text-sm font-semibold text-amber-400">Produção Gráfica em Andamento</h3>
               </div>
               <p className="text-xs text-muted-foreground">
-                Os porta-copos estão sendo produzidos. Quando a produção estiver concluída, clique em "Concluir Produção" para gerar automaticamente a OS de Produção e mover para trânsito.
+                Os porta-copos estão sendo produzidos. Assim que o material chegar, clique em "Material Recebido" para gerar automaticamente a OS de distribuição.
               </p>
               {(campaign as any).artPdfUrl && (
                 <div className="flex items-center gap-2 text-xs">
@@ -824,6 +991,37 @@ export default function CampaignDetail() {
                 onClick={() => startVeiculacaoMutation.mutate({ id: campaignId, veiculacaoStartDate: veiculacaoStart, veiculacaoEndDate: veiculacaoEnd })}
               >
                 <Play className="w-3.5 h-3.5" /> Iniciar Veiculação
+              </Button>
+            </div>
+          )}
+
+          {campaign.status === "distribuicao" && (
+            <div className="bg-card border border-teal-500/30 rounded-lg p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <Truck className="w-5 h-5 text-teal-400" />
+                <h3 className="text-sm font-semibold text-teal-400">Distribuição em Andamento</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Material recebido em {(campaign as any).materialReceivedDate ? new Date((campaign as any).materialReceivedDate).toLocaleDateString("pt-BR") : "—"}.
+                Configure os restaurantes na aba Distribuição e defina o período de veiculação para concluir.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Início da Veiculação</Label>
+                  <Input type="date" value={veiculacaoStart} onChange={(e) => setVeiculacaoStart(e.target.value)} className="bg-background border-border/30 h-9 text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Fim da Veiculação</Label>
+                  <Input type="date" value={veiculacaoEnd} onChange={(e) => setVeiculacaoEnd(e.target.value)} className="bg-background border-border/30 h-9 text-sm" />
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700"
+                disabled={!veiculacaoStart || !veiculacaoEnd || completeDistributionMutation.isPending}
+                onClick={() => completeDistributionMutation.mutate({ id: campaignId, veiculacaoStartDate: veiculacaoStart, veiculacaoEndDate: veiculacaoEnd })}
+              >
+                <Play className="w-3.5 h-3.5" /> Concluir Distribuição e Iniciar Veiculação
               </Button>
             </div>
           )}
@@ -1534,6 +1732,10 @@ export default function CampaignDetail() {
                 {confirmAction === "resume" && "Retomar Campanha?"}
                 {confirmAction === "complete" && "Concluir Campanha?"}
                 {confirmAction === "reactivate" && "Reativar Campanha?"}
+                {confirmAction === "completeBriefing" && "Concluir Briefing?"}
+                {confirmAction === "submitDesign" && "Enviar Design para Aprovação?"}
+                {confirmAction === "approveDesign" && "Aprovar Design?"}
+                {confirmAction === "receiveMaterial" && "Confirmar Recebimento do Material?"}
                 {confirmAction === "completeProduction" && "Concluir Produção?"}
                 {confirmAction === "confirmMaterial" && "Confirmar Recebimento?"}
                 {confirmAction === "finalize" && "Finalizar Campanha?"}
@@ -1545,6 +1747,10 @@ export default function CampaignDetail() {
                 {confirmAction === "resume" && "A campanha será retomada."}
                 {confirmAction === "complete" && "A campanha será marcada como concluída."}
                 {confirmAction === "reactivate" && "A campanha será reativada."}
+                {confirmAction === "completeBriefing" && "O briefing será marcado como concluído e a campanha avançará para produção de design."}
+                {confirmAction === "submitDesign" && "O design será enviado para aprovação do cliente. A campanha avançará para etapa de aprovação."}
+                {confirmAction === "approveDesign" && "O design será aprovado. Uma OS de produção gráfica será gerada automaticamente."}
+                {confirmAction === "receiveMaterial" && "O recebimento do material será confirmado. Uma OS de distribuição será gerada automaticamente para os restaurantes configurados."}
                 {confirmAction === "completeProduction" && "A produção será concluída, uma OS de Produção será gerada automaticamente e o material passará para trânsito."}
                 {confirmAction === "confirmMaterial" && "O recebimento será confirmado e a campanha ficará pronta para execução."}
                 {confirmAction === "finalize" && "A campanha será finalizada e arquivada na Biblioteca."}

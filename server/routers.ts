@@ -1409,6 +1409,149 @@ export const appRouter = router({
         await addCampaignHistory(input.id, "archived", "Cotação arquivada");
       }),
 
+    completeBriefing: operacoesProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await updateCampaign(input.id, { status: "design" } as any);
+        await addCampaignHistory(input.id, "briefing_complete", "Briefing concluído — campanha em produção de design");
+      }),
+
+    submitDesign: operacoesProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await updateCampaign(input.id, { status: "aprovacao" } as any);
+        await addCampaignHistory(input.id, "design_submitted", "Design enviado para aprovação");
+      }),
+
+    approveDesign: operacoesProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const campaign = await getCampaign(input.id);
+        if (!campaign) throw new Error("Campanha não encontrada");
+        await updateCampaign(input.id, { status: "producao" } as any);
+        await addCampaignHistory(input.id, "design_approved", "Design aprovado — campanha em produção gráfica");
+
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (db) {
+          const { serviceOrders: soTable } = await import("../drizzle/schema");
+          const { sql: sqlFn } = await import("drizzle-orm");
+          const year = new Date().getFullYear();
+          const pattern = `OS-PROD-${year}-%`;
+          const countResult = await db
+            .select({ count: sqlFn<number>`COUNT(*)` })
+            .from(soTable)
+            .where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
+          const seqNum = Number(countResult[0]?.count || 0) + 1;
+          const orderNumber = `OS-PROD-${year}-${String(seqNum).padStart(4, "0")}`;
+          await db.insert(soTable).values({
+            orderNumber,
+            type: "producao" as const,
+            campaignId: input.id,
+            clientId: campaign.clientId,
+            description: `OS de produção gráfica para campanha ${campaign.name}`,
+            coasterVolume: campaign.batchSize || (campaign.coastersPerRestaurant * campaign.activeRestaurants),
+            status: "execucao" as const,
+            productId: campaign.productId,
+          });
+        }
+      }),
+
+    receiveMaterial: operacoesProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const campaign = await getCampaign(input.id);
+        if (!campaign) throw new Error("Campanha não encontrada");
+        await updateCampaign(input.id, {
+          status: "distribuicao",
+          materialReceivedDate: new Date().toISOString().split("T")[0],
+        } as any);
+        await addCampaignHistory(input.id, "material_received", "Material recebido — campanha em distribuição");
+
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (db) {
+          const { serviceOrders: soTable, campaignRestaurants: crTable } = await import("../drizzle/schema");
+          const { sql: sqlFn, eq: eqFn } = await import("drizzle-orm");
+          const year = new Date().getFullYear();
+          const pattern = `OS-DIST-${year}-%`;
+          const countResult = await db
+            .select({ count: sqlFn<number>`COUNT(*)` })
+            .from(soTable)
+            .where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
+          const seqNum = Number(countResult[0]?.count || 0) + 1;
+          const orderNumber = `OS-DIST-${year}-${String(seqNum).padStart(4, "0")}`;
+          const restaurants = await db.select().from(crTable).where(eqFn(crTable.campaignId, input.id));
+          await db.insert(soTable).values({
+            orderNumber,
+            type: "distribuicao" as const,
+            campaignId: input.id,
+            clientId: campaign.clientId,
+            description: `OS de distribuição para campanha ${campaign.name} (${restaurants.length} restaurante${restaurants.length !== 1 ? "s" : ""})`,
+            coasterVolume: restaurants.reduce((s: number, r: any) => s + (r.coastersCount || 0), 0) || campaign.batchSize,
+            status: "execucao" as const,
+            productId: campaign.productId,
+          });
+        }
+      }),
+
+    completeDistribution: operacoesProcedure
+      .input(z.object({
+        id: z.number(),
+        veiculacaoStartDate: z.string(),
+        veiculacaoEndDate: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        await updateCampaign(input.id, {
+          status: "veiculacao",
+          veiculacaoStartDate: input.veiculacaoStartDate,
+          veiculacaoEndDate: input.veiculacaoEndDate,
+        } as any);
+        await addCampaignHistory(input.id, "distribution_complete", `Distribuição concluída — veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`);
+
+        try {
+          const campaign = await getCampaign(input.id);
+          if (campaign) {
+            const restaurantList = await getCampaignRestaurants(input.id);
+            if (restaurantList.length > 0) {
+              const { getDb: getDatabase } = await import("./db");
+              const db = await getDatabase();
+              if (db) {
+                const { quotations } = await import("../drizzle/schema");
+                const { eq } = await import("drizzle-orm");
+                let totalValue = 0;
+                if (campaign.quotationId) {
+                  const qRows = await db.select({ totalValue: quotations.totalValue }).from(quotations).where(eq(quotations.id, campaign.quotationId)).limit(1);
+                  totalValue = parseFloat(qRows[0]?.totalValue || "0");
+                }
+                const commissionRate = parseFloat(String(campaign.restaurantCommission || "20")) / 100;
+                const totalCoasters = restaurantList.reduce((sum: number, r: any) => sum + (r.coastersCount || 0), 0);
+                const referenceMonth = input.veiculacaoStartDate.slice(0, 7);
+                const paymentDueDate = new Date(new Date(input.veiculacaoEndDate).getTime() + 15 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+                for (const rest of restaurantList) {
+                  const share = totalCoasters > 0 ? (rest.coastersCount || 0) / totalCoasters : 1 / restaurantList.length;
+                  const amount = totalValue > 0
+                    ? (totalValue * commissionRate * share).toFixed(2)
+                    : (parseFloat(String(campaign.batchCost || "0")) * commissionRate * share).toFixed(2);
+                  await addRestaurantPayment({
+                    restaurantId: rest.restaurantId,
+                    campaignId: campaign.id,
+                    amount,
+                    referenceMonth,
+                    paymentDate: paymentDueDate,
+                    periodStart: input.veiculacaoStartDate,
+                    periodEnd: input.veiculacaoEndDate,
+                    status: "pending",
+                  });
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("[completeDistribution] Failed to auto-create restaurant payments:", err);
+        }
+      }),
+
     uploadArt: operacoesProcedure
       .input(z.object({
         id: z.number(),

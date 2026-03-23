@@ -17,12 +17,12 @@ import {
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 export const statusEnum = pgEnum("status", ["active", "inactive"]);
-export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa"]);
+export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa", "briefing", "design", "aprovacao", "distribuicao"]);
 export const budgetStatusEnum = pgEnum("budget_status", ["active", "expired", "rejected"]);
 export const invoiceStatusEnum = pgEnum("invoice_status", ["emitida", "paga", "vencida", "cancelada"]);
 export const quotationStatusEnum = pgEnum("quotation_status", ["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]);
 export const leadTypeEnum = pgEnum("lead_type", ["anunciante", "restaurante"]);
-export const serviceOrderTypeEnum = pgEnum("service_order_type", ["anunciante", "producao"]);
+export const serviceOrderTypeEnum = pgEnum("service_order_type", ["anunciante", "producao", "distribuicao"]);
 export const serviceOrderStatusEnum = pgEnum("service_order_status", ["rascunho", "enviada", "assinada", "execucao", "concluida"]);
 export const termStatusEnum = pgEnum("term_status", ["rascunho", "enviado", "assinado", "vigente", "encerrado"]);
 export const productTypeEnum = pgEnum("product_type", ["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro", "impressos", "eletronicos", "telas"]);
@@ -146,6 +146,7 @@ export const campaigns = pgTable("campaigns", {
   freightCost: decimal("freightCost", { precision: 12, scale: 2 }),
   isBonificada: boolean("isBonificada").default(false).notNull(),
   productId: integer("productId").references(() => products.id, { onDelete: "set null" }),
+  proposalSignedAt: timestamp("proposalSignedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [

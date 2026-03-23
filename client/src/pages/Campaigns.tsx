@@ -51,7 +51,7 @@ import { useLocation } from "wouter";
 interface CampaignForm {
   clientId: number | null;
   name: string;
-  status: "draft" | "active" | "paused" | "completed" | "quotation" | "archived" | "producao" | "transito" | "executar" | "veiculacao" | "inativa";
+  status: "draft" | "active" | "paused" | "completed" | "quotation" | "archived" | "briefing" | "design" | "aprovacao" | "producao" | "transito" | "executar" | "distribuicao" | "veiculacao" | "inativa";
   notes: string;
   coastersPerRestaurant: number;
   usagePerDay: number;
@@ -109,9 +109,13 @@ const STATUS_LABELS: Record<string, string> = {
   completed: "Concluída",
   quotation: "Cotação",
   archived: "Arquivada",
+  briefing: "Briefing",
+  design: "Design",
+  aprovacao: "Aprovação",
   producao: "Produção",
   transito: "Trânsito",
   executar: "Executar",
+  distribuicao: "Distribuição",
   veiculacao: "Veiculação",
   inativa: "Inativa",
 };
@@ -123,9 +127,13 @@ const STATUS_COLORS: Record<string, string> = {
   completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   quotation: "bg-orange-500/20 text-orange-400 border-orange-500/30",
   archived: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  briefing: "bg-sky-500/20 text-sky-400 border-sky-500/30",
+  design: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  aprovacao: "bg-orange-500/20 text-orange-400 border-orange-500/30",
   producao: "bg-amber-500/20 text-amber-400 border-amber-500/30",
   transito: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
   executar: "bg-violet-500/20 text-violet-400 border-violet-500/30",
+  distribuicao: "bg-teal-500/20 text-teal-400 border-teal-500/30",
   veiculacao: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
   inativa: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
@@ -427,7 +435,7 @@ export default function Campaigns() {
     return { ...base, fromQuotation: false };
   }
 
-  const activeCount = campaignsList.filter((c) => ["active", "producao", "transito", "executar", "veiculacao"].includes(c.status)).length;
+  const activeCount = campaignsList.filter((c) => ["active", "briefing", "design", "aprovacao", "producao", "transito", "executar", "distribuicao", "veiculacao"].includes(c.status)).length;
   const totals = useMemo(() => {
     let totalContract = 0;
     let totalProfit = 0;

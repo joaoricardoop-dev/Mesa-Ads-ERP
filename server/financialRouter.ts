@@ -91,7 +91,7 @@ export const financialRouter = router({
     const activeCampaignsResult = await db
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(campaigns)
-      .where(inArray(campaigns.status, ["active", "veiculacao", "executar", "producao", "transito"]));
+      .where(inArray(campaigns.status, ["active", "briefing", "design", "aprovacao", "veiculacao", "executar", "producao", "transito", "distribuicao"]));
 
     // ── Operational costs totals ──────────────────────────────────────────────
     const costData = await db
@@ -585,7 +585,7 @@ export const financialRouter = router({
       })
       .from(campaigns)
       .leftJoin(quotations, eq(campaigns.quotationId, quotations.id))
-      .where(inArray(campaigns.status, ["active", "quotation", "completed", "veiculacao", "executar", "producao", "transito", "paused"]))
+      .where(inArray(campaigns.status, ["active", "quotation", "completed", "briefing", "design", "aprovacao", "veiculacao", "executar", "producao", "transito", "distribuicao", "paused"]))
       .orderBy(desc(campaigns.createdAt));
 
     const cliIds = uniqueIds(rows.map((r) => r.clientId));
