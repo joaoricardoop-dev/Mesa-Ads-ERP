@@ -279,6 +279,7 @@ export default function CampaignDetail() {
   const { data: campaignSoList = [] } = trpc.serviceOrder.list.useQuery({ campaignId }, { enabled: campaignId > 0 });
 
   const distSo = campaignSoList.find((s: any) => s.type === "distribuicao");
+  const prodSo = campaignSoList.find((s: any) => s.type === "producao");
 
   const updateSoFreightMutation = trpc.serviceOrder.update.useMutation({
     onSuccess: () => {
@@ -1027,6 +1028,83 @@ export default function CampaignDetail() {
               <div className="text-xs text-muted-foreground">
                 Volume: <strong className="text-foreground">{expectedTotalCoasters.toLocaleString("pt-BR")}</strong> coasters
               </div>
+
+              {prodSo && (
+                <div className="border border-amber-500/20 rounded-md p-3 space-y-3 bg-amber-500/5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rastreamento de Frete · {prodSo.orderNumber}</p>
+                    {!freightEditing && (
+                      <button
+                        onClick={() => {
+                          setFreightCode((prodSo as any).trackingCode || "");
+                          setFreightProv((prodSo as any).freightProvider || "");
+                          setFreightDate((prodSo as any).freightExpectedDate || "");
+                          setFreightEditing(true);
+                        }}
+                        className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                      >
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                  {freightEditing ? (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Código de Rastreio</Label>
+                          <Input value={freightCode} onChange={e => setFreightCode(e.target.value)} placeholder="ex: BR123456789BR" className="h-8 text-xs bg-background border-border/30" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Transportadora</Label>
+                          <Input value={freightProv} onChange={e => setFreightProv(e.target.value)} placeholder="ex: Correios, Jadlog..." className="h-8 text-xs bg-background border-border/30" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Previsão de Entrega</Label>
+                          <Input type="date" value={freightDate} onChange={e => setFreightDate(e.target.value)} className="h-8 text-xs bg-background border-border/30" />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs gap-1 bg-amber-600 hover:bg-amber-700"
+                          disabled={updateSoFreightMutation.isPending}
+                          onClick={() => updateSoFreightMutation.mutate({
+                            id: prodSo.id,
+                            trackingCode: freightCode || undefined,
+                            freightProvider: freightProv || undefined,
+                            freightExpectedDate: freightDate || undefined,
+                          })}
+                        >
+                          Salvar
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setFreightEditing(false)}>Cancelar</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Código</p>
+                        <p className="text-xs font-mono">{(prodSo as any).trackingCode || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Transportadora</p>
+                        <p className="text-xs">{(prodSo as any).freightProvider || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Previsão de Entrega</p>
+                        {(prodSo as any).freightExpectedDate ? (
+                          <div className="flex items-center gap-1">
+                            <p className="text-xs">{new Date((prodSo as any).freightExpectedDate).toLocaleDateString("pt-BR")}</p>
+                            {(prodSo as any).freightExpectedDate < new Date().toISOString().split("T")[0] && (
+                              <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
+                            )}
+                          </div>
+                        ) : <p className="text-xs">—</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
