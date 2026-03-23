@@ -31,8 +31,20 @@ function calcUnitPrice(params: {
   comComercialProduto: number;
   comParceiro: number;
   billingMode?: "bruto" | "liquido";
+  pricingMode?: "cost_based" | "price_based";
+  precoBaseTier?: number;
 }) {
-  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercialProduto, comParceiro, billingMode = "bruto" } = params;
+  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercialProduto, comParceiro, billingMode = "bruto", pricingMode = "cost_based", precoBaseTier = 0 } = params;
+
+  if (pricingMode === "price_based") {
+    if (precoBaseTier <= 0) return 0;
+    const grossUpDen = 1 - comParceiro - irpj;
+    const precoTotal = billingMode === "bruto" && grossUpDen > 0
+      ? precoBaseTier / grossUpDen
+      : precoBaseTier;
+    return volume > 0 ? precoTotal / volume : 0;
+  }
+
   const denominadorBase = 1 - margem - irpj - comRestaurante - comComercialProduto;
   const custoTotal = custoUnitario * artes * volume + frete;
   const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
@@ -88,6 +100,7 @@ function ProductTable({ product, commissionPercent, billingMode }: ProductTableP
 
   const smallestVol = volumes[0];
   const smallestTier = tiers.find((t: any) => t.volumeMin === smallestVol);
+  const pricingMode = product.pricingMode ?? "cost_based";
   const baseUnitPrice = smallestTier
     ? calcUnitPrice({
         custoUnitario: parseFloat(smallestTier.custoUnitario),
@@ -100,6 +113,8 @@ function ProductTable({ product, commissionPercent, billingMode }: ProductTableP
         comComercialProduto,
         comParceiro,
         billingMode,
+        pricingMode,
+        precoBaseTier: parseFloat(smallestTier.precoBase ?? "0"),
       })
     : 0;
 
@@ -147,6 +162,8 @@ function ProductTable({ product, commissionPercent, billingMode }: ProductTableP
                   comComercialProduto,
                   comParceiro,
                   billingMode,
+                  pricingMode,
+                  precoBaseTier: parseFloat(tier.precoBase ?? "0"),
                 });
                 const discountVol = baseUnitPrice > 0 && vol > smallestVol ? (1 - unitPrice4sem / baseUnitPrice) : 0;
 
