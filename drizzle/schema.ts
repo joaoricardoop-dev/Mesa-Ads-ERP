@@ -147,7 +147,11 @@ export const campaigns = pgTable("campaigns", {
   isBonificada: boolean("isBonificada").default(false).notNull(),
   productId: integer("productId").references(() => products.id, { onDelete: "set null" }),
   proposalSignedAt: timestamp("proposalSignedAt"),
+  briefingEnteredAt: timestamp("briefingEnteredAt"),
+  designEnteredAt: timestamp("designEnteredAt"),
+  aprovacaoEnteredAt: timestamp("aprovacaoEnteredAt"),
   producaoEnteredAt: timestamp("producaoEnteredAt"),
+  distribuicaoEnteredAt: timestamp("distribuicaoEnteredAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -541,6 +545,9 @@ export const serviceOrders = pgTable("service_orders", {
   signedAt: timestamp("signedAt"),
   signatureHash: varchar("signatureHash", { length: 128 }),
   productId: integer("productId").references(() => products.id, { onDelete: "set null" }),
+  trackingCode: varchar("trackingCode", { length: 100 }),
+  freightProvider: varchar("freightProvider", { length: 150 }),
+  freightExpectedDate: date("freightExpectedDate"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [

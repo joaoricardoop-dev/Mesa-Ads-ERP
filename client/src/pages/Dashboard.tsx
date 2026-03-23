@@ -17,6 +17,7 @@ import {
   FileText,
   Pencil,
   CheckSquare,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 import { useMemo } from "react";
@@ -229,8 +230,106 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <SlaAlerts />
+
       <RecentActivity />
     </PageContainer>
+  );
+}
+
+function SlaAlerts() {
+  const campaignsQuery = trpc.campaign.list.useQuery(undefined, { staleTime: 30000 });
+  const soQuery = trpc.serviceOrder.list.useQuery({ type: "distribuicao" }, { staleTime: 30000 });
+  const [, navigate] = useLocation();
+
+  const { staleCampaigns, lateFreight } = useMemo(() => {
+    const now = Date.now();
+    const MS_PER_DAY = 1000 * 60 * 60 * 24;
+    const SLA_THRESHOLD = 5;
+
+    const staleCampaigns = (campaignsQuery.data || [])
+      .filter(c => ["briefing", "design", "aprovacao"].includes(c.status))
+      .map(c => {
+        const ref = (c as any).proposalSignedAt ? new Date((c as any).proposalSignedAt) : new Date(c.createdAt);
+        const days = Math.floor((now - ref.getTime()) / MS_PER_DAY);
+        return { ...c, staleDays: days };
+      })
+      .filter(c => c.staleDays > SLA_THRESHOLD)
+      .sort((a, b) => b.staleDays - a.staleDays);
+
+    const today = new Date().toISOString().split("T")[0];
+    const lateFreight = (soQuery.data || [])
+      .filter(s => (s as any).freightExpectedDate && (s as any).freightExpectedDate < today)
+      .map(s => {
+        const days = Math.floor((now - new Date((s as any).freightExpectedDate).getTime()) / MS_PER_DAY);
+        return { ...s, lateDays: days };
+      })
+      .sort((a, b) => b.lateDays - a.lateDays);
+
+    return { staleCampaigns, lateFreight };
+  }, [campaignsQuery.data, soQuery.data]);
+
+  const total = staleCampaigns.length + lateFreight.length;
+  if (total === 0) return null;
+
+  const stageLabels: Record<string, string> = { briefing: "Briefing", design: "Design", aprovacao: "Aprovação" };
+
+  return (
+    <div className="bg-red-500/5 border border-red-500/30 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+        <span className="text-sm font-semibold text-red-400">Alertas SLA — {total} item{total !== 1 ? "s" : ""} requer{total === 1 ? "" : "em"} atenção</span>
+      </div>
+
+      {staleCampaigns.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Pipeline parado (&gt;5 dias)</p>
+          {staleCampaigns.map(c => (
+            <button
+              key={c.id}
+              onClick={() => navigate(`/campanhas/${c.id}`)}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-md bg-red-500/10 hover:bg-red-500/20 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs font-medium truncate">{c.name}</span>
+                {(c as any).campaignNumber && (
+                  <span className="text-[10px] font-mono text-muted-foreground shrink-0">{(c as any).campaignNumber}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400 font-medium">
+                  {stageLabels[c.status] || c.status}
+                </span>
+                <span className="text-xs font-mono font-semibold text-red-400">{c.staleDays}d</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {lateFreight.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Frete em atraso</p>
+          {lateFreight.map(s => (
+            <div
+              key={s.id}
+              className="flex items-center justify-between px-3 py-2 rounded-md bg-orange-500/10 border border-orange-500/20"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs font-mono text-muted-foreground shrink-0">{s.orderNumber}</span>
+                <span className="text-xs truncate">{s.campaignName}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {(s as any).freightProvider && (
+                  <span className="text-[10px] text-muted-foreground">{(s as any).freightProvider}</span>
+                )}
+                <span className="text-xs font-mono font-semibold text-orange-400">{s.lateDays}d atraso</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

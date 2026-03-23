@@ -1412,14 +1412,14 @@ export const appRouter = router({
     completeBriefing: operacoesProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        await updateCampaign(input.id, { status: "design" });
+        await updateCampaign(input.id, { status: "design", designEnteredAt: new Date() });
         await addCampaignHistory(input.id, "briefing_complete", "Briefing concluído — campanha em produção de design");
       }),
 
     submitDesign: operacoesProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        await updateCampaign(input.id, { status: "aprovacao" });
+        await updateCampaign(input.id, { status: "aprovacao", aprovacaoEnteredAt: new Date() });
         await addCampaignHistory(input.id, "design_submitted", "Design enviado para aprovação");
       }),
 
@@ -1465,6 +1465,7 @@ export const appRouter = router({
         await updateCampaign(input.id, {
           status: "distribuicao",
           materialReceivedDate: new Date().toISOString().split("T")[0],
+          distribuicaoEnteredAt: new Date(),
         });
         await addCampaignHistory(input.id, "material_received", "Material recebido — campanha em distribuição");
 

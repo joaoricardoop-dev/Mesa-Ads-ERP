@@ -261,6 +261,10 @@ export default function CampaignDetail() {
   const [invoiceAmount, setInvoiceAmount] = useState("");
   const [invoiceDueDate, setInvoiceDueDate] = useState("");
   const [invoiceNotes, setInvoiceNotes] = useState("");
+  const [freightCode, setFreightCode] = useState("");
+  const [freightProv, setFreightProv] = useState("");
+  const [freightDate, setFreightDate] = useState("");
+  const [freightEditing, setFreightEditing] = useState(false);
 
   const utils = trpc.useUtils();
   const { data: campaign, isLoading } = trpc.campaign.get.useQuery({ id: campaignId }, { enabled: campaignId > 0 });
@@ -272,6 +276,18 @@ export default function CampaignDetail() {
   const { data: campaignBatchList = [] } = trpc.batch.getCampaignBatches.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignInvoices = [] } = trpc.financial.listInvoices.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignPayments = [] } = trpc.financial.listPayments.useQuery({ campaignId }, { enabled: campaignId > 0 });
+  const { data: campaignSoList = [] } = trpc.serviceOrder.list.useQuery({ campaignId }, { enabled: campaignId > 0 });
+
+  const distSo = campaignSoList.find((s: any) => s.type === "distribuicao");
+
+  const updateSoFreightMutation = trpc.serviceOrder.update.useMutation({
+    onSuccess: () => {
+      utils.serviceOrder.list.invalidate();
+      setFreightEditing(false);
+      toast.success("Rastreamento de frete atualizado.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
 
   const uploadArtMutation = trpc.campaign.uploadArt.useMutation({
     onSuccess: () => {
@@ -675,7 +691,11 @@ export default function CampaignDetail() {
     : null;
 
   const proposalSignedAt = (campaign as any).proposalSignedAt ? new Date((campaign as any).proposalSignedAt) : null;
+  const briefingEnteredAt = (campaign as any).briefingEnteredAt ? new Date((campaign as any).briefingEnteredAt) : proposalSignedAt;
+  const designEnteredAt = (campaign as any).designEnteredAt ? new Date((campaign as any).designEnteredAt) : null;
+  const aprovacaoEnteredAt = (campaign as any).aprovacaoEnteredAt ? new Date((campaign as any).aprovacaoEnteredAt) : null;
   const producaoEnteredAt = (campaign as any).producaoEnteredAt ? new Date((campaign as any).producaoEnteredAt) : null;
+  const distribuicaoEnteredAt = (campaign as any).distribuicaoEnteredAt ? new Date((campaign as any).distribuicaoEnteredAt) : null;
   const slaActive = proposalSignedAt !== null && ["briefing", "design", "aprovacao"].includes(campaign.status);
   const slaResolved = proposalSignedAt !== null && producaoEnteredAt !== null && !["briefing", "design", "aprovacao"].includes(campaign.status);
   const slaDays = slaActive
@@ -683,6 +703,32 @@ export default function CampaignDetail() {
     : slaResolved
       ? Math.floor((producaoEnteredAt!.getTime() - proposalSignedAt.getTime()) / (1000 * 60 * 60 * 24))
       : null;
+
+  const MS_DAY = 1000 * 60 * 60 * 24;
+  const now = Date.now();
+  const PIPELINE_STAGES_ORDERED = ["briefing", "design", "aprovacao", "producao", "distribuicao", "veiculacao", "inativa"] as const;
+  const stageOrderIndex = (s: string) => PIPELINE_STAGES_ORDERED.indexOf(s as typeof PIPELINE_STAGES_ORDERED[number]);
+  const currentStageIndex = stageOrderIndex(campaign.status);
+
+  function stageDays(entryAt: Date | null, exitAt: Date | null, stageKey: string): number | null {
+    if (!entryAt) return null;
+    const end = exitAt ?? (currentStageIndex === stageOrderIndex(stageKey) ? new Date(now) : null);
+    if (!end) return null;
+    return Math.max(0, Math.floor((end.getTime() - entryAt.getTime()) / MS_DAY));
+  }
+
+  const slaStages = [
+    { key: "briefing", label: "Briefing", enteredAt: briefingEnteredAt, exitAt: designEnteredAt, threshold: 5 },
+    { key: "design", label: "Design", enteredAt: designEnteredAt, exitAt: aprovacaoEnteredAt, threshold: 5 },
+    { key: "aprovacao", label: "Aprovação", enteredAt: aprovacaoEnteredAt, exitAt: producaoEnteredAt, threshold: 5 },
+    { key: "producao", label: "Produção", enteredAt: producaoEnteredAt, exitAt: distribuicaoEnteredAt, threshold: 14 },
+    { key: "distribuicao", label: "Distribuição", enteredAt: distribuicaoEnteredAt, exitAt: null, threshold: 7 },
+  ].map(s => ({
+    ...s,
+    days: stageDays(s.enteredAt, s.exitAt, s.key),
+    isCurrent: campaign.status === s.key,
+    isPast: currentStageIndex > stageOrderIndex(s.key),
+  })).filter(s => s.days !== null || s.isCurrent);
   const slaColor = slaDays === null ? "" : slaDays <= 3 ? "text-emerald-400" : slaDays <= 5 ? "text-yellow-400" : "text-red-400";
   const slaLabel = slaDays === null ? "" : slaDays === 0 ? "Hoje" : `${slaDays} dia${slaDays !== 1 ? "s" : ""}`;
   const showSlaBadge = slaDays !== null && (slaActive || slaResolved);
@@ -839,6 +885,31 @@ export default function CampaignDetail() {
                   );
                 })}
               </div>
+
+              {slaStages.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-border/20">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Duração por Etapa</p>
+                  <div className="flex flex-wrap gap-2">
+                    {slaStages.map(s => {
+                      const overdue = s.days !== null && s.days > s.threshold;
+                      const color = s.days === null ? "bg-muted/40 text-muted-foreground border-border/20" :
+                        overdue ? "bg-red-500/10 text-red-400 border-red-500/30" :
+                        s.days > s.threshold * 0.7 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" :
+                        "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+                      return (
+                        <div key={s.key} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium ${color}`}>
+                          {overdue && <AlertTriangle className="w-3 h-3 shrink-0" />}
+                          <span>{s.label}</span>
+                          <span className="font-mono font-bold">
+                            {s.days !== null ? `${s.days}d` : s.isCurrent ? "…" : "—"}
+                          </span>
+                          {s.isCurrent && <span className="text-[9px] opacity-70">em curso</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1012,6 +1083,84 @@ export default function CampaignDetail() {
                 Material recebido em {(campaign as any).materialReceivedDate ? new Date((campaign as any).materialReceivedDate).toLocaleDateString("pt-BR") : "—"}.
                 Configure os restaurantes na aba Distribuição e defina o período de veiculação para concluir.
               </p>
+
+              {distSo && (
+                <div className="border border-orange-500/20 rounded-md p-3 space-y-3 bg-orange-500/5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rastreamento de Frete · {distSo.orderNumber}</p>
+                    {!freightEditing && (
+                      <button
+                        onClick={() => {
+                          setFreightCode((distSo as any).trackingCode || "");
+                          setFreightProv((distSo as any).freightProvider || "");
+                          setFreightDate((distSo as any).freightExpectedDate || "");
+                          setFreightEditing(true);
+                        }}
+                        className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                      >
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                  {freightEditing ? (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Código de Rastreio</Label>
+                          <Input value={freightCode} onChange={e => setFreightCode(e.target.value)} placeholder="ex: BR123456789BR" className="h-8 text-xs bg-background border-border/30" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Transportadora</Label>
+                          <Input value={freightProv} onChange={e => setFreightProv(e.target.value)} placeholder="ex: Correios, Jadlog..." className="h-8 text-xs bg-background border-border/30" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Previsão de Entrega</Label>
+                          <Input type="date" value={freightDate} onChange={e => setFreightDate(e.target.value)} className="h-8 text-xs bg-background border-border/30" />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs gap-1 bg-teal-600 hover:bg-teal-700"
+                          disabled={updateSoFreightMutation.isPending}
+                          onClick={() => updateSoFreightMutation.mutate({
+                            id: distSo.id,
+                            trackingCode: freightCode || undefined,
+                            freightProvider: freightProv || undefined,
+                            freightExpectedDate: freightDate || undefined,
+                          })}
+                        >
+                          Salvar
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setFreightEditing(false)}>Cancelar</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Código</p>
+                        <p className="text-xs font-mono">{(distSo as any).trackingCode || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Transportadora</p>
+                        <p className="text-xs">{(distSo as any).freightProvider || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Previsão</p>
+                        {(distSo as any).freightExpectedDate ? (
+                          <div className="flex items-center gap-1">
+                            <p className="text-xs">{new Date((distSo as any).freightExpectedDate).toLocaleDateString("pt-BR")}</p>
+                            {(distSo as any).freightExpectedDate < new Date().toISOString().split("T")[0] && (
+                              <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
+                            )}
+                          </div>
+                        ) : <p className="text-xs">—</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Início da Veiculação</Label>

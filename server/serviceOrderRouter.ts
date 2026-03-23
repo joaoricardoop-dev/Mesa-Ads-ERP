@@ -101,6 +101,9 @@ export const serviceOrderRouter = router({
       artPdfUrl: z.string().optional(),
       artImageUrls: z.string().optional(),
       productId: z.number().optional(),
+      trackingCode: z.string().optional(),
+      freightProvider: z.string().optional(),
+      freightExpectedDate: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -129,6 +132,9 @@ export const serviceOrderRouter = router({
       artPdfUrl: z.string().optional(),
       artImageUrls: z.string().optional(),
       productId: z.number().optional(),
+      trackingCode: z.string().optional(),
+      freightProvider: z.string().optional(),
+      freightExpectedDate: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -188,6 +194,7 @@ export const serviceOrderRouter = router({
             status: "briefing",
             quotationId: q.id,
             proposalSignedAt: new Date(),
+            briefingEnteredAt: new Date(),
             coastersPerRestaurant: 500,
             usagePerDay: 3,
             daysPerMonth: 26,
