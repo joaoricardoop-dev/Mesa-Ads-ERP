@@ -559,6 +559,18 @@ export default function Quotations() {
                         {q.quotationName && (
                           <p className="text-[11px] text-muted-foreground font-normal">{q.quotationName}</p>
                         )}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {Number((q as any).itemCount) > 0 && (
+                            <span className="text-[10px] text-muted-foreground/70">
+                              {Number((q as any).itemCount)} {Number((q as any).itemCount) === 1 ? "item" : "itens"}
+                            </span>
+                          )}
+                          {q.createdAt && (
+                            <span className="text-[10px] text-muted-foreground/50">
+                              {Math.floor((Date.now() - new Date(q.createdAt).getTime()) / 86400000)}d atrás
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </button>
                   </TableCell>

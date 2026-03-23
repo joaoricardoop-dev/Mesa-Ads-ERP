@@ -151,6 +151,7 @@ export const quotationRouter = router({
           partnerName: partners.name,
           periodStart: quotations.periodStart,
           batchWeeks: quotations.batchWeeks,
+          itemCount: sql<number>`(SELECT COUNT(*) FROM quotation_items WHERE quotation_id = ${quotations.id})`,
         })
         .from(quotations)
         .leftJoin(clients, eq(quotations.clientId, clients.id))

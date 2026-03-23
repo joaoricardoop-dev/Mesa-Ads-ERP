@@ -585,6 +585,14 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                     <span className="text-right font-mono">{fmtBRL4(pricingInput.custoUnitario)}</span>
                     <span className="text-muted-foreground">Preço/un. base</span>
                     <span className="text-right font-mono font-semibold text-primary">{fmtBRL4(calc.precoUnit4sem)}</span>
+                    <span className="text-muted-foreground">Margem bruta</span>
+                    <span className={`text-right font-mono font-semibold ${
+                      pricingInput.margem >= 0.30 ? "text-emerald-600 dark:text-emerald-400" :
+                      pricingInput.margem >= 0.15 ? "text-amber-600 dark:text-amber-400" :
+                      "text-red-600 dark:text-red-400"
+                    }`}>
+                      {(pricingInput.margem * 100).toFixed(0)}%
+                    </span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-semibold">
@@ -866,13 +874,17 @@ export default function BudgetCreator() {
 
   const removeItem = useCallback((id: string) => {
     setItems((prev) => {
+      const target = prev.find((item) => item.id === id);
       const next = prev.filter((item) => item.id !== id);
+      if (target?.productName) toast(`"${target.productName}" removido do orçamento`);
+      else toast("Produto removido do orçamento");
       return next.length === 0 ? [makeBlankItem()] : next;
     });
   }, []);
 
   const addNewItem = useCallback(() => {
     setItems((prev) => [...prev, makeBlankItem()]);
+    toast.success("Novo produto adicionado");
   }, []);
 
   useEffect(() => {
