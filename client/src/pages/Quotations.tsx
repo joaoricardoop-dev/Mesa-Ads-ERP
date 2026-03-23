@@ -649,6 +649,8 @@ export default function Quotations() {
                               productName: q.productName || undefined,
                               productUnitLabelPlural: q.productUnitLabelPlural || undefined,
                               items: proposalItems,
+                              periodStart: (q as any).periodStart || undefined,
+                              batchWeeks: (q as any).batchWeeks ?? 4,
                             });
                             toast.success("PDF da proposta gerado!");
                           } catch (err) {
