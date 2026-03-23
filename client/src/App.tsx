@@ -469,7 +469,7 @@ function AuthenticatedApp() {
     return (
       <div className="h-screen flex overflow-hidden">
         <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)}>
-          <AnuncianteRouter />
+          <AnuncianteRouter key={devClientIdOverride ?? "no-client"} />
         </DashboardLayout>
         {devToolsPanel}
       </div>

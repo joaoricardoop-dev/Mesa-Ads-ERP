@@ -63,7 +63,7 @@ export async function createContext(
     user = null;
   }
 
-  if (process.env.NODE_ENV !== "production" && user && user.role === "admin") {
+  if (process.env.NODE_ENV !== "production" && user) {
     const devClientId = opts.req.headers["x-dev-client-id"];
     if (devClientId) {
       user = { ...user, clientId: parseInt(String(devClientId), 10) };
