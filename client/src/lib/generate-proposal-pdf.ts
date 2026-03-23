@@ -397,6 +397,79 @@ export function generateProposalPdf(data: ProposalPDFData) {
     }
   }
 
+  if (data.periodStart) {
+    y += 8;
+    y = checkPageBreak(doc, y, 60);
+    y = drawSectionTitle(doc, "PERÍODO DE VEICULAÇÃO", y, margin);
+
+    const batchWks = data.batchWeeks && data.batchWeeks > 0 ? data.batchWeeks : 4;
+    const totalWks = data.semanas ?? (cycles * 4);
+    const numBatches = Math.ceil(totalWks / batchWks);
+
+    const fmtDate = (d: Date) =>
+      d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+    const [year, month, day] = data.periodStart.split("-").map(Number);
+    const startBase = new Date(year, month - 1, day);
+
+    const batchRows: string[][] = [];
+    for (let i = 0; i < numBatches; i++) {
+      const bStart = new Date(startBase);
+      bStart.setDate(bStart.getDate() + i * batchWks * 7);
+      const bEnd = new Date(bStart);
+      bEnd.setDate(bEnd.getDate() + batchWks * 7 - 1);
+      const wksInBatch = Math.min(batchWks, totalWks - i * batchWks);
+      batchRows.push([
+        String(i + 1),
+        `Lote ${i + 1}`,
+        fmtDate(bStart),
+        fmtDate(bEnd),
+        `${wksInBatch} sem.`,
+      ]);
+    }
+
+    autoTable(doc, {
+      startY: y,
+      head: [["#", "Período", "Início", "Fim", "Duração"]],
+      body: batchRows,
+      foot: [[
+        "",
+        `${numBatches} período${numBatches !== 1 ? "s" : ""}`,
+        "",
+        "",
+        `${totalWks} sem. total`,
+      ]],
+      theme: "grid",
+      styles: { font: FONT_NAME, fontSize: 8 },
+      headStyles: {
+        fillColor: [...BLACK],
+        textColor: [...WHITE],
+        fontSize: 8,
+        fontStyle: "bold",
+        font: FONT_NAME,
+      },
+      bodyStyles: { textColor: [40, 40, 40], font: FONT_NAME },
+      footStyles: {
+        fillColor: [...LIGHT_GRAY],
+        textColor: [...BLACK],
+        fontSize: 8,
+        fontStyle: "bold",
+        font: FONT_NAME,
+      },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      margin: { left: margin, right: margin },
+      columnStyles: {
+        0: { cellWidth: 12, halign: "center" },
+        2: { halign: "center", cellWidth: 32 },
+        3: { halign: "center", cellWidth: 32 },
+        4: { halign: "right", cellWidth: 24, fontStyle: "bold" },
+      },
+    });
+
+    y = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y + 40;
+    y += 8;
+  }
+
   // ── SECTION: Investimento ─────────────────────────────────────────────────
   y += 8;
   y = checkPageBreak(doc, y, 70);
@@ -696,78 +769,6 @@ export function generateProposalPdf(data: ProposalPDFData) {
 
       y += discountBoxHeight + 10;
     }
-  }
-
-  if (data.periodStart) {
-    y = checkPageBreak(doc, y, 60);
-    y = drawSectionTitle(doc, "PERÍODO DE VEICULAÇÃO", y, margin);
-
-    const batchWks = data.batchWeeks && data.batchWeeks > 0 ? data.batchWeeks : 4;
-    const totalWks = data.semanas ?? (cycles * 4);
-    const numBatches = Math.ceil(totalWks / batchWks);
-
-    const fmtDate = (d: Date) =>
-      d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-
-    const [year, month, day] = data.periodStart.split("-").map(Number);
-    const startBase = new Date(year, month - 1, day);
-
-    const batchRows: string[][] = [];
-    for (let i = 0; i < numBatches; i++) {
-      const bStart = new Date(startBase);
-      bStart.setDate(bStart.getDate() + i * batchWks * 7);
-      const bEnd = new Date(bStart);
-      bEnd.setDate(bEnd.getDate() + batchWks * 7 - 1);
-      const wksInBatch = Math.min(batchWks, totalWks - i * batchWks);
-      batchRows.push([
-        String(i + 1),
-        `Lote ${i + 1}`,
-        fmtDate(bStart),
-        fmtDate(bEnd),
-        `${wksInBatch} sem.`,
-      ]);
-    }
-
-    autoTable(doc, {
-      startY: y,
-      head: [["#", "Período", "Início", "Fim", "Duração"]],
-      body: batchRows,
-      foot: [[
-        "",
-        `${numBatches} período${numBatches !== 1 ? "s" : ""}`,
-        "",
-        "",
-        `${totalWks} sem. total`,
-      ]],
-      theme: "grid",
-      styles: { font: FONT_NAME, fontSize: 8 },
-      headStyles: {
-        fillColor: [...BLACK],
-        textColor: [...WHITE],
-        fontSize: 8,
-        fontStyle: "bold",
-        font: FONT_NAME,
-      },
-      bodyStyles: { textColor: [40, 40, 40], font: FONT_NAME },
-      footStyles: {
-        fillColor: [...LIGHT_GRAY],
-        textColor: [...BLACK],
-        fontSize: 8,
-        fontStyle: "bold",
-        font: FONT_NAME,
-      },
-      alternateRowStyles: { fillColor: [250, 250, 250] },
-      margin: { left: margin, right: margin },
-      columnStyles: {
-        0: { cellWidth: 12, halign: "center" },
-        2: { halign: "center", cellWidth: 32 },
-        3: { halign: "center", cellWidth: 32 },
-        4: { halign: "right", cellWidth: 24, fontStyle: "bold" },
-      },
-    });
-
-    y = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y + 40;
-    y += 8;
   }
 
   y += 10;
