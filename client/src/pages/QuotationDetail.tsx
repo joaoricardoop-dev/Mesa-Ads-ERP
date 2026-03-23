@@ -111,6 +111,7 @@ export default function QuotationDetail() {
     isBonificada: false,
     periodStart: "",
     batchWeeks: 4,
+    editBatchIds: [] as number[],
   });
 
   const utils = trpc.useUtils();
@@ -169,20 +170,31 @@ export default function QuotationDetail() {
 
   const openEdit = () => {
     if (!quotation) return;
+    const existingPeriodStart = (quotation as any).periodStart || "";
+    const existingCycles = quotation.cycles || 1;
+    let preselectedBatchIds: number[] = [];
+    if (existingPeriodStart && batchesList.length > 0) {
+      const sorted = [...batchesList].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+      const startIdx = sorted.findIndex((b: any) => b.startDate === existingPeriodStart);
+      if (startIdx >= 0) {
+        preselectedBatchIds = sorted.slice(startIdx, startIdx + existingCycles).map((b: any) => b.id);
+      }
+    }
     setEditForm({
       clientId: quotation.clientId,
       coasterVolume: quotation.coasterVolume,
       networkProfile: quotation.networkProfile || "",
       regions: quotation.regions || "",
-      cycles: quotation.cycles || 1,
+      cycles: existingCycles,
       unitPrice: quotation.unitPrice || "",
       totalValue: quotation.totalValue || "",
       includesProduction: quotation.includesProduction ?? true,
       notes: quotation.notes || "",
       validUntil: quotation.validUntil || "",
       isBonificada: quotation.isBonificada ?? false,
-      periodStart: (quotation as any).periodStart || "",
+      periodStart: existingPeriodStart,
       batchWeeks: (quotation as any).batchWeeks ?? 4,
+      editBatchIds: preselectedBatchIds,
     });
     setEditOpen(true);
   };
@@ -925,15 +937,40 @@ export default function QuotationDetail() {
               <Label>Validade</Label>
               <Input type="date" value={editForm.validUntil} onChange={(e) => setEditForm({ ...editForm, validUntil: e.target.value })} className="bg-background border-border/30" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label>Início da Veiculação</Label>
-                <Input type="date" value={editForm.periodStart} onChange={(e) => setEditForm({ ...editForm, periodStart: e.target.value })} className="bg-background border-border/30" />
+            <div className="grid gap-2">
+              <Label>Período de Veiculação (Batches)</Label>
+              <div className="bg-background border border-border/30 rounded-lg p-3 max-h-[200px] overflow-y-auto space-y-1">
+                {batchesList.map((batch: any) => (
+                  <label key={batch.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/30 cursor-pointer">
+                    <Checkbox
+                      checked={editForm.editBatchIds.includes(batch.id)}
+                      onCheckedChange={(checked) => {
+                        const newIds = checked
+                          ? [...editForm.editBatchIds, batch.id].sort((a, b) => a - b)
+                          : editForm.editBatchIds.filter(id => id !== batch.id);
+                        const selectedBatches = batchesList
+                          .filter((b: any) => newIds.includes(b.id))
+                          .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+                        const newPeriodStart = selectedBatches.length > 0 ? selectedBatches[0].startDate : "";
+                        const newCycles = selectedBatches.length;
+                        setEditForm({ ...editForm, editBatchIds: newIds, periodStart: newPeriodStart, cycles: newCycles || editForm.cycles, batchWeeks: 4 });
+                      }}
+                    />
+                    <span className="text-sm font-medium">{batch.name}</span>
+                    <span className="text-xs text-muted-foreground ml-1">{batch.startDate} — {batch.endDate}</span>
+                  </label>
+                ))}
               </div>
-              <div className="grid gap-2">
-                <Label>Semanas por Lote</Label>
-                <Input type="number" min={1} max={52} value={editForm.batchWeeks} onChange={(e) => setEditForm({ ...editForm, batchWeeks: Number(e.target.value) })} className="bg-background border-border/30" />
-              </div>
+              {editForm.editBatchIds.length > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  {editForm.editBatchIds.length} batch(es) — Período: {(() => {
+                    const sel = batchesList
+                      .filter((b: any) => editForm.editBatchIds.includes(b.id))
+                      .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+                    return sel.length > 0 ? `${sel[0].startDate} a ${sel[sel.length - 1].endDate}` : "";
+                  })()}
+                </p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label>Observações</Label>
