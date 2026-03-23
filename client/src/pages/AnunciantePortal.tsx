@@ -33,12 +33,9 @@ import {
   Instagram,
   MapPin,
   Pencil,
-  Eye,
   CircleDot,
   CheckCircle2,
   Clock,
-  AlertCircle,
-  XCircle,
   Package,
   Truck,
   Play,
@@ -46,12 +43,22 @@ import {
   Archive,
   FileSignature,
   Download,
+  ArrowLeft,
+  ChevronRight,
+  Calendar,
+  Boxes,
+  ImageIcon,
+  AlertCircle,
 } from "lucide-react";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
 
 const campaignStatusConfig: Record<string, { label: string; color: string; icon: typeof CircleDot }> = {
   draft: { label: "Rascunho", color: "bg-gray-500/10 text-gray-500", icon: CircleDot },
+  briefing: { label: "Briefing", color: "bg-sky-500/10 text-sky-500", icon: FileText },
+  design: { label: "Design", color: "bg-violet-500/10 text-violet-500", icon: Pencil },
+  aprovacao: { label: "Aprovação", color: "bg-amber-500/10 text-amber-500", icon: CheckCircle2 },
   producao: { label: "Produção", color: "bg-blue-500/10 text-blue-500", icon: Package },
+  distribuicao: { label: "Distribuição", color: "bg-orange-500/10 text-orange-500", icon: Truck },
   transito: { label: "Trânsito", color: "bg-amber-500/10 text-amber-500", icon: Truck },
   executar: { label: "Executar", color: "bg-purple-500/10 text-purple-500", icon: Play },
   veiculacao: { label: "Em Veiculação", color: "bg-emerald-500/10 text-emerald-500", icon: Radio },
@@ -87,6 +94,20 @@ const invoiceStatusConfig: Record<string, { label: string; color: string }> = {
   cancelada: { label: "Cancelada", color: "bg-gray-500/10 text-gray-400" },
 };
 
+const PIPELINE_STAGES: { key: string; label: string; icon: typeof CircleDot }[] = [
+  { key: "briefing", label: "Briefing", icon: FileText },
+  { key: "design", label: "Design", icon: Pencil },
+  { key: "aprovacao", label: "Aprovação", icon: CheckCircle2 },
+  { key: "producao", label: "Produção", icon: Package },
+  { key: "distribuicao", label: "Distribuição", icon: Truck },
+  { key: "veiculacao", label: "Veiculação", icon: Radio },
+];
+
+const STAGE_ORDER: Record<string, number> = {
+  briefing: 0, design: 1, aprovacao: 2, producao: 3, distribuicao: 4, veiculacao: 5,
+  inativa: 6, active: 5, completed: 6,
+};
+
 function formatCurrency(value: string | number | null | undefined) {
   if (!value) return "—";
   const num = typeof value === "string" ? parseFloat(value) : value;
@@ -98,6 +119,280 @@ function formatDate(d: string | Date | null | undefined) {
   return new Date(d).toLocaleDateString("pt-BR");
 }
 
+type CampaignSO = {
+  id: number;
+  orderNumber: string;
+  type: "anunciante" | "producao" | "distribuicao";
+  status: string;
+  trackingCode: string | null;
+  freightProvider: string | null;
+  freightExpectedDate: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+};
+
+type CampaignProof = {
+  id: number;
+  week: number;
+  photoUrl: string;
+  restaurantId: number;
+  restaurantName: string | null;
+  createdAt: string;
+};
+
+function CampaignDetail({ campaign, onBack }: { campaign: any; onBack: () => void }) {
+  const { data: campSOs = [] } = trpc.portal.myCampaignServiceOrders.useQuery({ campaignId: campaign.id });
+  const { data: proofs = [] } = trpc.portal.myCampaignProofs.useQuery({ campaignId: campaign.id });
+
+  const serviceOrders = campSOs as CampaignSO[];
+  const proofPhotos = proofs as CampaignProof[];
+
+  const stageIdx = STAGE_ORDER[campaign.status] ?? -1;
+
+  const prodSO = serviceOrders.find(so => so.type === "producao");
+  const distSO = serviceOrders.find(so => so.type === "distribuicao");
+  const freightSO = distSO ?? prodSO;
+
+  const showFreight = ["producao", "distribuicao"].includes(campaign.status);
+  const showProofs = ["veiculacao", "active", "inativa", "completed"].includes(campaign.status);
+
+  const proofsByWeek = proofPhotos.reduce<Record<number, CampaignProof[]>>((acc, p) => {
+    if (!acc[p.week]) acc[p.week] = [];
+    acc[p.week].push(p);
+    return acc;
+  }, {});
+
+  const cfg = campaignStatusConfig[campaign.status] ?? campaignStatusConfig.draft;
+  const StatusIcon = cfg.icon;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" />
+          Voltar
+        </Button>
+        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">Campanhas</span>
+        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        <span className="text-sm font-medium truncate max-w-xs">{campaign.name}</span>
+      </div>
+
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold leading-tight">{campaign.name}</h2>
+          <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+            {campaign.campaignNumber && <span className="font-mono">{campaign.campaignNumber}</span>}
+            {campaign.startDate && (
+              <span>{formatDate(campaign.startDate)} — {formatDate(campaign.endDate)}</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {campaign.isBonificada && (
+            <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30">Bonificada</Badge>
+          )}
+          <Badge className={cfg.color}>
+            <StatusIcon className="w-3.5 h-3.5 mr-1" />
+            {cfg.label}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Card>
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Boxes className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-xl font-bold">{campaign.coasterVolume?.toLocaleString("pt-BR") ?? "—"}</p>
+                <p className="text-xs text-muted-foreground">Bolachas</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <Calendar className="w-4 h-4 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-base font-semibold">{formatDate(campaign.veiculacaoStartDate)}</p>
+                <p className="text-xs text-muted-foreground">Início veiculação</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-emerald-500/10">
+                <Calendar className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-base font-semibold">{formatDate(campaign.veiculacaoEndDate)}</p>
+                <p className="text-xs text-muted-foreground">Fim veiculação</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Esteira de Produção</CardTitle>
+          <CardDescription>Acompanhe as etapas da sua campanha em tempo real</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="relative">
+            <div className="flex items-start justify-between gap-1">
+              {PIPELINE_STAGES.map((stage, i) => {
+                const isCompleted = stageIdx > i;
+                const isCurrent = stageIdx === i;
+                const isPending = stageIdx < i;
+                const StageIcon = stage.icon;
+                return (
+                  <div key={stage.key} className="flex flex-col items-center flex-1 min-w-0">
+                    <div className="relative flex items-center w-full">
+                      {i > 0 && (
+                        <div className={`absolute left-0 right-1/2 h-0.5 top-4 -translate-y-0 ${isCompleted || isCurrent ? "bg-primary" : "bg-border"}`} />
+                      )}
+                      {i < PIPELINE_STAGES.length - 1 && (
+                        <div className={`absolute left-1/2 right-0 h-0.5 top-4 -translate-y-0 ${isCompleted ? "bg-primary" : "bg-border"}`} />
+                      )}
+                      <div className="relative mx-auto z-10">
+                        {isCompleted ? (
+                          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                            <CheckCircle2 className="w-4 h-4 text-primary-foreground" />
+                          </div>
+                        ) : isCurrent ? (
+                          <div className="w-8 h-8 rounded-full border-2 border-primary bg-primary/10 flex items-center justify-center ring-4 ring-primary/20">
+                            <StageIcon className="w-4 h-4 text-primary" />
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 rounded-full border-2 border-border bg-background flex items-center justify-center">
+                            <StageIcon className="w-4 h-4 text-muted-foreground/40" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <p className={`mt-2 text-[11px] text-center font-medium leading-tight ${isCurrent ? "text-primary" : isPending ? "text-muted-foreground/40" : "text-muted-foreground"}`}>
+                      {stage.label}
+                    </p>
+                    {isCurrent && (
+                      <span className="mt-1 text-[9px] uppercase tracking-wider font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                        Atual
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {showFreight && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Truck className="w-4 h-4" />
+              Rastreio de Mercadoria
+            </CardTitle>
+            <CardDescription>Informações de envio dos materiais</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!freightSO || (!freightSO.trackingCode && !freightSO.freightProvider && !freightSO.freightExpectedDate) ? (
+              <div className="flex items-center gap-3 text-sm text-muted-foreground py-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Informações de rastreio ainda não disponíveis. A equipe Mesa Ads atualizará assim que o material for enviado.</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Código de rastreio</p>
+                  {freightSO.trackingCode ? (
+                    <p className="font-mono font-semibold text-sm">{freightSO.trackingCode}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">—</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Transportadora</p>
+                  <p className="text-sm font-medium">{freightSO.freightProvider || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Previsão de entrega</p>
+                  <p className="text-sm font-medium">{formatDate(freightSO.freightExpectedDate)}</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {campaign.materialReceivedDate && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+          <Package className="w-4 h-4 shrink-0" />
+          <span>Material recebido nos estabelecimentos em <strong>{formatDate(campaign.materialReceivedDate)}</strong></span>
+        </div>
+      )}
+
+      {showProofs && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ImageIcon className="w-4 h-4" />
+              Fotos Semanais
+            </CardTitle>
+            <CardDescription>Registros fotográficos da campanha nos estabelecimentos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {proofPhotos.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+                <ImageIcon className="w-8 h-8 opacity-30" />
+                <p className="text-sm">Nenhuma foto registrada ainda</p>
+                <p className="text-xs">As fotos aparecerão aqui conforme os estabelecimentos forem registrando</p>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {Object.entries(proofsByWeek)
+                  .sort(([a], [b]) => Number(a) - Number(b))
+                  .map(([week, photos]) => (
+                    <div key={week}>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                        Semana {week}
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {photos.map(photo => (
+                          <div key={photo.id} className="group relative rounded-lg overflow-hidden border bg-muted aspect-square">
+                            <img
+                              src={photo.photoUrl}
+                              alt={`Semana ${week} — ${photo.restaurantName ?? "Estabelecimento"}`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            />
+                            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5">
+                              <p className="text-white text-[10px] font-medium truncate">
+                                {photo.restaurantName ?? "—"}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 export default function AnunciantePortal() {
   const { user } = useAuth();
   const { data: profile, isLoading: profileLoading } = trpc.portal.myProfile.useQuery();
@@ -106,6 +401,7 @@ export default function AnunciantePortal() {
   const { data: serviceOrders = [] } = trpc.portal.myServiceOrders.useQuery();
   const { data: invoices = [] } = trpc.portal.myInvoices.useQuery();
 
+  const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     contactEmail: "",
@@ -146,12 +442,14 @@ export default function AnunciantePortal() {
     setEditOpen(true);
   };
 
-  const activeCampaigns = campaigns.filter((c: any) => ["veiculacao", "active", "executar", "producao", "transito"].includes(c.status));
+  const activeCampaigns = campaigns.filter((c: any) => ["veiculacao", "active", "executar", "producao", "transito", "distribuicao", "briefing", "design", "aprovacao"].includes(c.status));
   const signedOsCount = serviceOrders.filter((os: any) => ["assinada", "execucao", "concluida"].includes(os.status)).length;
   const totalInvoiced = invoices
     .filter((i: any) => i.status !== "cancelada")
     .reduce((sum: number, i: any) => sum + (parseFloat(i.amount) || 0), 0);
   const pendingInvoices = invoices.filter((i: any) => i.status === "emitida" || i.status === "vencida");
+
+  const selectedCampaign = campaigns.find((c: any) => c.id === selectedCampaignId) ?? null;
 
   if (profileLoading) {
     return (
@@ -265,7 +563,7 @@ export default function AnunciantePortal() {
           </Card>
         </div>
 
-        <Tabs defaultValue="campaigns" className="w-full">
+        <Tabs defaultValue="campaigns" className="w-full" onValueChange={() => setSelectedCampaignId(null)}>
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="campaigns" className="gap-1.5">
               <Megaphone className="w-4 h-4" />
@@ -290,52 +588,62 @@ export default function AnunciantePortal() {
           </TabsList>
 
           <TabsContent value="campaigns" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Minhas Campanhas</CardTitle>
-                <CardDescription>Acompanhe o status das suas campanhas de mídia em bolachas de chopp</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {campaigns.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Megaphone className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                    <p>Nenhuma campanha encontrada</p>
-                    <p className="text-sm mt-1">Suas campanhas aparecerão aqui assim que forem criadas</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {campaigns.map((campaign: any) => {
-                      const cfg = campaignStatusConfig[campaign.status] || campaignStatusConfig.draft;
-                      const Icon = cfg.icon;
-                      return (
-                        <div key={campaign.id} className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-                          <div className="flex items-center gap-4">
-                            <div className={`p-2 rounded-lg ${cfg.color}`}>
-                              <Icon className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <p className="font-medium">{campaign.name}</p>
-                              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                                {campaign.campaignNumber && (
-                                  <span className="font-mono">{campaign.campaignNumber}</span>
-                                )}
-                                <span>{formatDate(campaign.startDate)} — {formatDate(campaign.endDate)}</span>
+            {selectedCampaign ? (
+              <CampaignDetail campaign={selectedCampaign} onBack={() => setSelectedCampaignId(null)} />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Minhas Campanhas</CardTitle>
+                  <CardDescription>Clique em uma campanha para ver detalhes, rastreio e fotos semanais</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {campaigns.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Megaphone className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                      <p>Nenhuma campanha encontrada</p>
+                      <p className="text-sm mt-1">Suas campanhas aparecerão aqui assim que forem criadas</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {campaigns.map((campaign: any) => {
+                        const cfg = campaignStatusConfig[campaign.status] || campaignStatusConfig.draft;
+                        const Icon = cfg.icon;
+                        return (
+                          <button
+                            key={campaign.id}
+                            type="button"
+                            className="w-full text-left flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 hover:border-primary/30 transition-colors cursor-pointer group"
+                            onClick={() => setSelectedCampaignId(campaign.id)}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className={`p-2 rounded-lg ${cfg.color}`}>
+                                <Icon className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="font-medium group-hover:text-primary transition-colors">{campaign.name}</p>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                                  {campaign.campaignNumber && (
+                                    <span className="font-mono">{campaign.campaignNumber}</span>
+                                  )}
+                                  <span>{formatDate(campaign.startDate)} — {formatDate(campaign.endDate)}</span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {campaign.isBonificada && (
-                              <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30">Bonificada</Badge>
-                            )}
-                            <Badge className={cfg.color}>{cfg.label}</Badge>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                            <div className="flex items-center gap-2">
+                              {campaign.isBonificada && (
+                                <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30">Bonificada</Badge>
+                              )}
+                              <Badge className={cfg.color}>{cfg.label}</Badge>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="quotations" className="mt-4">
@@ -697,14 +1005,16 @@ export default function AnunciantePortal() {
                     value={editForm.state}
                     onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
                     maxLength={2}
+                    placeholder="SP"
                   />
                 </div>
               </div>
-              <div className="space-y-2 max-w-[180px]">
+              <div className="space-y-2">
                 <Label>CEP</Label>
                 <Input
                   value={editForm.cep}
                   onChange={(e) => setEditForm({ ...editForm, cep: e.target.value })}
+                  placeholder="00000-000"
                 />
               </div>
             </div>

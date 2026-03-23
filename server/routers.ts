@@ -2282,6 +2282,63 @@ export const appRouter = router({
       return results;
     }),
 
+    myCampaignServiceOrders: anuncianteProcedure
+      .input(z.object({ campaignId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const user = ctx.user;
+        if (!user || !user.clientId) return [];
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { serviceOrders, campaigns } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        const camp = await db.select({ id: campaigns.id }).from(campaigns)
+          .where(and(eq(campaigns.id, input.campaignId), eq(campaigns.clientId, user.clientId)))
+          .limit(1);
+        if (!camp.length) return [];
+        const results = await db.select({
+          id: serviceOrders.id,
+          orderNumber: serviceOrders.orderNumber,
+          type: serviceOrders.type,
+          status: serviceOrders.status,
+          trackingCode: serviceOrders.trackingCode,
+          freightProvider: serviceOrders.freightProvider,
+          freightExpectedDate: serviceOrders.freightExpectedDate,
+          periodStart: serviceOrders.periodStart,
+          periodEnd: serviceOrders.periodEnd,
+        }).from(serviceOrders)
+          .where(eq(serviceOrders.campaignId, input.campaignId));
+        return results;
+      }),
+
+    myCampaignProofs: anuncianteProcedure
+      .input(z.object({ campaignId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const user = ctx.user;
+        if (!user || !user.clientId) return [];
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { campaignProofs, campaigns, restaurants } = await import("../drizzle/schema");
+        const { eq, and, asc } = await import("drizzle-orm");
+        const camp = await db.select({ id: campaigns.id }).from(campaigns)
+          .where(and(eq(campaigns.id, input.campaignId), eq(campaigns.clientId, user.clientId)))
+          .limit(1);
+        if (!camp.length) return [];
+        const results = await db.select({
+          id: campaignProofs.id,
+          week: campaignProofs.week,
+          photoUrl: campaignProofs.photoUrl,
+          restaurantId: campaignProofs.restaurantId,
+          restaurantName: restaurants.name,
+          createdAt: campaignProofs.createdAt,
+        }).from(campaignProofs)
+          .leftJoin(restaurants, eq(campaignProofs.restaurantId, restaurants.id))
+          .where(eq(campaignProofs.campaignId, input.campaignId))
+          .orderBy(asc(campaignProofs.week), asc(campaignProofs.createdAt));
+        return results;
+      }),
+
     updateProfile: anuncianteProcedure
       .input(z.object({
         contactEmail: z.string().optional(),
