@@ -145,7 +145,7 @@ export function CoasterPricingDialog({
       const dsc = (DESCONTOS_PRAZO[s] ?? 0) / 100;
       const pComDesc = pSemDesc * (1 - dsc);
       const pFinal = pComDesc * (1 + ajPag) * (1 - descParcPerc);
-      return { semanas: s, desconto: dsc, precoComDesconto: pComDesc, precoFinal: pFinal };
+      return { semanas: s, desconto: dsc, precoSemDesconto: pSemDesc, economia: pSemDesc - pComDesc, precoComDesconto: pComDesc, precoFinal: pFinal };
     });
 
     return {
@@ -334,8 +334,10 @@ export function CoasterPricingDialog({
                 <thead>
                   <tr className="bg-muted/40 border-b border-border/30">
                     <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Semanas</th>
-                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Desc. prazo</th>
-                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Preço final</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Preço s/ Desc.</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Desc.</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Economia</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Preço Final</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -354,8 +356,14 @@ export function CoasterPricingDialog({
                           · {row.semanas / 4}per.
                         </span>
                       </td>
+                      <td className="px-3 py-1.5 text-right font-mono text-muted-foreground">
+                        {fmtBRL(row.precoSemDesconto)}
+                      </td>
                       <td className="px-3 py-1.5 text-right text-emerald-600">
                         {row.desconto > 0 ? `−${fmtPct(row.desconto)}` : "—"}
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-mono text-emerald-600">
+                        {row.economia > 0 ? fmtBRL(row.economia) : "—"}
                       </td>
                       <td className="px-3 py-1.5 text-right font-mono">
                         {fmtBRL(row.precoFinal)}

@@ -221,7 +221,7 @@ function ClientQualificationCard({ client }: { client: ClientInfo }) {
 
 interface BudgetItemCardProps {
   item: BudgetItemState;
-  productsList: { id: number; name: string; tipo?: string | null; temDistribuicaoPorLocal?: boolean | null; pricingMode?: string | null; entryType?: string | null; defaultSemanas?: number | null }[];
+  productsList: { id: number; name: string; tipo?: string | null; temDistribuicaoPorLocal?: boolean | null; pricingMode?: string | null; entryType?: string | null; defaultSemanas?: number | null; irpj?: string | null; comRestaurante?: string | null; comComercial?: string | null }[];
   globalParams: GlobalBudgetParams;
   onUpdate: (id: string, patch: Partial<BudgetItemState>) => void;
   onRemove: (id: string) => void;
@@ -344,6 +344,11 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                   }
                   const pid = Number(v);
                   const prod = productsList.find((p) => p.id === pid);
+                  const prodPremissas: ItemPremissas = {
+                    irpj: parseFloat(prod?.irpj ?? "") || DEFAULT_PREMISSAS.irpj,
+                    comissaoRestaurante: parseFloat(prod?.comRestaurante ?? "") || DEFAULT_PREMISSAS.comissaoRestaurante,
+                    comissaoComercial: parseFloat(prod?.comComercial ?? "") || DEFAULT_PREMISSAS.comissaoComercial,
+                  };
                   onUpdate(item.id, {
                     productId: pid,
                     productName: prod?.name ?? "",
@@ -355,6 +360,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                     semanas: prod?.defaultSemanas ?? 12,
                     isCustomProduct: false,
                     customValues: undefined,
+                    premissas: prodPremissas,
                   });
                 }}
               >
@@ -752,7 +758,7 @@ export default function BudgetCreator() {
   const leadsList = useMemo(() => (leadsRaw as any[]) ?? [], [leadsRaw]);
 
   const { data: productsRaw } = trpc.product.list.useQuery();
-  const productsList = useMemo(() => (productsRaw ?? []) as { id: number; name: string; defaultSemanas?: number | null; tipo?: string | null; temDistribuicaoPorLocal?: boolean | null; pricingMode?: string | null; entryType?: string | null }[], [productsRaw]);
+  const productsList = useMemo(() => (productsRaw ?? []) as { id: number; name: string; defaultSemanas?: number | null; tipo?: string | null; temDistribuicaoPorLocal?: boolean | null; pricingMode?: string | null; entryType?: string | null; irpj?: string | null; comRestaurante?: string | null; comComercial?: string | null }[], [productsRaw]);
 
   const { data: partnersList = [] } = trpc.partner.list.useQuery();
 
