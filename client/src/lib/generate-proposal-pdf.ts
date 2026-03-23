@@ -696,56 +696,6 @@ export function generateProposalPdf(data: ProposalPDFData) {
     }
   }
 
-  if (data.restaurants.length > 0) {
-    y += 4;
-    y = checkPageBreak(doc, y, 60);
-    y = drawSectionTitle(doc, "REDE DE DISTRIBUIÇÃO", y, margin);
-
-    autoTable(doc, {
-      startY: y,
-      head: [["#", "Restaurante", "Bairro", `${(data.productUnitLabelPlural || "Bolachas").charAt(0).toUpperCase() + (data.productUnitLabelPlural || "Bolachas").slice(1)}/mês`]],
-      body: data.restaurants.map((r, i) => [
-        String(i + 1),
-        r.name,
-        r.neighborhood || "—",
-        fmtNumber(r.coasters),
-      ]),
-      foot: [[
-        "",
-        `${data.restaurants.length} restaurantes`,
-        "",
-        fmtNumber(data.restaurants.reduce((s, r) => s + r.coasters, 0)),
-      ]],
-      theme: "grid",
-      styles: {
-        font: FONT_NAME,
-      },
-      headStyles: {
-        fillColor: [...BLACK],
-        textColor: [...WHITE],
-        fontSize: 8,
-        fontStyle: "bold",
-        font: FONT_NAME,
-      },
-      bodyStyles: { fontSize: 8, textColor: [40, 40, 40], font: FONT_NAME },
-      footStyles: {
-        fillColor: [...LIGHT_GRAY],
-        textColor: [...BLACK],
-        fontSize: 8,
-        fontStyle: "bold",
-        font: FONT_NAME,
-      },
-      alternateRowStyles: { fillColor: [250, 250, 250] },
-      margin: { left: margin, right: margin },
-      columnStyles: {
-        0: { cellWidth: 12, halign: "center" },
-        3: { halign: "right", fontStyle: "bold" },
-      },
-    });
-
-    y = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y + 40;
-  }
-
   y += 10;
   y = checkPageBreak(doc, y, 75);
 
