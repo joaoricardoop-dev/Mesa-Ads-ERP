@@ -133,9 +133,7 @@ export function generatePriceTablePDF() {
   const irpj = 0.15;
   const comissaoRest = 0.15;
   const comissaoComercial = 0.10;
-  const varCosts = irpj + comissaoRest + comissaoComercial;
-
-  function getDenominator(m: number) { return 1 - m - varCosts; }
+  function getDenominatorBase(m: number) { return 1 - m - irpj - comissaoRest; }
   function fmtPct(n: number) { return `${(n * 100).toFixed(0)}%`; }
 
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -166,7 +164,7 @@ export function generatePriceTablePDF() {
   doc.text(`Margem: 50%→35% (escalonada)  |  IRPJ: 15%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%`, pageW - 150, 26);
   doc.setTextColor(...TEXT_GRAY);
   doc.setFontSize(8);
-  doc.text(`Preço = (Custo Produção + Frete) / (1 − margem − 40%)`, pageW - 150, 32);
+  doc.text(`Preço = [(Custo + Frete) / (1 − margem − 30%)] / (1 − 10%)`, pageW - 150, 32);
 
   function drawPriceTable(faces: number, startY: number) {
     const label = faces === 1 ? "1 FACE (frente)" : "2 FACES (frente e verso)";
@@ -188,8 +186,9 @@ export function generatePriceTablePDF() {
       const freight = getFreightForQty(qty);
       const totalCost = prodCost + freight;
       const totalCostUnit = totalCost / qty;
-      const denom = getDenominator(rowMargin);
-      const priceUnit = totalCostUnit / denom;
+      const denomBase = getDenominatorBase(rowMargin);
+      const priceUnitBase = denomBase > 0 ? totalCostUnit / denomBase : 0;
+      const priceUnit = comissaoComercial < 1 ? priceUnitBase / (1 - comissaoComercial) : 0;
       const total4 = priceUnit * qty;
       const lucro = total4 * rowMargin;
       const row = [
@@ -262,11 +261,12 @@ export function generatePriceTablePDF() {
   doc.text("EXEMPLO: 5.000 BOLACHAS, 1 FACE, 4 SEMANAS (MARGEM 40%)", 28, boxY + 7);
 
   const exMargin = 0.40;
-  const exDenom = getDenominator(exMargin);
+  const exDenomBase = getDenominatorBase(exMargin);
   const exProd = 0.2998 * 5000;
   const exFreight = FREIGHT_AZUL[5000];
   const exCostTotal = exProd + exFreight;
-  const exPriceUnit = (exCostTotal / 5000) / exDenom;
+  const exPriceUnitBase = exDenomBase > 0 ? (exCostTotal / 5000) / exDenomBase : 0;
+  const exPriceUnit = comissaoComercial < 1 ? exPriceUnitBase / (1 - comissaoComercial) : 0;
   const exTotal = exPriceUnit * 5000;
 
   const col1X = 28;
@@ -325,7 +325,7 @@ export function generatePriceTablePDF() {
   doc.text(`Margem: 50%→35% (escalonada)  |  IRPJ: 15%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%`, pageW - 150, 26);
   doc.setTextColor(...TEXT_GRAY);
   doc.setFontSize(8);
-  doc.text(`Preço = (Custo Produção × 2 + Frete) / (1 − margem − 40%)`, pageW - 150, 32);
+  doc.text(`Preço = [(Custo × 2 + Frete) / (1 − margem − 30%)] / (1 − 10%)`, pageW - 150, 32);
 
   drawPriceTable(2, 50);
   drawFooter(doc);
@@ -509,24 +509,16 @@ export function generatePriceTablePDF() {
   doc.setTextColor(...TEXT_GRAY);
   doc.text("2.", fmLeftX + 4, fmY + 2);
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text("Denominador = 1 − margem − 0,15 − 0,15 − 0,10", fmLeftX + 10, fmY + 2);
+  doc.text("Preço Base = Custo Base / (1 − margem − 0,15 − 0,15)", fmLeftX + 10, fmY + 2);
 
   fmY += 7;
-  doc.setTextColor(...TEXT_GRAY);
-  doc.text("", fmLeftX + 4, fmY + 2);
-  doc.setTextColor(...TEXT_LIGHT);
-  doc.setFontSize(7);
-  doc.text("1k→0,10  |  2k→0,12  |  3k→0,15  |  4k→0,17  |  5k→0,20  |  10k→0,23  |  20k→0,25", fmLeftX + 10, fmY + 2);
-  doc.setFontSize(8);
-
-  fmY += 7;
-  doc.setFont("helvetica", "normal");
   doc.setTextColor(...TEXT_GRAY);
   doc.text("3.", fmLeftX + 4, fmY + 2);
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text("Preço Unitário = Custo Base / qtd / denominador", fmLeftX + 10, fmY + 2);
+  doc.text("Preço Unit. = (Preço Base / qtd) / (1 − 0,10)", fmLeftX + 10, fmY + 2);
 
   fmY += 7;
+  doc.setFont("helvetica", "normal");
   doc.setTextColor(...TEXT_GRAY);
   doc.text("4.", fmLeftX + 4, fmY + 2);
   doc.setFont("helvetica", "bold");

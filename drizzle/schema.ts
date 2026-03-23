@@ -412,6 +412,7 @@ export type InsertQuotation = typeof quotations.$inferInsert;
 // ─── Partners (parceiros comerciais/agências) ────────────────────────────────
 
 export const partnerTypeEnum = pgEnum("partner_type", ["agencia", "indicador", "consultor"]);
+export const billingModeEnum = pgEnum("billing_mode", ["bruto", "liquido"]);
 
 export const partners = pgTable("partners", {
   id: serial("id").primaryKey(),
@@ -423,6 +424,7 @@ export const partners = pgTable("partners", {
   contactEmail: varchar("contactEmail", { length: 320 }),
   type: partnerTypeEnum("type").default("indicador").notNull(),
   commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("10.00").notNull(),
+  billingMode: billingModeEnum("billingMode").default("bruto").notNull(),
   status: statusEnum("status").default("active").notNull(),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

@@ -96,10 +96,12 @@ export function CoasterPricingDialog({
     const irpj = premissas.irpj / 100;
     const comRest = premissas.comissaoRestaurante / 100;
     const comCom = premissas.comissaoComercial / 100;
-    const denominador = 1 - dados.margem - irpj - comRest - comCom;
+    const denominador = 1 - dados.margem - irpj - comRest;
 
     const custoTotal4sem = dados.custoGPC * dados.artes * volume + dados.frete;
-    const precoTotalBase4sem = denominador > 0 ? custoTotal4sem / denominador : 0;
+    const precoTotalBase4sem = denominador > 0 && comCom < 1
+      ? (custoTotal4sem / denominador) / (1 - comCom)
+      : 0;
     const precoUnit4sem = volume > 0 ? precoTotalBase4sem / volume : 0;
 
     const smallestTier = tiers[0];
@@ -111,8 +113,8 @@ export function CoasterPricingDialog({
       const sm = parseFloat(smallestTier.margem) / 100;
       const sa = smallestTier.artes;
       const ct = sg * sa * sv + sf;
-      const den = 1 - sm - irpj - comRest - comCom;
-      return den > 0 ? ct / den / sv : 0;
+      const den = 1 - sm - irpj - comRest;
+      return den > 0 && comCom < 1 ? (ct / den) / (1 - comCom) / sv : 0;
     })();
 
     const descPrazo = (DESCONTOS_PRAZO[semanas] ?? 0) / 100;

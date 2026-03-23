@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { partners, leads, quotations, clients, users, leadInteractions, products, productPricingTiers } from "../drizzle/schema";
 import { eq, desc, and, sql, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { createCrmNotification } from "./notificationRouter";
 
 async function getDatabase() {
   const d = await getDb();
@@ -331,6 +332,7 @@ export const parceiroPortalRouter = router({
 
       return {
         commissionPercent: Number(partner.commissionPercent),
+        billingMode: partner.billingMode as "bruto" | "liquido",
         products: productsWithTiers,
       };
     }),
@@ -351,6 +353,127 @@ export const parceiroPortalRouter = router({
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Parceiro não encontrado." });
       return { commissionPercent: Number(updated.commissionPercent) };
+    }),
+
+  updateBillingMode: parceiroProcedure
+    .input(z.object({
+      billingMode: z.enum(["bruto", "liquido"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const partnerId = ctx.user.partnerId;
+      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+
+      const db = await getDatabase();
+      const [updated] = await db
+        .update(partners)
+        .set({ billingMode: input.billingMode, updatedAt: new Date() })
+        .where(eq(partners.id, partnerId))
+        .returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Parceiro não encontrado." });
+      return { billingMode: updated.billingMode as "bruto" | "liquido" };
+    }),
+
+  createQuotation: parceiroProcedure
+    .input(z.object({
+      leadId: z.number(),
+      productId: z.number(),
+      volume: z.number().int().min(1),
+      semanas: z.number().int().min(4),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const partnerId = ctx.user.partnerId;
+      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
+
+      const db = await getDatabase();
+
+      const [lead] = await db
+        .select()
+        .from(leads)
+        .where(and(eq(leads.id, input.leadId), eq(leads.partnerId, partnerId)))
+        .limit(1);
+      if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado ou sem permissão." });
+
+      const [product] = await db
+        .select()
+        .from(products)
+        .where(and(eq(products.id, input.productId), eq(products.visibleToPartners, true), eq(products.isActive, true)))
+        .limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado ou não disponível." });
+
+      const [partner] = await db.select().from(partners).where(eq(partners.id, partnerId)).limit(1);
+      if (!partner) throw new TRPCError({ code: "NOT_FOUND", message: "Parceiro não encontrado." });
+
+      const tiers = await db
+        .select()
+        .from(productPricingTiers)
+        .where(eq(productPricingTiers.productId, input.productId))
+        .orderBy(asc(productPricingTiers.volumeMin));
+
+      let matchedTier = tiers[0];
+      for (const t of tiers) {
+        if (input.volume >= t.volumeMin) matchedTier = t;
+      }
+      if (!matchedTier) throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhuma faixa de preço encontrada para o volume informado." });
+
+      const irpj = parseFloat(String(product.irpj ?? "6")) / 100;
+      const comRestaurante = parseFloat(String(product.comRestaurante ?? "0")) / 100;
+      const comComercial = Number(partner.commissionPercent) / 100;
+      const billingMode = (partner.billingMode ?? "bruto") as "bruto" | "liquido";
+      const denominadorBase = 1 - (parseFloat(String(matchedTier.margem)) / 100) - irpj - comRestaurante;
+      const custoTotal = parseFloat(String(matchedTier.custoUnitario)) * (matchedTier.artes ?? 1) * input.volume + parseFloat(String(matchedTier.frete));
+      const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
+      const precoTotal = billingMode === "bruto" && comComercial < 1 ? precoBase / (1 - comComercial) : precoBase;
+      const serverUnitPrice = input.volume > 0 ? precoTotal / input.volume : 0;
+
+      const DESCONTOS_PRAZO: Record<number, number> = {
+        4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11, 28: 13, 32: 15, 36: 17, 40: 19, 44: 21, 48: 23, 52: 25,
+      };
+      const cycles = Math.ceil(input.semanas / 4);
+      const dsc = (DESCONTOS_PRAZO[input.semanas] ?? 0) / 100;
+      const serverTotalValue = serverUnitPrice * input.volume * cycles * (1 - dsc);
+      const effectiveUnitPrice = input.volume > 0 && cycles > 0 ? serverTotalValue / (input.volume * cycles) : serverUnitPrice;
+
+      const entityName = lead.company || lead.name || "Lead";
+
+      const year = new Date().getFullYear();
+      const countResult = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(quotations)
+        .where(sql`"quotationNumber" LIKE ${'QOT-' + year + '-%'}`);
+      const seqNum = Number(countResult[0]?.count || 0) + 1;
+      const quotationNumber = `QOT-${year}-${String(seqNum).padStart(4, "0")}`;
+
+      const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+      const d = new Date();
+      const quotationName = `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()} | ${entityName} | ${input.volume.toLocaleString("pt-BR")} | ${product.name}`;
+
+      const billingLabel = billingMode === "bruto" ? "Fat. Bruto" : "Fat. Líquido";
+      const notesAuto = `Cotação criada pelo parceiro — ${product.name}: ${input.volume.toLocaleString("pt-BR")} un., ${input.semanas} semanas, ${billingLabel}`;
+
+      const [created] = await db.insert(quotations).values({
+        quotationNumber,
+        quotationName,
+        leadId: input.leadId,
+        coasterVolume: input.volume,
+        cycles,
+        unitPrice: effectiveUnitPrice.toFixed(4),
+        totalValue: serverTotalValue.toFixed(2),
+        includesProduction: true,
+        notes: input.notes ? `${notesAuto}\n${input.notes}` : notesAuto,
+        productId: input.productId,
+        partnerId,
+      }).returning();
+
+      const partnerLabel = partner?.name || `Parceiro #${partnerId}`;
+      await createCrmNotification(db, {
+        eventType: "quotation_created",
+        leadId: input.leadId,
+        partnerId,
+        message: `Cotação ${quotationNumber} criada por ${partnerLabel} para ${entityName} (${product.name})`,
+      });
+
+      return created;
     }),
 
   invitePartnerUser: adminProcedure

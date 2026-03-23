@@ -202,12 +202,14 @@ export default function PriceTable() {
     const comRest = premissas.comissaoRestaurante / 100;
     const comCom = premissas.comissaoComercial / 100;
     const totalDeducoesPerc = irpj + comRest + comCom;
-    const denominador = 1 - dados.margem - totalDeducoesPerc;
+    const denominador = 1 - dados.margem - irpj - comRest;
 
     const custoProducao = dados.custoGPC * dados.artes * volume;
     const custoTotal4sem = custoProducao + dados.frete;
 
-    const precoTotalBase4sem = denominador > 0 ? custoTotal4sem / denominador : 0;
+    const precoTotalBase4sem = denominador > 0 && comCom < 1
+      ? (custoTotal4sem / denominador) / (1 - comCom)
+      : 0;
     const precoUnit4sem = volume > 0 ? precoTotalBase4sem / volume : 0;
 
     const smallestVolume = volumes.length > 0 ? volumes[0] : 1000;
@@ -215,8 +217,8 @@ export default function PriceTable() {
       const d = custosVolume[smallestVolume];
       if (!d) return precoUnit4sem;
       const ct = d.custoGPC * d.artes * smallestVolume + d.frete;
-      const den = 1 - d.margem - totalDeducoesPerc;
-      return den > 0 ? ct / den / smallestVolume : 0;
+      const den = 1 - d.margem - irpj - comRest;
+      return den > 0 && comCom < 1 ? (ct / den) / (1 - comCom) / smallestVolume : 0;
     })();
     const descontoQuantidade = precoUnitSmallest > 0 && volume > smallestVolume ? 1 - (precoUnit4sem / precoUnitSmallest) : 0;
 

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Info, Package, Percent, Save, ChevronDown, ChevronRight } from "lucide-react";
+import { Info, Package, Percent, Save, ChevronDown, ChevronRight, Receipt } from "lucide-react";
 
 const SEMANAS_OPTIONS = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52];
 
@@ -29,11 +29,15 @@ function calcUnitPrice(params: {
   irpj: number;
   comRestaurante: number;
   comComercial: number;
+  billingMode?: "bruto" | "liquido";
 }) {
-  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercial } = params;
-  const denominador = 1 - margem - irpj - comRestaurante - comComercial;
+  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercial, billingMode = "bruto" } = params;
+  const denominadorBase = 1 - margem - irpj - comRestaurante;
   const custoTotal = custoUnitario * artes * volume + frete;
-  const precoTotal = denominador > 0 && custoTotal > 0 ? custoTotal / denominador : 0;
+  const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
+  const precoTotal = billingMode === "bruto" && comComercial < 1
+    ? precoBase / (1 - comComercial)
+    : precoBase;
   return volume > 0 ? precoTotal / volume : 0;
 }
 
@@ -51,9 +55,10 @@ function getPricingTierForVolume(tiers: any[], volume: number) {
 interface ProductTableProps {
   product: any;
   commissionPercent: number;
+  billingMode: "bruto" | "liquido";
 }
 
-function ProductTable({ product, commissionPercent }: ProductTableProps) {
+function ProductTable({ product, commissionPercent, billingMode }: ProductTableProps) {
   const [expanded, setExpanded] = useState(true);
   const tiers = product.tiers ?? [];
 
@@ -90,6 +95,7 @@ function ProductTable({ product, commissionPercent }: ProductTableProps) {
         irpj,
         comRestaurante,
         comComercial,
+        billingMode,
       })
     : 0;
 
@@ -135,6 +141,7 @@ function ProductTable({ product, commissionPercent }: ProductTableProps) {
                   irpj,
                   comRestaurante,
                   comComercial,
+                  billingMode,
                 });
                 const discountVol = baseUnitPrice > 0 && vol > smallestVol ? (1 - unitPrice4sem / baseUnitPrice) : 0;
 
@@ -181,14 +188,27 @@ export default function ParceiroTabelaPrecos() {
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
+  const updateBillingModeMutation = trpc.parceiroPortal.updateBillingMode.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Modo de faturamento atualizado para ${res.billingMode === "bruto" ? "Bruto" : "Líquido"}`);
+      refetch();
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
 
   const [localCommission, setLocalCommission] = useState<number | null>(null);
   const commissionPercent = localCommission ?? (data?.commissionPercent ?? 10);
   const hasUnsaved = localCommission !== null && localCommission !== data?.commissionPercent;
+  const billingMode: "bruto" | "liquido" = data?.billingMode ?? "bruto";
 
   const handleSaveCommission = () => {
     if (localCommission === null) return;
     updateCommissionMutation.mutate({ commissionPercent: localCommission });
+  };
+
+  const handleToggleBillingMode = () => {
+    const newMode = billingMode === "bruto" ? "liquido" : "bruto";
+    updateBillingModeMutation.mutate({ billingMode: newMode });
   };
 
   if (isLoading) {
@@ -260,6 +280,48 @@ export default function ParceiroTabelaPrecos() {
         </div>
       </div>
 
+      <div className="bg-card border border-border/30 rounded-xl p-5">
+        <div className="flex items-start gap-4 flex-wrap">
+          <div className="flex-1 min-w-64">
+            <div className="flex items-center gap-2 mb-1">
+              <Receipt className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Modo de Faturamento</span>
+              <Badge
+                variant="outline"
+                className={`font-mono text-xs ${billingMode === "bruto" ? "text-blue-400 border-blue-500/30 bg-blue-500/10" : "text-amber-400 border-amber-500/30 bg-amber-500/10"}`}
+              >
+                {billingMode === "bruto" ? "Bruto" : "Líquido"}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              {billingMode === "bruto"
+                ? "Faturamento Bruto: O cliente paga o valor total (incluindo sua comissão) para a Mesa Ads, que repassa sua comissão."
+                : "Faturamento Líquido: O cliente paga à Mesa Ads o valor sem comissão. Sua comissão é cobrada em fatura separada direto ao cliente."}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant={billingMode === "bruto" ? "default" : "outline"}
+                className={`gap-1.5 text-xs ${billingMode === "bruto" ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+                onClick={() => billingMode !== "bruto" && handleToggleBillingMode()}
+                disabled={updateBillingModeMutation.isPending}
+              >
+                Bruto
+              </Button>
+              <Button
+                size="sm"
+                variant={billingMode === "liquido" ? "default" : "outline"}
+                className={`gap-1.5 text-xs ${billingMode === "liquido" ? "bg-amber-600 hover:bg-amber-700" : ""}`}
+                onClick={() => billingMode !== "liquido" && handleToggleBillingMode()}
+                disabled={updateBillingModeMutation.isPending}
+              >
+                Líquido
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {products.length === 0 ? (
         <div className="bg-card border border-border/30 rounded-xl p-10 text-center text-muted-foreground text-sm">
           Nenhum produto disponível para visualização ainda.
@@ -273,6 +335,7 @@ export default function ParceiroTabelaPrecos() {
               key={product.id}
               product={product}
               commissionPercent={commissionPercent}
+              billingMode={billingMode}
             />
           ))}
         </div>
@@ -288,8 +351,13 @@ export default function ParceiroTabelaPrecos() {
         </p>
         <div className="bg-muted/20 rounded-lg p-3 font-mono text-xs space-y-1">
           <p><span className="text-muted-foreground">Custo total</span> = Custo GPC × Artes × Volume + Frete</p>
-          <p><span className="text-muted-foreground">Denominador</span> = 1 − Margem − IRPJ − Com. Restaurante − <span className="text-emerald-400">Com. Comercial ({commissionPercent}%)</span></p>
-          <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Custo total ÷ Denominador</p>
+          <p><span className="text-muted-foreground">Denominador base</span> = 1 − Margem − IRPJ − Com. Restaurante</p>
+          <p><span className="text-muted-foreground">Preço base (4 sem.)</span> = Custo total ÷ Denominador base</p>
+          {billingMode === "bruto" ? (
+            <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Preço base ÷ (1 − <span className="text-emerald-400">Com. Comercial ({commissionPercent}%)</span>)</p>
+          ) : (
+            <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Preço base <span className="text-amber-400">(sem gross-up — comissão faturada separadamente)</span></p>
+          )}
           <p><span className="text-muted-foreground">Preço unitário</span> = Preço total ÷ Volume</p>
         </div>
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-muted-foreground">

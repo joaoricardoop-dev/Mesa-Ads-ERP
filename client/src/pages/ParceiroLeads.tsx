@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import type { AppRouter } from "../../../server/routers";
@@ -8,11 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,11 +31,16 @@ import {
   Clock,
   Loader2,
   Users,
+  Rocket,
+  Package,
 } from "lucide-react";
 
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type LeadListItem = RouterOutput["parceiroPortal"]["getLeads"][number];
 type LeadDetail = RouterOutput["parceiroPortal"]["getLeadDetail"];
+type PriceTableOutput = RouterOutput["parceiroPortal"]["getPriceTable"];
+type PriceTableProduct = PriceTableOutput["products"][number];
+type PricingTier = PriceTableProduct["tiers"][number];
 type LeadDetailQuotation = LeadDetail["quotations"][number];
 type StageHistoryItem = LeadDetail["stageHistory"][number];
 
@@ -197,9 +204,265 @@ function InfoRow({
   );
 }
 
+const SEMANAS_OPTIONS = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52];
+
+const DESCONTOS_PRAZO: Record<number, number> = {
+  4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11, 28: 13, 32: 15, 36: 17, 40: 19, 44: 21, 48: 23, 52: 25,
+};
+
+function calcQuotationUnitPrice(params: {
+  custoUnitario: number;
+  frete: number;
+  margem: number;
+  artes: number;
+  volume: number;
+  irpj: number;
+  comRestaurante: number;
+  comComercial: number;
+  billingMode: "bruto" | "liquido";
+}) {
+  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercial, billingMode } = params;
+  const denominadorBase = 1 - margem - irpj - comRestaurante;
+  const custoTotal = custoUnitario * artes * volume + frete;
+  const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
+  const precoTotal = billingMode === "bruto" && comComercial < 1
+    ? precoBase / (1 - comComercial)
+    : precoBase;
+  return volume > 0 ? precoTotal / volume : 0;
+}
+
+function getPricingTierForVolume(tiers: PricingTier[], volume: number) {
+  if (!tiers || tiers.length === 0) return null;
+  const sorted = [...tiers].sort((a, b) => a.volumeMin - b.volumeMin);
+  let match = sorted[0];
+  for (const t of sorted) {
+    if (volume >= t.volumeMin) match = t;
+  }
+  return match;
+}
+
+function CreateQuotationDialog({
+  leadId,
+  leadName,
+  open,
+  onOpenChange,
+}: {
+  leadId: number;
+  leadName: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const adminPartnerId = (window as any).__IMPERSONATION__?.partnerId as number | undefined;
+  const { data: priceData } = trpc.parceiroPortal.getPriceTable.useQuery({ adminPartnerId });
+  const utils = trpc.useUtils();
+
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const [volume, setVolume] = useState<string>("1000");
+  const [semanas, setSemanas] = useState<number>(4);
+  const [notes, setNotes] = useState("");
+
+  const products = priceData?.products ?? [];
+  const commissionPercent = priceData?.commissionPercent ?? 10;
+  const billingMode = priceData?.billingMode ?? "bruto";
+  const comComercial = commissionPercent / 100;
+
+  const selectedProduct = useMemo(
+    () => products.find((p) => p.id === selectedProductId),
+    [products, selectedProductId]
+  );
+
+  const volumeNum = parseInt(volume, 10) || 0;
+
+  const pricing = useMemo(() => {
+    if (!selectedProduct || volumeNum <= 0) return null;
+    const tier = getPricingTierForVolume(selectedProduct.tiers ?? [], volumeNum);
+    if (!tier) return null;
+    const irpj = parseFloat(selectedProduct.irpj ?? "6") / 100;
+    const comRestaurante = parseFloat(selectedProduct.comRestaurante ?? "0") / 100;
+    const unitPrice = calcQuotationUnitPrice({
+      custoUnitario: parseFloat(tier.custoUnitario),
+      frete: parseFloat(tier.frete),
+      margem: parseFloat(tier.margem) / 100,
+      artes: tier.artes ?? 1,
+      volume: volumeNum,
+      irpj,
+      comRestaurante,
+      comComercial,
+      billingMode,
+    });
+    const cycles = Math.ceil(semanas / 4);
+    const dsc = (DESCONTOS_PRAZO[semanas] ?? 0) / 100;
+    const totalValue = unitPrice * volumeNum * cycles * (1 - dsc);
+    const effectiveUnitPrice = volumeNum > 0 && cycles > 0 ? totalValue / (volumeNum * cycles) : unitPrice;
+    return { unitPrice: effectiveUnitPrice, totalValue, cycles, discount: dsc };
+  }, [selectedProduct, volumeNum, semanas, comComercial, billingMode]);
+
+  const createMutation = trpc.parceiroPortal.createQuotation.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Cotação ${data.quotationNumber} criada com sucesso!`);
+      onOpenChange(false);
+      setSelectedProductId(null);
+      setVolume("1000");
+      setSemanas(4);
+      setNotes("");
+      utils.parceiroPortal.getLeadDetail.invalidate({ leadId });
+      utils.parceiroPortal.getLeads.invalidate();
+      utils.parceiroPortal.getDashboard.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleSubmit = () => {
+    if (!selectedProductId || !pricing || volumeNum <= 0) {
+      toast.error("Selecione um produto e informe o volume.");
+      return;
+    }
+    createMutation.mutate({
+      leadId,
+      productId: selectedProductId,
+      volume: volumeNum,
+      semanas,
+      notes: notes.trim() || undefined,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Rocket className="w-4 h-4 text-primary" />
+            Criar Cotação
+          </DialogTitle>
+          <DialogDescription>
+            Nova cotação para <strong>{leadName}</strong>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label className="text-xs">Produto</Label>
+            <Select
+              value={selectedProductId?.toString() ?? ""}
+              onValueChange={(v) => setSelectedProductId(Number(v))}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Selecione um produto" />
+              </SelectTrigger>
+              <SelectContent>
+                {products.map((p) => (
+                  <SelectItem key={p.id} value={p.id.toString()}>
+                    <span className="flex items-center gap-2">
+                      <Package className="w-3 h-3" />
+                      {p.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Volume (unidades)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={volume}
+                onChange={(e) => setVolume(e.target.value)}
+                className="mt-1 font-mono"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Duração (semanas)</Label>
+              <Select value={semanas.toString()} onValueChange={(v) => setSemanas(Number(v))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SEMANAS_OPTIONS.map((s) => (
+                    <SelectItem key={s} value={s.toString()}>
+                      {s} semanas ({Math.ceil(s / 4)} {Math.ceil(s / 4) === 1 ? "mês" : "meses"})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs">Observações (opcional)</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Informações adicionais para esta cotação..."
+              className="mt-1"
+              rows={2}
+            />
+          </div>
+
+          {pricing && (
+            <div className="bg-muted/20 border border-border/30 rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-2 mb-1">
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] ${billingMode === "bruto" ? "text-blue-400 border-blue-500/30 bg-blue-500/10" : "text-amber-400 border-amber-500/30 bg-amber-500/10"}`}
+                >
+                  {billingMode === "bruto" ? "Fat. Bruto" : "Fat. Líquido"}
+                </Badge>
+                <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                  Comissão {commissionPercent}%
+                </Badge>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <p className="text-muted-foreground">Preço Unitário</p>
+                  <p className="font-mono font-semibold">{formatCurrency(pricing.unitPrice)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Período</p>
+                  <p className="font-mono font-semibold">{pricing.cycles} {pricing.cycles === 1 ? "mês" : "meses"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Valor Total</p>
+                  <p className="font-mono font-semibold text-primary">{formatCurrency(pricing.totalValue)}</p>
+                </div>
+              </div>
+              {pricing.discount > 0 && (
+                <p className="text-[10px] text-emerald-400 mt-1">
+                  Desconto de prazo aplicado: {(pricing.discount * 100).toFixed(0)}%
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!selectedProductId || !pricing || createMutation.isPending}
+            className="gap-2"
+          >
+            {createMutation.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Rocket className="w-3.5 h-3.5" />
+            )}
+            Criar Cotação
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function LeadDetailPanel({ leadId, onClose }: { leadId: number; onClose: () => void }) {
   const adminPartnerId = (window as any).__IMPERSONATION__?.partnerId as number | undefined;
   const { data: lead, isLoading } = trpc.parceiroPortal.getLeadDetail.useQuery({ leadId, adminPartnerId });
+  const [quotationDialogOpen, setQuotationDialogOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -232,9 +495,19 @@ function LeadDetailPanel({ leadId, onClose }: { leadId: number; onClose: () => v
           </div>
           {lead.company && <p className="text-sm text-muted-foreground mt-0.5">{lead.company}</p>}
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setQuotationDialogOpen(true)}
+          >
+            <Rocket className="w-3.5 h-3.5" />
+            Criar Cotação
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -291,6 +564,13 @@ function LeadDetailPanel({ leadId, onClose }: { leadId: number; onClose: () => v
           Nenhuma cotação gerada para este lead ainda.
         </div>
       )}
+
+      <CreateQuotationDialog
+        leadId={leadId}
+        leadName={lead.company || lead.name}
+        open={quotationDialogOpen}
+        onOpenChange={setQuotationDialogOpen}
+      />
     </div>
   );
 }

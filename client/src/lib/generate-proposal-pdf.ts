@@ -90,8 +90,11 @@ function getTierForVolume(vol: number) {
 
 function calcUnitPriceFromTier(tier: typeof DEFAULT_CUSTOS_VOLUME[0], vol: number): number {
   const custoTotal = tier.custoGPC * tier.artes * vol + tier.frete;
-  const denominador = 1 - tier.margem - PRICING_DEDUCTIONS.irpj - PRICING_DEDUCTIONS.comRestaurante - PRICING_DEDUCTIONS.comComercial;
-  return denominador > 0 ? custoTotal / denominador / vol : 0;
+  const denominadorBase = 1 - tier.margem - PRICING_DEDUCTIONS.irpj - PRICING_DEDUCTIONS.comRestaurante;
+  const comCom = PRICING_DEDUCTIONS.comComercial;
+  const precoBase = denominadorBase > 0 ? custoTotal / denominadorBase : 0;
+  const precoTotal = comCom < 1 ? precoBase / (1 - comCom) : 0;
+  return vol > 0 ? precoTotal / vol : 0;
 }
 
 function getVexaUnitPrice1000(): number {
