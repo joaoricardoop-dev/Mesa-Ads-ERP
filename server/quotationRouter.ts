@@ -92,6 +92,15 @@ export const quotationRouter = router({
           isBonificada: quotations.isBonificada,
           hasPartnerDiscount: quotations.hasPartnerDiscount,
           productId: quotations.productId,
+          isCustomProduct: quotations.isCustomProduct,
+          customProductName: quotations.customProductName,
+          customProjectCost: quotations.customProjectCost,
+          customPricingMode: quotations.customPricingMode,
+          customMarginPercent: quotations.customMarginPercent,
+          customFinalPrice: quotations.customFinalPrice,
+          customRestaurantCommission: quotations.customRestaurantCommission,
+          customPartnerCommission: quotations.customPartnerCommission,
+          customSellerCommission: quotations.customSellerCommission,
           createdAt: quotations.createdAt,
           updatedAt: quotations.updatedAt,
           clientName: clients.name,
@@ -150,6 +159,15 @@ export const quotationRouter = router({
           isBonificada: quotations.isBonificada,
           hasPartnerDiscount: quotations.hasPartnerDiscount,
           productId: quotations.productId,
+          isCustomProduct: quotations.isCustomProduct,
+          customProductName: quotations.customProductName,
+          customProjectCost: quotations.customProjectCost,
+          customPricingMode: quotations.customPricingMode,
+          customMarginPercent: quotations.customMarginPercent,
+          customFinalPrice: quotations.customFinalPrice,
+          customRestaurantCommission: quotations.customRestaurantCommission,
+          customPartnerCommission: quotations.customPartnerCommission,
+          customSellerCommission: quotations.customSellerCommission,
           createdAt: quotations.createdAt,
           updatedAt: quotations.updatedAt,
           publicToken: quotations.publicToken,
@@ -187,7 +205,7 @@ export const quotationRouter = router({
     .input(z.object({
       clientId: z.number().optional(),
       leadId: z.number().optional(),
-      coasterVolume: z.number().int().min(1),
+      coasterVolume: z.number().int().min(0),
       manualDiscountPercent: z.string().optional(),
       networkProfile: z.string().optional(),
       regions: z.string().optional(),
@@ -200,14 +218,54 @@ export const quotationRouter = router({
       createdBy: z.string().optional(),
       isBonificada: z.boolean().optional(),
       hasPartnerDiscount: z.boolean().optional(),
-      productId: z.number(),
+      productId: z.number().optional().nullable(),
       partnerId: z.number().nullable().optional(),
+      isCustomProduct: z.boolean().optional(),
+      customProductName: z.string().optional(),
+      customProjectCost: z.string().optional(),
+      customPricingMode: z.string().optional(),
+      customMarginPercent: z.string().optional(),
+      customFinalPrice: z.string().optional(),
+      customRestaurantCommission: z.string().optional(),
+      customPartnerCommission: z.string().optional(),
+      customSellerCommission: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
 
       if (!input.clientId && !input.leadId) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Informe um cliente ou lead para a cotação" });
+      }
+
+      if (input.isCustomProduct) {
+        if (!input.customProductName?.trim()) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Nome do produto personalizado é obrigatório" });
+        }
+        const cost = parseFloat(input.customProjectCost || "0");
+        if (!cost || cost <= 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Custo do projeto deve ser maior que zero" });
+        }
+        const restComm = parseFloat(input.customRestaurantCommission || "0");
+        const partnerComm = parseFloat(input.customPartnerCommission || "0");
+        const sellerComm = parseFloat(input.customSellerCommission || "0");
+        if (restComm < 0 || partnerComm < 0 || sellerComm < 0 || restComm > 100 || partnerComm > 100 || sellerComm > 100) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Comissões devem estar entre 0% e 100%" });
+        }
+        if (input.customPricingMode === "margin") {
+          const margin = parseFloat(input.customMarginPercent || "0");
+          if (margin < 0 || margin > 100) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Margem deve estar entre 0% e 100%" });
+          }
+          const totalDeduct = restComm + partnerComm + sellerComm + margin;
+          if (totalDeduct >= 100) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Soma das comissões e margem deve ser menor que 100%" });
+          }
+        } else if (input.customPricingMode === "fixed_price") {
+          const fp = parseFloat(input.customFinalPrice || "0");
+          if (!fp || fp <= 0) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Preço final deve ser maior que zero" });
+          }
+        }
       }
 
       let entityName = "Lead";
@@ -223,20 +281,22 @@ export const quotationRouter = router({
       }
 
       let productName: string | undefined;
-      if (input.productId) {
+      if (input.isCustomProduct && input.customProductName) {
+        productName = input.customProductName;
+      } else if (input.productId) {
         const prod = await db.select().from(products).where(eq(products.id, input.productId)).limit(1);
         if (prod[0]) productName = prod[0].name;
       }
 
       const quotationNumber = await generateQuotationNumber(db);
-      const quotationName = generateQuotationName(entityName, input.coasterVolume, productName);
+      const quotationName = generateQuotationName(entityName, input.coasterVolume ?? 0, productName);
 
       const [created] = await db.insert(quotations).values({
         quotationNumber,
         quotationName,
         clientId: input.clientId ?? null,
         leadId: input.leadId ?? null,
-        coasterVolume: input.coasterVolume,
+        coasterVolume: input.coasterVolume ?? 0,
         manualDiscountPercent: input.manualDiscountPercent ?? "0",
         networkProfile: input.networkProfile,
         regions: input.regions,
@@ -249,8 +309,17 @@ export const quotationRouter = router({
         createdBy: input.createdBy,
         isBonificada: input.isBonificada ?? false,
         hasPartnerDiscount: input.hasPartnerDiscount ?? false,
-        productId: input.productId,
+        productId: input.productId ?? null,
         partnerId: input.partnerId ?? null,
+        isCustomProduct: input.isCustomProduct ?? false,
+        customProductName: input.customProductName,
+        customProjectCost: input.customProjectCost,
+        customPricingMode: input.customPricingMode,
+        customMarginPercent: input.customMarginPercent,
+        customFinalPrice: input.customFinalPrice,
+        customRestaurantCommission: input.customRestaurantCommission,
+        customPartnerCommission: input.customPartnerCommission,
+        customSellerCommission: input.customSellerCommission,
       }).returning();
 
       if (created.partnerId) {
@@ -283,7 +352,7 @@ export const quotationRouter = router({
     .input(z.object({
       id: z.number(),
       clientId: z.number().optional(),
-      coasterVolume: z.number().int().min(1).optional(),
+      coasterVolume: z.number().int().min(0).optional(),
       manualDiscountPercent: z.string().optional(),
       networkProfile: z.string().optional(),
       regions: z.string().optional(),
@@ -301,6 +370,15 @@ export const quotationRouter = router({
       partnerId: z.number().nullable().optional(),
       periodStart: z.string().nullable().optional(),
       batchWeeks: z.number().int().min(1).optional(),
+      isCustomProduct: z.boolean().optional(),
+      customProductName: z.string().optional().nullable(),
+      customProjectCost: z.string().optional().nullable(),
+      customPricingMode: z.string().optional().nullable(),
+      customMarginPercent: z.string().optional().nullable(),
+      customFinalPrice: z.string().optional().nullable(),
+      customRestaurantCommission: z.string().optional().nullable(),
+      customPartnerCommission: z.string().optional().nullable(),
+      customSellerCommission: z.string().optional().nullable(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -319,16 +397,20 @@ export const quotationRouter = router({
       const clientId = data.clientId ?? existing[0].clientId;
       const coasterVolume = data.coasterVolume ?? existing[0].coasterVolume;
       const productId = data.productId !== undefined ? data.productId : existing[0].productId;
+      const isCustomProduct = data.isCustomProduct !== undefined ? data.isCustomProduct : existing[0].isCustomProduct;
+      const customProductName = data.customProductName !== undefined ? data.customProductName : existing[0].customProductName;
 
-      if (data.clientId !== undefined || data.coasterVolume !== undefined || data.productId !== undefined) {
-        const client = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
-        const clientName = client[0]?.name || client[0]?.company || "Cliente";
+      if (data.clientId !== undefined || data.coasterVolume !== undefined || data.productId !== undefined || data.isCustomProduct !== undefined || data.customProductName !== undefined) {
+        const client = clientId ? await db.select().from(clients).where(eq(clients.id, clientId)).limit(1) : [];
+        const clientName = (client as any)[0]?.name || (client as any)[0]?.company || "Cliente";
         let productName: string | undefined;
-        if (productId) {
+        if (isCustomProduct && customProductName) {
+          productName = customProductName;
+        } else if (productId) {
           const prod = await db.select().from(products).where(eq(products.id, productId)).limit(1);
           if (prod[0]) productName = prod[0].name;
         }
-        (data as any).quotationName = generateQuotationName(clientName, coasterVolume, productName);
+        (data as any).quotationName = generateQuotationName(clientName, coasterVolume ?? 0, productName);
       }
 
       const [updated] = await db

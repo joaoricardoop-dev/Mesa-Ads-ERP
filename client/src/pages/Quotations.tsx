@@ -571,13 +571,26 @@ export default function Quotations() {
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {q.coasterVolume ? (
-                      <span>{q.coasterVolume.toLocaleString("pt-BR")} un.</span>
+                    {(q as any).isCustomProduct ? (
+                      <div>
+                        <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-violet-500 border-violet-500/30 bg-violet-500/10">
+                          Sob Medida
+                        </Badge>
+                        {q.productName && (
+                          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{q.productName}</p>
+                        )}
+                      </div>
                     ) : (
-                      <span className="text-muted-foreground/50 text-xs italic">—</span>
-                    )}
-                    {q.productName && (
-                      <p className="text-[10px] text-muted-foreground/70">{q.productName}</p>
+                      <>
+                        {q.coasterVolume ? (
+                          <span>{q.coasterVolume.toLocaleString("pt-BR")} un.</span>
+                        ) : (
+                          <span className="text-muted-foreground/50 text-xs italic">—</span>
+                        )}
+                        {q.productName && (
+                          <p className="text-[10px] text-muted-foreground/70">{q.productName}</p>
+                        )}
+                      </>
                     )}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">

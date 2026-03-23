@@ -134,6 +134,13 @@
       "when": 1774300000000,
       "tag": "0018_partner_product_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1774400000000,
+      "tag": "0019_custom_product_quotations",
+      "breakpoints": true
     }
   ]
 }

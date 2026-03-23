@@ -11,10 +11,11 @@ import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
 import { Separator } from "../components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group";
-import { Trash2, Plus, Calculator, RotateCcw, ExternalLink, Building2, Mail, Phone, MapPin, Tag } from "lucide-react";
+import { Trash2, Plus, Calculator, RotateCcw, ExternalLink, Building2, Mail, Phone, MapPin, Tag, PackagePlus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { BudgetPricingDialog, type PricingDialogImportResult } from "../components/BudgetPricingDialog";
 import { CoasterPricingDialog } from "../components/CoasterPricingDialog";
+import { CustomProductDialog, type CustomProductValues } from "../components/CustomProductDialog";
 import {
   calcItemPrice,
   calcBudgetTotals,
@@ -54,6 +55,8 @@ interface BudgetItemState {
   freeManualCost: number;
   semanas: number;
   premissas: ItemPremissas;
+  isCustomProduct?: boolean;
+  customValues?: CustomProductValues;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -229,6 +232,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
   const [pricingOpen, setPricingOpen] = useState(false);
+  const [customDialogOpen, setCustomDialogOpen] = useState(false);
 
   const selectedProduct = productsList.find((p) => p.id === item.productId);
   const isCoaster = selectedProduct?.temDistribuicaoPorLocal === true;
@@ -301,42 +305,85 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
             </div>
           </div>
 
-          <div>
-            <Select
-              value={item.productId ? String(item.productId) : ""}
-              onValueChange={(v) => {
-                const pid = Number(v);
-                const prod = productsList.find((p) => p.id === pid);
-                onUpdate(item.id, {
-                  productId: pid,
-                  productName: prod?.name ?? "",
-                  pricingMode: (prod?.pricingMode as "cost_based" | "price_based") ?? "cost_based",
-                  entryType: (prod?.entryType as "tiers" | "fixed_quantities") ?? "tiers",
-                  tiers: [],
-                  hasTiers: false,
-                  volumeIdx: 0,
-                  semanas: prod?.defaultSemanas ?? 12,
-                });
-              }}
-            >
-              <SelectTrigger className="h-9 text-sm">
-                <SelectValue placeholder="Selecionar produto..." />
-              </SelectTrigger>
-              <SelectContent>
-                {productsList.map((p) => (
-                  <SelectItem key={p.id} value={String(p.id)}>
-                    {p.name}
+          {item.isCustomProduct ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 p-3 bg-violet-50 dark:bg-violet-950/20 rounded-md border border-violet-200 dark:border-violet-800/40">
+                <PackagePlus className="h-4 w-4 text-violet-600 dark:text-violet-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-violet-800 dark:text-violet-200 truncate">
+                    {item.customValues?.customProductName || "Produto Personalizado"}
+                  </p>
+                  <p className="text-xs text-violet-600 dark:text-violet-400">Projeto Sob Medida</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-violet-600 hover:text-violet-700"
+                  onClick={() => setCustomDialogOpen(true)}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs text-muted-foreground"
+                onClick={() => onUpdate(item.id, { isCustomProduct: false, customValues: undefined, productId: null, productName: "" })}
+              >
+                Trocar por produto do catálogo
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <Select
+                value={item.productId ? String(item.productId) : ""}
+                onValueChange={(v) => {
+                  if (v === "__custom__") {
+                    setCustomDialogOpen(true);
+                    return;
+                  }
+                  const pid = Number(v);
+                  const prod = productsList.find((p) => p.id === pid);
+                  onUpdate(item.id, {
+                    productId: pid,
+                    productName: prod?.name ?? "",
+                    pricingMode: (prod?.pricingMode as "cost_based" | "price_based") ?? "cost_based",
+                    entryType: (prod?.entryType as "tiers" | "fixed_quantities") ?? "tiers",
+                    tiers: [],
+                    hasTiers: false,
+                    volumeIdx: 0,
+                    semanas: prod?.defaultSemanas ?? 12,
+                    isCustomProduct: false,
+                    customValues: undefined,
+                  });
+                }}
+              >
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Selecionar produto..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {productsList.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                  <Separator className="my-1" />
+                  <SelectItem value="__custom__" className="text-violet-600 dark:text-violet-400 font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <PackagePlus className="h-3.5 w-3.5" />
+                      Produto Personalizado (Sob Medida)
+                    </div>
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-          {item.productId && tiersLoading && (
+          {!item.isCustomProduct && item.productId && tiersLoading && (
             <p className="text-xs text-muted-foreground animate-pulse">Carregando entradas de preço...</p>
           )}
 
-          {item.productId && !tiersLoading && item.hasTiers && item.tiers.length > 0 && (
+          {!item.isCustomProduct && item.productId && !tiersLoading && item.hasTiers && item.tiers.length > 0 && (
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">
                 {isFixedQty ? "Quantidade" : "Faixa de volume"}
@@ -359,7 +406,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
             </div>
           )}
 
-          {item.productId && !tiersLoading && !item.hasTiers && !isPriceBased && (
+          {!item.isCustomProduct && item.productId && !tiersLoading && !item.hasTiers && !isPriceBased && (
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs text-muted-foreground mb-1 block">Quantidade</Label>
@@ -385,8 +432,42 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
             </div>
           )}
 
+          {/* Custom product summary strip */}
+          {item.isCustomProduct && item.customValues && (
+            <div className="bg-violet-50/60 dark:bg-violet-950/10 rounded-md p-3 space-y-1.5 text-xs border border-violet-200/60 dark:border-violet-800/30">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                <span className="text-muted-foreground">Custo do Projeto</span>
+                <span className="text-right font-mono">{fmtBRL(parseFloat(item.customValues.customProjectCost) || 0)}</span>
+                {item.customValues.customPricingMode === "margin" ? (
+                  <>
+                    <span className="text-muted-foreground">Margem</span>
+                    <span className="text-right font-mono">{item.customValues.customMarginPercent}%</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-muted-foreground">Preço Final</span>
+                    <span className="text-right font-mono">{fmtBRL(parseFloat(item.customValues.customFinalPrice) || 0)}</span>
+                  </>
+                )}
+                <span className="text-muted-foreground">Comissão Restaurante</span>
+                <span className="text-right font-mono">{item.customValues.customRestaurantCommission}%</span>
+                <span className="text-muted-foreground">Comissão Parceiro</span>
+                <span className="text-right font-mono">{item.customValues.customPartnerCommission}%</span>
+                <span className="text-muted-foreground">Comissão Vendedor</span>
+                <span className="text-right font-mono">{item.customValues.customSellerCommission}%</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between font-semibold">
+                <span className="text-muted-foreground">Valor Total</span>
+                <span className="text-violet-700 dark:text-violet-300">
+                  {fmtBRL(item.customValues.calculatedFinalPrice)}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Pricing result strip */}
-          {calc && pricingInput && (
+          {!item.isCustomProduct && calc && pricingInput && (
             <div className="bg-muted/40 rounded-md p-3 space-y-1.5 text-xs border border-border/30">
               {isPriceBased ? (
                 <>
@@ -450,7 +531,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
           )}
 
           {/* Abrir Precificador button — only for cost_based products */}
-          {item.productId && !tiersLoading && !isPriceBased && (
+          {!item.isCustomProduct && item.productId && !tiersLoading && !isPriceBased && (
             <Button
               variant="outline"
               size="sm"
@@ -476,6 +557,26 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
           onImport={handlePricingImport}
         />
       )}
+
+      <CustomProductDialog
+        open={customDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && !item.customValues) {
+            onUpdate(item.id, { isCustomProduct: false });
+          }
+          setCustomDialogOpen(open);
+        }}
+        initialValues={item.customValues}
+        onConfirm={(values) => {
+          onUpdate(item.id, {
+            isCustomProduct: true,
+            customValues: values,
+            productName: values.customProductName,
+            productId: null,
+          });
+          setCustomDialogOpen(false);
+        }}
+      />
       {pricingOpen && !isCoaster && (
         <BudgetPricingDialog
           open={pricingOpen}
@@ -717,7 +818,7 @@ export default function BudgetCreator() {
 
   const itemCalcs = useMemo(() => {
     return items
-      .filter((item) => item.productId !== null)
+      .filter((item) => item.productId !== null && !item.isCustomProduct)
       .flatMap((item) => {
         const input = getItemPricingInput(item);
         if (!input || input.volume <= 0) return [];
@@ -726,72 +827,120 @@ export default function BudgetCreator() {
       });
   }, [items]);
 
+  const customItems = useMemo(() => {
+    return items.filter((item) => item.isCustomProduct && item.customValues);
+  }, [items]);
+
   const totals = useMemo(
     () => calcBudgetTotals(itemCalcs.map((c) => c.calc) as ItemCalcResult[], globalParams),
     [itemCalcs, globalParams]
   );
+
+  const customTotalValue = useMemo(() => {
+    return customItems.reduce((sum, item) => {
+      return sum + (item.customValues?.calculatedFinalPrice ?? 0);
+    }, 0);
+  }, [customItems]);
 
   const handleGerarCotacao = useCallback(async () => {
     if (!clientId && !leadId) {
       toast.error("Selecione um cliente ou lead antes de gerar a cotação");
       return;
     }
-    if (itemCalcs.length === 0) {
+    const hasCustom = customItems.length > 0;
+    const hasRegular = itemCalcs.length > 0;
+    if (!hasCustom && !hasRegular) {
       toast.error("Adicione pelo menos um produto com volume definido");
+      return;
+    }
+    if (hasCustom && hasRegular) {
+      toast.error("Não é possível combinar produto personalizado com produtos do catálogo na mesma cotação. Crie cotações separadas.");
+      return;
+    }
+    if (customItems.length > 1) {
+      toast.error("Apenas um produto personalizado por cotação é permitido.");
       return;
     }
 
     setIsGenerating(true);
     try {
-      const totalVolume = itemCalcs.reduce((sum, c) => sum + c.input.volume, 0);
-      const firstProductId = itemCalcs[0].item.productId!;
-      const totalValue = isBonificada ? "0" : totals.total.toFixed(2);
+      if (hasCustom) {
+        const cv = customItems[0].customValues!;
+        const cvFinalPrice = cv.calculatedFinalPrice;
 
-      const quotation = await createQuotation.mutateAsync({
-        clientId: clientId ?? undefined,
-        leadId: leadId ?? undefined,
-        coasterVolume: totalVolume,
-        manualDiscountPercent: descontoManual > 0 ? String(descontoManual) : undefined,
-        cycles: Math.round((itemCalcs[0]?.item.semanas ?? 12) / 4),
-        totalValue,
-        notes: notes || undefined,
-        isBonificada,
-        hasPartnerDiscount: descontoParceiro,
-        productId: firstProductId,
-        partnerId: descontoParceiro ? partnerId : null,
-      });
+        const quotation = await createQuotation.mutateAsync({
+          clientId: clientId ?? undefined,
+          leadId: leadId ?? undefined,
+          coasterVolume: 0,
+          totalValue: isBonificada ? "0" : cvFinalPrice.toFixed(2),
+          notes: notes || undefined,
+          isBonificada,
+          hasPartnerDiscount: descontoParceiro,
+          partnerId: descontoParceiro ? partnerId : null,
+          isCustomProduct: true,
+          customProductName: cv.customProductName,
+          customProjectCost: cv.customProjectCost,
+          customPricingMode: cv.customPricingMode,
+          customMarginPercent: cv.customPricingMode === "margin" ? cv.customMarginPercent : undefined,
+          customFinalPrice: cv.customPricingMode === "fixed_price" ? cv.customFinalPrice : undefined,
+          customRestaurantCommission: cv.customRestaurantCommission,
+          customPartnerCommission: cv.customPartnerCommission,
+          customSellerCommission: cv.customSellerCommission,
+        });
 
-      // discountRatio applies the global payment + partner discounts to each item proportionally
-      const discountRatio = totals.subtotalPostDuration > 0 ? totals.total / totals.subtotalPostDuration : 1;
+        toast.success("Cotação gerada com sucesso!");
+        navigate(`/comercial/cotacoes/${quotation.id}`);
+      } else {
+        const totalVolume = itemCalcs.reduce((sum, c) => sum + c.input.volume, 0);
+        const firstProductId = itemCalcs[0].item.productId!;
+        const regularTotal = isBonificada ? 0 : totals.total;
+        const totalValue = (regularTotal + customTotalValue).toFixed(2);
 
-      for (const { item, input, calc } of itemCalcs) {
-        let unitPriceFinal: string;
-        if (isBonificada) {
-          unitPriceFinal = "0";
-        } else {
-          // Full per-unit price: total for this item (with duration discount) × global ratio ÷ volume
-          const itemTotal = calc.precoComDescDuracao * discountRatio;
-          const unitPrice = input.volume > 0 ? itemTotal / input.volume : 0;
-          unitPriceFinal = unitPrice.toFixed(4);
+        const quotation = await createQuotation.mutateAsync({
+          clientId: clientId ?? undefined,
+          leadId: leadId ?? undefined,
+          coasterVolume: totalVolume,
+          manualDiscountPercent: descontoManual > 0 ? String(descontoManual) : undefined,
+          cycles: Math.round((itemCalcs[0]?.item.semanas ?? 12) / 4),
+          totalValue: isBonificada ? "0" : totalValue,
+          notes: notes || undefined,
+          isBonificada,
+          hasPartnerDiscount: descontoParceiro,
+          productId: firstProductId,
+          partnerId: descontoParceiro ? partnerId : null,
+        });
+
+        // discountRatio applies the global payment + partner discounts to each item proportionally
+        const discountRatio = totals.subtotalPostDuration > 0 ? totals.total / totals.subtotalPostDuration : 1;
+
+        for (const { item, input, calc } of itemCalcs) {
+          let unitPriceFinal: string;
+          if (isBonificada) {
+            unitPriceFinal = "0";
+          } else {
+            const itemTotal = calc.precoComDescDuracao * discountRatio;
+            const unitPrice = input.volume > 0 ? itemTotal / input.volume : 0;
+            unitPriceFinal = unitPrice.toFixed(4);
+          }
+
+          await addItem.mutateAsync({
+            quotationId: quotation.id,
+            productId: item.productId!,
+            quantity: input.volume,
+            unitPrice: unitPriceFinal,
+            notes: `${item.productName} · ${item.semanas}sem`,
+          });
         }
 
-        await addItem.mutateAsync({
-          quotationId: quotation.id,
-          productId: item.productId!,
-          quantity: input.volume,
-          unitPrice: unitPriceFinal,
-          notes: `${item.productName} · ${item.semanas}sem`,
-        });
+        toast.success("Cotação gerada com sucesso!");
+        navigate(`/comercial/cotacoes/${quotation.id}`);
       }
-
-      toast.success("Cotação gerada com sucesso!");
-      navigate(`/comercial/cotacoes/${quotation.id}`);
     } catch (err: any) {
       toast.error(err?.message || "Erro ao gerar cotação");
     } finally {
       setIsGenerating(false);
     }
-  }, [clientId, leadId, itemCalcs, totals, descontoManual, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate]);
+  }, [clientId, leadId, itemCalcs, customItems, customTotalValue, totals, descontoManual, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

@@ -258,6 +258,15 @@ export default function QuotationDetail() {
         items: proposalItems,
         periodStart: (quotation as any).periodStart || undefined,
         batchWeeks: (quotation as any).batchWeeks ?? 4,
+        isCustomProduct: (quotation as any).isCustomProduct ?? false,
+        customProductName: (quotation as any).customProductName || undefined,
+        customProjectCost: (quotation as any).customProjectCost ? Number((quotation as any).customProjectCost) : undefined,
+        customPricingMode: (quotation as any).customPricingMode || undefined,
+        customMarginPercent: (quotation as any).customMarginPercent ? Number((quotation as any).customMarginPercent) : undefined,
+        customRestaurantCommission: (quotation as any).customRestaurantCommission ? Number((quotation as any).customRestaurantCommission) : undefined,
+        customPartnerCommission: (quotation as any).customPartnerCommission ? Number((quotation as any).customPartnerCommission) : undefined,
+        customSellerCommission: (quotation as any).customSellerCommission ? Number((quotation as any).customSellerCommission) : undefined,
+        customFinalPrice: (quotation as any).customFinalPrice ? Number((quotation as any).customFinalPrice) : undefined,
       });
       toast.success("PDF da proposta gerado!");
     } catch {
@@ -502,6 +511,54 @@ export default function QuotationDetail() {
                       </tr>
                     </tfoot>
                   </table>
+                ) : (quotation as any).isCustomProduct ? (
+                  <div className="px-4 py-4 space-y-1.5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        Projeto Sob Medida
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Nome do Projeto</span>
+                      <span className="font-medium">{(quotation as any).customProductName || quotation.productName || "—"}</span>
+                    </div>
+                    {(quotation as any).customProjectCost && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Custo do Projeto</span>
+                        <span className="font-mono">{formatCurrency(Number((quotation as any).customProjectCost))}</span>
+                      </div>
+                    )}
+                    {(quotation as any).customPricingMode === "margin" && (quotation as any).customMarginPercent && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Margem</span>
+                        <span className="font-mono">{Number((quotation as any).customMarginPercent).toFixed(1)}%</span>
+                      </div>
+                    )}
+                    {(quotation as any).customRestaurantCommission && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Comissão Restaurante</span>
+                        <span className="font-mono">{Number((quotation as any).customRestaurantCommission).toFixed(1)}%</span>
+                      </div>
+                    )}
+                    {(quotation as any).customPartnerCommission && Number((quotation as any).customPartnerCommission) > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Comissão Parceiro/Agência</span>
+                        <span className="font-mono">{Number((quotation as any).customPartnerCommission).toFixed(1)}%</span>
+                      </div>
+                    )}
+                    {(quotation as any).customSellerCommission && Number((quotation as any).customSellerCommission) > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Comissão Vendedor</span>
+                        <span className="font-mono">{Number((quotation as any).customSellerCommission).toFixed(1)}%</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm pt-1 border-t border-border/20 mt-2">
+                      <span className="text-muted-foreground">Valor Total</span>
+                      <span className={`font-mono font-bold ${quotation.isBonificada ? "text-amber-500" : "text-violet-600 dark:text-violet-400"}`}>
+                        {quotation.isBonificada ? "R$ 0,00 (Bonificada)" : quotation.totalValue ? formatCurrency(Number(quotation.totalValue)) : "—"}
+                      </span>
+                    </div>
+                  </div>
                 ) : (
                   <div className="px-4 py-4 space-y-1">
                     {quotation.productName && (

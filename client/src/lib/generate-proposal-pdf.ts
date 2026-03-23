@@ -41,6 +41,16 @@ interface ProposalPDFData {
   isBonificada?: boolean;
   periodStart?: string;
   batchWeeks?: number;
+  /** Custom product (Projeto Sob Medida) fields */
+  isCustomProduct?: boolean;
+  customProductName?: string;
+  customProjectCost?: number;
+  customPricingMode?: string;
+  customMarginPercent?: number;
+  customRestaurantCommission?: number;
+  customPartnerCommission?: number;
+  customSellerCommission?: number;
+  customFinalPrice?: number;
 }
 
 const FONT_NAME = "HostGrotesk";
@@ -249,6 +259,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
   const contentWidth = pageWidth - margin * 2;
 
   const isMultiProduct = !!(data.items && data.items.length > 0);
+  const isCustomProduct = data.isCustomProduct === true;
   const isBonificada = data.isBonificada === true;
 
   const numRest = data.numRestaurants > 0 ? data.numRestaurants : 1;
@@ -315,7 +326,32 @@ export function generateProposalPdf(data: ProposalPDFData) {
   y += 8;
 
   // ── SECTION: Service description / Products ──────────────────────────────
-  if (isMultiProduct) {
+  if (isCustomProduct) {
+    y = checkPageBreak(doc, y, 60);
+    y = drawSectionTitle(doc, "PROPOSTA DE PROJETO", y, margin);
+    const projName = data.customProductName || data.productName || "Projeto Sob Medida";
+    y = drawInfoRow(doc, "Projeto:", projName, y, margin);
+    if (data.customProjectCost) {
+      y = drawInfoRow(doc, "Custo do Projeto:", fmtCurrency(data.customProjectCost), y, margin);
+    }
+    if (data.customPricingMode === "margin" && data.customMarginPercent !== undefined) {
+      y = drawInfoRow(doc, "Margem:", `${data.customMarginPercent.toFixed(1)}%`, y, margin);
+    }
+    if (data.customRestaurantCommission !== undefined) {
+      y = drawInfoRow(doc, "Comissão Restaurante:", `${data.customRestaurantCommission.toFixed(1)}%`, y, margin);
+    }
+    if (data.customPartnerCommission !== undefined && data.customPartnerCommission > 0) {
+      y = drawInfoRow(doc, "Comissão Parceiro/Agência:", `${data.customPartnerCommission.toFixed(1)}%`, y, margin);
+    }
+    if (data.customSellerCommission !== undefined && data.customSellerCommission > 0) {
+      y = drawInfoRow(doc, "Comissão Vendedor:", `${data.customSellerCommission.toFixed(1)}%`, y, margin);
+    }
+    y += 4;
+    y = checkPageBreak(doc, y, 20);
+    y = drawSectionTitle(doc, "VALOR DO PROJETO", y, margin);
+    y = drawInfoRow(doc, "Valor Total:", isBonificada ? "R$ 0,00 (Bonificada)" : fmtCurrency(contractTotal), y, margin);
+    y += 8;
+  } else if (isMultiProduct) {
     // Multi-product layout: show a table of all budget items
     y = checkPageBreak(doc, y, 60);
     y = drawSectionTitle(doc, "PRODUTOS DO ORÇAMENTO", y, margin);
@@ -475,7 +511,21 @@ export function generateProposalPdf(data: ProposalPDFData) {
   y = checkPageBreak(doc, y, 70);
   y = drawSectionTitle(doc, "INVESTIMENTO", y, margin);
 
-  if (isMultiProduct) {
+  if (isCustomProduct) {
+    const boxH = 36;
+    y = checkPageBreak(doc, y, boxH + 10);
+    doc.setFillColor(...LIGHT_GRAY);
+    doc.roundedRect(margin, y, contentWidth, boxH, 3, 3, "F");
+    doc.setTextColor(...GRAY);
+    doc.setFontSize(9);
+    doc.setFont(FONT_NAME, "normal");
+    doc.text("Valor total desta proposta", margin + 10, y + 12);
+    doc.setTextColor(...GREEN);
+    doc.setFontSize(14);
+    doc.setFont(FONT_NAME, "bold");
+    doc.text(isBonificada ? "R$ 0,00" : fmtCurrency(contractTotal), pageWidth - margin - 10, y + 28, { align: "right" });
+    y += boxH + 10;
+  } else if (isMultiProduct) {
     const multiItems = data.items!;
     // Dynamic box height: 8 top pad + label row (12) + N item rows (10 each) + separator + total row (14) + 4 bottom pad
     const boxH = isBonificada
