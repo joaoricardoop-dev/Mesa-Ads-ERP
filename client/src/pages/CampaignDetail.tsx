@@ -256,7 +256,7 @@ export default function CampaignDetail() {
   const { data: restaurantsList = [] } = trpc.restaurant.list.useQuery();
   const { data: proofsList = [] } = trpc.campaign.getProofs.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignBatchList = [] } = trpc.batch.getCampaignBatches.useQuery({ campaignId }, { enabled: campaignId > 0 });
-  const { data: campaignInvoices = [], refetch: refetchInvoices } = trpc.financial.listInvoices.useQuery({ campaignId }, { enabled: campaignId > 0 });
+  const { data: campaignInvoices = [] } = trpc.financial.listInvoices.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignPayments = [] } = trpc.financial.listPayments.useQuery({ campaignId }, { enabled: campaignId > 0 });
 
   const uploadArtMutation = trpc.campaign.uploadArt.useMutation({
@@ -376,7 +376,8 @@ export default function CampaignDetail() {
 
   const createInvoiceMutation = trpc.financial.createInvoice.useMutation({
     onSuccess: () => {
-      refetchInvoices();
+      utils.financial.listInvoices.invalidate();
+      utils.financial.dashboard.invalidate();
       setIsInvoiceDialogOpen(false);
       setInvoiceAmount("");
       setInvoiceDueDate("");
