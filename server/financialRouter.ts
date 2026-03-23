@@ -565,7 +565,7 @@ export const financialRouter = router({
     const rows = await db
       .select({ id: campaigns.id, name: campaigns.name, clientId: campaigns.clientId, status: campaigns.status })
       .from(campaigns)
-      .where(inArray(campaigns.status, ["active", "quotation", "completed"]))
+      .where(inArray(campaigns.status, ["active", "quotation", "completed", "veiculacao", "executar", "producao", "transito", "paused"]))
       .orderBy(desc(campaigns.createdAt));
 
     const cliIds = uniqueIds(rows.map((r) => r.clientId));
