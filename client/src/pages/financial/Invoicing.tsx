@@ -141,14 +141,12 @@ export default function Invoicing() {
                 </Select>
                 {newCampaignId && (() => {
                   const camp = (campaignsForInvoice || []).find((c) => String(c.id) === newCampaignId);
-                  if (!camp) return null;
-                  const method = camp.quotationPaymentMethod === "pix" ? "Pix" : camp.quotationPaymentMethod === "cartao" ? "Cartão" : camp.quotationPaymentMethod === "boleto" ? "Boleto" : camp.quotationPaymentMethod || "—";
-                  if (!camp.invoiceAmount) return null;
+                  if (!camp || !camp.invoiceAmount) return null;
                   return (
                     <p className="text-xs text-muted-foreground mt-1">
                       {camp.cycles > 1
-                        ? `${camp.cycles}x de ${formatCurrency(camp.invoiceAmount)} · ${method}`
-                        : `À vista: ${formatCurrency(camp.invoiceAmount)} · ${method}`}
+                        ? `${camp.cycles}x de ${formatCurrency(camp.invoiceAmount)}`
+                        : `À vista: ${formatCurrency(camp.invoiceAmount)}`}
                     </p>
                   );
                 })()}

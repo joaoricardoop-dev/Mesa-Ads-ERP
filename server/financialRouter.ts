@@ -571,7 +571,6 @@ export const financialRouter = router({
         status: campaigns.status,
         quotationTotalValue: quotations.totalValue,
         quotationCycles: quotations.cycles,
-        quotationPaymentMethod: quotations.paymentMethod,
       })
       .from(campaigns)
       .leftJoin(quotations, eq(campaigns.quotationId, quotations.id))
@@ -590,7 +589,10 @@ export const financialRouter = router({
       const cycles = r.quotationCycles && r.quotationCycles > 0 ? r.quotationCycles : 1;
       const invoiceAmount = total !== null ? (total / cycles) : null;
       return {
-        ...r,
+        id: r.id,
+        name: r.name,
+        clientId: r.clientId,
+        status: r.status,
         clientName: clientMap[r.clientId] || "—",
         invoiceAmount,
         cycles,
