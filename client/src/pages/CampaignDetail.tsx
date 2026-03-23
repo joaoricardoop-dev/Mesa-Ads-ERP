@@ -474,8 +474,21 @@ export default function CampaignDetail() {
   const quotationTotalValue = (campaign as any).quotationTotalValue ? parseFloat((campaign as any).quotationTotalValue) : null;
   const hasQuotationRevenue = !campaign.isBonificada && quotationTotalValue && quotationTotalValue > 0;
 
-  // pBase uses original campaign params for production cost (batchCost was set for coastersPerRestaurant)
-  const pBase = calcCampaignPricing(campaign);
+  // Effective coasters per restaurant: prefer quotation volume over stored campaign value
+  // (campaign.coastersPerRestaurant may be the default 500 even when quotation specifies different volume)
+  const quotationCoasterVolume = (campaign as any).quotationCoasterVolume ? parseInt((campaign as any).quotationCoasterVolume) : null;
+  const effectiveCoastersPerRest: number = (() => {
+    if (quotationCoasterVolume && quotationCoasterVolume > 0 && campaign.activeRestaurants > 0) {
+      return Math.round(quotationCoasterVolume / campaign.activeRestaurants);
+    }
+    if (totalCoastersDistributed > 0 && restaurantsConfigured > 0) {
+      return Math.round(totalCoastersDistributed / restaurantsConfigured);
+    }
+    return campaign.coastersPerRestaurant;
+  })();
+
+  // pBase uses the effective per-restaurant coaster count for accurate production cost
+  const pBase = calcCampaignPricing({ ...campaign, coastersPerRestaurant: effectiveCoastersPerRest });
 
   let p: typeof pBase;
   if (hasQuotationRevenue) {

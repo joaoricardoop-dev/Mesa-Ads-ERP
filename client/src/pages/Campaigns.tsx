@@ -410,7 +410,11 @@ export default function Campaigns() {
   );
 
   function effectivePricing(c: typeof campaignsList[0]) {
-    const base = calcCampaignPricing(c);
+    const qVolume = (c as any).quotationCoasterVolume ? parseInt((c as any).quotationCoasterVolume) : null;
+    const effectiveCoastersPerRest = (qVolume && qVolume > 0 && c.activeRestaurants > 0)
+      ? Math.round(qVolume / c.activeRestaurants)
+      : c.coastersPerRestaurant;
+    const base = calcCampaignPricing({ ...c, coastersPerRestaurant: effectiveCoastersPerRest });
     const qTotal = (c as any).quotationTotalValue ? parseFloat((c as any).quotationTotalValue) : null;
     if (qTotal !== null && qTotal > 0) {
       const totalCostsContract = base.totalCosts * c.activeRestaurants * c.contractDuration;
