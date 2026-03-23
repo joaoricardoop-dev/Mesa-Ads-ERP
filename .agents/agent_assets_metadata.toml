@@ -6,3 +6,9 @@ id = "FzBKqv2NAFzcmqelaIcCI"
 uri = "file://backlog-mesa-ads.xlsx"
 type = "table"
 title = "Backlog Completo Mesa Ads — Fev a Mar 2026"
+
+[[outputs]]
+id = "OpSsWlU-_TLYuZY5_dcyj"
+uri = "file://proposta-unipar.pdf"
+type = "pdf"
+title = "Proposta Comercial — UNIPAR (QOT-2026-0005)"
