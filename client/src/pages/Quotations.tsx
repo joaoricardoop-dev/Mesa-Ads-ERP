@@ -157,6 +157,9 @@ interface QuotationForm {
   hasPartnerDiscount: boolean;
   productId: number | "";
   partnerId: number | "" | null;
+  periodStart: string;
+  batchWeeks: number;
+  editBatchIds: number[];
 }
 
 const emptyForm: QuotationForm = {
@@ -174,6 +177,9 @@ const emptyForm: QuotationForm = {
   hasPartnerDiscount: false,
   productId: "",
   partnerId: "",
+  periodStart: "",
+  batchWeeks: 4,
+  editBatchIds: [],
 };
 
 const STATUS_CONFIG: Record<QuotationStatus, { label: string; className: string }> = {
@@ -344,19 +350,35 @@ export default function Quotations() {
       partnerId: form.partnerId ? Number(form.partnerId) : null,
     };
 
+    const savePayload = {
+      ...payload,
+      periodStart: form.periodStart || null,
+      batchWeeks: form.batchWeeks || 4,
+    };
+
     if (editingId) {
-      updateMutation.mutate({ id: editingId, ...payload });
+      updateMutation.mutate({ id: editingId, ...savePayload });
     }
   };
 
   const handleEdit = (q: (typeof quotationsList)[0]) => {
     setEditingId(q.id);
+    const existingPeriodStart = (q as any).periodStart || "";
+    const existingCycles = q.cycles || 1;
+    let preselectedBatchIds: number[] = [];
+    if (existingPeriodStart && batchesList.length > 0) {
+      const sorted = [...batchesList].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+      const startIdx = sorted.findIndex((b: any) => b.startDate === existingPeriodStart);
+      if (startIdx >= 0) {
+        preselectedBatchIds = sorted.slice(startIdx, startIdx + existingCycles).map((b: any) => b.id);
+      }
+    }
     setForm({
       clientId: q.clientId,
       coasterVolume: q.coasterVolume,
       networkProfile: q.networkProfile || "",
       regions: q.regions || "",
-      cycles: q.cycles || 1,
+      cycles: existingCycles,
       unitPrice: q.unitPrice || "",
       totalValue: q.totalValue || "",
       includesProduction: q.includesProduction ?? true,
@@ -366,6 +388,9 @@ export default function Quotations() {
       hasPartnerDiscount: q.hasPartnerDiscount ?? false,
       productId: q.productId || "",
       partnerId: (q as any).partnerId || "",
+      periodStart: existingPeriodStart,
+      batchWeeks: (q as any).batchWeeks ?? 4,
+      editBatchIds: preselectedBatchIds,
     });
     setIsDialogOpen(true);
   };
@@ -831,6 +856,42 @@ export default function Quotations() {
                   className="bg-background border-border/30"
                 />
               </div>
+            </div>
+
+            <div className="grid gap-2">
+              <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Período de Veiculação</p>
+              <div className="bg-background border border-border/30 rounded-lg p-3 max-h-[200px] overflow-y-auto space-y-1">
+                {batchesList.map((batch: any) => (
+                  <label key={batch.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/30 cursor-pointer">
+                    <Checkbox
+                      checked={form.editBatchIds.includes(batch.id)}
+                      onCheckedChange={(checked) => {
+                        const newIds = checked
+                          ? [...form.editBatchIds, batch.id].sort((a, b) => a - b)
+                          : form.editBatchIds.filter(id => id !== batch.id);
+                        const selectedBatches = batchesList
+                          .filter((b: any) => newIds.includes(b.id))
+                          .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+                        const newPeriodStart = selectedBatches.length > 0 ? selectedBatches[0].startDate : "";
+                        const newCycles = selectedBatches.length || form.cycles;
+                        setForm({ ...form, editBatchIds: newIds, periodStart: newPeriodStart, cycles: newCycles, batchWeeks: 4 });
+                      }}
+                    />
+                    <span className="text-sm font-medium">{batch.name}</span>
+                    <span className="text-xs text-muted-foreground ml-1">{batch.startDate} — {batch.endDate}</span>
+                  </label>
+                ))}
+              </div>
+              {form.editBatchIds.length > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  {form.editBatchIds.length} batch(es) — Período: {(() => {
+                    const sel = batchesList
+                      .filter((b: any) => form.editBatchIds.includes(b.id))
+                      .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+                    return sel.length > 0 ? `${sel[0].startDate} a ${sel[sel.length - 1].endDate}` : "";
+                  })()}
+                </p>
+              )}
             </div>
 
             {editingId && (
