@@ -550,7 +550,7 @@ export default function Quotations() {
                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {search || statusFilter !== "all"
                     ? "Nenhuma cotação encontrada"
-                    : 'Nenhuma cotação cadastrada. Use o Simulador para criar uma nova cotação.'}
+                    : 'Nenhuma cotação cadastrada. Clique em "Novo Orçamento" para começar.'}
                 </TableCell>
               </TableRow>
             ) : (
