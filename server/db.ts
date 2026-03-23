@@ -16,6 +16,7 @@ import {
   budgets,
   budgetItems,
   products,
+  quotations,
   type InsertRestaurant,
   type InsertClient,
   type InsertCampaign,
@@ -183,13 +184,23 @@ export async function getCampaign(id: number) {
     .select({
       campaign: campaigns,
       productName: products.name,
+      quotationTotalValue: quotations.totalValue,
+      quotationCoasterVolume: quotations.coasterVolume,
+      quotationUnitPrice: quotations.unitPrice,
     })
     .from(campaigns)
     .leftJoin(products, eq(campaigns.productId, products.id))
+    .leftJoin(quotations, eq(campaigns.quotationId, quotations.id))
     .where(eq(campaigns.id, id))
     .limit(1);
   if (!result[0]) return undefined;
-  return { ...result[0].campaign, productName: result[0].productName };
+  return {
+    ...result[0].campaign,
+    productName: result[0].productName,
+    quotationTotalValue: result[0].quotationTotalValue,
+    quotationCoasterVolume: result[0].quotationCoasterVolume,
+    quotationUnitPrice: result[0].quotationUnitPrice,
+  };
 }
 
 export async function createCampaign(data: Omit<InsertCampaign, "id" | "createdAt" | "updatedAt">) {

@@ -464,20 +464,76 @@ export default function CampaignDetail() {
     );
   }
 
-  const p = calcCampaignPricing(campaign);
-  const client = clientsList.find((cl) => cl.id === campaign.clientId);
   const totalCoastersDistributed = campaignRestaurants.reduce((sum, r) => sum + r.coastersCount, 0);
+  const restaurantsConfigured = campaignRestaurants.length;
   const expectedTotalCoasters = campaign.batchSize > 0 ? campaign.batchSize : campaign.coastersPerRestaurant * campaign.activeRestaurants;
   const allocationPct = expectedTotalCoasters > 0 ? (totalCoastersDistributed / expectedTotalCoasters) * 100 : 0;
-  const restaurantsConfigured = campaignRestaurants.length;
   const restaurantsMissing = campaign.activeRestaurants - restaurantsConfigured;
+
+  // When a linked quotation has a totalValue, use it as the revenue source of truth
+  const quotationTotalValue = (campaign as any).quotationTotalValue ? parseFloat((campaign as any).quotationTotalValue) : null;
+  const hasQuotationRevenue = !campaign.isBonificada && quotationTotalValue && quotationTotalValue > 0;
+
+  // pBase uses original campaign params for production cost (batchCost was set for coastersPerRestaurant)
+  const pBase = calcCampaignPricing(campaign);
+
+  let p: typeof pBase;
+  if (hasQuotationRevenue) {
+    // Revenue source of truth = quotation's agreed total value
+    const contractRevenue = quotationTotalValue!;
+    const n = campaign.activeRestaurants || 1;
+    const monthlyRevenue = contractRevenue / (campaign.contractDuration || 1);
+    const sellingPricePerRest = monthlyRevenue / n;
+    // Commissions applied to actual agreed revenue
+    const restCommPerRest = sellingPricePerRest * (Number(campaign.restaurantCommission) / 100);
+    const sellerCommPerRest = sellingPricePerRest * (Number(campaign.sellerCommission) / 100);
+    const taxPerRest = sellingPricePerRest * (Number(campaign.taxRate) / 100);
+    // Production cost: use campaign's coastersPerRestaurant as originally modeled
+    const productionCostPerRest = pBase.productionCostPerRest;
+    const totalCostsPerRest = productionCostPerRest + restCommPerRest + sellerCommPerRest + taxPerRest;
+    const profitPerRest = sellingPricePerRest - totalCostsPerRest;
+    const totalRestComm = restCommPerRest * n;
+    const totalSellerComm = sellerCommPerRest * n;
+    const totalTax = taxPerRest * n;
+    const totalProductionCost = productionCostPerRest * n;
+    const totalCosts = totalCostsPerRest * n;
+    const monthlyProfit = profitPerRest * n;
+    const grossMargin = sellingPricePerRest > 0 ? (profitPerRest / sellingPricePerRest) * 100 : 0;
+    p = {
+      ...pBase,
+      sellingPricePerRest,
+      restCommPerRest,
+      sellerCommPerRest,
+      taxPerRest,
+      productionCostPerRest,
+      profitPerRest,
+      totalCostsPerRest,
+      totalRestComm,
+      totalSellerComm,
+      totalTax,
+      totalProductionCost,
+      totalCosts,
+      monthlyRevenue,
+      monthlyProfit,
+      contractRevenue,
+      contractProfit: monthlyProfit * campaign.contractDuration,
+      contractCosts: totalCosts * campaign.contractDuration,
+      grossMargin,
+      roi: totalCosts > 0 ? (monthlyProfit / totalCosts) * 100 : 0,
+      cpi: pBase.totalImpressions > 0 ? monthlyRevenue / pBase.totalImpressions : 0,
+    };
+  } else {
+    p = pBase;
+  }
+
+  const client = clientsList.find((cl) => cl.id === campaign.clientId);
 
   const costBreakdownData = [
     { name: "Produção", value: p.totalProductionCost, color: "#22c55e" },
     { name: "Com. Restaurante", value: p.totalRestComm, color: "#3b82f6" },
     { name: "Com. Vendedor", value: p.totalSellerComm, color: "#f59e0b" },
     { name: "Impostos", value: p.totalTax, color: "#ef4444" },
-    { name: "Lucro", value: p.monthlyProfit, color: "#8b5cf6" },
+    { name: "Lucro", value: Math.max(0, p.monthlyProfit), color: "#8b5cf6" },
   ];
 
   const perRestBarData = [
@@ -907,7 +963,7 @@ export default function CampaignDetail() {
                     <MiniStat label="Restaurantes" value={`${restaurantsConfigured}/${campaign.activeRestaurants}`}
                       warn={restaurantsMissing > 0}
                     />
-                    <MiniStat label="Coasters/Rest." value={campaign.coastersPerRestaurant.toLocaleString("pt-BR")} />
+                    <MiniStat label="Coasters/Rest." value={(restaurantsConfigured > 0 ? Math.round(totalCoastersDistributed / restaurantsConfigured) : campaign.coastersPerRestaurant).toLocaleString("pt-BR")} />
                     <MiniStat label="Total Coasters" value={expectedTotalCoasters.toLocaleString("pt-BR")} />
                     <MiniStat label="Alocação" value={`${allocationPct.toFixed(0)}%`} warn={allocationPct < 100} />
                   </div>
@@ -971,7 +1027,7 @@ export default function CampaignDetail() {
                 <ContractCard label="Contrato Total" value={formatCurrency(p.contractRevenue)} sub={batchCount > 0 ? `${batchCount} batch${batchCount > 1 ? "es" : ""} (${batchWeeks} semanas)` : `${campaign.contractDuration} meses`} />
                 <ContractCard label="Custos do Contrato" value={formatCurrency(p.contractCosts)} />
                 <ContractCard label="Lucro do Contrato" value={formatCurrency(p.contractProfit)} accent />
-                <ContractCard label="Coasters Total Contrato" value={(p.totalCoasters * campaign.contractDuration).toLocaleString("pt-BR")} sub="unidades" />
+                <ContractCard label="Coasters Total Contrato" value={(expectedTotalCoasters * campaign.contractDuration).toLocaleString("pt-BR")} sub="unidades" />
               </div>
             </TabsContent>
 
