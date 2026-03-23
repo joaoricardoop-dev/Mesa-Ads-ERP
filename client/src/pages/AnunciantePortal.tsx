@@ -104,8 +104,10 @@ const PIPELINE_STAGES: { key: string; label: string; icon: typeof CircleDot }[] 
 ];
 
 const STAGE_ORDER: Record<string, number> = {
-  briefing: 0, design: 1, aprovacao: 2, producao: 3, distribuicao: 4, veiculacao: 5,
-  inativa: 6, active: 5, completed: 6,
+  briefing: 0, design: 1, aprovacao: 2, producao: 3,
+  distribuicao: 4, transito: 4,
+  veiculacao: 5, executar: 5, active: 5,
+  inativa: 6, completed: 6,
 };
 
 function formatCurrency(value: string | number | null | undefined) {
@@ -151,10 +153,10 @@ function CampaignDetail({ campaign, onBack }: { campaign: any; onBack: () => voi
 
   const prodSO = serviceOrders.find(so => so.type === "producao");
   const distSO = serviceOrders.find(so => so.type === "distribuicao");
-  const freightSO = distSO ?? prodSO;
+  const freightSO = prodSO ?? distSO;
 
-  const showFreight = ["producao", "distribuicao"].includes(campaign.status);
-  const showProofs = ["veiculacao", "active", "inativa", "completed"].includes(campaign.status);
+  const showFreight = ["producao", "distribuicao", "transito"].includes(campaign.status);
+  const showProofs = ["veiculacao", "executar", "active", "inativa", "completed"].includes(campaign.status);
 
   const proofsByWeek = proofPhotos.reduce<Record<number, CampaignProof[]>>((acc, p) => {
     if (!acc[p.week]) acc[p.week] = [];
