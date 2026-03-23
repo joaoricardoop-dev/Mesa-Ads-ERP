@@ -109,6 +109,8 @@ export const quotationRouter = router({
           productUnitLabelPlural: products.unitLabelPlural,
           partnerId: quotations.partnerId,
           partnerName: partners.name,
+          periodStart: quotations.periodStart,
+          batchWeeks: quotations.batchWeeks,
         })
         .from(quotations)
         .leftJoin(clients, eq(quotations.clientId, clients.id))
@@ -167,6 +169,8 @@ export const quotationRouter = router({
           productUnitLabelPlural: products.unitLabelPlural,
           partnerId: quotations.partnerId,
           partnerName: partners.name,
+          periodStart: quotations.periodStart,
+          batchWeeks: quotations.batchWeeks,
         })
         .from(quotations)
         .leftJoin(clients, eq(quotations.clientId, clients.id))
