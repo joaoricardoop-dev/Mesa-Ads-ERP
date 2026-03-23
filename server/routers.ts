@@ -1475,6 +1475,52 @@ export const appRouter = router({
           veiculacaoEndDate: input.veiculacaoEndDate,
         } as any);
         await addCampaignHistory(input.id, "veiculacao_started", `Veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`);
+
+        try {
+          const campaign = await getCampaign(input.id);
+          if (campaign) {
+            const restaurantList = await getCampaignRestaurants(input.id);
+            if (restaurantList.length > 0) {
+              const { getDb: getDatabase } = await import("./db");
+              const db = await getDatabase();
+              if (db) {
+                const { quotations } = await import("../drizzle/schema");
+                const { eq } = await import("drizzle-orm");
+
+                let totalValue = 0;
+                if (campaign.quotationId) {
+                  const qRows = await db.select({ totalValue: quotations.totalValue }).from(quotations).where(eq(quotations.id, campaign.quotationId)).limit(1);
+                  totalValue = parseFloat(qRows[0]?.totalValue || "0");
+                }
+
+                const commissionRate = parseFloat(String(campaign.restaurantCommission || "20")) / 100;
+                const totalCoasters = restaurantList.reduce((sum: number, r: any) => sum + (r.coastersCount || 0), 0);
+                const referenceMonth = input.veiculacaoStartDate.slice(0, 7);
+                const paymentDueDate = new Date(new Date(input.veiculacaoEndDate).getTime() + 15 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+                for (const rest of restaurantList) {
+                  const share = totalCoasters > 0 ? (rest.coastersCount || 0) / totalCoasters : 1 / restaurantList.length;
+                  const amount = totalValue > 0
+                    ? (totalValue * commissionRate * share).toFixed(2)
+                    : (parseFloat(String(campaign.batchCost || "0")) * commissionRate * share).toFixed(2);
+
+                  await addRestaurantPayment({
+                    restaurantId: rest.restaurantId,
+                    campaignId: campaign.id,
+                    amount,
+                    referenceMonth,
+                    paymentDate: paymentDueDate,
+                    periodStart: input.veiculacaoStartDate,
+                    periodEnd: input.veiculacaoEndDate,
+                    status: "pending",
+                  });
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("[startVeiculacao] Failed to auto-create restaurant payments:", err);
+        }
       }),
 
     finalizeCampaign: operacoesProcedure

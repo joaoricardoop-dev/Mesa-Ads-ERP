@@ -1,7 +1,7 @@
 import { internalProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { serviceOrders, campaigns, clients, quotations, campaignHistory, products } from "../drizzle/schema";
+import { serviceOrders, campaigns, clients, quotations, campaignHistory, products, invoices } from "../drizzle/schema";
 import { eq, and, desc, sql, inArray, ilike } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -211,6 +211,24 @@ export const serviceOrderRouter = router({
             action: "created_from_quotation",
             details: `Campanha criada após assinatura da OS ${updated.orderNumber} (cotação ${q.quotationNumber})`,
           });
+
+          if (!q.isBonificada && q.totalValue && parseFloat(q.totalValue) > 0) {
+            const invYear = new Date().getFullYear();
+            const invCount = await db.select({ count: sql<number>`COUNT(*)` }).from(invoices).where(sql`"invoiceNumber" LIKE ${'FAT-' + invYear + '-%'}`);
+            const invSeq = Number(invCount[0]?.count || 0) + 1;
+            const invoiceNumber = `FAT-${invYear}-${String(invSeq).padStart(4, "0")}`;
+            const today = new Date().toISOString().split("T")[0];
+            const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+            await db.insert(invoices).values({
+              campaignId: campaign.id,
+              clientId: campaign.clientId,
+              invoiceNumber,
+              amount: q.totalValue,
+              issueDate: today,
+              dueDate,
+              status: "emitida",
+            });
+          }
 
           await db
             .update(quotations)

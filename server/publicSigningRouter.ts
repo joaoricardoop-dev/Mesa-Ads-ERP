@@ -1,7 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import { getDb } from "./db";
-import { quotations, clients, leads, serviceOrders, quotationRestaurants, activeRestaurants, campaigns, campaignHistory, campaignRestaurants, campaignBatches, campaignBatchAssignments } from "../drizzle/schema";
+import { quotations, clients, leads, serviceOrders, quotationRestaurants, activeRestaurants, campaigns, campaignHistory, campaignRestaurants, campaignBatches, campaignBatchAssignments, invoices } from "../drizzle/schema";
 import { eq, inArray, asc, sql } from "drizzle-orm";
 
 async function getDatabase() {
@@ -317,6 +317,28 @@ export function setupPublicSigningRoutes(app: express.Express) {
           updatedAt: new Date(),
         }).where(eq(serviceOrders.id, os[0].id));
       });
+
+      if (!isBonificada && campaignId > 0 && quotation[0].totalValue && parseFloat(quotation[0].totalValue) > 0) {
+        try {
+          const invYear = new Date().getFullYear();
+          const invCount = await db.select({ count: sql<number>`COUNT(*)` }).from(invoices).where(sql`"invoiceNumber" LIKE ${'FAT-' + invYear + '-%'}`);
+          const invSeq = Number(invCount[0]?.count || 0) + 1;
+          const invoiceNumber = `FAT-${invYear}-${String(invSeq).padStart(4, "0")}`;
+          const today = new Date().toISOString().split("T")[0];
+          const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+          await db.insert(invoices).values({
+            campaignId,
+            clientId: resolvedClientId,
+            invoiceNumber,
+            amount: quotation[0].totalValue,
+            issueDate: today,
+            dueDate,
+            status: "emitida",
+          });
+        } catch (err) {
+          console.warn("[publicSigning] Failed to auto-create invoice:", err);
+        }
+      }
 
       res.json({
         success: true,

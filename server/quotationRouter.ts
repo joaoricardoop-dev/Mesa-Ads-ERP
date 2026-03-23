@@ -1,7 +1,7 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers } from "../drizzle/schema";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, invoices } from "../drizzle/schema";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -42,6 +42,36 @@ async function generateCampaignNumber(db: any) {
     .where(sql`"campaignNumber" LIKE ${'CMP-' + year + '-%'}`);
   const seqNum = Number(countResult[0]?.count || 0) + 1;
   return `CMP-${year}-${String(seqNum).padStart(4, "0")}`;
+}
+
+async function generateInvoiceNumber(db: any) {
+  const year = new Date().getFullYear();
+  const countResult = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(invoices)
+    .where(sql`"invoiceNumber" LIKE ${'FAT-' + year + '-%'}`);
+  const seqNum = Number(countResult[0]?.count || 0) + 1;
+  return `FAT-${year}-${String(seqNum).padStart(4, "0")}`;
+}
+
+async function autoCreateInvoice(db: any, campaign: { id: number; clientId: number }, quotation: { totalValue: string | null; isBonificada: boolean | null }) {
+  if (quotation.isBonificada) return;
+  const amount = quotation.totalValue;
+  if (!amount || parseFloat(amount) <= 0) return;
+
+  const invoiceNumber = await generateInvoiceNumber(db);
+  const today = new Date().toISOString().split("T")[0];
+  const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+  await db.insert(invoices).values({
+    campaignId: campaign.id,
+    clientId: campaign.clientId,
+    invoiceNumber,
+    amount,
+    issueDate: today,
+    dueDate,
+    status: "emitida",
+  });
 }
 
 async function generateOSNumber(db: any) {
@@ -479,6 +509,8 @@ export const quotationRouter = router({
         details: `Campanha criada a partir da cotação ${quotation[0].quotationNumber}`,
       });
 
+      await autoCreateInvoice(db, { id: campaign.id, clientId: campaign.clientId }, { totalValue: quotation[0].totalValue, isBonificada: quotation[0].isBonificada });
+
       await db
         .update(quotations)
         .set({ status: "win", updatedAt: new Date() })
@@ -805,6 +837,8 @@ export const quotationRouter = router({
           }))
         );
       }
+
+      await autoCreateInvoice(db, { id: campaign.id, clientId: campaign.clientId }, { totalValue: quotation[0].totalValue, isBonificada: quotation[0].isBonificada });
 
       await db
         .update(quotations)
