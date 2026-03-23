@@ -11,6 +11,7 @@ import { clerkWebhookHandler } from "../clerkWebhook";
 import { setupRestaurantOnboardingRoutes } from "../restaurantOnboardingRouter";
 import { setupPublicSigningRoutes } from "../publicSigningRouter";
 import { setupPublicLogoUploadRoutes, setupAuthenticatedLogoUploadRoutes } from "../logoUploadRouter";
+import { runMigrations } from "../migrations";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -32,6 +33,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  await runMigrations();
+
   const app = express();
   const server = createServer(app);
   app.post(
