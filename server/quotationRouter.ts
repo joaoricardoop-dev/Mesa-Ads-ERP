@@ -131,6 +131,7 @@ export const quotationRouter = router({
           customRestaurantCommission: quotations.customRestaurantCommission,
           customPartnerCommission: quotations.customPartnerCommission,
           customSellerCommission: quotations.customSellerCommission,
+          agencyCommissionPercent: quotations.agencyCommissionPercent,
           createdAt: quotations.createdAt,
           updatedAt: quotations.updatedAt,
           clientName: clients.name,
@@ -198,6 +199,7 @@ export const quotationRouter = router({
           customRestaurantCommission: quotations.customRestaurantCommission,
           customPartnerCommission: quotations.customPartnerCommission,
           customSellerCommission: quotations.customSellerCommission,
+          agencyCommissionPercent: quotations.agencyCommissionPercent,
           createdAt: quotations.createdAt,
           updatedAt: quotations.updatedAt,
           publicToken: quotations.publicToken,
@@ -409,6 +411,7 @@ export const quotationRouter = router({
       customRestaurantCommission: z.string().optional().nullable(),
       customPartnerCommission: z.string().optional().nullable(),
       customSellerCommission: z.string().optional().nullable(),
+      agencyCommissionPercent: z.string().optional().nullable(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();

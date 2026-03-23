@@ -112,6 +112,7 @@ export default function QuotationDetail() {
     periodStart: "",
     batchWeeks: 4,
     editBatchIds: [] as number[],
+    agencyCommissionPercent: "",
   });
 
   const utils = trpc.useUtils();
@@ -195,6 +196,7 @@ export default function QuotationDetail() {
       periodStart: existingPeriodStart,
       batchWeeks: (quotation as any).batchWeeks ?? 4,
       editBatchIds: preselectedBatchIds,
+      agencyCommissionPercent: (quotation as any).agencyCommissionPercent ? String((quotation as any).agencyCommissionPercent) : "",
     });
     setEditOpen(true);
   };
@@ -291,6 +293,7 @@ export default function QuotationDetail() {
       isBonificada: editForm.isBonificada,
       periodStart: editForm.periodStart || null,
       batchWeeks: editForm.batchWeeks || 4,
+      agencyCommissionPercent: editForm.agencyCommissionPercent || null,
     });
   };
 
@@ -550,6 +553,12 @@ export default function QuotationDetail() {
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Comissão Vendedor</span>
                         <span className="font-mono">{Number((quotation as any).customSellerCommission).toFixed(1)}%</span>
+                      </div>
+                    )}
+                    {(quotation as any).agencyCommissionPercent && Number((quotation as any).agencyCommissionPercent) > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Comissão de Agência</span>
+                        <span className="font-mono text-amber-500">{Number((quotation as any).agencyCommissionPercent).toFixed(1)}%</span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm pt-1 border-t border-border/20 mt-2">
@@ -989,6 +998,23 @@ export default function QuotationDetail() {
                 <Label>Valor Total (R$)</Label>
                 <Input value={editForm.isBonificada ? "0.00" : editForm.totalValue} onChange={(e) => setEditForm({ ...editForm, totalValue: e.target.value })} placeholder="0.00" className="bg-background border-border/30" disabled={editForm.isBonificada} />
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Comissão de Agência (%)</Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  value={editForm.agencyCommissionPercent}
+                  onChange={(e) => setEditForm({ ...editForm, agencyCommissionPercent: e.target.value })}
+                  placeholder="Ex: 15"
+                  className="bg-background border-border/30 pr-8"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Comissão paga à agência parceira (apenas informativo)</p>
             </div>
             <div className="grid gap-2">
               <Label>Validade</Label>
