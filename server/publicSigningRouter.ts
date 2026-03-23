@@ -270,7 +270,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
           endDate: lastBatch.endDate,
           status: "producao",
           quotationId: quotation[0].id,
-          coastersPerRestaurant: 500,
+          coastersPerRestaurant: allocatedRestaurants.length > 0 ? Math.round(totalCoasters / allocatedRestaurants.length) : quotation[0].coasterVolume,
           usagePerDay: 3,
           daysPerMonth: 26,
           activeRestaurants: allocatedRestaurants.length,

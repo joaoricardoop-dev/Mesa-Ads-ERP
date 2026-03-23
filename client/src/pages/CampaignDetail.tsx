@@ -467,7 +467,7 @@ export default function CampaignDetail() {
   const p = calcCampaignPricing(campaign);
   const client = clientsList.find((cl) => cl.id === campaign.clientId);
   const totalCoastersDistributed = campaignRestaurants.reduce((sum, r) => sum + r.coastersCount, 0);
-  const expectedTotalCoasters = campaign.coastersPerRestaurant * campaign.activeRestaurants;
+  const expectedTotalCoasters = campaign.batchSize > 0 ? campaign.batchSize : campaign.coastersPerRestaurant * campaign.activeRestaurants;
   const allocationPct = expectedTotalCoasters > 0 ? (totalCoastersDistributed / expectedTotalCoasters) * 100 : 0;
   const restaurantsConfigured = campaignRestaurants.length;
   const restaurantsMissing = campaign.activeRestaurants - restaurantsConfigured;
@@ -682,7 +682,7 @@ export default function CampaignDetail() {
                 </div>
               )}
               <div className="text-xs text-muted-foreground">
-                Volume: <strong className="text-foreground">{(campaign.coastersPerRestaurant * campaign.activeRestaurants).toLocaleString("pt-BR")}</strong> coasters
+                Volume: <strong className="text-foreground">{expectedTotalCoasters.toLocaleString("pt-BR")}</strong> coasters
               </div>
             </div>
           )}
@@ -908,7 +908,7 @@ export default function CampaignDetail() {
                       warn={restaurantsMissing > 0}
                     />
                     <MiniStat label="Coasters/Rest." value={campaign.coastersPerRestaurant.toLocaleString("pt-BR")} />
-                    <MiniStat label="Total Coasters" value={p.totalCoasters.toLocaleString("pt-BR")} />
+                    <MiniStat label="Total Coasters" value={expectedTotalCoasters.toLocaleString("pt-BR")} />
                     <MiniStat label="Alocação" value={`${allocationPct.toFixed(0)}%`} warn={allocationPct < 100} />
                   </div>
                 </div>
