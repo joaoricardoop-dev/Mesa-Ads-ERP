@@ -1020,10 +1020,10 @@ export default function BudgetCreator() {
                   <Input
                     type="number"
                     min={0}
-                    max={100}
+                    max={20}
                     step={0.5}
                     value={descontoManual || ""}
-                    onChange={(e) => setDescontoManual(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                    onChange={(e) => setDescontoManual(Math.min(20, Math.max(0, parseFloat(e.target.value) || 0)))}
                     className="h-9 text-sm"
                     placeholder="0"
                   />

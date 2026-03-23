@@ -339,7 +339,7 @@ export const parceiroPortalRouter = router({
 
   updateCommission: parceiroProcedure
     .input(z.object({
-      commissionPercent: z.number().min(10).max(20),
+      commissionPercent: z.number().min(0).max(20),
     }))
     .mutation(async ({ ctx, input }) => {
       const partnerId = ctx.user.partnerId;

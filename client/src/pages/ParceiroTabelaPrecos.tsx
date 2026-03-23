@@ -254,12 +254,12 @@ export default function ParceiroTabelaPrecos() {
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mb-4">
-              Ajuste sua comissão entre 10% e 20%. Ao salvar, os preços são recalculados e o valor é salvo no seu perfil.
+              Ajuste sua comissão entre 0% e 20%. Ao salvar, os preços são recalculados e o valor é salvo no seu perfil.
             </p>
             <div className="flex items-center gap-4">
-              <span className="text-xs text-muted-foreground w-8">10%</span>
+              <span className="text-xs text-muted-foreground w-8">0%</span>
               <Slider
-                min={10}
+                min={0}
                 max={20}
                 step={0.5}
                 value={[commissionPercent]}
