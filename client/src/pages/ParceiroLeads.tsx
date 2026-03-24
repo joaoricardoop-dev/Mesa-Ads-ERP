@@ -41,6 +41,7 @@ type LeadDetail = RouterOutput["parceiroPortal"]["getLeadDetail"];
 type PriceTableOutput = RouterOutput["parceiroPortal"]["getPriceTable"];
 type PriceTableProduct = PriceTableOutput["products"][number];
 type PricingTier = PriceTableProduct["tiers"][number];
+type PriceDiscountTier = PriceTableProduct["discountTiers"][number];
 type LeadDetailQuotation = LeadDetail["quotations"][number];
 type StageHistoryItem = LeadDetail["stageHistory"][number];
 
@@ -306,10 +307,18 @@ function CreateQuotationDialog({
       precoBaseTier: parseFloat(tier.precoBase ?? "0"),
     });
     const cycles = Math.ceil(semanas / 4);
+    // Gross total before discounts
+    const precoBruto = unitPrice * volumeNum * cycles;
+    // Faixa discount applied on bruto first
+    const discountTiersList: PriceDiscountTier[] = selectedProduct.discountTiers ?? [];
+    const faixaTier = discountTiersList.find((t) => precoBruto >= parseFloat(String(t.priceMin)) && precoBruto <= parseFloat(String(t.priceMax)));
+    const descFaixaPerc = faixaTier ? parseFloat(String(faixaTier.discountPercent)) / 100 : 0;
+    const precoPosFaixa = precoBruto * (1 - descFaixaPerc);
+    // Then prazo discount
     const dsc = (DESCONTOS_PRAZO[semanas] ?? 0) / 100;
-    const totalValue = unitPrice * volumeNum * cycles * (1 - dsc);
+    const totalValue = precoPosFaixa * (1 - dsc);
     const effectiveUnitPrice = volumeNum > 0 && cycles > 0 ? totalValue / (volumeNum * cycles) : unitPrice;
-    return { unitPrice: effectiveUnitPrice, totalValue, cycles, discount: dsc };
+    return { unitPrice: effectiveUnitPrice, totalValue, cycles, discount: dsc, descFaixaPerc };
   }, [selectedProduct, volumeNum, semanas, comComercial, billingMode]);
 
   const createMutation = trpc.parceiroPortal.createQuotation.useMutation({
@@ -443,10 +452,19 @@ function CreateQuotationDialog({
                   <p className="font-mono font-semibold text-primary">{formatCurrency(pricing.totalValue)}</p>
                 </div>
               </div>
-              {pricing.discount > 0 && (
-                <p className="text-[10px] text-emerald-400 mt-1">
-                  Desconto de prazo aplicado: {(pricing.discount * 100).toFixed(0)}%
-                </p>
+              {(pricing.descFaixaPerc > 0 || pricing.discount > 0) && (
+                <div className="space-y-0.5 mt-1">
+                  {pricing.descFaixaPerc > 0 && (
+                    <p className="text-[10px] text-amber-400">
+                      Desconto por faixa de preço: {(pricing.descFaixaPerc * 100).toFixed(0)}%
+                    </p>
+                  )}
+                  {pricing.discount > 0 && (
+                    <p className="text-[10px] text-emerald-400">
+                      Desconto de prazo: {(pricing.discount * 100).toFixed(0)}%
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           )}

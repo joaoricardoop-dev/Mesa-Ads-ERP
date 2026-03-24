@@ -29,6 +29,7 @@ export interface ItemPricingInput {
   semanas: number;
   premissas: ItemPremissas;
   precoBase?: number;
+  discountPriceTiers?: DiscountPriceTier[];
 }
 
 /** Parâmetros globais que se aplicam ao orçamento inteiro */
@@ -39,6 +40,12 @@ export interface GlobalBudgetParams {
   descontoManualPercent: number;
 }
 
+export interface DiscountPriceTier {
+  priceMin: number;
+  priceMax: number;
+  discountPercent: number;
+}
+
 export interface ItemCalcResult {
   denominador: number;
   custoTotal4sem: number;
@@ -47,6 +54,8 @@ export interface ItemCalcResult {
   nPeriodos: number;
   custoPorUnidade: number;
   precoSemDesconto: number;
+  descFaixaPrecoPerc: number;
+  descFaixaPrecoVal: number;
   descPrazoPerc: number;
   descPrazoVal: number;
   precoComDescDuracao: number;
@@ -68,8 +77,16 @@ export interface BudgetTotals {
 
 // ─── Calculation ───────────────────────────────────────────────────────────────
 
+function applyDiscountPriceTier(price: number, tiers?: DiscountPriceTier[]): { perc: number; val: number } {
+  if (!tiers || tiers.length === 0) return { perc: 0, val: 0 };
+  const tier = tiers.find(t => price >= t.priceMin && price <= t.priceMax);
+  if (!tier) return { perc: 0, val: 0 };
+  const perc = tier.discountPercent / 100;
+  return { perc, val: price * perc };
+}
+
 export function calcItemPrice(input: ItemPricingInput): ItemCalcResult {
-  const { volume, custoUnitario, frete, margem, artes, semanas, premissas, precoBase } = input;
+  const { volume, custoUnitario, frete, margem, artes, semanas, premissas, precoBase, discountPriceTiers } = input;
   const irpj = premissas.irpj / 100;
   const comRest = premissas.comissaoRestaurante / 100;
   const comCom = premissas.comissaoComercial / 100;
@@ -79,9 +96,12 @@ export function calcItemPrice(input: ItemPricingInput): ItemCalcResult {
   if (isPriceBased) {
     const nPeriodos = semanas / 4;
     const precoSemDesconto = precoBase * nPeriodos;
+    // Faixa discount applied on gross bruto amount (before prazo)
+    const { perc: descFaixaPrecoPerc, val: descFaixaPrecoVal } = applyDiscountPriceTier(precoSemDesconto, discountPriceTiers);
+    const precoPosFaixa = precoSemDesconto - descFaixaPrecoVal;
     const descPrazoPerc = (DESCONTOS_PRAZO[semanas] ?? 0) / 100;
-    const descPrazoVal = precoSemDesconto * descPrazoPerc;
-    const precoComDescDuracao = precoSemDesconto - descPrazoVal;
+    const descPrazoVal = precoPosFaixa * descPrazoPerc;
+    const precoComDescDuracao = precoPosFaixa - descPrazoVal;
     const precoUnit4sem = volume > 0 ? precoBase / volume : 0;
     const receitaLiquidaGPC = precoBase * (1 - irpj - comRest - comCom);
 
@@ -93,6 +113,8 @@ export function calcItemPrice(input: ItemPricingInput): ItemCalcResult {
       nPeriodos,
       custoPorUnidade: 0,
       precoSemDesconto,
+      descFaixaPrecoPerc,
+      descFaixaPrecoVal,
       descPrazoPerc,
       descPrazoVal,
       precoComDescDuracao,
@@ -112,9 +134,12 @@ export function calcItemPrice(input: ItemPricingInput): ItemCalcResult {
   const nPeriodos = semanas / 4;
   const precoSemDesconto = precoTotalBase4sem * nPeriodos;
 
+  // Faixa discount applied on gross bruto amount (before prazo)
+  const { perc: descFaixaPrecoPerc, val: descFaixaPrecoVal } = applyDiscountPriceTier(precoSemDesconto, discountPriceTiers);
+  const precoPosFaixa = precoSemDesconto - descFaixaPrecoVal;
   const descPrazoPerc = (DESCONTOS_PRAZO[semanas] ?? 0) / 100;
-  const descPrazoVal = precoSemDesconto * descPrazoPerc;
-  const precoComDescDuracao = precoSemDesconto - descPrazoVal;
+  const descPrazoVal = precoPosFaixa * descPrazoPerc;
+  const precoComDescDuracao = precoPosFaixa - descPrazoVal;
   const custoPorUnidade = volume > 0 ? custoTotal4sem / volume : 0;
 
   return {
@@ -125,6 +150,8 @@ export function calcItemPrice(input: ItemPricingInput): ItemCalcResult {
     nPeriodos,
     custoPorUnidade,
     precoSemDesconto,
+    descFaixaPrecoPerc,
+    descFaixaPrecoVal,
     descPrazoPerc,
     descPrazoVal,
     precoComDescDuracao,

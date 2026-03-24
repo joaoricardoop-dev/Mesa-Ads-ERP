@@ -1,7 +1,7 @@
 import { protectedProcedure, adminProcedure, internalProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { products, productPricingTiers } from "../drizzle/schema";
+import { products, productPricingTiers, productDiscountPriceTiers } from "../drizzle/schema";
 import { eq, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -164,5 +164,63 @@ export const productRouter = router({
       return db.select().from(productPricingTiers)
         .where(eq(productPricingTiers.productId, input.productId))
         .orderBy(asc(productPricingTiers.volumeMin));
+    }),
+
+  // ── Product Discount Price Tiers CRUD ────────────────────────────────────────
+
+  listDiscountTiers: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      return db.select().from(productDiscountPriceTiers)
+        .where(eq(productDiscountPriceTiers.productId, input.productId))
+        .orderBy(asc(productDiscountPriceTiers.priceMin));
+    }),
+
+  upsertDiscountTiers: internalProcedure
+    .input(z.object({
+      productId: z.number(),
+      tiers: z.array(z.object({
+        priceMin: z.string(),
+        priceMax: z.string(),
+        discountPercent: z.string(),
+      })),
+    }))
+    .mutation(async ({ input }) => {
+      for (const t of input.tiers) {
+        const min = parseFloat(t.priceMin);
+        const max = parseFloat(t.priceMax);
+        const disc = parseFloat(t.discountPercent);
+        if (isNaN(min) || isNaN(max) || isNaN(disc))
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Valores de faixa inválidos." });
+        if (min < 0 || max < 0)
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Preço mínimo e máximo devem ser positivos." });
+        if (min >= max)
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Preço mínimo deve ser menor que o máximo." });
+        if (disc <= 0 || disc > 100)
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Desconto deve ser entre 0.01% e 100%." });
+      }
+      const sorted = [...input.tiers].sort((a, b) => parseFloat(a.priceMin) - parseFloat(b.priceMin));
+      for (let i = 1; i < sorted.length; i++) {
+        if (parseFloat(sorted[i].priceMin) <= parseFloat(sorted[i - 1].priceMax))
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Faixas de preço não podem se sobrepor." });
+      }
+      const db = await getDatabase();
+      await db.transaction(async (tx) => {
+        await tx.delete(productDiscountPriceTiers).where(eq(productDiscountPriceTiers.productId, input.productId));
+        if (input.tiers.length > 0) {
+          await tx.insert(productDiscountPriceTiers).values(
+            input.tiers.map(t => ({
+              productId: input.productId,
+              priceMin: t.priceMin,
+              priceMax: t.priceMax,
+              discountPercent: t.discountPercent,
+            }))
+          );
+        }
+      });
+      return db.select().from(productDiscountPriceTiers)
+        .where(eq(productDiscountPriceTiers.productId, input.productId))
+        .orderBy(asc(productDiscountPriceTiers.priceMin));
     }),
 });

@@ -841,6 +841,21 @@ export const productPricingTiers = pgTable("product_pricing_tiers", {
 export type ProductPricingTier = typeof productPricingTiers.$inferSelect;
 export type InsertProductPricingTier = typeof productPricingTiers.$inferInsert;
 
+// ─── Product Discount Price Tiers ─────────────────────────────────────────────
+
+export const productDiscountPriceTiers = pgTable("product_discount_price_tiers", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
+  priceMin: decimal("priceMin", { precision: 12, scale: 2 }).notNull(),
+  priceMax: decimal("priceMax", { precision: 12, scale: 2 }).notNull(),
+  discountPercent: decimal("discountPercent", { precision: 5, scale: 2 }).notNull(),
+}, (t) => [
+  index("idx_product_discount_price_tiers_product_id").on(t.productId),
+]);
+
+export type ProductDiscountPriceTier = typeof productDiscountPriceTiers.$inferSelect;
+export type InsertProductDiscountPriceTier = typeof productDiscountPriceTiers.$inferInsert;
+
 // ─── Quotation Items (cotação multiproduto) ───────────────────────────────────
 
 export const quotationItems = pgTable("quotation_items", {

@@ -26,6 +26,7 @@ import {
   type ItemPricingInput,
   type ItemCalcResult,
   type ItemPremissas,
+  type DiscountPriceTier,
 } from "../hooks/useBudgetCalculator";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ interface BudgetItemState {
   premissas: ItemPremissas;
   isCustomProduct?: boolean;
   customValues?: CustomProductValues;
+  discountPriceTiers?: DiscountPriceTier[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -99,6 +101,7 @@ function getItemPricingInput(item: BudgetItemState): ItemPricingInput | null {
       semanas: item.semanas,
       premissas: item.premissas,
       precoBase,
+      discountPriceTiers: item.discountPriceTiers,
     };
   }
 
@@ -113,6 +116,7 @@ function getItemPricingInput(item: BudgetItemState): ItemPricingInput | null {
       artes: tier.artes ?? 1,
       semanas: item.semanas,
       premissas: item.premissas,
+      discountPriceTiers: item.discountPriceTiers,
     };
   }
   return {
@@ -123,6 +127,7 @@ function getItemPricingInput(item: BudgetItemState): ItemPricingInput | null {
     artes: 1,
     semanas: item.semanas,
     premissas: item.premissas,
+    discountPriceTiers: item.discountPriceTiers,
   };
 }
 
@@ -243,6 +248,11 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
     { enabled: item.productId !== null }
   );
 
+  const { data: discountTiersRaw } = trpc.product.listDiscountTiers.useQuery(
+    { productId: item.productId! },
+    { enabled: item.productId !== null }
+  );
+
   useEffect(() => {
     if (tiersRaw !== undefined && item.productId !== null) {
       onUpdateRef.current(item.id, {
@@ -252,6 +262,18 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
       });
     }
   }, [tiersRaw, item.id, item.productId]);
+
+  useEffect(() => {
+    if (discountTiersRaw !== undefined && item.productId !== null) {
+      onUpdateRef.current(item.id, {
+        discountPriceTiers: discountTiersRaw.map((t) => ({
+          priceMin: parseFloat(String(t.priceMin)),
+          priceMax: parseFloat(String(t.priceMax)),
+          discountPercent: parseFloat(String(t.discountPercent)),
+        })),
+      });
+    }
+  }, [discountTiersRaw, item.id, item.productId]);
 
   const pricingInput = getItemPricingInput(item);
   const calc = pricingInput ? calcItemPrice(pricingInput) : null;
@@ -575,6 +597,12 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                       <span>−{fmtBRL(calc.descPrazoVal)}</span>
                     </div>
                   )}
+                  {calc.descFaixaPrecoPerc > 0 && !isBonificada && (
+                    <div className="flex justify-between text-[10px] text-violet-600 dark:text-violet-400">
+                      <span>Desc. faixa de preço ({(calc.descFaixaPrecoPerc * 100).toFixed(0)}%)</span>
+                      <span>−{fmtBRL(calc.descFaixaPrecoVal)}</span>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -605,6 +633,12 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                     <div className="flex justify-between text-[10px] text-amber-600 dark:text-amber-400">
                       <span>Desc. prazo incluso ({(calc.descPrazoPerc * 100).toFixed(0)}%)</span>
                       <span>−{fmtBRL(calc.descPrazoVal)}</span>
+                    </div>
+                  )}
+                  {calc.descFaixaPrecoPerc > 0 && !isBonificada && (
+                    <div className="flex justify-between text-[10px] text-violet-600 dark:text-violet-400">
+                      <span>Desc. faixa de preço ({(calc.descFaixaPrecoPerc * 100).toFixed(0)}%)</span>
+                      <span>−{fmtBRL(calc.descFaixaPrecoVal)}</span>
                     </div>
                   )}
                 </>
@@ -744,6 +778,7 @@ function BudgetSummaryPanel({ items, globalParams, clientName, onGerarCotacao, i
                       <p className="text-muted-foreground text-[11px]">
                         {input.volume.toLocaleString("pt-BR")} un. · {item.semanas}sem
                         {calc.descPrazoPerc > 0 ? ` · −${(calc.descPrazoPerc * 100).toFixed(0)}%` : ""}
+                        {calc.descFaixaPrecoPerc > 0 ? ` · faixa −${(calc.descFaixaPrecoPerc * 100).toFixed(0)}%` : ""}
                       </p>
                     </div>
                     <span className={`text-right shrink-0 font-mono font-medium ${globalParams.isBonificada ? "line-through text-muted-foreground" : ""}`}>

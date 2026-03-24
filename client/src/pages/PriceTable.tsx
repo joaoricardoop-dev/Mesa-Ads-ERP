@@ -86,6 +86,15 @@ export default function PriceTable() {
     { enabled: selectedProductId !== null }
   );
   const productTiers = useMemo(() => productTiersRaw ?? [], [productTiersRaw]);
+  const { data: discountPriceTiersRaw } = trpc.product.listDiscountTiers.useQuery(
+    { productId: selectedProductId! },
+    { enabled: selectedProductId !== null }
+  );
+  const discountPriceTiers = useMemo(() => (discountPriceTiersRaw ?? []).map((t) => ({
+    priceMin: parseFloat(String(t.priceMin)),
+    priceMax: parseFloat(String(t.priceMax)),
+    discountPercent: parseFloat(String(t.discountPercent)),
+  })), [discountPriceTiersRaw]);
   const selectedProduct = useMemo(
     () => productsList.find((p) => p.id === selectedProductId),
     [productsList, selectedProductId]
@@ -224,7 +233,14 @@ export default function PriceTable() {
 
     const nPeriodos = semanas / 4;
     const precoSemDesconto = precoTotalBase4sem * nPeriodos;
-    const precoComDescDuracao = precoSemDesconto * (1 - descPrazo);
+
+    // Faixa discount applied on gross bruto amount (before prazo)
+    const faixaDescTier = discountPriceTiers.find(t => precoSemDesconto >= t.priceMin && precoSemDesconto <= t.priceMax);
+    const descFaixaPrecoPerc = faixaDescTier ? faixaDescTier.discountPercent / 100 : 0;
+    const descFaixaPrecoVal = precoSemDesconto * descFaixaPrecoPerc;
+    const precoPosFaixa = precoSemDesconto - descFaixaPrecoVal;
+    const precoComDescDuracao = precoPosFaixa * (1 - descPrazo);
+
     const precoAntesDescParceiro = precoComDescDuracao * (1 + ajustePag);
     const descParcPerc = descontoParceiro ? 0.10 : 0;
     const precoFinal = precoAntesDescParceiro * (1 - descParcPerc);
@@ -257,23 +273,26 @@ export default function PriceTable() {
     const tabela = SEMANAS.map((s) => {
       const mult = s / 4;
       const pSemDesc = precoTotalBase4sem * mult;
+      const faixaTier = discountPriceTiers.find(t => pSemDesc >= t.priceMin && pSemDesc <= t.priceMax);
+      const descFaixaTabela = faixaTier ? faixaTier.discountPercent / 100 : 0;
+      const pPosFaixa = pSemDesc * (1 - descFaixaTabela);
       const dsc = (descontosPrazo[s] || 0) / 100;
-      const pComDesc = pSemDesc * (1 - dsc);
+      const pComDesc = pPosFaixa * (1 - dsc);
       const pFinal = pComDesc * (1 + ajustePag) * (1 - descParcPerc);
-      return { semanas: s, desconto: dsc, precoSemDesconto: pSemDesc, precoComDesconto: pComDesc, economia: pSemDesc - pComDesc, precoFinal: pFinal };
+      return { semanas: s, desconto: dsc, descFaixa: descFaixaTabela, precoSemDesconto: pSemDesc, precoComDesconto: pComDesc, economia: pSemDesc - pComDesc, precoFinal: pFinal };
     });
 
     return {
       totalDeducoesPerc, denominador, custoProducao, custoTotal4sem, custoTotalPeriodo,
       precoTotalBase4sem, precoUnit4sem, precoUnitSmallest, descontoQuantidade,
       nPeriodos, precoSemDesconto, precoComDescDuracao, precoFinal, precoUnitComDesc, precoMensal, descCombinado,
-      descParcPerc,
+      descParcPerc, descFaixaPrecoPerc, descFaixaPrecoVal,
       valorIRPJ, valorComRest, valorComCom, totalDeducoesValor,
       receitaLiquida, lucroBruto, margemLiquida, margemSobreReceita: dados.margem,
       lucroPorUnidade, custoPorUnidade, decomposicaoUnit, tabela,
       irpj, comRest, comCom,
     };
-  }, [volume, dados, semanas, descPrazo, ajustePag, premissas, custosVolume, descontosPrazo, descontoParceiro]);
+  }, [volume, dados, semanas, descPrazo, ajustePag, premissas, custosVolume, descontosPrazo, descontoParceiro, discountPriceTiers]);
 
   const updateVolumeDado = (vol: number, field: keyof typeof dados, val: number) => {
     setCustosVolume((prev) => ({ ...prev, [vol]: { ...prev[vol], [field]: val } }));
@@ -512,7 +531,7 @@ export default function PriceTable() {
         body: calc.tabela.map((r) => [
           `${r.semanas} sem`,
           formatCurrency(r.precoSemDesconto),
-          r.desconto > 0 ? `${(r.desconto * 100).toFixed(0)}%` : "—",
+          [r.desconto > 0 ? `Prazo: ${(r.desconto * 100).toFixed(0)}%` : "", r.descFaixa > 0 ? `Faixa: ${(r.descFaixa * 100).toFixed(0)}%` : ""].filter(Boolean).join(" + ") || "—",
           r.economia > 0 ? formatCurrency(r.economia) : "—",
           formatCurrency(r.precoFinal),
         ]),
@@ -674,20 +693,27 @@ export default function PriceTable() {
                 const receitaLiquidaGPC4sem = precoBase4sem * (1 - irpj - comRest - comCom);
                 const nPeriodos = semanas / 4;
                 const precoSemDescDuracao = precoBase4sem * nPeriodos;
-                const precoComDescDuracao = precoSemDescDuracao * (1 - descPrazo);
+                // Faixa discount applied on gross bruto amount (before prazo)
+                const faixaTierDuracao = discountPriceTiers.find(t => precoSemDescDuracao >= t.priceMin && precoSemDescDuracao <= t.priceMax);
+                const descFaixaDuracao = faixaTierDuracao ? faixaTierDuracao.discountPercent / 100 : 0;
+                const precoPosFaixaDuracao = precoSemDescDuracao * (1 - descFaixaDuracao);
+                const precoComDescDuracao = precoPosFaixaDuracao * (1 - descPrazo);
                 const precoAntesDescParceiro = precoComDescDuracao * (1 + ajustePag);
                 const descParcPerc = descontoParceiro ? 0.10 : 0;
                 const precoFinal = precoAntesDescParceiro * (1 - descParcPerc);
-                const receitaLiquidaGPCTotal = receitaLiquidaGPC4sem * nPeriodos * (1 - descPrazo) * (1 + ajustePag) * (1 - descParcPerc);
+                const receitaLiquidaGPCTotal = receitaLiquidaGPC4sem * nPeriodos * (1 - descFaixaDuracao) * (1 - descPrazo) * (1 + ajustePag) * (1 - descParcPerc);
 
                 const tabelaDuracao = SEMANAS.map((s) => {
                   const mult = s / 4;
                   const pSemDesc = precoBase4sem * mult;
+                  const faixaTier = discountPriceTiers.find(t => pSemDesc >= t.priceMin && pSemDesc <= t.priceMax);
+                  const descFaixa = faixaTier ? faixaTier.discountPercent / 100 : 0;
+                  const pPosFaixa = pSemDesc * (1 - descFaixa);
                   const dsc = (descontosPrazo[s] || 0) / 100;
-                  const pComDesc = pSemDesc * (1 - dsc);
+                  const pComDesc = pPosFaixa * (1 - dsc);
                   const pFinal = pComDesc * (1 + ajustePag) * (1 - descParcPerc);
-                  const recLiq = receitaLiquidaGPC4sem * mult * (1 - dsc) * (1 + ajustePag) * (1 - descParcPerc);
-                  return { semanas: s, desconto: dsc, precoSemDesconto: pSemDesc, precoComDesconto: pComDesc, precoFinal: pFinal, receitaLiquidaGPC: recLiq };
+                  const recLiq = receitaLiquidaGPC4sem * mult * (1 - descFaixa) * (1 - dsc) * (1 + ajustePag) * (1 - descParcPerc);
+                  return { semanas: s, desconto: dsc, descFaixa, precoSemDesconto: pSemDesc, precoComDesconto: pComDesc, precoFinal: pFinal, receitaLiquidaGPC: recLiq };
                 });
 
                 return (
@@ -717,6 +743,7 @@ export default function PriceTable() {
                                 <td className="p-2.5 text-right font-mono text-muted-foreground">{formatCurrency(row.precoSemDesconto)}</td>
                                 <td className="p-2.5 text-center">
                                   {row.desconto > 0 ? <span className="text-emerald-400 font-mono text-xs font-semibold">-{(row.desconto * 100).toFixed(0)}%</span> : <span className="text-muted-foreground text-xs">—</span>}
+                                  {row.descFaixa > 0 && <span className="block text-amber-400 font-mono text-[10px] font-semibold">faixa -{(row.descFaixa * 100).toFixed(0)}%</span>}
                                 </td>
                                 <td className="p-2.5 text-right font-mono font-semibold text-primary">{formatCurrency(row.precoFinal)}</td>
                                 <td className="p-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400">{formatCurrency(row.receitaLiquidaGPC)}</td>
@@ -875,6 +902,7 @@ export default function PriceTable() {
             <div className="space-y-2">
               <EconRow label="Desc. por Prazo" value={descPrazo > 0 ? `${(descPrazo * 100).toFixed(0)}%` : "—"} accent={descPrazo > 0} />
               <EconRow label="Desc. por Quantidade" value={calc.descontoQuantidade > 0 ? `${(calc.descontoQuantidade * 100).toFixed(1)}%` : "—"} accent={calc.descontoQuantidade > 0} />
+              <EconRow label="Desc. Faixa de Preço" value={calc.descFaixaPrecoPerc > 0 ? `${(calc.descFaixaPrecoPerc * 100).toFixed(0)}%` : "—"} accent={calc.descFaixaPrecoPerc > 0} />
               <EconRow label="Desc. Forma Pagamento" value={ajustePag !== 0 ? `${Math.abs(ajustePag * 100).toFixed(0)}%` : "—"} accent={ajustePag < 0} />
               <EconRow label="Desc. Parceiro" value={descontoParceiro ? "10%" : "—"} accent={descontoParceiro} />
               <EconRow label="Desc. Combinado (vs base 1k/4sem)" value={calc.descCombinado > 0 ? `${(calc.descCombinado * 100).toFixed(1)}%` : "—"} accent={calc.descCombinado > 0} />
@@ -1070,6 +1098,7 @@ export default function PriceTable() {
                       <td className="p-2.5 text-right font-mono text-muted-foreground">{formatCurrency(row.precoSemDesconto)}</td>
                       <td className="p-2.5 text-center">
                         {row.desconto > 0 ? <span className="text-emerald-400 font-mono text-xs font-semibold">-{(row.desconto * 100).toFixed(0)}%</span> : <span className="text-muted-foreground text-xs">—</span>}
+                        {row.descFaixa > 0 && <span className="block text-amber-400 font-mono text-[10px] font-semibold">faixa -{(row.descFaixa * 100).toFixed(0)}%</span>}
                       </td>
                       <td className="p-2.5 text-right font-mono text-emerald-400">{row.economia > 0 ? formatCurrency(row.economia) : "—"}</td>
                       <td className="p-2.5 text-right font-mono font-semibold text-primary">{formatCurrency(row.precoFinal)}</td>

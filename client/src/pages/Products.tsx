@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Users, Tag } from "lucide-react";
 import { SEMANAS_OPTIONS } from "@/hooks/useBudgetCalculator";
 
 type TipoProduct = "impressos" | "eletronicos" | "telas";
@@ -57,6 +57,22 @@ interface TierForm {
 }
 
 const emptyTier: TierForm = { volumeMin: "", volumeMax: "", custoUnitario: "", frete: "", margem: "50.00", artes: "1", precoBase: "" };
+
+interface DiscountTierForm {
+  priceMin: string;
+  priceMax: string;
+  discountPercent: string;
+}
+
+interface DiscountPriceTierRow {
+  id: number;
+  productId: number;
+  priceMin: string;
+  priceMax: string;
+  discountPercent: string;
+}
+
+const emptyDiscountTier: DiscountTierForm = { priceMin: "", priceMax: "", discountPercent: "" };
 
 type PricingMode = "cost_based" | "price_based";
 type EntryType = "tiers" | "fixed_quantities";
@@ -125,6 +141,10 @@ export default function Products() {
   const [tiersProductId, setTiersProductId] = useState<number | null>(null);
   const [tiersProduct, setTiersProduct] = useState<ProductListItem | null>(null);
   const [tiersForm, setTiersForm] = useState<TierForm[]>([]);
+  const [discountTiersDialogOpen, setDiscountTiersDialogOpen] = useState(false);
+  const [discountTiersProductId, setDiscountTiersProductId] = useState<number | null>(null);
+  const [discountTiersProduct, setDiscountTiersProduct] = useState<ProductListItem | null>(null);
+  const [discountTiersForm, setDiscountTiersForm] = useState<DiscountTierForm[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   const createMutation = trpc.product.create.useMutation({
@@ -144,6 +164,11 @@ export default function Products() {
 
   const upsertTiersMutation = trpc.product.upsertTiers.useMutation({
     onSuccess: () => { utils.product.listTiers.invalidate(); setTiersDialogOpen(false); toast.success("Entradas de preço atualizadas"); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const upsertDiscountTiersMutation = trpc.product.upsertDiscountTiers.useMutation({
+    onSuccess: () => { utils.product.listDiscountTiers.invalidate(); setDiscountTiersDialogOpen(false); toast.success("Descontos por faixa atualizados"); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -202,6 +227,36 @@ export default function Products() {
     setTiersProductId(product.id);
     setTiersProduct(product);
     setTiersDialogOpen(true);
+  }
+
+  function openDiscountTiersEditor(product: ProductListItem) {
+    setDiscountTiersProductId(product.id);
+    setDiscountTiersProduct(product);
+    setDiscountTiersDialogOpen(true);
+  }
+
+  function handleSaveDiscountTiers() {
+    if (!discountTiersProductId) return;
+    const tiers = discountTiersForm
+      .filter(t => t.priceMin.trim() !== "" && t.priceMax.trim() !== "" && t.discountPercent.trim() !== "")
+      .map(t => ({
+        priceMin: t.priceMin,
+        priceMax: t.priceMax,
+        discountPercent: t.discountPercent,
+      }));
+    upsertDiscountTiersMutation.mutate({ productId: discountTiersProductId, tiers });
+  }
+
+  function addDiscountTierRow() {
+    setDiscountTiersForm(prev => [...prev, { ...emptyDiscountTier }]);
+  }
+
+  function removeDiscountTierRow(idx: number) {
+    setDiscountTiersForm(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateDiscountTierRow(idx: number, field: keyof DiscountTierForm, val: string) {
+    setDiscountTiersForm(prev => prev.map((t, i) => i === idx ? { ...t, [field]: val } : t));
   }
 
   function handleSaveTiers() {
@@ -283,6 +338,7 @@ export default function Products() {
                   onEdit={() => openEdit(p)}
                   onDelete={() => setDeleteConfirm(p.id)}
                   onEditTiers={() => openTiersEditor(p)}
+                  onEditDiscountTiers={() => openDiscountTiersEditor(p)}
                 />
               ))}
             </TableBody>
@@ -439,19 +495,38 @@ export default function Products() {
         onUpdateRow={updateTierRow}
         saving={upsertTiersMutation.isPending}
       />
+
+      <DiscountTiersDialog
+        open={discountTiersDialogOpen}
+        onOpenChange={setDiscountTiersDialogOpen}
+        productId={discountTiersProductId}
+        productName={discountTiersProduct?.name ?? ""}
+        tiers={discountTiersForm}
+        setTiers={setDiscountTiersForm}
+        onSave={handleSaveDiscountTiers}
+        onAddRow={addDiscountTierRow}
+        onRemoveRow={removeDiscountTierRow}
+        onUpdateRow={updateDiscountTierRow}
+        saving={upsertDiscountTiersMutation.isPending}
+      />
     </div>
   );
 }
 
-function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTiers }: {
+function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTiers, onEditDiscountTiers }: {
   product: any;
   expanded: boolean;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onEditTiers: () => void;
+  onEditDiscountTiers: () => void;
 }) {
   const { data: tiers = [] } = trpc.product.listTiers.useQuery(
+    { productId: p.id },
+    { enabled: expanded }
+  );
+  const { data: discountTiers = [] as DiscountPriceTierRow[] } = trpc.product.listDiscountTiers.useQuery(
     { productId: p.id },
     { enabled: expanded }
   );
@@ -572,6 +647,41 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
                 </Table>
               </div>
             )}
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-3.5 w-3.5 text-violet-500" />
+                  <h3 className="text-sm font-semibold">Descontos por Faixa de Preço ({discountTiers.length})</h3>
+                </div>
+                <Button size="sm" variant="outline" onClick={onEditDiscountTiers}>
+                  <Pencil className="h-3 w-3 mr-1" /> Editar Descontos
+                </Button>
+              </div>
+              {discountTiers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum desconto por faixa configurado</p>
+              ) : (
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Preço Mín (R$)</TableHead>
+                        <TableHead>Preço Máx (R$)</TableHead>
+                        <TableHead>Desconto (%)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {discountTiers.map((t: DiscountPriceTierRow) => (
+                        <TableRow key={t.id}>
+                          <TableCell className="font-mono">R$ {Number(t.priceMin).toFixed(2)}</TableCell>
+                          <TableCell className="font-mono">R$ {Number(t.priceMax).toFixed(2)}</TableCell>
+                          <TableCell className="text-violet-600 dark:text-violet-400">{t.discountPercent}%</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
             {p.description && (
               <p className="text-xs text-muted-foreground mt-3">{p.description}</p>
             )}
@@ -702,6 +812,101 @@ function TiersDialog({ open, onOpenChange, productId, product, tiers, setTiers, 
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={onSave} disabled={saving}>
             {saving ? "Salvando..." : "Salvar Entradas"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DiscountTiersDialog({ open, onOpenChange, productId, productName, tiers, setTiers, onSave, onAddRow, onRemoveRow, onUpdateRow, saving }: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  productId: number | null;
+  productName: string;
+  tiers: DiscountTierForm[];
+  setTiers: (t: DiscountTierForm[]) => void;
+  onSave: () => void;
+  onAddRow: () => void;
+  onRemoveRow: (i: number) => void;
+  onUpdateRow: (i: number, field: keyof DiscountTierForm, val: string) => void;
+  saving: boolean;
+}) {
+  const { data: existingTiers } = trpc.product.listDiscountTiers.useQuery(
+    { productId: productId! },
+    { enabled: open && productId !== null }
+  );
+
+  const hydratedForRef = useRef<string>("");
+
+  useEffect(() => {
+    if (!open) {
+      hydratedForRef.current = "";
+      return;
+    }
+    if (!existingTiers) return;
+    const key = `${productId}:${existingTiers.length}`;
+    if (key === hydratedForRef.current) return;
+    hydratedForRef.current = key;
+    setTiers(existingTiers.map((t: DiscountPriceTierRow) => ({
+      priceMin: String(t.priceMin),
+      priceMax: String(t.priceMax),
+      discountPercent: String(t.discountPercent),
+    })));
+  }, [open, existingTiers, productId, setTiers]);
+
+  const inputCls = "h-8 text-xs font-mono px-2";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Descontos por Faixa de Preço{productName ? ` — ${productName}` : ""}</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-muted-foreground">
+          Quando o preço bruto total do item (antes dos descontos) cair em uma faixa configurada, o desconto correspondente é aplicado automaticamente, antes do desconto por prazo.
+        </p>
+        <div className="space-y-3">
+          {tiers.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Nenhuma faixa de desconto. Clique em "Adicionar Faixa" para começar.
+            </p>
+          ) : (
+            <div className="border rounded-md overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-36">Preço Mín (R$)</TableHead>
+                    <TableHead className="w-36">Preço Máx (R$)</TableHead>
+                    <TableHead className="w-32">Desconto (%)</TableHead>
+                    <TableHead className="w-10"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tiers.map((t, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell><Input className={inputCls} type="number" min="0" step="0.01" value={t.priceMin} onChange={e => onUpdateRow(idx, "priceMin", e.target.value)} placeholder="0.00" /></TableCell>
+                      <TableCell><Input className={inputCls} type="number" min="0" step="0.01" value={t.priceMax} onChange={e => onUpdateRow(idx, "priceMax", e.target.value)} placeholder="0.00" /></TableCell>
+                      <TableCell><Input className={inputCls} type="number" min="0" max="100" step="0.01" value={t.discountPercent} onChange={e => onUpdateRow(idx, "discountPercent", e.target.value)} placeholder="0.00" /></TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onRemoveRow(idx)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <Button variant="outline" size="sm" onClick={onAddRow}>
+            <Plus className="h-3 w-3 mr-1" /> Adicionar Faixa
+          </Button>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={onSave} disabled={saving}>
+            {saving ? "Salvando..." : "Salvar Descontos"}
           </Button>
         </DialogFooter>
       </DialogContent>

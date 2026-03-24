@@ -72,9 +72,23 @@ interface ProductTableProps {
   billingMode: "bruto" | "liquido";
 }
 
+interface DiscountTierEntry {
+  priceMin: string | number;
+  priceMax: string | number;
+  discountPercent: string | number;
+}
+
+function applyDiscountTier(price: number, discountTiers: DiscountTierEntry[]): number {
+  if (!discountTiers || discountTiers.length === 0) return price;
+  const tier = discountTiers.find((t) => price >= parseFloat(String(t.priceMin)) && price <= parseFloat(String(t.priceMax)));
+  if (!tier) return price;
+  return price * (1 - parseFloat(String(tier.discountPercent)) / 100);
+}
+
 function ProductTable({ product, commissionPercent, billingMode }: ProductTableProps) {
   const [expanded, setExpanded] = useState(true);
   const tiers = product.tiers ?? [];
+  const discountTiers = product.discountTiers ?? [];
 
   const irpj = parseFloat(product.irpj ?? "6") / 100;
   const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
@@ -178,8 +192,10 @@ function ProductTable({ product, commissionPercent, billingMode }: ProductTableP
                     <td className="px-4 py-2.5 text-right font-mono">{fmtBRL4(unitPrice4sem)}</td>
                     {SEMANAS_OPTIONS.slice(0, 7).map((s) => {
                       const nPer = s / 4;
+                      const precoBruto = unitPrice4sem * vol * nPer;
+                      const precoPosFaixa = applyDiscountTier(precoBruto, discountTiers);
                       const dsc = (DESCONTOS_PRAZO[s] ?? 0) / 100;
-                      const precoTotal = unitPrice4sem * vol * nPer * (1 - dsc);
+                      const precoTotal = precoPosFaixa * (1 - dsc);
                       const precoUnit = vol > 0 ? precoTotal / (vol * nPer) : 0;
                       return (
                         <td key={s} className="px-3 py-2.5 text-right font-mono">

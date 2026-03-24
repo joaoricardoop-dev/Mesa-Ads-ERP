@@ -1,7 +1,7 @@
 import { parceiroProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { partners, leads, quotations, clients, users, leadInteractions, products, productPricingTiers } from "../drizzle/schema";
+import { partners, leads, quotations, clients, users, leadInteractions, products, productPricingTiers, productDiscountPriceTiers } from "../drizzle/schema";
 import { eq, desc, and, sql, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
@@ -321,12 +321,11 @@ export const parceiroPortalRouter = router({
 
       const productsWithTiers = await Promise.all(
         visibleProducts.map(async (p) => {
-          const tiers = await db
-            .select()
-            .from(productPricingTiers)
-            .where(eq(productPricingTiers.productId, p.id))
-            .orderBy(asc(productPricingTiers.volumeMin));
-          return { ...p, tiers };
+          const [tiers, discountTiers] = await Promise.all([
+            db.select().from(productPricingTiers).where(eq(productPricingTiers.productId, p.id)).orderBy(asc(productPricingTiers.volumeMin)),
+            db.select().from(productDiscountPriceTiers).where(eq(productDiscountPriceTiers.productId, p.id)).orderBy(asc(productDiscountPriceTiers.priceMin)),
+          ]);
+          return { ...p, tiers, discountTiers };
         })
       );
 
@@ -404,11 +403,10 @@ export const parceiroPortalRouter = router({
       const [partner] = await db.select().from(partners).where(eq(partners.id, partnerId)).limit(1);
       if (!partner) throw new TRPCError({ code: "NOT_FOUND", message: "Parceiro não encontrado." });
 
-      const tiers = await db
-        .select()
-        .from(productPricingTiers)
-        .where(eq(productPricingTiers.productId, input.productId))
-        .orderBy(asc(productPricingTiers.volumeMin));
+      const [tiers, discountTiers] = await Promise.all([
+        db.select().from(productPricingTiers).where(eq(productPricingTiers.productId, input.productId)).orderBy(asc(productPricingTiers.volumeMin)),
+        db.select().from(productDiscountPriceTiers).where(eq(productDiscountPriceTiers.productId, input.productId)).orderBy(asc(productDiscountPriceTiers.priceMin)),
+      ]);
 
       let matchedTier = tiers[0];
       for (const t of tiers) {
@@ -442,8 +440,15 @@ export const parceiroPortalRouter = router({
         4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11, 28: 13, 32: 15, 36: 17, 40: 19, 44: 21, 48: 23, 52: 25,
       };
       const cycles = Math.ceil(input.semanas / 4);
+      // Gross total before any discounts
+      const precoBruto = serverUnitPrice * input.volume * cycles;
+      // Faixa discount applied on bruto amount first
+      const faixaTier = discountTiers.find(t => precoBruto >= parseFloat(String(t.priceMin)) && precoBruto <= parseFloat(String(t.priceMax)));
+      const descFaixa = faixaTier ? parseFloat(String(faixaTier.discountPercent)) / 100 : 0;
+      const precoPosFaixa = precoBruto * (1 - descFaixa);
+      // Then prazo discount
       const dsc = (DESCONTOS_PRAZO[input.semanas] ?? 0) / 100;
-      const serverTotalValue = serverUnitPrice * input.volume * cycles * (1 - dsc);
+      const serverTotalValue = precoPosFaixa * (1 - dsc);
       const effectiveUnitPrice = input.volume > 0 && cycles > 0 ? serverTotalValue / (input.volume * cycles) : serverUnitPrice;
 
       const entityName = lead.company || lead.name || "Lead";
