@@ -510,12 +510,18 @@ export const financialRouter = router({
       if (!campaign[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
 
       const year = new Date().getFullYear();
-      const countResult = await db
-        .select({ count: sql<number>`COUNT(*)` })
+      const prefix = `FAT-${year}-`;
+      const maxResult = await db
+        .select({ maxNum: sql<string>`MAX("invoiceNumber")` })
         .from(invoices)
-        .where(sql`EXTRACT(YEAR FROM "createdAt") = ${year}`);
-      const seqNum = Number(countResult[0]?.count || 0) + 1;
-      const invoiceNumber = `FAT-${year}-${String(seqNum).padStart(4, "0")}`;
+        .where(sql`"invoiceNumber" LIKE ${prefix + '%'}`);
+      const maxStr = maxResult[0]?.maxNum;
+      let seqNum = 1;
+      if (maxStr) {
+        const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
+        if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
+      }
+      const invoiceNumber = `${prefix}${String(seqNum).padStart(4, "0")}`;
 
       const issueDate = input.issueDate || new Date().toISOString().split("T")[0];
 

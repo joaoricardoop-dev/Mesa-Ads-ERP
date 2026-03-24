@@ -321,9 +321,12 @@ export function setupPublicSigningRoutes(app: express.Express) {
       if (!isBonificada && campaignId > 0 && quotation[0].totalValue && parseFloat(quotation[0].totalValue) > 0) {
         try {
           const invYear = new Date().getFullYear();
-          const invCount = await db.select({ count: sql<number>`COUNT(*)` }).from(invoices).where(sql`"invoiceNumber" LIKE ${'FAT-' + invYear + '-%'}`);
-          const invSeq = Number(invCount[0]?.count || 0) + 1;
-          const invoiceNumber = `FAT-${invYear}-${String(invSeq).padStart(4, "0")}`;
+          const invPrefix = `FAT-${invYear}-`;
+          const invMax = await db.select({ maxNum: sql<string>`MAX("invoiceNumber")` }).from(invoices).where(sql`"invoiceNumber" LIKE ${invPrefix + '%'}`);
+          const invMaxStr = invMax[0]?.maxNum;
+          let invSeq = 1;
+          if (invMaxStr) { const n = parseInt(invMaxStr.slice(invPrefix.length), 10); if (!isNaN(n)) invSeq = n + 1; }
+          const invoiceNumber = `${invPrefix}${String(invSeq).padStart(4, "0")}`;
           const today = new Date().toISOString().split("T")[0];
           const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
           await db.insert(invoices).values({

@@ -26,32 +26,50 @@ async function getDatabase() {
 
 async function generateQuotationNumber(db: any) {
   const year = new Date().getFullYear();
-  const countResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
+  const prefix = `QOT-${year}-`;
+  const result = await db
+    .select({ maxNum: sql<string>`MAX("quotationNumber")` })
     .from(quotations)
-    .where(sql`"quotationNumber" LIKE ${'QOT-' + year + '-%'}`);
-  const seqNum = Number(countResult[0]?.count || 0) + 1;
-  return `QOT-${year}-${String(seqNum).padStart(4, "0")}`;
+    .where(sql`"quotationNumber" LIKE ${prefix + '%'}`);
+  const maxStr = result[0]?.maxNum;
+  let seqNum = 1;
+  if (maxStr) {
+    const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
+    if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
+  }
+  return `${prefix}${String(seqNum).padStart(4, "0")}`;
 }
 
 async function generateCampaignNumber(db: any) {
   const year = new Date().getFullYear();
-  const countResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
+  const prefix = `CMP-${year}-`;
+  const result = await db
+    .select({ maxNum: sql<string>`MAX("campaignNumber")` })
     .from(campaigns)
-    .where(sql`"campaignNumber" LIKE ${'CMP-' + year + '-%'}`);
-  const seqNum = Number(countResult[0]?.count || 0) + 1;
-  return `CMP-${year}-${String(seqNum).padStart(4, "0")}`;
+    .where(sql`"campaignNumber" LIKE ${prefix + '%'}`);
+  const maxStr = result[0]?.maxNum;
+  let seqNum = 1;
+  if (maxStr) {
+    const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
+    if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
+  }
+  return `${prefix}${String(seqNum).padStart(4, "0")}`;
 }
 
 async function generateInvoiceNumber(db: any) {
   const year = new Date().getFullYear();
-  const countResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
+  const prefix = `FAT-${year}-`;
+  const result = await db
+    .select({ maxNum: sql<string>`MAX("invoiceNumber")` })
     .from(invoices)
-    .where(sql`"invoiceNumber" LIKE ${'FAT-' + year + '-%'}`);
-  const seqNum = Number(countResult[0]?.count || 0) + 1;
-  return `FAT-${year}-${String(seqNum).padStart(4, "0")}`;
+    .where(sql`"invoiceNumber" LIKE ${prefix + '%'}`);
+  const maxStr = result[0]?.maxNum;
+  let seqNum = 1;
+  if (maxStr) {
+    const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
+    if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
+  }
+  return `${prefix}${String(seqNum).padStart(4, "0")}`;
 }
 
 async function autoCreateInvoice(db: any, campaign: { id: number; clientId: number }, quotation: { totalValue: string | null; isBonificada: boolean | null }) {
