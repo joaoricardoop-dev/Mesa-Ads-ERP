@@ -701,7 +701,7 @@ export default function PriceTable() {
                 const precoAntesDescParceiro = precoComDescDuracao * (1 + ajustePag);
                 const descParcPerc = descontoParceiro ? 0.10 : 0;
                 const precoFinal = precoAntesDescParceiro * (1 - descParcPerc);
-                const receitaLiquidaGPCTotal = receitaLiquidaGPC4sem * nPeriodos * (1 - descFaixaDuracao) * (1 - descPrazo) * (1 + ajustePag) * (1 - descParcPerc);
+                const descontoTotalValor = precoSemDescDuracao - precoFinal;
 
                 const tabelaDuracao = SEMANAS.map((s) => {
                   const mult = s / 4;
@@ -712,8 +712,8 @@ export default function PriceTable() {
                   const dsc = (descontosPrazo[s] || 0) / 100;
                   const pComDesc = pPosFaixa * (1 - dsc);
                   const pFinal = pComDesc * (1 + ajustePag) * (1 - descParcPerc);
-                  const recLiq = receitaLiquidaGPC4sem * mult * (1 - descFaixa) * (1 - dsc) * (1 + ajustePag) * (1 - descParcPerc);
-                  return { semanas: s, desconto: dsc, descFaixa, precoSemDesconto: pSemDesc, precoComDesconto: pComDesc, precoFinal: pFinal, receitaLiquidaGPC: recLiq };
+                  const descontoTotalPerc = pSemDesc > 0 ? (pSemDesc - pFinal) / pSemDesc : 0;
+                  return { semanas: s, desconto: dsc, descFaixa, precoSemDesconto: pSemDesc, precoComDesconto: pComDesc, precoFinal: pFinal, descontoTotalPerc };
                 });
 
                 return (
@@ -721,7 +721,7 @@ export default function PriceTable() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       <KpiCard label="Preço Total" value={formatCurrency(precoFinal)} sub={`${semanas} sem • ${pagLabel}${descontoParceiro ? " • parceiro" : ""}`} variant="primary" icon={DollarSign} />
                       <KpiCard label="Preço Base (4sem)" value={formatCurrency(precoBase4sem)} sub="por período sem desconto" icon={TrendingUp} />
-                      <KpiCard label="Rec. Líquida GPC" value={formatCurrency(receitaLiquidaGPCTotal)} sub={`${semanas} sem após deduções`} icon={PieChart} />
+                      <KpiCard label="Desconto Total" value={formatCurrency(descontoTotalValor)} sub={`${semanas} sem economizados`} icon={PieChart} />
                     </div>
 
                     <Section title="Tabela por Duração" icon={BarChart3}>
@@ -733,7 +733,7 @@ export default function PriceTable() {
                               <th className="text-right p-2.5 font-medium text-muted-foreground">S/ Desc.</th>
                               <th className="text-center p-2.5 font-medium text-muted-foreground">Desc. Prazo</th>
                               <th className="text-right p-2.5 font-medium text-muted-foreground">Preço Final</th>
-                              <th className="text-right p-2.5 font-medium text-muted-foreground text-emerald-600 dark:text-emerald-400">Rec. Líq. GPC</th>
+                              <th className="text-right p-2.5 font-medium text-muted-foreground text-emerald-600 dark:text-emerald-400">Desc. Total</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -746,7 +746,7 @@ export default function PriceTable() {
                                   {row.descFaixa > 0 && <span className="block text-amber-400 font-mono text-[10px] font-semibold">faixa -{(row.descFaixa * 100).toFixed(0)}%</span>}
                                 </td>
                                 <td className="p-2.5 text-right font-mono font-semibold text-primary">{formatCurrency(row.precoFinal)}</td>
-                                <td className="p-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400">{formatCurrency(row.receitaLiquidaGPC)}</td>
+                                <td className="p-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400">{row.descontoTotalPerc > 0 ? `-${(row.descontoTotalPerc * 100).toFixed(1)}%` : "—"}</td>
                               </tr>
                             ))}
                           </tbody>
