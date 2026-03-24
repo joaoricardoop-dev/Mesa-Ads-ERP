@@ -577,10 +577,14 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                     <span className="text-right font-medium">{pricingInput.volume.toLocaleString("pt-BR")} un.</span>
                     <span className="text-muted-foreground">Preço Base (4sem)</span>
                     <span className="text-right font-mono font-semibold text-primary">{fmtBRL(pricingInput.precoBase ?? 0)}</span>
-                    {calc.receitaLiquidaGPC !== undefined && (
+                    {calc.receitaMensal !== undefined && (
                       <>
-                        <span className="text-muted-foreground">Rec. Líquida GPC</span>
-                        <span className="text-right font-mono text-emerald-600 dark:text-emerald-400">{fmtBRL(calc.receitaLiquidaGPC)}</span>
+                        <span className="text-muted-foreground">Receita Mensal</span>
+                        <span className="text-right font-mono text-blue-600 dark:text-blue-400">{fmtBRL(calc.receitaMensal)}</span>
+                        <span className="text-muted-foreground">Desconto Total</span>
+                        <span className="text-right font-mono text-emerald-600 dark:text-emerald-400">
+                          {calc.precoSemDesconto > 0 ? `-${(((calc.precoSemDesconto - calc.precoComDescDuracao) / calc.precoSemDesconto) * 100).toFixed(1)}%` : "—"}
+                        </span>
                       </>
                     )}
                   </div>

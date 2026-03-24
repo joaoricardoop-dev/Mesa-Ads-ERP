@@ -702,6 +702,7 @@ export default function PriceTable() {
                 const descParcPerc = descontoParceiro ? 0.10 : 0;
                 const precoFinal = precoAntesDescParceiro * (1 - descParcPerc);
                 const descontoTotalValor = precoSemDescDuracao - precoFinal;
+                const receitaMensal = nPeriodos > 0 ? precoFinal / nPeriodos : 0;
 
                 const tabelaDuracao = SEMANAS.map((s) => {
                   const mult = s / 4;
@@ -713,14 +714,16 @@ export default function PriceTable() {
                   const pComDesc = pPosFaixa * (1 - dsc);
                   const pFinal = pComDesc * (1 + ajustePag) * (1 - descParcPerc);
                   const descontoTotalPerc = pSemDesc > 0 ? (pSemDesc - pFinal) / pSemDesc : 0;
-                  return { semanas: s, desconto: dsc, descFaixa, precoSemDesconto: pSemDesc, precoComDesconto: pComDesc, precoFinal: pFinal, descontoTotalPerc };
+                  const recMensal = mult > 0 ? pFinal / mult : 0;
+                  return { semanas: s, desconto: dsc, descFaixa, precoSemDesconto: pSemDesc, precoComDesconto: pComDesc, precoFinal: pFinal, descontoTotalPerc, recMensal };
                 });
 
                 return (
                   <>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <KpiCard label="Preço Total" value={formatCurrency(precoFinal)} sub={`${semanas} sem • ${pagLabel}${descontoParceiro ? " • parceiro" : ""}`} variant="primary" icon={DollarSign} />
                       <KpiCard label="Preço Base (4sem)" value={formatCurrency(precoBase4sem)} sub="por período sem desconto" icon={TrendingUp} />
+                      <KpiCard label="Receita Mensal" value={formatCurrency(receitaMensal)} sub={`${semanas} sem = ${nPeriodos} ${nPeriodos === 1 ? "mês" : "meses"}`} icon={CalendarDays} />
                       <KpiCard label="Desconto Total" value={formatCurrency(descontoTotalValor)} sub={`${semanas} sem economizados`} icon={PieChart} />
                     </div>
 
@@ -733,6 +736,7 @@ export default function PriceTable() {
                               <th className="text-right p-2.5 font-medium text-muted-foreground">S/ Desc.</th>
                               <th className="text-center p-2.5 font-medium text-muted-foreground">Desc. Prazo</th>
                               <th className="text-right p-2.5 font-medium text-muted-foreground">Preço Final</th>
+                              <th className="text-right p-2.5 font-medium text-muted-foreground text-blue-600 dark:text-blue-400">Rec. Mensal</th>
                               <th className="text-right p-2.5 font-medium text-muted-foreground text-emerald-600 dark:text-emerald-400">Desc. Total</th>
                             </tr>
                           </thead>
@@ -746,6 +750,7 @@ export default function PriceTable() {
                                   {row.descFaixa > 0 && <span className="block text-amber-400 font-mono text-[10px] font-semibold">faixa -{(row.descFaixa * 100).toFixed(0)}%</span>}
                                 </td>
                                 <td className="p-2.5 text-right font-mono font-semibold text-primary">{formatCurrency(row.precoFinal)}</td>
+                                <td className="p-2.5 text-right font-mono text-blue-600 dark:text-blue-400">{formatCurrency(row.recMensal)}</td>
                                 <td className="p-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400">{row.descontoTotalPerc > 0 ? `-${(row.descontoTotalPerc * 100).toFixed(1)}%` : "—"}</td>
                               </tr>
                             ))}

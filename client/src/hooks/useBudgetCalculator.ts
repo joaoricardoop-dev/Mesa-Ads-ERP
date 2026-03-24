@@ -61,7 +61,7 @@ export interface ItemCalcResult {
   precoComDescDuracao: number;
   semanas: number;
   isPriceBased: boolean;
-  receitaLiquidaGPC?: number;
+  receitaMensal?: number;
 }
 
 export interface BudgetTotals {
@@ -103,7 +103,7 @@ export function calcItemPrice(input: ItemPricingInput): ItemCalcResult {
     const descPrazoVal = precoPosFaixa * descPrazoPerc;
     const precoComDescDuracao = precoPosFaixa - descPrazoVal;
     const precoUnit4sem = volume > 0 ? precoBase / volume : 0;
-    const receitaLiquidaGPC = precoBase * (1 - irpj - comRest - comCom);
+    const receitaMensal = nPeriodos > 0 ? precoComDescDuracao / nPeriodos : 0;
 
     return {
       denominador: 1 - irpj - comRest,
@@ -120,7 +120,7 @@ export function calcItemPrice(input: ItemPricingInput): ItemCalcResult {
       precoComDescDuracao,
       semanas,
       isPriceBased: true,
-      receitaLiquidaGPC,
+      receitaMensal,
     };
   }
 
