@@ -50,7 +50,16 @@ The application features a sidebar-based layout using `shadcn/ui` with a collaps
 ### System Design Choices
 - **Monorepo Structure**: `client/` for frontend, `server/` for backend, and `shared/` for common types and constants.
 - **tRPC**: Utilized for end-to-end type safety between frontend and backend APIs.
-- **Drizzle ORM**: Used for type-safe database interactions and migrations.
+- **Drizzle ORM**: Used for type-safe database interactions and schema definition.
+
+### ⚠️ Database Migration Rules — MANDATORY
+This project uses a **custom migration runner** in `server/migrations.ts` (an array of `{ name, sql }` objects executed on every server start). The Drizzle CLI generates reference SQL files in `drizzle/*.sql` but **these files are NEVER executed automatically** — they are documentation only.
+
+**Every database schema change requires TWO steps — both are mandatory:**
+1. Update `drizzle/schema.ts` with the Drizzle schema definition.
+2. Add a corresponding entry to the `MIGRATIONS` array in `server/migrations.ts` using **idempotent SQL** (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, etc.).
+
+Skipping step 2 means the table or column will never exist in the database, causing runtime "Failed query" errors. The script `scripts/validate-migrations.sh` checks this automatically in post-merge and will fail the build if a table is missing.
 
 ## External Dependencies
 - **Clerk**: For authentication, user management, and authorization.
