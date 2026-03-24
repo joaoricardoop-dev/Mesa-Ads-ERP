@@ -54,6 +54,10 @@ const DEFAULT_DESCONTOS_PRAZO: Record<number, number> = {
   4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11, 28: 13, 32: 15, 36: 17, 40: 19, 44: 21, 48: 23, 52: 25,
 };
 
+const ZERO_DESCONTOS_PRAZO: Record<number, number> = {
+  4: 0, 8: 0, 12: 0, 16: 0, 20: 0, 24: 0, 28: 0, 32: 0, 36: 0, 40: 0, 44: 0, 48: 0, 52: 0,
+};
+
 const DEFAULT_PAGAMENTO = {
   pix: 5,
   boleto: 0,
@@ -139,6 +143,11 @@ export default function PriceTable() {
         comissaoRestaurante: parseFloat(selectedProduct.comRestaurante ?? "15"),
         comissaoComercial: parseFloat(selectedProduct.comComercial ?? "10"),
       });
+      setDescontosPrazo(
+        selectedProduct.pricingMode === "price_based"
+          ? ZERO_DESCONTOS_PRAZO
+          : DEFAULT_DESCONTOS_PRAZO
+      );
     }
   }, [selectedProduct]);
 
@@ -308,7 +317,7 @@ export default function PriceTable() {
     } else {
       setPremissas(DEFAULT_PREMISSAS);
     }
-    setDescontosPrazo(DEFAULT_DESCONTOS_PRAZO);
+    setDescontosPrazo(isPriceBasedProduct ? ZERO_DESCONTOS_PRAZO : DEFAULT_DESCONTOS_PRAZO);
     setPagamentoConfig(DEFAULT_PAGAMENTO);
     if (productTiers.length > 0) {
       const newCustos: Record<number, { custoGPC: number; margem: number; frete: number; artes: number }> = {};
