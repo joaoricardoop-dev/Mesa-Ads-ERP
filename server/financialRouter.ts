@@ -197,6 +197,253 @@ export const financialRouter = router({
     };
   }),
 
+  dashboardExpanded: protectedProcedure.query(async ({ ctx }) => {
+    requireFinancialAccess(ctx.user.role);
+    const db = await getDatabase();
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const today = now.toISOString().split("T")[0];
+    const ytdStart = `${currentYear}-01-01`;
+    const currMonthStart = new Date(currentYear, currentMonth, 1).toISOString().split("T")[0];
+    const currMonthEnd = new Date(currentYear, currentMonth + 1, 0).toISOString().split("T")[0];
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const prevMonthStart = new Date(prevYear, prevMonth, 1).toISOString().split("T")[0];
+    const prevMonthEnd = new Date(prevYear, prevMonth + 1, 0).toISOString().split("T")[0];
+
+    // ── YTD & current month revenue ─────────────────────────────────────────
+    const [ytdInvoiced, ytdReceived, currInvoiced, currReceived, prevInvoiced, prevReceived] = await Promise.all([
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(invoices)
+        .where(and(sql`status NOT IN ('cancelada')`, gte(invoices.issueDate, ytdStart), lte(invoices.issueDate, today))),
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(invoices)
+        .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, ytdStart), lte(invoices.paymentDate, today))),
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(invoices)
+        .where(and(sql`status NOT IN ('cancelada')`, gte(invoices.issueDate, currMonthStart), lte(invoices.issueDate, currMonthEnd))),
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(invoices)
+        .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, currMonthStart), lte(invoices.paymentDate, currMonthEnd))),
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(invoices)
+        .where(and(sql`status NOT IN ('cancelada')`, gte(invoices.issueDate, prevMonthStart), lte(invoices.issueDate, prevMonthEnd))),
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(invoices)
+        .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, prevMonthStart), lte(invoices.paymentDate, prevMonthEnd))),
+    ]);
+
+    // ── Total costs (no date on operational_costs) ──────────────────────────
+    const [totalCostRows, ytdRpRows, allRpRows, currRpRows, prevRpRows] = await Promise.all([
+      db.select({
+        production: sql<string>`COALESCE(SUM("productionCost"::numeric), 0)`,
+        freight: sql<string>`COALESCE(SUM("freightCost"::numeric), 0)`,
+      }).from(operationalCosts),
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(restaurantPayments)
+        .where(and(eq(restaurantPayments.status, "paid"), gte(restaurantPayments.createdAt, new Date(ytdStart)))),
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)`, count: sql<number>`COUNT(*)::int` })
+        .from(restaurantPayments).where(eq(restaurantPayments.status, "paid")),
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(restaurantPayments)
+        .where(and(eq(restaurantPayments.status, "paid"), gte(restaurantPayments.createdAt, new Date(currMonthStart)), lte(restaurantPayments.createdAt, new Date(currMonthEnd + "T23:59:59")))),
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(restaurantPayments)
+        .where(and(eq(restaurantPayments.status, "paid"), gte(restaurantPayments.createdAt, new Date(prevMonthStart)), lte(restaurantPayments.createdAt, new Date(prevMonthEnd + "T23:59:59")))),
+    ]);
+
+    const totalProduction = parseFloat(totalCostRows[0]?.production || "0");
+    const totalFreight = parseFloat(totalCostRows[0]?.freight || "0");
+    const ytdRpCosts = parseFloat(ytdRpRows[0]?.total || "0");
+    const allRpPaid = parseFloat(allRpRows[0]?.total || "0");
+    const currRpCosts = parseFloat(currRpRows[0]?.total || "0");
+    const prevRpCosts = parseFloat(prevRpRows[0]?.total || "0");
+
+    // ── 12-month series ─────────────────────────────────────────────────────
+    const monthlySeries: { month: string; invoiced: number; received: number; rpCosts: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(currentYear, currentMonth - i, 1);
+      const mStart = d.toISOString().split("T")[0];
+      const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split("T")[0];
+      const [inv, rcv, rp] = await Promise.all([
+        db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(invoices)
+          .where(and(sql`status NOT IN ('cancelada')`, gte(invoices.issueDate, mStart), lte(invoices.issueDate, mEnd))),
+        db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(invoices)
+          .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, mStart), lte(invoices.paymentDate, mEnd))),
+        db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(restaurantPayments)
+          .where(and(eq(restaurantPayments.status, "paid"), gte(restaurantPayments.createdAt, new Date(mStart)), lte(restaurantPayments.createdAt, new Date(mEnd + "T23:59:59")))),
+      ]);
+      monthlySeries.push({
+        month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        invoiced: parseFloat(inv[0]?.total || "0"),
+        received: parseFloat(rcv[0]?.total || "0"),
+        rpCosts: parseFloat(rp[0]?.total || "0"),
+      });
+    }
+
+    // ── Quotation stats ─────────────────────────────────────────────────────
+    const qStatRows = await db
+      .select({
+        status: quotations.status,
+        count: sql<number>`COUNT(*)::int`,
+        total: sql<string>`COALESCE(SUM("totalValue"::numeric), 0)`,
+        avgDiscount: sql<string>`COALESCE(AVG(NULLIF("manualDiscountPercent"::numeric, 0)), 0)`,
+        sumDiscountVal: sql<string>`COALESCE(SUM(CASE WHEN "manualDiscountPercent"::numeric > 0 THEN "totalValue"::numeric * "manualDiscountPercent"::numeric / (100 - "manualDiscountPercent"::numeric) ELSE 0 END), 0)`,
+      })
+      .from(quotations)
+      .groupBy(quotations.status);
+
+    const qByStatus: Record<string, { count: number; total: number; avgDiscount: number; totalDiscount: number }> = {};
+    for (const row of qStatRows) {
+      qByStatus[row.status] = {
+        count: row.count,
+        total: parseFloat(row.total),
+        avgDiscount: parseFloat(row.avgDiscount),
+        totalDiscount: parseFloat(row.sumDiscountVal),
+      };
+    }
+
+    const qWon = qByStatus["ganha"] || { count: 0, total: 0, avgDiscount: 0, totalDiscount: 0 };
+    const qLost = qByStatus["perdida"] || { count: 0, total: 0, avgDiscount: 0, totalDiscount: 0 };
+    const qCancelled = qByStatus["cancelada"] || { count: 0, total: 0, avgDiscount: 0, totalDiscount: 0 };
+    const qSent = qByStatus["enviada"] || { count: 0, total: 0, avgDiscount: 0, totalDiscount: 0 };
+    const qDraft = qByStatus["rascunho"] || { count: 0, total: 0, avgDiscount: 0, totalDiscount: 0 };
+    const totalClosed = qWon.count + qLost.count;
+    const conversionRate = totalClosed > 0 ? qWon.count / totalClosed : 0;
+
+    const bonificadasRows = await db
+      .select({ count: sql<number>`COUNT(*)::int`, total: sql<string>`COALESCE(SUM("totalValue"::numeric), 0)` })
+      .from(quotations).where(and(eq(quotations.isBonificada, true), sql`"totalValue" IS NOT NULL`));
+    const bonificadas = { count: bonificadasRows[0]?.count || 0, total: parseFloat(bonificadasRows[0]?.total || "0") };
+
+    // ── Top clients by paid invoices ─────────────────────────────────────────
+    const topClientRows = await db
+      .select({
+        clientId: invoices.clientId,
+        total: sql<string>`COALESCE(SUM(amount::numeric), 0)`,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(invoices)
+      .where(eq(invoices.status, "paga"))
+      .groupBy(invoices.clientId)
+      .orderBy(desc(sql`SUM(amount::numeric)`))
+      .limit(10);
+
+    const topClientIds = uniqueIds(topClientRows.map(r => r.clientId));
+    const topCliMap: Record<number, string> = {};
+    if (topClientIds.length > 0) {
+      const rows = await db.select({ id: clients.id, name: clients.name }).from(clients).where(inArray(clients.id, topClientIds));
+      for (const r of rows) topCliMap[r.id] = r.name;
+    }
+    const topClients = topClientRows.map(r => ({
+      name: topCliMap[r.clientId] || `Cliente #${r.clientId}`,
+      total: parseFloat(r.total),
+      count: r.count,
+    }));
+
+    // ── Number of distinct clients with paid invoices ────────────────────────
+    const clientCountRow = await db
+      .select({ count: sql<number>`COUNT(DISTINCT "clientId")::int` })
+      .from(invoices).where(eq(invoices.status, "paga"));
+    const activeClientsCount = clientCountRow[0]?.count || 0;
+
+    // ── Invoice count paid ───────────────────────────────────────────────────
+    const paidCountRow = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(invoices).where(eq(invoices.status, "paga"));
+    const paidInvoiceCount = paidCountRow[0]?.count || 0;
+
+    // ── DRE components ───────────────────────────────────────────────────────
+    const ytdInvoicedVal = parseFloat(ytdInvoiced[0]?.total || "0");
+    const ytdReceivedVal = parseFloat(ytdReceived[0]?.total || "0");
+    const ytdTotalCosts = ytdRpCosts + totalProduction + totalFreight;
+    const ytdIrpj = ytdInvoicedVal * 0.06;
+    const ytdGrossProfit = ytdInvoicedVal - ytdRpCosts - totalProduction - totalFreight;
+    const ytdNetProfit = ytdGrossProfit - ytdIrpj;
+    const ytdGrossMargin = ytdInvoicedVal > 0 ? ytdGrossProfit / ytdInvoicedVal : 0;
+    const ytdNetMargin = ytdInvoicedVal > 0 ? ytdNetProfit / ytdInvoicedVal : 0;
+
+    const currInvoicedVal = parseFloat(currInvoiced[0]?.total || "0");
+    const currReceivedVal = parseFloat(currReceived[0]?.total || "0");
+    const currDirectCosts = currRpCosts;
+    const currGrossProfit = currInvoicedVal - currDirectCosts;
+    const currIrpj = currInvoicedVal * 0.06;
+    const currNetProfit = currGrossProfit - currIrpj;
+    const currGrossMargin = currInvoicedVal > 0 ? currGrossProfit / currInvoicedVal : 0;
+
+    const prevInvoicedVal = parseFloat(prevInvoiced[0]?.total || "0");
+    const prevReceivedVal = parseFloat(prevReceived[0]?.total || "0");
+    const prevDirectCosts = prevRpCosts;
+    const prevGrossProfit = prevInvoicedVal - prevDirectCosts;
+
+    const growthInvoiced = prevInvoicedVal > 0 ? (currInvoicedVal - prevInvoicedVal) / prevInvoicedVal : null;
+    const growthReceived = prevReceivedVal > 0 ? (currReceivedVal - prevReceivedVal) / prevReceivedVal : null;
+    const growthProfit = prevGrossProfit > 0 ? (currGrossProfit - prevGrossProfit) / prevGrossProfit : null;
+
+    const avgTicket = paidInvoiceCount > 0 ? ytdReceivedVal / paidInvoiceCount : 0;
+    const avgRevenuePerClient = activeClientsCount > 0 ? ytdReceivedVal / activeClientsCount : 0;
+
+    return {
+      ytd: {
+        invoiced: ytdInvoicedVal,
+        received: ytdReceivedVal,
+        directCosts: ytdTotalCosts,
+        restaurantCosts: allRpPaid,
+        productionCosts: totalProduction,
+        freightCosts: totalFreight,
+        grossProfit: ytdGrossProfit,
+        irpj: ytdIrpj,
+        netProfit: ytdNetProfit,
+        grossMargin: ytdGrossMargin,
+        netMargin: ytdNetMargin,
+        discountsGiven: qWon.totalDiscount,
+        avgTicket,
+        avgRevenuePerClient,
+        activeClientsCount,
+        paidInvoiceCount,
+      },
+      currMonth: {
+        invoiced: currInvoicedVal,
+        received: currReceivedVal,
+        grossProfit: currGrossProfit,
+        irpj: currIrpj,
+        netProfit: currNetProfit,
+        grossMargin: currGrossMargin,
+        directCosts: currDirectCosts,
+      },
+      prevMonth: {
+        invoiced: prevInvoicedVal,
+        received: prevReceivedVal,
+        grossProfit: prevGrossProfit,
+      },
+      growth: {
+        invoiced: growthInvoiced,
+        received: growthReceived,
+        profit: growthProfit,
+      },
+      dre: {
+        grossRevenue: ytdInvoicedVal,
+        restaurantCommissions: allRpPaid,
+        productionCosts: totalProduction,
+        freightCosts: totalFreight,
+        totalDirectCosts: allRpPaid + totalProduction + totalFreight,
+        grossProfit: ytdInvoicedVal - (allRpPaid + totalProduction + totalFreight),
+        irpj: ytdIrpj,
+        netProfit: ytdInvoicedVal - (allRpPaid + totalProduction + totalFreight) - ytdIrpj,
+        grossMarginPct: ytdInvoicedVal > 0 ? (ytdInvoicedVal - (allRpPaid + totalProduction + totalFreight)) / ytdInvoicedVal : 0,
+        netMarginPct: ytdInvoicedVal > 0 ? (ytdInvoicedVal - (allRpPaid + totalProduction + totalFreight) - ytdIrpj) / ytdInvoicedVal : 0,
+      },
+      quotations: {
+        won: qWon,
+        lost: qLost,
+        cancelled: qCancelled,
+        sent: qSent,
+        draft: qDraft,
+        conversionRate,
+        totalClosed,
+        lostRevenue: qLost.total + qCancelled.total,
+        totalDiscountsGiven: qWon.totalDiscount,
+        avgDiscountPercent: qWon.avgDiscount,
+        bonificadas,
+      },
+      monthlySeries,
+      topClients,
+    };
+  }),
+
   listInvoices: protectedProcedure
     .input(z.object({
       status: z.enum(["emitida", "paga", "vencida", "cancelada"]).optional(),

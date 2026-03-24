@@ -1,0 +1,173 @@
+Quero que você expanda o dashboard financeiro deste negócio para incluir uma visão gerencial completa, com todos os economics relevantes da operação. O dashboard não deve mostrar apenas entradas e saídas, mas sim traduzir a saúde financeira real do negócio, com foco em faturamento, lucratividade, eficiência comercial, descontos, perdas de receita, margem e análise gerencial.
+
+Estruture o dashboard para apresentar, no mínimo, os seguintes blocos:
+
+1. VISÃO EXECUTIVA
+- Faturamento bruto total
+- Faturamento líquido
+- Receita média por cliente
+- Ticket médio
+- Quantidade de vendas / contratos / pedidos
+- Lucro bruto
+- Lucro operacional
+- Lucro líquido
+- Margem bruta
+- Margem operacional
+- Margem líquida
+- Crescimento mensal de faturamento
+- Crescimento mensal de lucro
+- Comparativo realizado vs meta
+- Comparativo mês atual vs mês anterior
+
+2. RECEITA E FATURAMENTO
+- Receita bruta por período
+- Receita líquida por período
+- Receita por produto / serviço / categoria
+- Receita por canal de venda
+- Receita por cliente
+- Receita recorrente vs não recorrente
+- Receita contratada vs receita efetivamente recebida
+- Receita prevista vs realizada
+- Curva de faturamento mensal
+- Sazonalidade de receita
+- Top clientes por faturamento
+- Concentração de receita (% dos maiores clientes no faturamento total)
+
+3. DESCONTOS, PERDAS E EFICIÊNCIA COMERCIAL
+- Total de descontos concedidos
+- Desconto médio por venda
+- % de desconto sobre faturamento bruto
+- Faturamento perdido por desconto
+- Faturamento perdido por negociação não fechada
+- Faturamento perdido por cancelamento
+- Faturamento perdido por inadimplência
+- Taxa de conversão comercial
+- Preço cheio vs preço vendido
+- Impacto dos descontos na margem
+- Simulação de quanto o lucro teria sido sem os descontos concedidos
+- Simulação de sensibilidade: como a margem muda com diferentes níveis de desconto
+
+4. CUSTOS E DESPESAS
+- Custos diretos
+- Custos variáveis
+- Custos fixos
+- Despesas operacionais
+- Despesas administrativas
+- Despesas comerciais
+- Despesas financeiras
+- Tributos
+- Custo por produto / serviço / operação
+- Custo por cliente
+- Evolução mensal de custos
+- Percentual de custos sobre receita
+- Percentual de despesas sobre receita
+
+5. DRE GERENCIAL
+Montar uma DRE gerencial completa e visual, com:
+- Receita bruta
+- (-) Deduções da receita
+- (=) Receita líquida
+- (-) Custos diretos / custo dos serviços / custo dos produtos vendidos
+- (=) Lucro bruto
+- (-) Despesas operacionais
+- (=) EBITDA / resultado operacional, se aplicável
+- (-) Depreciação / amortização, se aplicável
+- (=) EBIT
+- (-) Resultado financeiro
+- (=) Lucro antes dos impostos
+- (-) Impostos
+- (=) Lucro líquido
+
+A DRE deve permitir:
+- Visão mensal
+- Visão anual acumulada
+- Comparativo entre períodos
+- Comparativo realizado vs orçado/meta
+- Percentual de cada linha sobre a receita
+
+6. LUCRO, MARGEM E RENTABILIDADE
+- Lucro bruto, operacional e líquido por período
+- Margem por produto / serviço
+- Margem por cliente
+- Margem por canal
+- Margem consolidada
+- Rentabilidade por operação
+- Operações mais lucrativas
+- Operações menos lucrativas
+- Ranking de clientes mais rentáveis
+- Ranking de produtos/serviços mais rentáveis
+- Identificação de clientes que geram faturamento mas destroem margem
+
+7. FLUXO DE CAIXA E REALIZAÇÃO FINANCEIRA
+- Contas a receber
+- Contas a pagar
+- Fluxo de caixa realizado
+- Fluxo de caixa projetado
+- Saldo de caixa atual
+- Geração de caixa operacional
+- Necessidade de capital de giro
+- Prazo médio de recebimento
+- Prazo médio de pagamento
+- Inadimplência
+- Recebimento em atraso
+- Diferença entre lucro contábil e caixa efetivo
+
+8. INDICADORES GERENCIAIS
+- Break-even / ponto de equilíbrio
+- Margem de contribuição
+- CAC, se aplicável
+- LTV, se aplicável
+- Payback por cliente ou contrato, se aplicável
+- ROI por campanha / canal / produto, se aplicável
+- Receita por colaborador, se aplicável
+- Lucro por colaborador, se aplicável
+- Eficiência operacional
+- Receita por unidade de negócio
+- Margem de contribuição por unidade de negócio
+
+9. ANÁLISES E ALERTAS AUTOMÁTICOS
+O dashboard deve gerar alertas visuais e insights automáticos quando houver:
+- Queda de faturamento
+- Queda de margem
+- Lucro abaixo da meta
+- Excesso de descontos
+- Crescimento de custo acima do crescimento da receita
+- Cliente com alta receita e baixa margem
+- Concentração excessiva em poucos clientes
+- Inadimplência crescente
+- Faturamento previsto muito diferente do realizado
+- Despesas fora do padrão histórico
+
+10. VISUALIZAÇÃO E USABILIDADE
+Quero um dashboard com visual executivo, limpo e profissional, pensado para tomada de decisão financeira. Deve conter:
+- Cards principais no topo com os KPIs mais importantes
+- Gráficos de evolução mensal
+- Tabelas com drill-down
+- Filtros por período, cliente, canal, produto/serviço e status
+- Comparativos mensais, trimestrais e anuais
+- Destaques visuais para desvios relevantes
+- Layout que permita leitura rápida por gestor ou sócio
+
+11. LÓGICA DE CÁLCULO
+Garanta que todos os indicadores sejam calculados corretamente e com lógica financeira consistente. O sistema deve separar claramente:
+- faturamento bruto
+- faturamento líquido
+- receita recebida
+- receita prevista
+- lucro contábil
+- geração de caixa
+- desconto concedido
+- receita perdida
+- custo direto
+- despesa operacional
+
+12. OBJETIVO FINAL
+O dashboard deve funcionar como uma central gerencial financeira completa, permitindo que eu entenda:
+- quanto o negócio fatura
+- quanto realmente sobra
+- onde estou perdendo margem
+- quanto estou sacrificando em desconto
+- quais clientes/produtos valem mais a pena
+- onde há desperdício financeiro
+- qual é a performance real da operação
+- quais decisões precisam ser tomadas para aumentar lucro e eficiência
