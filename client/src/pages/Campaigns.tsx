@@ -44,9 +44,12 @@ import {
   Users,
   Percent,
   Gift,
+  List,
+  Columns2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { useLocation } from "wouter";
+import CampaignsKanban from "./CampaignsKanban";
 
 interface CampaignForm {
   clientId: number | null;
@@ -212,6 +215,7 @@ function calcCampaignPricing(c: {
 }
 
 export default function Campaigns() {
+  const [view, setView] = useState<"list" | "kanban">("list");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isRestaurantsDialogOpen, setIsRestaurantsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -450,11 +454,54 @@ export default function Campaigns() {
     return { totalContract, totalProfit, totalMonthly };
   }, [campaignsList]);
 
+  if (view === "kanban") {
+    return (
+      <PageContainer
+        title="Campanhas"
+        description="Gestão de campanhas de mídia"
+        actions={
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+            <button
+              onClick={() => setView("list")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${view === "list" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <List className="w-3.5 h-3.5" /> Lista
+            </button>
+            <button
+              onClick={() => setView("kanban")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${view === "kanban" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Columns2 className="w-3.5 h-3.5" /> Kanban
+            </button>
+          </div>
+        }
+        noPadding
+      >
+        <CampaignsKanban />
+      </PageContainer>
+    );
+  }
+
   return (
     <PageContainer
       title="Campanhas"
       description="Gestão de campanhas de mídia"
-      actions={null}
+      actions={
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+          <button
+            onClick={() => setView("list")}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${view === "list" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <List className="w-3.5 h-3.5" /> Lista
+          </button>
+          <button
+            onClick={() => setView("kanban")}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${view === "kanban" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Columns2 className="w-3.5 h-3.5" /> Kanban
+          </button>
+        </div>
+      }
     >
 
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
