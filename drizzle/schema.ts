@@ -273,6 +273,8 @@ export const activeRestaurants = pgTable("active_restaurants", {
   ratingTier: varchar("ratingTier", { length: 20 }),
   ratingMultiplier: decimal("ratingMultiplier", { precision: 3, scale: 2 }),
   ratingUpdatedAt: timestamp("ratingUpdatedAt"),
+  lat: decimal("lat", { precision: 10, scale: 7 }),
+  lng: decimal("lng", { precision: 10, scale: 7 }),
   parentRestaurantId: integer("parentRestaurantId").references((): any => activeRestaurants.id, { onDelete: "set null" }),
   coastersAllocated: integer("coastersAllocated").default(500).notNull(),
   commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("20.00").notNull(),

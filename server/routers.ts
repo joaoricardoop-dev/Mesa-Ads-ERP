@@ -794,6 +794,10 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteActiveRestaurant(input.id)),
 
+    saveCoordinates: protectedProcedure
+      .input(z.object({ id: z.number(), lat: z.number(), lng: z.number() }))
+      .mutation(({ input }) => updateActiveRestaurant(input.id, { lat: String(input.lat), lng: String(input.lng) } as any)),
+
     getCampaigns: protectedProcedure
       .input(z.object({ restaurantId: z.number() }))
       .query(({ input }) => getRestaurantCampaigns(input.restaurantId)),

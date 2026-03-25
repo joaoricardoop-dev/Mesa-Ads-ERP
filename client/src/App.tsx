@@ -49,6 +49,7 @@ import QuotationSign from "./pages/QuotationSign";
 import Products from "./pages/Products";
 import Partners from "./pages/Partners";
 import PartnerDetail from "./pages/PartnerDetail";
+import RestaurantsMap from "./pages/RestaurantsMap";
 import ParceiroPortal from "./pages/ParceiroPortal";
 import ParceiroOnboarding from "./pages/ParceiroOnboarding";
 import ParceiroTabelaPrecos from "./pages/ParceiroTabelaPrecos";
@@ -101,6 +102,7 @@ function Router() {
       <Route path="/comercial/contatos" component={Contacts} />
       <Route path="/comercial/parceiros/:id" component={PartnerDetail} />
       <Route path="/comercial/parceiros" component={Partners} />
+      <Route path="/restaurantes/mapa" component={RestaurantsMap} />
       <Route path="/restaurantes/perfil/:id" component={ActiveRestaurantProfile} />
       <Route path="/restaurantes/novo" component={ActiveRestaurantForm} />
       <Route path="/restaurantes/:id" component={ActiveRestaurantForm} />

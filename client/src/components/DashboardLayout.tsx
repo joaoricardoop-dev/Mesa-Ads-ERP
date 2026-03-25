@@ -71,6 +71,7 @@ import {
   Users,
   UserPlus,
   Wallet,
+  MapPin,
   ClipboardList,
   Layers,
   Eye,
@@ -145,7 +146,14 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: FileBarChart, label: "Relatórios", path: "/financeiro/relatorios" },
     ],
   },
-  { icon: UtensilsCrossed, label: "Restaurantes", path: "/restaurantes" },
+  {
+    icon: UtensilsCrossed,
+    label: "Restaurantes",
+    items: [
+      { icon: UtensilsCrossed, label: "Lista", path: "/restaurantes" },
+      { icon: MapPin, label: "Mapa", path: "/restaurantes/mapa" },
+    ],
+  },
   { icon: Image, label: "Biblioteca", path: "/biblioteca" },
   {
     icon: Settings,
