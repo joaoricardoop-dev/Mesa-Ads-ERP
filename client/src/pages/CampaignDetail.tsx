@@ -71,6 +71,26 @@ import {
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
+const CARRIER_SLUGS: Record<string, string> = {
+  latam: "latam", "latam cargo": "latam", ltm: "latam",
+  jadlog: "jadlog", "jad log": "jadlog",
+  correios: "correios", ect: "correios",
+  loggi: "loggi",
+  azul: "azul-cargo", "azul cargo": "azul-cargo", "azul cargo express": "azul-cargo",
+  tnt: "tnt",
+  buslog: "buslog",
+  braspress: "braspress",
+  sequoia: "sequoia",
+  "total express": "total-express", totalexpress: "total-express",
+  "melhor envio": "melhor-envio", melhorenvio: "melhor-envio",
+};
+
+function buildTrackingUrl(code: string, provider?: string | null): string {
+  const slug = provider ? CARRIER_SLUGS[provider.toLowerCase().trim()] : undefined;
+  if (slug) return `https://www.melhorrastreio.com.br/app/${slug}/${code}`;
+  return `https://www.melhorrastreio.com.br/rastreio/${code}`;
+}
+
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
   quotation: "Cotação",
@@ -1143,7 +1163,7 @@ export default function CampaignDetail() {
                             </div>
                           </div>
                           <div className="flex gap-1 shrink-0">
-                            <a href={`https://rastreio.melhorenvio.com.br/${t.trackingCode}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:text-blue-300 underline">Rastrear</a>
+                            <a href={buildTrackingUrl(t.trackingCode, t.freightProvider)} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:text-blue-300 underline">Rastrear</a>
                             <button onClick={() => { setEditingTrackId(t.id); setEditTrackCode(t.trackingCode); setEditTrackProv(t.freightProvider || ""); setEditTrackDate(t.expectedDate || ""); setEditTrackLabel(t.label || ""); }} className="text-[10px] text-muted-foreground hover:text-foreground underline ml-2">Editar</button>
                             <button onClick={() => deleteTrackingMutation.mutate({ id: t.id })} className="text-[10px] text-red-400 hover:text-red-300 underline ml-2">Remover</button>
                           </div>
@@ -1304,7 +1324,7 @@ export default function CampaignDetail() {
                             </div>
                           </div>
                           <div className="flex gap-1 shrink-0">
-                            <a href={`https://rastreio.melhorenvio.com.br/${t.trackingCode}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:text-blue-300 underline">Rastrear</a>
+                            <a href={buildTrackingUrl(t.trackingCode, t.freightProvider)} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:text-blue-300 underline">Rastrear</a>
                             <button onClick={() => { setEditingTrackId(t.id); setEditTrackCode(t.trackingCode); setEditTrackProv(t.freightProvider || ""); setEditTrackDate(t.expectedDate || ""); setEditTrackLabel(t.label || ""); }} className="text-[10px] text-muted-foreground hover:text-foreground underline ml-2">Editar</button>
                             <button onClick={() => deleteTrackingMutation.mutate({ id: t.id })} className="text-[10px] text-red-400 hover:text-red-300 underline ml-2">Remover</button>
                           </div>
