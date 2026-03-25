@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   Clock,
   Timer,
-  Flame,
   Layers,
   Printer,
   Radio,
@@ -125,7 +124,7 @@ function PreProdChip({ info }: { info: PreProdInfo }) {
     return (
       <span className="inline-flex items-center gap-0.5 text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/30 px-1.5 py-0.5 rounded-full">
         <CheckCircle2 className="w-2.5 h-2.5" />
-        Pré: {info.days}d
+        Pré-produção: {info.days}d
       </span>
     );
   }
@@ -137,8 +136,8 @@ function PreProdChip({ info }: { info: PreProdInfo }) {
         : isWarn ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
         : "bg-muted/60 border-border/30 text-muted-foreground"
     }`}>
-      {isCrit ? <Flame className="w-2.5 h-2.5" /> : <Timer className="w-2.5 h-2.5" />}
-      Pré: {info.days}d
+      {isCrit ? <AlertTriangle className="w-2.5 h-2.5" /> : <Timer className="w-2.5 h-2.5" />}
+      Pré-produção: {info.days}d
     </span>
   );
 }
@@ -212,7 +211,7 @@ function CampaignCard({
         {daysInStage !== null && (
           <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted/60 border border-border/20 px-1.5 py-0.5 rounded-full">
             <Clock className="w-2.5 h-2.5" />
-            {daysInStage === 0 ? "hoje aqui" : daysInStage === 1 ? "1 dia aqui" : `${daysInStage}d aqui`}
+            {daysInStage === 0 ? "Nesta etapa: hoje" : daysInStage === 1 ? "Nesta etapa: 1d" : `Nesta etapa: ${daysInStage}d`}
           </span>
         )}
         <PreProdChip info={preProdInfo} />
