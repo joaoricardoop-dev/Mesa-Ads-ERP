@@ -11,6 +11,7 @@ import { productRouter } from "./productRouter";
 import { partnerRouter } from "./partnerRouter";
 import { parceiroPortalRouter } from "./parceiroPortalRouter";
 import { notificationRouter } from "./notificationRouter";
+import { melhorEnvioRouter } from "./melhorEnvioRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, anuncianteProcedure, restauranteProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -80,6 +81,7 @@ export const appRouter = router({
   partner: partnerRouter,
   parceiroPortal: parceiroPortalRouter,
   notification: notificationRouter,
+  melhorEnvio: melhorEnvioRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
 

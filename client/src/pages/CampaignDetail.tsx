@@ -68,6 +68,8 @@ import {
   ExternalLink,
   Plus,
   ChevronRight,
+  Loader2,
+  Search,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -265,6 +267,7 @@ export default function CampaignDetail() {
   const [freightProv, setFreightProv] = useState("");
   const [freightDate, setFreightDate] = useState("");
   const [freightEditing, setFreightEditing] = useState(false);
+  const [trackingLookupEntry, setTrackingLookupEntry] = useState<{ code: string; label?: string | null } | null>(null);
   const [addTrackingForSoId, setAddTrackingForSoId] = useState<number | null>(null);
   const [newTrackCode, setNewTrackCode] = useState("");
   const [newTrackProv, setNewTrackProv] = useState("");
@@ -340,6 +343,16 @@ export default function CampaignDetail() {
     },
     onError: (err: any) => toast.error(err.message),
   });
+
+  const {
+    data: trackingLookupResult,
+    isFetching: trackingLookupFetching,
+    refetch: refetchTrackingLookup,
+    error: trackingLookupError,
+  } = trpc.melhorEnvio.trackShipments.useQuery(
+    { trackingCodes: trackingLookupEntry ? [trackingLookupEntry.code] : ["_"] },
+    { enabled: false, retry: false }
+  );
 
   const uploadArtMutation = trpc.campaign.uploadArt.useMutation({
     onSuccess: () => {
@@ -1143,7 +1156,8 @@ export default function CampaignDetail() {
                             </div>
                           </div>
                           <div className="flex gap-1 shrink-0">
-                            <button onClick={() => { setEditingTrackId(t.id); setEditTrackCode(t.trackingCode); setEditTrackProv(t.freightProvider || ""); setEditTrackDate(t.expectedDate || ""); setEditTrackLabel(t.label || ""); }} className="text-[10px] text-muted-foreground hover:text-foreground underline">Editar</button>
+                            <button onClick={() => { setTrackingLookupEntry({ code: t.trackingCode, label: t.label }); setTimeout(() => refetchTrackingLookup(), 50); }} className="text-[10px] text-blue-400 hover:text-blue-300 underline">Rastrear</button>
+                            <button onClick={() => { setEditingTrackId(t.id); setEditTrackCode(t.trackingCode); setEditTrackProv(t.freightProvider || ""); setEditTrackDate(t.expectedDate || ""); setEditTrackLabel(t.label || ""); }} className="text-[10px] text-muted-foreground hover:text-foreground underline ml-2">Editar</button>
                             <button onClick={() => deleteTrackingMutation.mutate({ id: t.id })} className="text-[10px] text-red-400 hover:text-red-300 underline ml-2">Remover</button>
                           </div>
                         </div>
@@ -1303,7 +1317,8 @@ export default function CampaignDetail() {
                             </div>
                           </div>
                           <div className="flex gap-1 shrink-0">
-                            <button onClick={() => { setEditingTrackId(t.id); setEditTrackCode(t.trackingCode); setEditTrackProv(t.freightProvider || ""); setEditTrackDate(t.expectedDate || ""); setEditTrackLabel(t.label || ""); }} className="text-[10px] text-muted-foreground hover:text-foreground underline">Editar</button>
+                            <button onClick={() => { setTrackingLookupEntry({ code: t.trackingCode, label: t.label }); setTimeout(() => refetchTrackingLookup(), 50); }} className="text-[10px] text-blue-400 hover:text-blue-300 underline">Rastrear</button>
+                            <button onClick={() => { setEditingTrackId(t.id); setEditTrackCode(t.trackingCode); setEditTrackProv(t.freightProvider || ""); setEditTrackDate(t.expectedDate || ""); setEditTrackLabel(t.label || ""); }} className="text-[10px] text-muted-foreground hover:text-foreground underline ml-2">Editar</button>
                             <button onClick={() => deleteTrackingMutation.mutate({ id: t.id })} className="text-[10px] text-red-400 hover:text-red-300 underline ml-2">Remover</button>
                           </div>
                         </div>
@@ -2111,7 +2126,67 @@ export default function CampaignDetail() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* ── EMITIR FATURA DIALOG ── */}
+        {/* ── TRACKING LOOKUP DIALOG ── */}
+        <Dialog open={!!trackingLookupEntry} onOpenChange={(open) => { if (!open) setTrackingLookupEntry(null); }}>
+          <DialogContent className="sm:max-w-lg bg-card border-border/30">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Search className="w-4 h-4" />
+                Consulta de Rastreamento
+              </DialogTitle>
+            </DialogHeader>
+            {trackingLookupEntry && (
+              <div className="space-y-3 py-1">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Código:</span>
+                  <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{trackingLookupEntry.code}</code>
+                  {trackingLookupEntry.label && <span className="text-muted-foreground">({trackingLookupEntry.label})</span>}
+                </div>
+                {trackingLookupFetching && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Consultando transportadora…
+                  </div>
+                )}
+                {!trackingLookupFetching && trackingLookupError && (
+                  <div className="text-sm text-red-400 bg-red-400/10 rounded p-3">
+                    {(trackingLookupError as any).message ?? "Erro ao consultar rastreamento. Verifique a integração com Melhor Envio."}
+                  </div>
+                )}
+                {!trackingLookupFetching && trackingLookupResult && (() => {
+                  const entry = trackingLookupResult[trackingLookupEntry.code];
+                  if (!entry) return <p className="text-sm text-muted-foreground">Nenhum resultado retornado para este código.</p>;
+                  const events: any[] = entry.events ?? [];
+                  return (
+                    <div className="space-y-2">
+                      {entry.id && <p className="text-xs text-muted-foreground">ID: {entry.id}</p>}
+                      {events.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Sem eventos de rastreamento disponíveis.</p>
+                      ) : (
+                        <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                          {events.map((ev: any, i: number) => (
+                            <div key={i} className="flex gap-2 text-xs border-l-2 border-muted pl-2">
+                              <div className="text-muted-foreground shrink-0">{ev.created_at ? new Date(ev.created_at).toLocaleString("pt-BR") : "—"}</div>
+                              <div className="text-foreground">{ev.description ?? ev.status ?? JSON.stringify(ev)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+            <DialogFooter>
+              <Button size="sm" variant="outline" onClick={() => setTrackingLookupEntry(null)}>Fechar</Button>
+              <Button size="sm" onClick={() => refetchTrackingLookup()} disabled={trackingLookupFetching}>
+                {trackingLookupFetching ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Search className="w-3 h-3 mr-1" />}
+                Atualizar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>

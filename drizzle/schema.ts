@@ -969,4 +969,20 @@ export const userRestaurants = pgTable("user_restaurants", {
 export type UserRestaurant = typeof userRestaurants.$inferSelect;
 export type InsertUserRestaurant = typeof userRestaurants.$inferInsert;
 
+// ─── Integration Tokens (OAuth2 provider tokens) ──────────────────────────────
+
+export const integrationTokens = pgTable("integration_tokens", {
+  id: serial("id").primaryKey(),
+  provider: varchar("provider", { length: 50 }).notNull().unique(),
+  accessToken: text("accessToken"),
+  refreshToken: text("refreshToken"),
+  tokenType: varchar("tokenType", { length: 50 }),
+  expiresAt: timestamp("expiresAt"),
+  scopes: text("scopes"),
+  metadata: jsonb("metadata"),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type IntegrationToken = typeof integrationTokens.$inferSelect;
+
 export * from "../shared/models/auth";

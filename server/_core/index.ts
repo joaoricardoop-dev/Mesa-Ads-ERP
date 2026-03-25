@@ -12,6 +12,7 @@ import { setupRestaurantOnboardingRoutes } from "../restaurantOnboardingRouter";
 import { setupPublicSigningRoutes } from "../publicSigningRouter";
 import { setupPublicLogoUploadRoutes, setupAuthenticatedLogoUploadRoutes } from "../logoUploadRouter";
 import { runMigrations } from "../migrations";
+import { exchangeCode } from "../melhorEnvioService";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -48,6 +49,32 @@ async function startServer() {
   setupRestaurantOnboardingRoutes(app);
   setupPublicSigningRoutes(app);
   setupPublicLogoUploadRoutes(app);
+
+  app.get("/api/melhor-envio/callback", async (req, res) => {
+    const { code, error, error_description } = req.query as Record<string, string>;
+
+    const domain = process.env.APP_URL || process.env.REPLIT_DEV_DOMAIN;
+    const baseUrl = domain?.startsWith("http") ? domain : `https://${domain}`;
+    const callbackUrl = `${baseUrl}/api/melhor-envio/callback`;
+    const settingsUrl = `${baseUrl}/configuracoes/integracoes`;
+
+    if (error) {
+      console.error("[MelhorEnvio] OAuth error:", error, error_description);
+      return res.redirect(`${settingsUrl}?me_error=${encodeURIComponent(error_description || error)}`);
+    }
+
+    if (!code) {
+      return res.redirect(`${settingsUrl}?me_error=Código de autorização não recebido`);
+    }
+
+    try {
+      await exchangeCode(code, callbackUrl);
+      res.redirect(`${settingsUrl}?me_connected=1`);
+    } catch (err: any) {
+      console.error("[MelhorEnvio] Token exchange error:", err.message);
+      res.redirect(`${settingsUrl}?me_error=${encodeURIComponent(err.message)}`);
+    }
+  });
 
   if (process.env.NODE_ENV === "development") {
     const cookieParser = await import("cookie-parser");

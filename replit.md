@@ -63,6 +63,8 @@ This project uses a **custom migration runner** in `server/migrations.ts` (an ar
 
 Skipping step 2 means the table or column will never exist in the database, causing runtime "Failed query" errors. The script `scripts/validate-migrations.sh` checks this automatically in post-merge and will fail the build if a table is missing.
 
+- **Melhor Envio Integration**: OAuth2-based freight integration stored in `integration_tokens` table (provider key `melhor_envio`). Service: `server/melhorEnvioService.ts` handles OAuth2 flow, auto-refresh 5 min before expiry, `trackShipments` and `calculateFreight` API calls. Router: `server/melhorEnvioRouter.ts` registered under `melhorEnvio.*` tRPC namespace. OAuth callback: `/api/melhor-envio/callback` (Express route in `server/_core/index.ts`). Settings page: `client/src/pages/IntegrationSettings.tsx` at `/configuracoes/integracoes` (sidebar item "Integrações"). Required env vars: `MELHOR_ENVIO_CLIENT_ID`, `MELHOR_ENVIO_CLIENT_SECRET`, `MELHOR_ENVIO_SANDBOX` (true/false), `MELHOR_ENVIO_APP_NAME`. In `CampaignDetail.tsx`, each tracking entry has a "Rastrear" button that opens a dialog calling `melhorEnvio.trackShipments` with real-time freight status and event history.
+
 ## External Dependencies
 - **Clerk**: For authentication, user management, and authorization.
 - **Neon Database**: Provides the PostgreSQL database infrastructure.
