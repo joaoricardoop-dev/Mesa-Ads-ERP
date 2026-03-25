@@ -191,6 +191,7 @@ export const campaignHistory = pgTable("campaign_history", {
   action: varchar("action", { length: 50 }).notNull(),
   details: text("details"),
   userId: varchar("userId"),
+  userName: varchar("userName", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
   index("idx_campaign_history_campaign_id").on(t.campaignId),

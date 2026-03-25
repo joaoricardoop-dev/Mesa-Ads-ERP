@@ -50,6 +50,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_integration_tokens_table",
     sql: `CREATE TABLE IF NOT EXISTS "integration_tokens" ("id" serial PRIMARY KEY NOT NULL, "provider" varchar(50) NOT NULL UNIQUE, "accessToken" text, "refreshToken" text, "tokenType" varchar(50), "expiresAt" timestamp, "scopes" text, "metadata" jsonb, "updatedAt" timestamp DEFAULT now() NOT NULL);`,
   },
+  {
+    name: "add_user_name_to_campaign_history",
+    sql: `ALTER TABLE "campaign_history" ADD COLUMN IF NOT EXISTS "userName" varchar(255);`,
+  },
 ];
 
 export async function runMigrations() {

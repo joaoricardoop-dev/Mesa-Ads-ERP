@@ -36,6 +36,7 @@ import {
   setCampaignRestaurants,
   getCampaignHistory,
   addCampaignHistory,
+  getRecentHistory,
   getClientHistory,
   getMonthlyEconomics,
   listSuppliers,
@@ -1393,45 +1394,63 @@ export const appRouter = router({
       .input(z.object({ campaignId: z.number() }))
       .query(({ input }) => getCampaignHistory(input.campaignId)),
 
+    getRecentHistory: protectedProcedure
+      .input(z.object({ limit: z.number().optional() }))
+      .query(({ input }) => getRecentHistory(input.limit ?? 20)),
+
     addHistory: protectedProcedure
       .input(z.object({ campaignId: z.number(), action: z.string(), details: z.string().optional() }))
-      .mutation(({ input }) => addCampaignHistory(input.campaignId, input.action, input.details)),
+      .mutation(({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
+        return addCampaignHistory(input.campaignId, input.action, input.details, u?.id, uName);
+      }),
 
     approve: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         await updateCampaign(input.id, { status: "active" });
-        await addCampaignHistory(input.id, "approved", "Cotação aprovada — campanha ativada");
+        await addCampaignHistory(input.id, "approved", "Cotação aprovada — campanha ativada", u?.id, uName);
       }),
 
     archive: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         await updateCampaign(input.id, { status: "archived" });
-        await addCampaignHistory(input.id, "archived", "Cotação arquivada");
+        await addCampaignHistory(input.id, "archived", "Cotação arquivada", u?.id, uName);
       }),
 
     completeBriefing: operacoesProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         await updateCampaign(input.id, { status: "design", designEnteredAt: new Date() });
-        await addCampaignHistory(input.id, "briefing_complete", "Briefing concluído — campanha em produção de design");
+        await addCampaignHistory(input.id, "briefing_complete", "Briefing concluído — campanha em produção de design", u?.id, uName);
       }),
 
     submitDesign: operacoesProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         await updateCampaign(input.id, { status: "aprovacao", aprovacaoEnteredAt: new Date() });
-        await addCampaignHistory(input.id, "design_submitted", "Design enviado para aprovação");
+        await addCampaignHistory(input.id, "design_submitted", "Design enviado para aprovação", u?.id, uName);
       }),
 
     approveDesign: operacoesProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         const campaign = await getCampaign(input.id);
         if (!campaign) throw new Error("Campanha não encontrada");
         await updateCampaign(input.id, { status: "producao", producaoEnteredAt: new Date() });
-        await addCampaignHistory(input.id, "design_approved", "Design aprovado — campanha em produção gráfica");
+        await addCampaignHistory(input.id, "design_approved", "Design aprovado — campanha em produção gráfica", u?.id, uName);
 
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
@@ -1461,7 +1480,9 @@ export const appRouter = router({
 
     receiveMaterial: operacoesProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         const campaign = await getCampaign(input.id);
         if (!campaign) throw new Error("Campanha não encontrada");
         await updateCampaign(input.id, {
@@ -1469,7 +1490,7 @@ export const appRouter = router({
           materialReceivedDate: new Date().toISOString().split("T")[0],
           distribuicaoEnteredAt: new Date(),
         });
-        await addCampaignHistory(input.id, "material_received", "Material recebido — campanha em distribuição");
+        await addCampaignHistory(input.id, "material_received", "Material recebido — campanha em distribuição", u?.id, uName);
 
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
@@ -1504,13 +1525,15 @@ export const appRouter = router({
         veiculacaoStartDate: z.string(),
         veiculacaoEndDate: z.string(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         await updateCampaign(input.id, {
           status: "veiculacao",
           veiculacaoStartDate: input.veiculacaoStartDate,
           veiculacaoEndDate: input.veiculacaoEndDate,
         });
-        await addCampaignHistory(input.id, "distribution_complete", `Distribuição concluída — veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`);
+        await addCampaignHistory(input.id, "distribution_complete", `Distribuição concluída — veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`, u?.id, uName);
 
         try {
           const campaign = await getCampaign(input.id);
@@ -1561,19 +1584,23 @@ export const appRouter = router({
         artPdfUrl: z.string().optional(),
         artImageUrls: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         const { id, ...artData } = input;
         await updateCampaign(id, { ...artData, status: "producao" });
-        await addCampaignHistory(id, "art_uploaded", "Arte enviada — campanha em produção");
+        await addCampaignHistory(id, "art_uploaded", "Arte enviada — campanha em produção", u?.id, uName);
       }),
 
     completeProduction: operacoesProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         const campaign = await getCampaign(input.id);
         if (!campaign) throw new Error("Campanha não encontrada");
         await updateCampaign(input.id, { status: "transito" });
-        await addCampaignHistory(input.id, "production_complete", "Produção concluída — material em trânsito");
+        await addCampaignHistory(input.id, "production_complete", "Produção concluída — material em trânsito", u?.id, uName);
 
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
@@ -1603,9 +1630,11 @@ export const appRouter = router({
 
     confirmMaterial: operacoesProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         await updateCampaign(input.id, { status: "executar", materialReceivedDate: new Date().toISOString().split("T")[0] });
-        await addCampaignHistory(input.id, "material_received", "Material recebido — pronto para execução");
+        await addCampaignHistory(input.id, "material_received", "Material recebido — pronto para execução", u?.id, uName);
       }),
 
     startVeiculacao: operacoesProcedure
@@ -1614,13 +1643,15 @@ export const appRouter = router({
         veiculacaoStartDate: z.string(),
         veiculacaoEndDate: z.string(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         await updateCampaign(input.id, {
           status: "veiculacao",
           veiculacaoStartDate: input.veiculacaoStartDate,
           veiculacaoEndDate: input.veiculacaoEndDate,
         });
-        await addCampaignHistory(input.id, "veiculacao_started", `Veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`);
+        await addCampaignHistory(input.id, "veiculacao_started", `Veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`, u?.id, uName);
 
         try {
           const campaign = await getCampaign(input.id);
@@ -1671,11 +1702,13 @@ export const appRouter = router({
 
     finalizeCampaign: operacoesProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         const campaign = await getCampaign(input.id);
         if (!campaign) throw new Error("Campanha não encontrada");
         await updateCampaign(input.id, { status: "inativa" });
-        await addCampaignHistory(input.id, "finalized", "Campanha finalizada e arquivada");
+        await addCampaignHistory(input.id, "finalized", "Campanha finalizada e arquivada", u?.id, uName);
 
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
@@ -1701,13 +1734,15 @@ export const appRouter = router({
         photoUrl: z.string(),
         uploadedBy: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const u = ctx.user;
+        const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
         if (!db) throw new Error("Database not available");
         const { campaignProofs } = await import("../drizzle/schema");
         const [created] = await db.insert(campaignProofs).values(input).returning();
-        await addCampaignHistory(input.campaignId, "proof_added", `Comprovante semana ${input.week} adicionado`);
+        await addCampaignHistory(input.campaignId, "proof_added", `Comprovante semana ${input.week} adicionado`, u?.id, uName);
         return created;
       }),
 

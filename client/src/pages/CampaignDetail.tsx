@@ -2005,21 +2005,28 @@ export default function CampaignDetail() {
               ) : (
                 <div className="relative pl-4">
                   <div className="absolute left-[7px] top-2 bottom-2 w-px bg-border/30" />
-                  {historyList.map((h, i) => (
+                  {historyList.map((h) => (
                     <div key={h.id} className="relative flex items-start gap-3 pb-4">
-                      <div className={`relative z-10 mt-1 w-3 h-3 rounded-full border-2 ${
-                        h.action === "approved" ? "bg-emerald-400 border-emerald-500" :
-                        h.action === "archived" ? "bg-gray-400 border-gray-500" :
-                        h.action === "created" ? "bg-orange-400 border-orange-500" :
+                      <div className={`relative z-10 mt-1.5 w-3 h-3 rounded-full border-2 shrink-0 ${
+                        h.action === "approved" || h.action === "design_approved" ? "bg-emerald-400 border-emerald-500" :
+                        h.action === "archived" || h.action === "finalized" ? "bg-gray-400 border-gray-500" :
+                        h.action === "created" || h.action === "created_from_quotation" ? "bg-orange-400 border-orange-500" :
                         h.action === "paused" ? "bg-yellow-400 border-yellow-500" :
+                        h.action === "veiculacao_started" || h.action === "distribution_complete" ? "bg-emerald-400 border-emerald-500" :
+                        h.action === "design_submitted" || h.action === "briefing_complete" ? "bg-violet-400 border-violet-500" :
                         "bg-primary border-primary"
                       }`} />
                       <div className="flex-1 bg-card border border-border/30 rounded-lg p-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">{HISTORY_LABELS[h.action] || h.action}</p>
-                          <p className="text-[10px] text-muted-foreground">{new Date(h.createdAt).toLocaleString("pt-BR")}</p>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium leading-tight">{HISTORY_LABELS[h.action] || h.action}</p>
+                          <div className="text-right shrink-0">
+                            <p className="text-[10px] text-muted-foreground">{new Date(h.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                            {(h as any).userName && (
+                              <p className="text-[10px] text-foreground/50 font-medium mt-0.5">{(h as any).userName}</p>
+                            )}
+                          </div>
                         </div>
-                        {h.details && <p className="text-xs text-muted-foreground mt-1">{h.details}</p>}
+                        {h.details && <p className="text-xs text-muted-foreground mt-1.5 border-t border-border/20 pt-1.5">{h.details}</p>}
                       </div>
                     </div>
                   ))}

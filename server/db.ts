@@ -304,10 +304,32 @@ export async function getCampaignHistory(campaignId: number) {
     .orderBy(desc(campaignHistory.createdAt));
 }
 
-export async function addCampaignHistory(campaignId: number, action: string, details?: string) {
+export async function addCampaignHistory(campaignId: number, action: string, details?: string, userId?: string, userName?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.insert(campaignHistory).values({ campaignId, action, details });
+  await db.insert(campaignHistory).values({ campaignId, action, details, userId: userId || null, userName: userName || null });
+}
+
+export async function getRecentHistory(limit = 20) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: campaignHistory.id,
+      campaignId: campaignHistory.campaignId,
+      campaignName: campaigns.name,
+      clientName: clients.name,
+      action: campaignHistory.action,
+      details: campaignHistory.details,
+      userId: campaignHistory.userId,
+      userName: campaignHistory.userName,
+      createdAt: campaignHistory.createdAt,
+    })
+    .from(campaignHistory)
+    .leftJoin(campaigns, eq(campaignHistory.campaignId, campaigns.id))
+    .leftJoin(clients, eq(campaigns.clientId, clients.id))
+    .orderBy(desc(campaignHistory.createdAt))
+    .limit(limit);
 }
 
 export async function getClientHistory(clientId: number) {
