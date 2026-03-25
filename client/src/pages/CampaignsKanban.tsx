@@ -19,6 +19,10 @@ import {
   Clock,
   Timer,
   Flame,
+  Layers,
+  Printer,
+  Radio,
+  Activity,
 } from "lucide-react";
 import {
   Select,
@@ -302,29 +306,72 @@ export default function CampaignsKanban() {
   }, [filtered]);
 
   const totalAtivas   = kanbanCampaigns.filter((c) => c.status !== "archived").length;
-  const emProducao    = kanbanCampaigns.filter((c) => c.status === "producao").length;
+  const emPreProd     = kanbanCampaigns.filter((c) => ["briefing","design","aprovacao"].includes(c.status)).length;
+  const emProducao    = kanbanCampaigns.filter((c) => ["producao","distribuicao"].includes(c.status)).length;
+  const emVeiculacao  = kanbanCampaigns.filter((c) => c.status === "veiculacao").length;
   const atrasadas     = kanbanCampaigns.filter((c) => c.status !== "archived" && isOverdue(c.endDate)).length;
   const emRiscoSla    = kanbanCampaigns.filter((c) => { const pp = getPreProdInfo(c); return !!pp && pp.days >= SLA_WARN_DAYS; }).length;
 
   return (
     <div className="flex flex-col">
-      <div className="px-4 pt-4 pb-3 space-y-3 border-b border-border/20">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="bg-card border border-border/30 rounded-lg px-3 py-2">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Ativas</p>
-            <p className="text-xl font-bold">{totalAtivas}</p>
+      <div className="px-4 pt-3 pb-3 space-y-3 border-b border-border/20">
+        <div className="flex items-center gap-2">
+          <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Indicadores de Gestão</span>
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <LayoutGrid className="w-3 h-3" />
+              <span className="text-[10px] uppercase tracking-wide">Ativas</span>
+            </div>
+            <p className="text-2xl font-bold leading-none">{totalAtivas}</p>
+            <p className="text-[9px] text-muted-foreground/60">campanhas em curso</p>
           </div>
-          <div className="bg-card border border-border/30 rounded-lg px-3 py-2">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Em Produção</p>
-            <p className="text-xl font-bold text-amber-400">{emProducao}</p>
+
+          <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 text-violet-400">
+              <Layers className="w-3 h-3" />
+              <span className="text-[10px] uppercase tracking-wide">Pré-prod</span>
+            </div>
+            <p className={`text-2xl font-bold leading-none ${emPreProd > 0 ? "text-violet-400" : "text-muted-foreground"}`}>{emPreProd}</p>
+            <p className="text-[9px] text-muted-foreground/60">briefing → aprovação</p>
           </div>
-          <div className="bg-card border border-border/30 rounded-lg px-3 py-2">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Atrasadas</p>
-            <p className={`text-xl font-bold ${atrasadas > 0 ? "text-red-400" : "text-muted-foreground"}`}>{atrasadas}</p>
+
+          <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 text-amber-400">
+              <Printer className="w-3 h-3" />
+              <span className="text-[10px] uppercase tracking-wide">Produção</span>
+            </div>
+            <p className={`text-2xl font-bold leading-none ${emProducao > 0 ? "text-amber-400" : "text-muted-foreground"}`}>{emProducao}</p>
+            <p className="text-[9px] text-muted-foreground/60">produção + distribuição</p>
           </div>
-          <div className="bg-card border border-border/30 rounded-lg px-3 py-2">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Risco SLA</p>
-            <p className={`text-xl font-bold ${emRiscoSla > 0 ? "text-amber-400" : "text-muted-foreground"}`}>{emRiscoSla}</p>
+
+          <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 text-emerald-400">
+              <Radio className="w-3 h-3" />
+              <span className="text-[10px] uppercase tracking-wide">Veiculação</span>
+            </div>
+            <p className={`text-2xl font-bold leading-none ${emVeiculacao > 0 ? "text-emerald-400" : "text-muted-foreground"}`}>{emVeiculacao}</p>
+            <p className="text-[9px] text-muted-foreground/60">campanhas ao vivo</p>
+          </div>
+
+          <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+            <div className={`flex items-center gap-1.5 ${atrasadas > 0 ? "text-red-400" : "text-muted-foreground"}`}>
+              <AlertTriangle className="w-3 h-3" />
+              <span className="text-[10px] uppercase tracking-wide">Atrasadas</span>
+            </div>
+            <p className={`text-2xl font-bold leading-none ${atrasadas > 0 ? "text-red-400" : "text-muted-foreground"}`}>{atrasadas}</p>
+            <p className="text-[9px] text-muted-foreground/60">prazo de fim vencido</p>
+          </div>
+
+          <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+            <div className={`flex items-center gap-1.5 ${emRiscoSla > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
+              <Timer className="w-3 h-3" />
+              <span className="text-[10px] uppercase tracking-wide">Risco SLA</span>
+            </div>
+            <p className={`text-2xl font-bold leading-none ${emRiscoSla > 0 ? "text-amber-400" : "text-muted-foreground"}`}>{emRiscoSla}</p>
+            <p className="text-[9px] text-muted-foreground/60">pré-prod ≥ 3 dias</p>
           </div>
         </div>
 
@@ -396,7 +443,7 @@ export default function CampaignsKanban() {
       </div>
 
       <div className="overflow-x-auto">
-        <div className="flex gap-3 p-4 min-w-max" style={{ height: "calc(100vh - 280px)" }}>
+        <div className="flex gap-3 p-4 min-w-max" style={{ height: "calc(100vh - 330px)" }}>
           {STAGES.map((stage, stageIndex) => {
             const cards = byStage[stage.key];
             const hasSlaRisk = SLA_STAGES.has(stage.key as any);
