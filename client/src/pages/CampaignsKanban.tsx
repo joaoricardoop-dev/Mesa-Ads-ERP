@@ -471,8 +471,10 @@ export default function CampaignsKanban() {
                 </div>
 
                 {hasSlaRisk && (
-                  <div className={`px-3 py-1 text-[10px] border-b border-current/10 ${stage.text} opacity-60`}>
-                    SLA: <span className="text-amber-400">⚠ ≥3d</span> · <span className="text-red-400">🔥 ≥5d</span>
+                  <div className="px-3 py-1 text-[10px] border-b border-current/10 text-muted-foreground flex items-center gap-2">
+                    <span className="flex items-center gap-0.5 text-amber-400"><Timer className="w-2.5 h-2.5" /> ≥3d em aviso</span>
+                    <span className="text-muted-foreground/30">·</span>
+                    <span className="flex items-center gap-0.5 text-red-400"><AlertTriangle className="w-2.5 h-2.5" /> ≥5d crítico</span>
                   </div>
                 )}
 
