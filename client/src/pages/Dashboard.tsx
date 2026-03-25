@@ -1,427 +1,401 @@
 import PageContainer from "@/components/PageContainer";
-import Section from "@/components/Section";
 import { trpc } from "@/lib/trpc";
-import { formatCurrency, formatCompact } from "@/lib/format";
+import { formatCurrency } from "@/lib/format";
 import { useLocation } from "wouter";
 import {
-  ClipboardList,
-  Factory,
-  Truck,
-  Play,
   Radio,
   ArrowRight,
-  DollarSign,
-  TrendingUp,
-  Activity,
-  Clock,
-  FileText,
-  Pencil,
-  CheckSquare,
   AlertTriangle,
-  type LucideIcon,
+  CheckSquare,
+  Clock,
+  Timer,
+  Layers,
+  Printer,
+  Activity,
+  Package,
+  ChevronRight,
+  TrendingUp,
+  Building2,
+  Calendar,
 } from "lucide-react";
 import { useMemo } from "react";
 
-interface StatusCardDef {
-  label: string;
-  icon: LucideIcon;
-  color: string;
-  path: string;
-  statusKey: string;
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function daysSince(d: string | Date | null | undefined): number | null {
+  if (!d) return null;
+  return Math.floor((Date.now() - new Date(d as string).getTime()) / 86_400_000);
 }
 
-const STATUS_CARD_DEFS: StatusCardDef[] = [
-  { label: "Cotações Ativas", icon: ClipboardList, color: "text-amber-400 bg-amber-500/10", path: "/comercial/cotacoes", statusKey: "quotations_active" },
-  { label: "Briefing / Design", icon: FileText, color: "text-violet-400 bg-violet-500/10", path: "/campanhas", statusKey: "briefing_design" },
-  { label: "Em Produção Gráf.", icon: Factory, color: "text-yellow-400 bg-yellow-500/10", path: "/campanhas", statusKey: "producao" },
-  { label: "Em Distribuição", icon: Truck, color: "text-orange-400 bg-orange-500/10", path: "/campanhas", statusKey: "distribuicao" },
-  { label: "Em Veiculação", icon: Radio, color: "text-emerald-400 bg-emerald-500/10", path: "/campanhas", statusKey: "veiculacao" },
+function isOverdue(endDate: string | null | undefined): boolean {
+  if (!endDate) return false;
+  return new Date(endDate + "T23:59:59") < new Date();
+}
+
+const SLA_WARN = 3;
+const SLA_CRIT = 5;
+const PRE_PROD_STAGES = new Set(["briefing", "design", "aprovacao"]);
+
+function getPreProdDays(c: { status: string; briefingEnteredAt?: any; producaoEnteredAt?: any }): number | null {
+  if (!c.briefingEnteredAt) return null;
+  if (PRE_PROD_STAGES.has(c.status)) return daysSince(c.briefingEnteredAt);
+  if (c.producaoEnteredAt) {
+    return Math.max(0, Math.floor(
+      (new Date(c.producaoEnteredAt).getTime() - new Date(c.briefingEnteredAt).getTime()) / 86_400_000
+    ));
+  }
+  return null;
+}
+
+function calcMonthlyRevenue(c: {
+  coastersPerRestaurant: number; activeRestaurants: number; pricingType: string;
+  markupPercent: string; fixedPrice: string; commissionType: string;
+  restaurantCommission: string; fixedCommission: string; sellerCommission: string;
+  taxRate: string; batchSize: number; batchCost: string;
+}): number {
+  const unitCost = Number(c.batchCost) / c.batchSize;
+  const prodCost = c.coastersPerRestaurant * unitCost;
+  const restFixed = c.commissionType === "fixed" ? Number(c.fixedCommission) * c.coastersPerRestaurant : 0;
+  const custoPD = prodCost + restFixed;
+  const restVar = c.commissionType === "variable" ? Number(c.restaurantCommission) / 100 : 0;
+  const totalVarRate = Number(c.sellerCommission) / 100 + Number(c.taxRate) / 100 + restVar;
+  const denom = 1 - totalVarRate;
+  const custoBruto = denom > 0 ? custoPD / denom : custoPD;
+  const price = c.pricingType === "fixed"
+    ? custoBruto + Number(c.fixedPrice)
+    : custoBruto * (1 + Number(c.markupPercent) / 100);
+  return price * c.activeRestaurants;
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Rascunho", quotation: "Cotação", briefing: "Briefing", design: "Design",
+  aprovacao: "Aprovação", producao: "Produção", distribuicao: "Distribuição",
+  veiculacao: "Veiculação", inativa: "Inativa", archived: "Arquivada",
+  active: "Ativa", transito: "Trânsito",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  briefing: "bg-sky-500/20 text-sky-400", design: "bg-purple-500/20 text-purple-400",
+  aprovacao: "bg-orange-500/20 text-orange-400", producao: "bg-amber-500/20 text-amber-400",
+  distribuicao: "bg-teal-500/20 text-teal-400", veiculacao: "bg-emerald-500/20 text-emerald-400",
+  active: "bg-emerald-500/20 text-emerald-400", draft: "bg-muted text-muted-foreground",
+  archived: "bg-muted text-muted-foreground", inativa: "bg-muted text-muted-foreground",
+};
+
+const PIPELINE_STAGES = [
+  { label: "Briefing", key: "briefing", color: "bg-sky-500" },
+  { label: "Design", key: "design", color: "bg-purple-500" },
+  { label: "Aprovação", key: "aprovacao", color: "bg-pink-500" },
+  { label: "Produção", key: "producao", color: "bg-amber-500" },
+  { label: "Distribuição", key: "distribuicao", color: "bg-teal-500" },
+  { label: "Veiculação", key: "veiculacao", color: "bg-emerald-500" },
 ];
 
-const PIPELINE_STAGE_DEFS = [
-  { label: "Cotação", statusKey: "quotation", color: "bg-amber-500" },
-  { label: "Briefing", statusKey: "briefing", color: "bg-violet-500" },
-  { label: "Design", statusKey: "design", color: "bg-purple-500" },
-  { label: "Aprovação", statusKey: "aprovacao", color: "bg-pink-500" },
-  { label: "Produção", statusKey: "producao", color: "bg-yellow-500" },
-  { label: "Distribuição", statusKey: "distribuicao", color: "bg-orange-500" },
-  { label: "Veiculação", statusKey: "veiculacao", color: "bg-emerald-500" },
-  { label: "Inativa", statusKey: "inativa", color: "bg-muted" },
-];
-
-function useStatusCounts() {
-  const quotationsQuery = trpc.quotation.list.useQuery(undefined, { staleTime: 30000 });
-  const campaignsQuery = trpc.campaign.list.useQuery(undefined, { staleTime: 30000 });
-
-  return useMemo(() => {
-    const counts: Record<string, number> = {};
-
-    const quotations = quotationsQuery.data || [];
-    counts["quotations_active"] = quotations.filter(
-      (q) => q.status === "ativa" || q.status === "enviada" || q.status === "rascunho"
-    ).length;
-
-    const campaigns = campaignsQuery.data || [];
-    const campaignStatusCounts: Record<string, number> = {};
-    for (const c of campaigns) {
-      campaignStatusCounts[c.status] = (campaignStatusCounts[c.status] || 0) + 1;
-    }
-
-    counts["quotation"] = campaignStatusCounts["quotation"] || 0;
-    counts["briefing"] = campaignStatusCounts["briefing"] || 0;
-    counts["design"] = campaignStatusCounts["design"] || 0;
-    counts["aprovacao"] = campaignStatusCounts["aprovacao"] || 0;
-    counts["producao"] = campaignStatusCounts["producao"] || 0;
-    counts["distribuicao"] = campaignStatusCounts["distribuicao"] || 0;
-    counts["transito"] = campaignStatusCounts["transito"] || 0;
-    counts["executar"] = campaignStatusCounts["executar"] || 0;
-    counts["veiculacao"] = campaignStatusCounts["veiculacao"] || 0;
-    counts["inativa"] = campaignStatusCounts["inativa"] || 0;
-    counts["active"] = campaignStatusCounts["active"] || 0;
-    counts["draft"] = campaignStatusCounts["draft"] || 0;
-    counts["completed"] = campaignStatusCounts["completed"] || 0;
-    counts["briefing_design"] = (campaignStatusCounts["briefing"] || 0) + (campaignStatusCounts["design"] || 0) + (campaignStatusCounts["aprovacao"] || 0);
-
-    const totalCampaignValue = campaigns.reduce((sum, c) => {
-      const price = parseFloat((c as any).fixedPrice || "0");
-      return sum + price;
-    }, 0);
-
-    const activeCampaigns = campaigns.filter(
-      (c) => c.status === "active" || c.status === "veiculacao" || c.status === "producao" ||
-             c.status === "transito" || c.status === "executar" || c.status === "briefing" ||
-             c.status === "design" || c.status === "aprovacao" || c.status === "distribuicao"
-    );
-
-    return {
-      counts,
-      totalCampaigns: campaigns.length,
-      activeCampaigns: activeCampaigns.length,
-      totalCampaignValue,
-      quotationsTotal: quotations.length,
-      quotationsWon: quotations.filter((q) => q.status === "win").length,
-      isLoading: quotationsQuery.isLoading || campaignsQuery.isLoading,
-    };
-  }, [quotationsQuery.data, campaignsQuery.data, quotationsQuery.isLoading, campaignsQuery.isLoading]);
+function formatRelativeDate(d: string | Date): string {
+  const ms = Date.now() - new Date(d as string).getTime();
+  const min = Math.floor(ms / 60000);
+  const hr  = Math.floor(ms / 3600000);
+  const day = Math.floor(ms / 86400000);
+  if (min < 1) return "agora";
+  if (min < 60) return `${min}min atrás`;
+  if (hr < 24) return `${hr}h atrás`;
+  if (day < 7) return `${day}d atrás`;
+  return new Date(d as string).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
-function formatRelativeDate(dateStr: string | Date): string {
-  const date = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHr = Math.floor(diffMs / 3600000);
-  const diffDay = Math.floor(diffMs / 86400000);
-
-  if (diffMin < 1) return "agora";
-  if (diffMin < 60) return `${diffMin}min atrás`;
-  if (diffHr < 24) return `${diffHr}h atrás`;
-  if (diffDay < 7) return `${diffDay}d atrás`;
-  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-}
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const { counts, activeCampaigns, totalCampaigns, quotationsTotal, quotationsWon, isLoading } = useStatusCounts();
+  const { data: campaigns = [], isLoading } = trpc.campaign.list.useQuery(undefined, { staleTime: 30000 });
 
-  const pipelineTotal = PIPELINE_STAGE_DEFS.reduce((sum, s) => sum + (counts[s.statusKey] || 0), 0);
-  const maxPipelineCount = Math.max(...PIPELINE_STAGE_DEFS.map((s) => counts[s.statusKey] || 0), 1);
+  const kpis = useMemo(() => {
+    const ativas      = campaigns.filter((c) => c.status !== "archived").length;
+    const preProducao = campaigns.filter((c) => PRE_PROD_STAGES.has(c.status)).length;
+    const producao    = campaigns.filter((c) => ["producao", "distribuicao"].includes(c.status)).length;
+    const veiculacao  = campaigns.filter((c) => c.status === "veiculacao").length;
+    const atrasadas   = campaigns.filter((c) => c.status !== "archived" && isOverdue(c.endDate)).length;
+    const riscoSla    = campaigns.filter((c) => {
+      const pp = getPreProdDays(c as any);
+      return PRE_PROD_STAGES.has(c.status) && pp !== null && pp >= SLA_WARN;
+    }).length;
+    return { ativas, preProducao, producao, veiculacao, atrasadas, riscoSla };
+  }, [campaigns]);
 
-  const conversionRate = quotationsTotal > 0 ? ((quotationsWon / quotationsTotal) * 100).toFixed(1) : "0.0";
+  const billing = useMemo(() => {
+    let monthlyTotal = 0;
+    let contractTotal = 0;
+    for (const c of campaigns) {
+      if ((c as any).isBonificada || c.status === "archived") continue;
+      const monthly = calcMonthlyRevenue(c as any);
+      monthlyTotal += monthly;
+      contractTotal += monthly * c.contractDuration;
+    }
+    const activeBilling = campaigns.filter(
+      (c) => !(c as any).isBonificada && ["veiculacao","producao","distribuicao"].includes(c.status)
+    );
+    const activeMontly = activeBilling.reduce((s, c) => s + calcMonthlyRevenue(c as any), 0);
+    return { monthlyTotal, contractTotal, activeMontly };
+  }, [campaigns]);
+
+  const pipelineMap = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const c of campaigns) m[c.status] = (m[c.status] || 0) + 1;
+    return m;
+  }, [campaigns]);
+
+  const maxPipeline = Math.max(...PIPELINE_STAGES.map((s) => pipelineMap[s.key] || 0), 1);
+
+  const atrasadasList = useMemo(() =>
+    campaigns
+      .filter((c) => c.status !== "archived" && isOverdue(c.endDate))
+      .sort((a, b) => (a.endDate || "").localeCompare(b.endDate || ""))
+      .slice(0, 6),
+    [campaigns]
+  );
+
+  const slaList = useMemo(() =>
+    campaigns
+      .filter((c) => {
+        const pp = getPreProdDays(c as any);
+        return PRE_PROD_STAGES.has(c.status) && pp !== null && pp >= SLA_WARN;
+      })
+      .map((c) => ({ ...c, pp: getPreProdDays(c as any)! }))
+      .sort((a, b) => b.pp - a.pp)
+      .slice(0, 6),
+    [campaigns]
+  );
+
+  const recent = useMemo(() =>
+    [...campaigns]
+      .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+      .slice(0, 8),
+    [campaigns]
+  );
 
   return (
-    <PageContainer title="Dashboard" description="Visão executiva do Mesa Ads">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        {STATUS_CARD_DEFS.map((card) => {
-          const Icon = card.icon;
-          const count = counts[card.statusKey] || 0;
-          return (
-            <button
-              key={card.label}
-              onClick={() => navigate(card.path)}
-              className="bg-card border border-border/30 rounded-xl p-4 text-left hover:border-primary/30 transition-colors group"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.color}`}>
-                  <Icon className="w-4 h-4" />
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+    <PageContainer title="Dashboard" description="Gestão de campanhas · Mesa Ads">
+
+      {/* ── KPIs de Campanha ── */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Visão Geral de Campanhas</span>
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {[
+            { label: "Ativas", value: kpis.ativas, sub: "não arquivadas", icon: Package, color: "" },
+            { label: "Pré-prod", value: kpis.preProducao, sub: "briefing → aprovação", icon: Layers, color: kpis.preProducao > 0 ? "text-violet-400" : "" },
+            { label: "Produção", value: kpis.producao, sub: "produção + distribuição", icon: Printer, color: kpis.producao > 0 ? "text-amber-400" : "" },
+            { label: "Veiculação", value: kpis.veiculacao, sub: "campanhas ao vivo", icon: Radio, color: kpis.veiculacao > 0 ? "text-emerald-400" : "" },
+            { label: "Atrasadas", value: kpis.atrasadas, sub: "prazo de fim vencido", icon: AlertTriangle, color: kpis.atrasadas > 0 ? "text-red-400" : "" },
+            { label: "Risco SLA", value: kpis.riscoSla, sub: "pré-prod ≥ 3 dias", icon: Timer, color: kpis.riscoSla > 0 ? "text-amber-400" : "" },
+          ].map(({ label, value, sub, icon: Icon, color }) => (
+            <div key={label} className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+              <div className={`flex items-center gap-1.5 ${color || "text-muted-foreground"}`}>
+                <Icon className="w-3 h-3" />
+                <span className="text-[10px] uppercase tracking-wide">{label}</span>
               </div>
-              <p className="font-mono text-2xl font-bold tabular-nums">
-                {isLoading ? "—" : count}
-              </p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">{card.label}</p>
-            </button>
-          );
-        })}
+              <p className={`text-2xl font-bold leading-none ${color || ""}`}>{isLoading ? "—" : value}</p>
+              <p className="text-[9px] text-muted-foreground/60">{sub}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <Section title="Pipeline" icon={Factory} description="Volume por status no funil de campanhas">
-        <div className="flex items-end gap-1 h-24 overflow-x-auto scrollbar-hide">
-          {PIPELINE_STAGE_DEFS.map((stage) => {
-            const count = counts[stage.statusKey] || 0;
-            const barHeight = maxPipelineCount > 0 ? Math.max(8, (count / maxPipelineCount) * 60) : 8;
+      {/* ── Faturamento ── */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Faturamento</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="bg-card border border-border/30 rounded-xl p-4">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Faturamento Mensal Projetado</p>
+            <p className="text-2xl font-bold font-mono text-emerald-400">
+              {isLoading ? "—" : formatCurrency(billing.monthlyTotal)}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-1">soma de todas as campanhas ativas</p>
+          </div>
+          <div className="bg-card border border-border/30 rounded-xl p-4">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Faturamento em Veiculação</p>
+            <p className="text-2xl font-bold font-mono text-sky-400">
+              {isLoading ? "—" : formatCurrency(billing.activeMontly)}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-1">produção + distribuição + veiculação</p>
+          </div>
+          <div className="bg-card border border-border/30 rounded-xl p-4">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Total em Carteira (contratos)</p>
+            <p className="text-2xl font-bold font-mono">
+              {isLoading ? "—" : formatCurrency(billing.contractTotal)}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-1">valor total dos contratos vigentes</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Pipeline ── */}
+      <div className="bg-card border border-border/30 rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-semibold">Pipeline de Campanhas</p>
+            <p className="text-[10px] text-muted-foreground">Volume por etapa do funil</p>
+          </div>
+        </div>
+        <div className="flex items-end gap-2 h-24">
+          {PIPELINE_STAGES.map((stage) => {
+            const count = pipelineMap[stage.key] || 0;
+            const barH = Math.max(6, (count / maxPipeline) * 72);
+            const pct = ((count / Math.max(campaigns.filter(c=>c.status!=="archived").length, 1)) * 100).toFixed(0);
             return (
-              <div key={stage.label} className="flex-1 flex flex-col items-center gap-1.5">
-                <span className="text-xs font-mono font-semibold tabular-nums">
-                  {isLoading ? "—" : count}
-                </span>
-                <div
-                  className={`w-full rounded-t-sm ${stage.color} opacity-60 transition-all duration-500`}
-                  style={{ height: `${barHeight}px` }}
-                />
-                <span className="text-[9px] text-muted-foreground uppercase tracking-wider">{stage.label}</span>
+              <div key={stage.key} className="flex-1 flex flex-col items-center gap-1">
+                <span className="text-xs font-mono font-bold tabular-nums">{isLoading ? "—" : count}</span>
+                <div className={`w-full rounded-t ${stage.color} opacity-70 transition-all duration-500`} style={{ height: `${barH}px` }} />
+                <span className="text-[9px] text-muted-foreground text-center leading-tight">{stage.label}</span>
+                {!isLoading && count > 0 && <span className="text-[9px] text-muted-foreground/50">{pct}%</span>}
               </div>
             );
           })}
         </div>
-        {!isLoading && (
-          <div className="mt-3 pt-3 border-t border-border/20 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Total no pipeline</span>
-            <span className="text-sm font-mono font-semibold">{pipelineTotal}</span>
+        <div className="pt-2 border-t border-border/20 flex items-center justify-between text-xs text-muted-foreground">
+          <span>Total no pipeline</span>
+          <span className="font-mono font-semibold">{PIPELINE_STAGES.reduce((s, st) => s + (pipelineMap[st.key] || 0), 0)}</span>
+        </div>
+      </div>
+
+      {/* ── Alertas de atraso ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Campanhas atrasadas */}
+        <div className={`rounded-xl border p-4 space-y-2 ${atrasadasList.length > 0 ? "bg-red-500/5 border-red-500/30" : "bg-emerald-500/5 border-emerald-500/20"}`}>
+          <div className="flex items-center gap-2">
+            {atrasadasList.length > 0
+              ? <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              : <CheckSquare className="w-4 h-4 text-emerald-400 shrink-0" />}
+            <span className={`text-sm font-semibold ${atrasadasList.length > 0 ? "text-red-400" : "text-emerald-400"}`}>
+              {atrasadasList.length > 0 ? `${atrasadasList.length} campanha${atrasadasList.length > 1 ? "s" : ""} atrasada${atrasadasList.length > 1 ? "s" : ""}` : "Nenhuma campanha atrasada"}
+            </span>
+          </div>
+          {atrasadasList.length > 0 && (
+            <div className="space-y-1">
+              {atrasadasList.map((c) => {
+                const daysLate = c.endDate ? Math.floor((Date.now() - new Date(c.endDate + "T23:59:59").getTime()) / 86_400_000) : 0;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => navigate(`/campanhas/${c.id}`)}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/15 transition-colors text-left group"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium truncate">{c.name}</p>
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <Building2 className="w-2.5 h-2.5" />{c.clientName}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${STATUS_COLORS[c.status] || "bg-muted text-muted-foreground"}`}>
+                        {STATUS_LABELS[c.status] || c.status}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-red-400">{daysLate}d</span>
+                      <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Risco SLA */}
+        <div className={`rounded-xl border p-4 space-y-2 ${slaList.length > 0 ? "bg-amber-500/5 border-amber-500/30" : "bg-emerald-500/5 border-emerald-500/20"}`}>
+          <div className="flex items-center gap-2">
+            {slaList.length > 0
+              ? <Timer className="w-4 h-4 text-amber-400 shrink-0" />
+              : <CheckSquare className="w-4 h-4 text-emerald-400 shrink-0" />}
+            <span className={`text-sm font-semibold ${slaList.length > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+              {slaList.length > 0 ? `${slaList.length} campanha${slaList.length > 1 ? "s" : ""} em risco SLA` : "Nenhum risco de SLA"}
+            </span>
+          </div>
+          {slaList.length > 0 && (
+            <div className="space-y-1">
+              {slaList.map((c) => {
+                const isCrit = c.pp >= SLA_CRIT;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => navigate(`/campanhas/${c.id}`)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-left group ${isCrit ? "bg-red-500/10 hover:bg-red-500/15" : "bg-amber-500/10 hover:bg-amber-500/15"}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium truncate">{c.name}</p>
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <Building2 className="w-2.5 h-2.5" />{c.clientName}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${STATUS_COLORS[c.status] || "bg-muted text-muted-foreground"}`}>
+                        {STATUS_LABELS[c.status] || c.status}
+                      </span>
+                      <span className={`text-xs font-mono font-bold ${isCrit ? "text-red-400" : "text-amber-400"}`}>
+                        {isCrit ? <AlertTriangle className="w-2.5 h-2.5 inline mr-0.5" /> : null}{c.pp}d pré-prod
+                      </span>
+                      <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Atividade Recente ── */}
+      <div className="bg-card border border-border/30 rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-semibold">Atividade Recente</p>
+            <p className="text-[10px] text-muted-foreground">Últimas campanhas atualizadas</p>
+          </div>
+        </div>
+        {recent.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma atividade</p>
+        ) : (
+          <div className="space-y-1">
+            {recent.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => navigate(`/campanhas/${c.id}`)}
+                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-muted/50 transition-colors text-left group"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium truncate">{c.name}</span>
+                    {(c as any).campaignNumber && (
+                      <span className="text-[10px] font-mono text-muted-foreground shrink-0">{(c as any).campaignNumber}</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Building2 className="w-2.5 h-2.5" />{c.clientName}
+                    <span className="text-border mx-0.5">·</span>
+                    <Calendar className="w-2.5 h-2.5" />{formatRelativeDate((c as any).updatedAt || c.createdAt)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {isOverdue(c.endDate) && c.status !== "archived" && (
+                    <span className="text-[10px] text-red-400 font-medium">Atrasada</span>
+                  )}
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${STATUS_COLORS[c.status] || "bg-muted text-muted-foreground"}`}>
+                    {STATUS_LABELS[c.status] || c.status}
+                  </span>
+                  <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </button>
+            ))}
           </div>
         )}
-      </Section>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-card border border-border/30 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-              <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-            </div>
-            <span className="text-sm font-semibold">Campanhas Ativas</span>
-          </div>
-          <p className="font-mono text-2xl font-bold tabular-nums">
-            {isLoading ? "—" : activeCampaigns}
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-1">
-            de {isLoading ? "—" : totalCampaigns} total
-          </p>
-        </div>
-
-        <div className="bg-card border border-border/30 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-              <TrendingUp className="w-3.5 h-3.5 text-blue-400" />
-            </div>
-            <span className="text-sm font-semibold">Taxa de Conversão</span>
-          </div>
-          <p className="font-mono text-2xl font-bold tabular-nums">
-            {isLoading ? "—" : `${conversionRate}%`}
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-1">
-            {isLoading ? "—" : `${quotationsWon} wins de ${quotationsTotal} cotações`}
-          </p>
-        </div>
-
-        <div className="bg-card border border-border/30 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
-              <Activity className="w-3.5 h-3.5 text-purple-400" />
-            </div>
-            <span className="text-sm font-semibold">Projeções</span>
-          </div>
-          <p className="font-mono text-2xl font-bold tabular-nums">
-            {isLoading ? "—" : activeCampaigns}
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-1">
-            campanhas gerando receita
-          </p>
-        </div>
       </div>
 
-      <SlaAlerts />
-
-      <RecentActivity />
     </PageContainer>
-  );
-}
-
-function SlaAlerts() {
-  const campaignsQuery = trpc.campaign.list.useQuery(undefined, { staleTime: 30000 });
-  const soQuery = trpc.serviceOrder.list.useQuery({ type: "distribuicao" }, { staleTime: 30000 });
-  const [, navigate] = useLocation();
-
-  const { staleCampaigns, lateFreight } = useMemo(() => {
-    const now = Date.now();
-    const MS_PER_DAY = 1000 * 60 * 60 * 24;
-    const SLA_THRESHOLD = 5;
-
-    const staleCampaigns = (campaignsQuery.data || [])
-      .filter(c => ["briefing", "design", "aprovacao"].includes(c.status))
-      .map(c => {
-        const ref = (c as any).proposalSignedAt ? new Date((c as any).proposalSignedAt) : new Date(c.createdAt);
-        const days = Math.floor((now - ref.getTime()) / MS_PER_DAY);
-        return { ...c, staleDays: days };
-      })
-      .filter(c => c.staleDays > SLA_THRESHOLD)
-      .sort((a, b) => b.staleDays - a.staleDays);
-
-    const today = new Date().toISOString().split("T")[0];
-    const lateFreight = (soQuery.data || [])
-      .filter(s => (s as any).freightExpectedDate && (s as any).freightExpectedDate < today)
-      .map(s => {
-        const days = Math.floor((now - new Date((s as any).freightExpectedDate).getTime()) / MS_PER_DAY);
-        return { ...s, lateDays: days };
-      })
-      .sort((a, b) => b.lateDays - a.lateDays);
-
-    return { staleCampaigns, lateFreight };
-  }, [campaignsQuery.data, soQuery.data]);
-
-  const total = staleCampaigns.length + lateFreight.length;
-  const stageLabels: Record<string, string> = { briefing: "Briefing", design: "Design", aprovacao: "Aprovação" };
-
-  if (total === 0) {
-    return (
-      <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 flex items-center gap-2">
-        <CheckSquare className="w-4 h-4 text-emerald-400 shrink-0" />
-        <span className="text-sm text-emerald-400 font-medium">Nenhum SLA vencido</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-red-500/5 border border-red-500/30 rounded-xl p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-        <span className="text-sm font-semibold text-red-400">Alertas SLA — {total} item{total !== 1 ? "s" : ""} requer{total === 1 ? "" : "em"} atenção</span>
-      </div>
-
-      {staleCampaigns.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Pipeline parado (&gt;5 dias)</p>
-          {staleCampaigns.map(c => (
-            <button
-              key={c.id}
-              onClick={() => navigate(`/campanhas/${c.id}`)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-md bg-red-500/10 hover:bg-red-500/20 transition-colors text-left"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-medium truncate">{c.name}</span>
-                {(c as any).campaignNumber && (
-                  <span className="text-[10px] font-mono text-muted-foreground shrink-0">{(c as any).campaignNumber}</span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400 font-medium">
-                  {stageLabels[c.status] || c.status}
-                </span>
-                <span className="text-xs font-mono font-semibold text-red-400">{c.staleDays}d</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {lateFreight.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Frete em atraso</p>
-          {lateFreight.map(s => (
-            <div
-              key={s.id}
-              className="flex items-center justify-between px-3 py-2 rounded-md bg-orange-500/10 border border-orange-500/20"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-mono text-muted-foreground shrink-0">{s.orderNumber}</span>
-                <span className="text-xs truncate">{s.campaignName}</span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {(s as any).freightProvider && (
-                  <span className="text-[10px] text-muted-foreground">{(s as any).freightProvider}</span>
-                )}
-                <span className="text-xs font-mono font-semibold text-orange-400">{s.lateDays}d atraso</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RecentActivity() {
-  const campaignsQuery = trpc.campaign.list.useQuery(undefined, { staleTime: 30000 });
-
-  const recentCampaigns = useMemo(() => {
-    if (!campaignsQuery.data) return [];
-    return [...campaignsQuery.data]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 8);
-  }, [campaignsQuery.data]);
-
-  const statusLabels: Record<string, string> = {
-    draft: "Rascunho",
-    quotation: "Cotação",
-    briefing: "Briefing",
-    design: "Design",
-    aprovacao: "Aprovação",
-    active: "Ativa",
-    producao: "Produção",
-    distribuicao: "Distribuição",
-    transito: "Trânsito",
-    executar: "Executar",
-    veiculacao: "Veiculação",
-    inativa: "Inativa",
-    paused: "Pausada",
-    completed: "Concluída",
-    archived: "Arquivada",
-  };
-
-  const statusColors: Record<string, string> = {
-    draft: "bg-muted text-muted-foreground",
-    quotation: "bg-amber-500/20 text-amber-400",
-    briefing: "bg-violet-500/20 text-violet-400",
-    design: "bg-purple-500/20 text-purple-400",
-    aprovacao: "bg-pink-500/20 text-pink-400",
-    active: "bg-emerald-500/20 text-emerald-400",
-    producao: "bg-yellow-500/20 text-yellow-400",
-    distribuicao: "bg-orange-500/20 text-orange-400",
-    transito: "bg-orange-500/20 text-orange-400",
-    executar: "bg-blue-500/20 text-blue-400",
-    veiculacao: "bg-emerald-500/20 text-emerald-400",
-    inativa: "bg-muted text-muted-foreground",
-    paused: "bg-red-500/20 text-red-400",
-    completed: "bg-purple-500/20 text-purple-400",
-    archived: "bg-muted text-muted-foreground",
-  };
-
-  return (
-    <Section title="Atividade Recente" icon={Clock} description="Últimas campanhas criadas ou atualizadas">
-      {recentCampaigns.length === 0 ? (
-        <div className="flex items-center justify-center py-8">
-          <p className="text-sm text-muted-foreground">Nenhuma atividade recente</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {recentCampaigns.map((campaign) => (
-            <button
-              key={campaign.id}
-              onClick={() => window.location.assign(`/campanhas/${campaign.id}`)}
-              className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors text-left"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium truncate">{campaign.name}</span>
-                  {(campaign as any).campaignNumber && (
-                    <span className="text-[10px] font-mono text-muted-foreground">
-                      {(campaign as any).campaignNumber}
-                    </span>
-                  )}
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {formatRelativeDate(campaign.createdAt)}
-                </p>
-              </div>
-              <span
-                className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusColors[campaign.status] || "bg-muted text-muted-foreground"}`}
-              >
-                {statusLabels[campaign.status] || campaign.status}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-    </Section>
   );
 }
