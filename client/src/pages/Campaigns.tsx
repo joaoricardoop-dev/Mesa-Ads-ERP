@@ -725,39 +725,40 @@ export default function Campaigns() {
                     </div>
 
                     {/* ── Status + chips + ações ── */}
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={`text-[10px] ${STATUS_COLORS[c.status] || ""}`}>
-                          {STATUS_LABELS[c.status] || c.status}
-                        </Badge>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(c)}>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0 min-w-[160px]">
+                      {/* Linha 1: badge + ações */}
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEdit(c)}>
                             <Pencil className="w-3 h-3" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteId(c.id)}>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => setDeleteId(c.id)}>
                             <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
+                        <Badge variant="outline" className={`text-[10px] shrink-0 ${STATUS_COLORS[c.status] || ""}`}>
+                          {STATUS_LABELS[c.status] || c.status}
+                        </Badge>
                       </div>
-                      <div className="flex items-center gap-1 flex-wrap justify-end">
-                        {daysInStage !== null && (
-                          <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted/60 border border-border/20 px-1.5 py-0.5 rounded-full">
-                            <Clock className="w-2.5 h-2.5" />
-                            Nesta etapa: {daysInStage === 0 ? "hoje" : `${daysInStage}d`}
-                          </span>
-                        )}
-                        {preProdDays !== null && (
-                          <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
-                            !preProdActive ? "text-sky-400 bg-sky-500/10 border-sky-500/30"
-                              : preProdIsCrit ? "text-red-400 bg-red-500/20 border-red-500/40"
-                              : preProdIsWarn ? "text-amber-400 bg-amber-500/20 border-amber-500/40"
-                              : "text-muted-foreground bg-muted/60 border-border/20"
-                          }`}>
-                            {!preProdActive ? <CheckCircle2 className="w-2.5 h-2.5" /> : preProdIsCrit ? <AlertTriangle className="w-2.5 h-2.5" /> : <Timer className="w-2.5 h-2.5" />}
-                            Pré-produção: {preProdDays}d
-                          </span>
-                        )}
-                      </div>
+                      {/* Linha 2: nesta etapa */}
+                      {daysInStage !== null && (
+                        <span className="inline-flex items-center justify-end gap-0.5 text-[10px] text-muted-foreground bg-muted/60 border border-border/20 px-1.5 py-0.5 rounded-full w-full">
+                          <Clock className="w-2.5 h-2.5 shrink-0" />
+                          Nesta etapa: {daysInStage === 0 ? "hoje" : `${daysInStage}d`}
+                        </span>
+                      )}
+                      {/* Linha 3: pré-produção */}
+                      {preProdDays !== null && (
+                        <span className={`inline-flex items-center justify-end gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full border w-full ${
+                          !preProdActive ? "text-sky-400 bg-sky-500/10 border-sky-500/30"
+                            : preProdIsCrit ? "text-red-400 bg-red-500/20 border-red-500/40"
+                            : preProdIsWarn ? "text-amber-400 bg-amber-500/20 border-amber-500/40"
+                            : "text-muted-foreground bg-muted/60 border-border/20"
+                        }`}>
+                          {!preProdActive ? <CheckCircle2 className="w-2.5 h-2.5 shrink-0" /> : preProdIsCrit ? <AlertTriangle className="w-2.5 h-2.5 shrink-0" /> : <Timer className="w-2.5 h-2.5 shrink-0" />}
+                          Pré-produção: {preProdDays}d
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
