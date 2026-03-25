@@ -1514,6 +1514,272 @@ export default function CampaignDetail() {
                 </div>
               )}
 
+              {/* ── Ficha Operacional ── */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+                {/* Dados da Campanha */}
+                <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <FileText className="w-3 h-3" /> Dados da Campanha
+                  </h3>
+                  <div className="space-y-2.5">
+                    {(campaign as any).campaignNumber && (
+                      <DetailRow label="Número" value={(campaign as any).campaignNumber} icon={<Hash className="w-3 h-3" />} />
+                    )}
+                    {campaign.productName && (
+                      <DetailRow label="Produto" value={campaign.productName} icon={<Package className="w-3 h-3" />} />
+                    )}
+                    <DetailRow label="Período Previsto"
+                      value={campaign.startDate && campaign.endDate
+                        ? `${new Date(campaign.startDate).toLocaleDateString("pt-BR")} → ${new Date(campaign.endDate).toLocaleDateString("pt-BR")}`
+                        : "—"
+                      }
+                      icon={<Calendar className="w-3 h-3" />}
+                    />
+                    {campaign.veiculacaoStartDate && (
+                      <DetailRow label="Veiculação"
+                        value={`${new Date(campaign.veiculacaoStartDate + "T12:00:00").toLocaleDateString("pt-BR")} → ${campaign.veiculacaoEndDate ? new Date(campaign.veiculacaoEndDate + "T12:00:00").toLocaleDateString("pt-BR") : "—"}`}
+                        icon={<Calendar className="w-3 h-3" />}
+                      />
+                    )}
+                    <DetailRow label="Duração do Contrato" value={`${campaign.contractDuration} ${campaign.contractDuration === 1 ? "mês" : "meses"}`} />
+                    {(campaign as any).proposalSignedAt && (
+                      <DetailRow label="Proposta Assinada"
+                        value={new Date((campaign as any).proposalSignedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        icon={<CheckCircle2 className="w-3 h-3" />}
+                      />
+                    )}
+                    {campaign.materialReceivedDate && (
+                      <DetailRow label="Material Recebido"
+                        value={new Date(campaign.materialReceivedDate + "T12:00:00").toLocaleDateString("pt-BR")}
+                        icon={<Package className="w-3 h-3" />}
+                      />
+                    )}
+                    <DetailRow label="Criada em"
+                      value={new Date(campaign.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                      icon={<Clock className="w-3 h-3" />}
+                    />
+                  </div>
+                </div>
+
+                {/* Contato do Anunciante */}
+                <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <Building2 className="w-3 h-3" /> Contato do Anunciante
+                  </h3>
+                  {client ? (
+                    <div className="space-y-2.5">
+                      <DetailRow label="Cliente" value={client.name} />
+                      {client.company && <DetailRow label="Empresa" value={client.company} />}
+                      {client.segment && <DetailRow label="Segmento" value={client.segment} />}
+                      {client.contactName && <DetailRow label="Responsável" value={client.contactName} />}
+                      {(client as any).phone && (
+                        <DetailRow label="Telefone" value={(client as any).phone} icon={<Phone className="w-3 h-3" />} />
+                      )}
+                      {client.email && (
+                        <DetailRow label="E-mail" value={client.email} icon={<Mail className="w-3 h-3" />} />
+                      )}
+                      {client.cnpj && (
+                        <DetailRow label="CNPJ" value={client.cnpj} icon={<Hash className="w-3 h-3" />} />
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Cliente não encontrado</p>
+                  )}
+                </div>
+
+                {/* Linha do Tempo do Processo */}
+                <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <Clock className="w-3 h-3" /> Linha do Tempo
+                  </h3>
+                  <div className="space-y-1.5">
+                    {[
+                      { label: "Proposta Assinada", at: (campaign as any).proposalSignedAt, color: "bg-orange-400" },
+                      { label: "Briefing", at: (campaign as any).briefingEnteredAt, color: "bg-sky-400" },
+                      { label: "Design", at: (campaign as any).designEnteredAt, color: "bg-purple-400" },
+                      { label: "Aprovação", at: (campaign as any).aprovacaoEnteredAt, color: "bg-pink-400" },
+                      { label: "Produção", at: (campaign as any).producaoEnteredAt, color: "bg-amber-400" },
+                      { label: "Distribuição", at: (campaign as any).distribuicaoEnteredAt, color: "bg-teal-400" },
+                      { label: "Veiculação", at: campaign.veiculacaoStartDate ? campaign.veiculacaoStartDate + "T12:00:00" : null, color: "bg-emerald-400" },
+                    ].filter(s => s.at).map((s, i, arr) => {
+                      const entryDate = new Date(s.at);
+                      const nextAt = arr[i + 1]?.at ? new Date(arr[i + 1].at) : null;
+                      const exitDate = nextAt || (i === arr.length - 1 ? null : null);
+                      const days = exitDate
+                        ? Math.max(0, Math.floor((exitDate.getTime() - entryDate.getTime()) / 86400000))
+                        : Math.max(0, Math.floor((Date.now() - entryDate.getTime()) / 86400000));
+                      const isCurrent = !exitDate;
+                      return (
+                        <div key={s.label} className="flex items-center gap-2 text-xs">
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${s.color} ${isCurrent ? "ring-2 ring-offset-1 ring-offset-card ring-current" : ""}`} />
+                          <div className="flex-1 flex items-center justify-between min-w-0">
+                            <span className={`font-medium ${isCurrent ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</span>
+                            <span className="font-mono text-[10px] text-muted-foreground shrink-0 ml-2">
+                              {entryDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                              {isCurrent ? <span className="text-primary ml-1">({days}d)</span> : days > 0 ? <span className="ml-1">{days}d</span> : null}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {![(campaign as any).proposalSignedAt, (campaign as any).briefingEnteredAt].some(Boolean) && (
+                      <p className="text-xs text-muted-foreground">Nenhuma etapa registrada ainda</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Produção & Rastreamento ── */}
+              {(prodSo || distSo || prodTrackings.length > 0 || distTrackings.length > 0 || (campaign as any).artPdfUrl || (campaign as any).artImageUrls) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* OS de Produção */}
+                  {(prodSo || (campaign as any).artPdfUrl) && (
+                    <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                      <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                        <Package className="w-3 h-3" /> Produção Gráfica
+                      </h3>
+                      <div className="space-y-2.5">
+                        {prodSo && (
+                          <>
+                            <DetailRow label="OS de Produção" value={prodSo.orderNumber} />
+                            <DetailRow label="Status OS" value={(prodSo as any).status} />
+                          </>
+                        )}
+                        {(campaign as any).artPdfUrl && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Arte (PDF)</p>
+                            <a href={(campaign as any).artPdfUrl} target="_blank" rel="noopener noreferrer"
+                              className="text-xs text-primary hover:underline flex items-center gap-1 mt-0.5">
+                              <ExternalLink className="w-3 h-3" /> Abrir arquivo
+                            </a>
+                          </div>
+                        )}
+                        {prodTrackings.length > 0 && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Rastreamento Produção</p>
+                            {prodTrackings.map((t: any) => (
+                              <div key={t.id} className="flex items-center justify-between text-xs py-1 border-b border-border/10 last:border-0">
+                                <div>
+                                  <span className="font-mono">{t.trackingCode}</span>
+                                  {t.freightProvider && <span className="text-muted-foreground ml-1.5">· {t.freightProvider}</span>}
+                                </div>
+                                {t.expectedDate && (
+                                  <span className="text-muted-foreground text-[10px]">Prev. {new Date(t.expectedDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* OS de Distribuição */}
+                  {(distSo || distTrackings.length > 0) && (
+                    <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                      <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                        <Truck className="w-3 h-3" /> Distribuição & Frete
+                      </h3>
+                      <div className="space-y-2.5">
+                        {distSo && (
+                          <>
+                            <DetailRow label="OS de Distribuição" value={distSo.orderNumber} />
+                            <DetailRow label="Status OS" value={(distSo as any).status} />
+                          </>
+                        )}
+                        {distTrackings.length > 0 && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Rastreamento Frete</p>
+                            {distTrackings.map((t: any) => (
+                              <div key={t.id} className="flex items-center justify-between text-xs py-1 border-b border-border/10 last:border-0">
+                                <div>
+                                  <a href={buildTrackingUrl(t.trackingCode, t.freightProvider)} target="_blank" rel="noopener noreferrer"
+                                    className="font-mono text-primary hover:underline flex items-center gap-1">
+                                    {t.trackingCode} <ExternalLink className="w-2.5 h-2.5" />
+                                  </a>
+                                  {t.freightProvider && <span className="text-muted-foreground text-[10px]">{t.freightProvider}</span>}
+                                </div>
+                                {t.expectedDate && (
+                                  <span className="text-muted-foreground text-[10px]">Prev. {new Date(t.expectedDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Faturas & Pagamentos ── */}
+              {(campaignInvoices.length > 0 || campaignPayments.length > 0) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {campaignInvoices.length > 0 && (
+                    <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                      <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                        <Receipt className="w-3 h-3" /> Faturas do Anunciante
+                      </h3>
+                      <div className="space-y-1">
+                        {campaignInvoices.map((inv: any) => {
+                          const statusColor = inv.status === "paga" ? "text-emerald-400" : inv.status === "vencida" ? "text-red-400" : "text-amber-400";
+                          const statusLabel: Record<string, string> = { emitida: "Emitida", paga: "Paga", vencida: "Vencida", cancelada: "Cancelada" };
+                          return (
+                            <div key={inv.id} className="flex items-center justify-between text-xs py-1.5 border-b border-border/10 last:border-0">
+                              <div>
+                                <span className="font-mono font-medium">{formatCurrency(Number(inv.amount))}</span>
+                                {inv.dueDate && (
+                                  <span className="text-muted-foreground ml-1.5">vence {new Date(inv.dueDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                                )}
+                              </div>
+                              <span className={`text-[10px] font-semibold ${statusColor}`}>{statusLabel[inv.status] || inv.status}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {campaignPayments.length > 0 && (
+                    <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                      <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                        <HandCoins className="w-3 h-3" /> Pagamentos aos Restaurantes
+                      </h3>
+                      <div className="space-y-1">
+                        {campaignPayments.slice(0, 6).map((pay: any) => {
+                          const statusColor = pay.status === "paid" ? "text-emerald-400" : pay.status === "overdue" ? "text-red-400" : "text-amber-400";
+                          const statusLabel: Record<string, string> = { pending: "Pendente", paid: "Pago", overdue: "Vencido" };
+                          return (
+                            <div key={pay.id} className="flex items-center justify-between text-xs py-1.5 border-b border-border/10 last:border-0">
+                              <div>
+                                <span className="font-medium truncate max-w-[140px] block">{pay.restaurantName || `Rest. #${pay.restaurantId}`}</span>
+                                {pay.paymentDate && (
+                                  <span className="text-muted-foreground text-[10px]">{new Date(pay.paymentDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <span className="font-mono">{formatCurrency(Number(pay.amount))}</span>
+                                <span className={`block text-[10px] font-semibold ${statusColor}`}>{statusLabel[pay.status] || pay.status}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {campaignPayments.length > 6 && (
+                          <p className="text-[10px] text-muted-foreground text-center pt-1">+ {campaignPayments.length - 6} outros pagamentos</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ─── Separador visual ─── */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-border/20" />
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">Indicadores Financeiros</span>
+                <div className="flex-1 h-px bg-border/20" />
+              </div>
+
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <KPIBig label="Receita Mensal" value={formatCurrency(p.monthlyRevenue)} icon={<Banknote className="w-5 h-5" />} />
                 <KPIBig label="Lucro Mensal" value={formatCurrency(p.monthlyProfit)} icon={<TrendingUp className="w-5 h-5" />} accent />
