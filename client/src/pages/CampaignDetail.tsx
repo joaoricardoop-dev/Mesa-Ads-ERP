@@ -1515,50 +1515,45 @@ export default function CampaignDetail() {
               )}
 
               {/* ── Ficha Operacional ── */}
+              {/* Row 1: Identificação, Contato, Timeline */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 
                 {/* Dados da Campanha */}
                 <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
                   <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                    <FileText className="w-3 h-3" /> Dados da Campanha
+                    <FileText className="w-3 h-3" /> Identificação
                   </h3>
                   <div className="space-y-2.5">
                     {(campaign as any).campaignNumber && (
-                      <DetailRow label="Número" value={(campaign as any).campaignNumber} icon={<Hash className="w-3 h-3" />} />
+                      <DetailRow label="Número da Campanha" value={(campaign as any).campaignNumber} icon={<Hash className="w-3 h-3" />} />
                     )}
+                    <DetailRow label="Nome" value={campaign.name} />
                     {campaign.productName && (
-                      <DetailRow label="Produto" value={campaign.productName} icon={<Package className="w-3 h-3" />} />
+                      <DetailRow label="Produto / Marca" value={campaign.productName} icon={<Package className="w-3 h-3" />} />
                     )}
-                    <DetailRow label="Período Previsto"
-                      value={campaign.startDate && campaign.endDate
-                        ? `${new Date(campaign.startDate).toLocaleDateString("pt-BR")} → ${new Date(campaign.endDate).toLocaleDateString("pt-BR")}`
-                        : "—"
-                      }
-                      icon={<Calendar className="w-3 h-3" />}
-                    />
-                    {campaign.veiculacaoStartDate && (
-                      <DetailRow label="Veiculação"
-                        value={`${new Date(campaign.veiculacaoStartDate + "T12:00:00").toLocaleDateString("pt-BR")} → ${campaign.veiculacaoEndDate ? new Date(campaign.veiculacaoEndDate + "T12:00:00").toLocaleDateString("pt-BR") : "—"}`}
-                        icon={<Calendar className="w-3 h-3" />}
-                      />
+                    {client?.segment && (
+                      <DetailRow label="Segmento de Mercado" value={client.segment} />
                     )}
-                    <DetailRow label="Duração do Contrato" value={`${campaign.contractDuration} ${campaign.contractDuration === 1 ? "mês" : "meses"}`} />
+                    <DetailRow label="Status Atual" value={STATUS_LABELS[campaign.status] || campaign.status} />
+                    {(campaign as any).isBonificada && (
+                      <DetailRow label="Tipo" value="Bonificada (sem receita)" />
+                    )}
                     {(campaign as any).proposalSignedAt && (
-                      <DetailRow label="Proposta Assinada"
+                      <DetailRow label="Proposta Assinada em"
                         value={new Date((campaign as any).proposalSignedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                         icon={<CheckCircle2 className="w-3 h-3" />}
-                      />
-                    )}
-                    {campaign.materialReceivedDate && (
-                      <DetailRow label="Material Recebido"
-                        value={new Date(campaign.materialReceivedDate + "T12:00:00").toLocaleDateString("pt-BR")}
-                        icon={<Package className="w-3 h-3" />}
                       />
                     )}
                     <DetailRow label="Criada em"
                       value={new Date(campaign.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
                       icon={<Clock className="w-3 h-3" />}
                     />
+                    {campaign.materialReceivedDate && (
+                      <DetailRow label="Material Recebido"
+                        value={new Date(campaign.materialReceivedDate + "T12:00:00").toLocaleDateString("pt-BR")}
+                        icon={<Package className="w-3 h-3" />}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -1569,18 +1564,21 @@ export default function CampaignDetail() {
                   </h3>
                   {client ? (
                     <div className="space-y-2.5">
-                      <DetailRow label="Cliente" value={client.name} />
+                      <DetailRow label="Nome / Fantasia" value={client.name} />
                       {client.company && <DetailRow label="Empresa" value={client.company} />}
-                      {client.segment && <DetailRow label="Segmento" value={client.segment} />}
-                      {client.contactName && <DetailRow label="Responsável" value={client.contactName} />}
+                      {(client as any).razaoSocial && <DetailRow label="Razão Social" value={(client as any).razaoSocial} />}
+                      {client.cnpj && (
+                        <DetailRow label="CNPJ" value={client.cnpj} icon={<Hash className="w-3 h-3" />} />
+                      )}
+                      {client.contactName && <DetailRow label="Responsável / Contato" value={client.contactName} />}
                       {(client as any).phone && (
                         <DetailRow label="Telefone" value={(client as any).phone} icon={<Phone className="w-3 h-3" />} />
                       )}
                       {client.email && (
                         <DetailRow label="E-mail" value={client.email} icon={<Mail className="w-3 h-3" />} />
                       )}
-                      {client.cnpj && (
-                        <DetailRow label="CNPJ" value={client.cnpj} icon={<Hash className="w-3 h-3" />} />
+                      {(client as any).instagram && (
+                        <DetailRow label="Instagram" value={(client as any).instagram} icon={<Instagram className="w-3 h-3" />} />
                       )}
                     </div>
                   ) : (
@@ -1605,7 +1603,7 @@ export default function CampaignDetail() {
                     ].filter(s => s.at).map((s, i, arr) => {
                       const entryDate = new Date(s.at);
                       const nextAt = arr[i + 1]?.at ? new Date(arr[i + 1].at) : null;
-                      const exitDate = nextAt || (i === arr.length - 1 ? null : null);
+                      const exitDate = nextAt || null;
                       const days = exitDate
                         ? Math.max(0, Math.floor((exitDate.getTime() - entryDate.getTime()) / 86400000))
                         : Math.max(0, Math.floor((Date.now() - entryDate.getTime()) / 86400000));
@@ -1627,6 +1625,184 @@ export default function CampaignDetail() {
                       <p className="text-xs text-muted-foreground">Nenhuma etapa registrada ainda</p>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Row 2: Escopo Contratado + Distribuição Geográfica */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                {/* Escopo do Contrato */}
+                <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <Target className="w-3 h-3" /> Escopo do Contrato
+                  </h3>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                    {/* Produto */}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Produto Veiculado</p>
+                      <p className="text-sm mt-0.5 font-medium">{campaign.productName || "Coaster (Porta-Copo)"}</p>
+                    </div>
+                    {/* Restaurantes */}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Restaurantes</p>
+                      <p className="text-sm mt-0.5 font-medium font-mono">
+                        {campaign.activeRestaurants}
+                        <span className="text-muted-foreground text-xs font-sans ml-1">estabelecimentos</span>
+                      </p>
+                    </div>
+                    {/* Volume de coasters */}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Coasters / Mês</p>
+                      <p className="text-sm mt-0.5 font-medium font-mono">
+                        {(quotationCoasterVolume || expectedTotalCoasters).toLocaleString("pt-BR")}
+                        <span className="text-muted-foreground text-xs font-sans ml-1">un</span>
+                      </p>
+                    </div>
+                    {/* Coasters por restaurante */}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Coasters / Restaurante</p>
+                      <p className="text-sm mt-0.5 font-medium font-mono">
+                        {effectiveCoastersPerRest.toLocaleString("pt-BR")}
+                        <span className="text-muted-foreground text-xs font-sans ml-1">un</span>
+                      </p>
+                    </div>
+                    {/* Duração */}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Duração do Contrato</p>
+                      <p className="text-sm mt-0.5 font-medium font-mono">
+                        {campaign.contractDuration}
+                        <span className="text-muted-foreground text-xs font-sans ml-1">{campaign.contractDuration === 1 ? "mês" : "meses"}</span>
+                      </p>
+                    </div>
+                    {/* Total de coasters no contrato */}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Total Coasters Contrato</p>
+                      <p className="text-sm mt-0.5 font-medium font-mono">
+                        {((quotationCoasterVolume || expectedTotalCoasters) * campaign.contractDuration).toLocaleString("pt-BR")}
+                        <span className="text-muted-foreground text-xs font-sans ml-1">un</span>
+                      </p>
+                    </div>
+                    {/* Período de veiculação */}
+                    <div className="col-span-2">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Período de Veiculação</p>
+                      {campaign.veiculacaoStartDate ? (
+                        <p className="text-sm mt-0.5 font-medium">
+                          {new Date(campaign.veiculacaoStartDate + "T12:00:00").toLocaleDateString("pt-BR")}
+                          {" → "}
+                          {campaign.veiculacaoEndDate ? new Date(campaign.veiculacaoEndDate + "T12:00:00").toLocaleDateString("pt-BR") : "—"}
+                        </p>
+                      ) : campaign.startDate && campaign.endDate ? (
+                        <p className="text-sm mt-0.5">
+                          {new Date(campaign.startDate).toLocaleDateString("pt-BR")}
+                          {" → "}
+                          {new Date(campaign.endDate).toLocaleDateString("pt-BR")}
+                          <span className="text-[10px] text-muted-foreground ml-1">(previsto)</span>
+                        </p>
+                      ) : (
+                        <p className="text-sm mt-0.5 text-muted-foreground">—</p>
+                      )}
+                    </div>
+                    {/* Frequência de uso */}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Uso / Dia</p>
+                      <p className="text-sm mt-0.5 font-medium font-mono">
+                        {campaign.usagePerDay}×
+                        <span className="text-muted-foreground text-xs font-sans ml-1">por coaster</span>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Dias / Mês</p>
+                      <p className="text-sm mt-0.5 font-medium font-mono">
+                        {campaign.daysPerMonth}
+                        <span className="text-muted-foreground text-xs font-sans ml-1">dias úteis</span>
+                      </p>
+                    </div>
+                    {/* Impressões mensais */}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Impressões / Mês</p>
+                      <p className="text-sm mt-0.5 font-medium font-mono text-primary">
+                        {p.totalImpressions.toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                    {/* Impressões totais contrato */}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Impressões Totais</p>
+                      <p className="text-sm mt-0.5 font-medium font-mono text-primary">
+                        {(p.totalImpressions * campaign.contractDuration).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                    {/* Notas */}
+                    {(campaign as any).notes && (
+                      <div className="col-span-2 pt-1 border-t border-border/20">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Observações</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{(campaign as any).notes}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Distribuição Geográfica */}
+                <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <MapPin className="w-3 h-3" /> Distribuição Geográfica
+                  </h3>
+                  {campaignRestaurants.length > 0 ? (
+                    <div className="space-y-2">
+                      {/* Bairros únicos */}
+                      {(() => {
+                        const neighborhoods = [...new Set(
+                          campaignRestaurants.map((r: any) => r.restaurantNeighborhood).filter(Boolean)
+                        )];
+                        return neighborhoods.length > 0 ? (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">
+                              Bairros Cobertos ({neighborhoods.length})
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {neighborhoods.map((n: any) => (
+                                <span key={n} className="inline-flex text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
+                                  {n}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+                      {/* Lista de restaurantes */}
+                      <div className="pt-1">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">
+                          Estabelecimentos ({restaurantsConfigured}/{campaign.activeRestaurants})
+                        </p>
+                        <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                          {campaignRestaurants.map((r: any) => (
+                            <div key={r.id} className="flex items-center justify-between text-xs py-1 border-b border-border/10 last:border-0">
+                              <div className="min-w-0">
+                                <p className="font-medium truncate">{r.restaurantName || `Restaurante #${r.restaurantId}`}</p>
+                                {r.restaurantNeighborhood && (
+                                  <p className="text-muted-foreground text-[10px]">{r.restaurantNeighborhood}</p>
+                                )}
+                              </div>
+                              <span className="font-mono text-muted-foreground text-[10px] shrink-0 ml-2">
+                                {r.coastersCount.toLocaleString("pt-BR")} un
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {restaurantsMissing > 0 && (
+                        <p className="text-[10px] text-yellow-400 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Faltam {restaurantsMissing} restaurante(s) para atingir a meta
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 py-4 text-center">
+                      <Store className="w-6 h-6 text-muted-foreground/40" />
+                      <p className="text-xs text-muted-foreground">Nenhum restaurante configurado</p>
+                      <p className="text-[10px] text-muted-foreground">Previsto: {campaign.activeRestaurants} restaurantes</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
