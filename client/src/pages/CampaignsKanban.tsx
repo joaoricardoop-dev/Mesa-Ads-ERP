@@ -95,22 +95,46 @@ function getDaysInStage(c: KanbanCampaign): number | null {
   return daysSince(c.updatedAt);
 }
 
-function getSlaElapsed(c: KanbanCampaign): number | null {
-  if (!SLA_STAGES.has(c.status)) return null;
-  return daysSince(c.briefingEnteredAt);
+type PreProdInfo =
+  | { status: "active"; days: number }
+  | { status: "done"; days: number }
+  | null;
+
+function getPreProdInfo(c: KanbanCampaign): PreProdInfo {
+  if (!c.briefingEnteredAt) return null;
+  if (SLA_STAGES.has(c.status)) {
+    const d = daysSince(c.briefingEnteredAt);
+    return d !== null ? { status: "active", days: d } : null;
+  }
+  if (c.producaoEnteredAt) {
+    const start = new Date(c.briefingEnteredAt).getTime();
+    const end   = new Date(c.producaoEnteredAt).getTime();
+    const days  = Math.max(0, Math.floor((end - start) / 86_400_000));
+    return { status: "done", days };
+  }
+  return null;
 }
 
-function SlaChip({ days }: { days: number }) {
-  if (days < SLA_WARN_DAYS) return null;
-  const isCrit = days >= SLA_CRIT_DAYS;
+function PreProdChip({ info }: { info: PreProdInfo }) {
+  if (!info) return null;
+  if (info.status === "done") {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/30 px-1.5 py-0.5 rounded-full">
+        <CheckCircle2 className="w-2.5 h-2.5" />
+        Pré: {info.days}d
+      </span>
+    );
+  }
+  const isCrit = info.days >= SLA_CRIT_DAYS;
+  const isWarn = info.days >= SLA_WARN_DAYS;
   return (
     <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
-      isCrit
-        ? "bg-red-500/20 border-red-500/40 text-red-400"
-        : "bg-amber-500/20 border-amber-500/40 text-amber-400"
+      isCrit ? "bg-red-500/20 border-red-500/40 text-red-400"
+        : isWarn ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+        : "bg-muted/60 border-border/30 text-muted-foreground"
     }`}>
       {isCrit ? <Flame className="w-2.5 h-2.5" /> : <Timer className="w-2.5 h-2.5" />}
-      SLA {days}d
+      Pré: {info.days}d
     </span>
   );
 }
@@ -132,7 +156,7 @@ function CampaignCard({
   const canMovePrev = stageIndex > 0;
   const canMoveNext = stageIndex < KANBAN_STATUSES.length - 1;
   const daysInStage = getDaysInStage(campaign);
-  const slaElapsed = getSlaElapsed(campaign);
+  const preProdInfo = getPreProdInfo(campaign);
 
   return (
     <div
@@ -182,12 +206,12 @@ function CampaignCard({
 
       <div className="flex items-center gap-1 flex-wrap">
         {daysInStage !== null && (
-          <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-full">
+          <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted/60 border border-border/20 px-1.5 py-0.5 rounded-full">
             <Clock className="w-2.5 h-2.5" />
-            {daysInStage === 0 ? "hoje" : daysInStage === 1 ? "1 dia" : `${daysInStage} dias`}
+            {daysInStage === 0 ? "hoje aqui" : daysInStage === 1 ? "1 dia aqui" : `${daysInStage}d aqui`}
           </span>
         )}
-        {slaElapsed !== null && <SlaChip days={slaElapsed} />}
+        <PreProdChip info={preProdInfo} />
         {hasMaterial && (
           <span className="inline-flex items-center gap-0.5 text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full">
             <CheckCircle2 className="w-2.5 h-2.5" /> Material
@@ -261,8 +285,8 @@ export default function CampaignsKanban() {
       if (filterOverdue && !isOverdue(c.endDate)) return false;
       if (filterBonificada && !c.isBonificada) return false;
       if (filterSla) {
-        const sla = getSlaElapsed(c);
-        if (sla === null || sla < SLA_WARN_DAYS) return false;
+        const pp = getPreProdInfo(c);
+        if (!pp || pp.days < SLA_WARN_DAYS) return false;
       }
       return true;
     });
@@ -280,7 +304,7 @@ export default function CampaignsKanban() {
   const totalAtivas   = kanbanCampaigns.filter((c) => c.status !== "archived").length;
   const emProducao    = kanbanCampaigns.filter((c) => c.status === "producao").length;
   const atrasadas     = kanbanCampaigns.filter((c) => c.status !== "archived" && isOverdue(c.endDate)).length;
-  const emRiscoSla    = kanbanCampaigns.filter((c) => { const s = getSlaElapsed(c); return s !== null && s >= SLA_WARN_DAYS; }).length;
+  const emRiscoSla    = kanbanCampaigns.filter((c) => { const pp = getPreProdInfo(c); return !!pp && pp.days >= SLA_WARN_DAYS; }).length;
 
   return (
     <div className="flex flex-col">
@@ -377,7 +401,7 @@ export default function CampaignsKanban() {
             const cards = byStage[stage.key];
             const hasSlaRisk = SLA_STAGES.has(stage.key as any);
             const slaRiskCount = hasSlaRisk
-              ? cards.filter((c) => { const s = getSlaElapsed(c); return s !== null && s >= SLA_WARN_DAYS; }).length
+              ? cards.filter((c) => { const pp = getPreProdInfo(c); return !!pp && pp.days >= SLA_WARN_DAYS; }).length
               : 0;
 
             return (
