@@ -361,11 +361,20 @@ export default function CampaignDetail() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const ensureProductionOSMutation = trpc.campaign.ensureProductionOS.useMutation({
+    onSuccess: () => {
+      utils.serviceOrder.list.invalidate();
+      toast.success("OS de produção criada com sucesso.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   const uploadArtMutation = trpc.campaign.uploadArt.useMutation({
     onSuccess: () => {
       utils.campaign.get.invalidate();
       utils.campaign.getHistory.invalidate();
       utils.campaign.list.invalidate();
+      utils.serviceOrder.list.invalidate();
       setArtPdfUrl("");
       setArtImageUrls("");
       toast.success("Arte enviada! Campanha em produção.");
@@ -1099,6 +1108,19 @@ export default function CampaignDetail() {
               <div className="text-xs text-muted-foreground">
                 Volume: <strong className="text-foreground">{expectedTotalCoasters.toLocaleString("pt-BR")}</strong> coasters
               </div>
+
+              {!prodSo && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs border-amber-500/40 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                  disabled={ensureProductionOSMutation.isPending}
+                  onClick={() => ensureProductionOSMutation.mutate({ id: campaignId })}
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  {ensureProductionOSMutation.isPending ? "Criando OS..." : "Criar OS de Produção"}
+                </Button>
+              )}
 
               {prodSo && (
                 <div className="border border-amber-500/20 rounded-md p-3 space-y-3 bg-amber-500/5">

@@ -1594,6 +1594,67 @@ export const appRouter = router({
         const { id, ...artData } = input;
         await updateCampaign(id, { ...artData, status: "producao" });
         await addCampaignHistory(id, "art_uploaded", "Arte enviada — campanha em produção", u?.id, uName);
+
+        // Create production OS automatically when entering producao status
+        const campaign = await getCampaign(id);
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (db && campaign) {
+          const { serviceOrders: soTable } = await import("../drizzle/schema");
+          const { sql: sqlFn, eq: eqFn, and: andFn } = await import("drizzle-orm");
+          const existing = await db.select({ id: soTable.id }).from(soTable)
+            .where(andFn(eqFn(soTable.campaignId, id), eqFn(soTable.type, "producao" as const)))
+            .limit(1);
+          if (existing.length === 0) {
+            const year = new Date().getFullYear();
+            const pattern = `OS-PROD-${year}-%`;
+            const countResult = await db.select({ count: sqlFn<number>`COUNT(*)` }).from(soTable).where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
+            const seqNum = Number(countResult[0]?.count || 0) + 1;
+            const orderNumber = `OS-PROD-${year}-${String(seqNum).padStart(4, "0")}`;
+            await db.insert(soTable).values({
+              orderNumber,
+              type: "producao" as const,
+              campaignId: id,
+              clientId: campaign.clientId,
+              description: `OS de produção para campanha ${campaign.name}`,
+              coasterVolume: campaign.coastersPerRestaurant * campaign.activeRestaurants,
+              status: "execucao" as const,
+              productId: campaign.productId,
+            });
+          }
+        }
+      }),
+
+    ensureProductionOS: operacoesProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const campaign = await getCampaign(input.id);
+        if (!campaign) throw new Error("Campanha não encontrada");
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new Error("Database not available");
+        const { serviceOrders: soTable } = await import("../drizzle/schema");
+        const { sql: sqlFn, eq: eqFn, and: andFn } = await import("drizzle-orm");
+        const existing = await db.select({ id: soTable.id }).from(soTable)
+          .where(andFn(eqFn(soTable.campaignId, input.id), eqFn(soTable.type, "producao" as const)))
+          .limit(1);
+        if (existing.length > 0) return { id: existing[0].id, alreadyExisted: true };
+        const year = new Date().getFullYear();
+        const pattern = `OS-PROD-${year}-%`;
+        const countResult = await db.select({ count: sqlFn<number>`COUNT(*)` }).from(soTable).where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
+        const seqNum = Number(countResult[0]?.count || 0) + 1;
+        const orderNumber = `OS-PROD-${year}-${String(seqNum).padStart(4, "0")}`;
+        const [created] = await db.insert(soTable).values({
+          orderNumber,
+          type: "producao" as const,
+          campaignId: input.id,
+          clientId: campaign.clientId,
+          description: `OS de produção para campanha ${campaign.name}`,
+          coasterVolume: campaign.coastersPerRestaurant * campaign.activeRestaurants,
+          status: "execucao" as const,
+          productId: campaign.productId,
+        }).returning();
+        return { id: created.id, alreadyExisted: false };
       }),
 
     completeProduction: operacoesProcedure
@@ -1610,25 +1671,31 @@ export const appRouter = router({
         const db = await getDatabase();
         if (db) {
           const { serviceOrders: soTable } = await import("../drizzle/schema");
-          const { sql: sqlFn } = await import("drizzle-orm");
-          const year = new Date().getFullYear();
-          const pattern = `OS-PROD-${year}-%`;
-          const countResult = await db
-            .select({ count: sqlFn<number>`COUNT(*)` })
-            .from(soTable)
-            .where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
-          const seqNum = Number(countResult[0]?.count || 0) + 1;
-          const orderNumber = `OS-PROD-${year}-${String(seqNum).padStart(4, "0")}`;
-          await db.insert(soTable).values({
-            orderNumber,
-            type: "producao" as const,
-            campaignId: input.id,
-            clientId: campaign.clientId,
-            description: `OS de produção para campanha ${campaign.name}`,
-            coasterVolume: campaign.coastersPerRestaurant * campaign.activeRestaurants,
-            status: "execucao" as const,
-            productId: campaign.productId,
-          });
+          const { sql: sqlFn, eq: eqFn, and: andFn } = await import("drizzle-orm");
+          // Only create if one doesn't already exist (uploadArt may have created it)
+          const existing = await db.select({ id: soTable.id }).from(soTable)
+            .where(andFn(eqFn(soTable.campaignId, input.id), eqFn(soTable.type, "producao" as const)))
+            .limit(1);
+          if (existing.length === 0) {
+            const year = new Date().getFullYear();
+            const pattern = `OS-PROD-${year}-%`;
+            const countResult = await db
+              .select({ count: sqlFn<number>`COUNT(*)` })
+              .from(soTable)
+              .where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
+            const seqNum = Number(countResult[0]?.count || 0) + 1;
+            const orderNumber = `OS-PROD-${year}-${String(seqNum).padStart(4, "0")}`;
+            await db.insert(soTable).values({
+              orderNumber,
+              type: "producao" as const,
+              campaignId: input.id,
+              clientId: campaign.clientId,
+              description: `OS de produção para campanha ${campaign.name}`,
+              coasterVolume: campaign.coastersPerRestaurant * campaign.activeRestaurants,
+              status: "execucao" as const,
+              productId: campaign.productId,
+            });
+          }
         }
       }),
 
