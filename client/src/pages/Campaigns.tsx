@@ -46,6 +46,20 @@ import {
   Gift,
   List,
   Columns2,
+  Activity,
+  Layers,
+  Printer,
+  Radio,
+  AlertTriangle,
+  Clock,
+  Timer,
+  CheckCircle2,
+  Calendar,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Building2,
+  ChevronRight,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { useLocation } from "wouter";
@@ -222,6 +236,12 @@ export default function Campaigns() {
   const [form, setForm] = useState<CampaignForm>(emptyForm);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterAtrasadas, setFilterAtrasadas] = useState(false);
+  const [filterRiscoSla, setFilterRiscoSla] = useState(false);
+  const [filterBonificada, setFilterBonificada] = useState(false);
+  const [sortBy, setSortBy] = useState<"name" | "client" | "startDate" | "endDate" | "status" | "restaurants">("endDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [managingCampaignId, setManagingCampaignId] = useState<number | null>(null);
   const [, setLocation] = useLocation();
   const [restaurantSelections, setRestaurantSelections] = useState<RestaurantSelection[]>([]);
@@ -415,11 +435,66 @@ export default function Campaigns() {
     );
   };
 
-  const filtered = campaignsList.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.clientName || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const SLA_WARN = 3;
+  const SLA_CRIT = 5;
+  const SLA_PRE_STAGES = new Set(["briefing", "design", "aprovacao"]);
+  const STAGE_AT: Record<string, string> = {
+    briefing: "briefingEnteredAt", design: "designEnteredAt",
+    aprovacao: "aprovacaoEnteredAt", producao: "producaoEnteredAt",
+    distribuicao: "distribuicaoEnteredAt",
+  };
+  function daysSince(d: string | Date | null | undefined): number | null {
+    if (!d) return null;
+    return Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000);
+  }
+  function isOverdue(endDate: string | null | undefined) {
+    if (!endDate) return false;
+    return new Date(endDate + "T23:59:59") < new Date();
+  }
+  function getPreProdDays(c: typeof campaignsList[0]) {
+    if (!(c as any).briefingEnteredAt) return null;
+    if (SLA_PRE_STAGES.has(c.status)) return daysSince((c as any).briefingEnteredAt);
+    if ((c as any).producaoEnteredAt) {
+      return Math.max(0, Math.floor((new Date((c as any).producaoEnteredAt).getTime() - new Date((c as any).briefingEnteredAt).getTime()) / 86_400_000));
+    }
+    return null;
+  }
+  function isPreProdActive(c: typeof campaignsList[0]) {
+    return SLA_PRE_STAGES.has(c.status);
+  }
+  function getDaysInStage(c: typeof campaignsList[0]) {
+    const field = STAGE_AT[c.status];
+    if (field) { const d = daysSince((c as any)[field]); if (d !== null) return d; }
+    return daysSince((c as any).updatedAt);
+  }
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    let list = campaignsList.filter((c) => {
+      if (q && !c.name.toLowerCase().includes(q) && !(c.clientName || "").toLowerCase().includes(q) && !(c.clientCompany || "").toLowerCase().includes(q)) return false;
+      if (filterStatus !== "all" && c.status !== filterStatus) return false;
+      if (filterAtrasadas && !isOverdue(c.endDate)) return false;
+      if (filterBonificada && !(c as any).isBonificada) return false;
+      if (filterRiscoSla) {
+        const pp = getPreProdDays(c);
+        if (pp === null || pp < SLA_WARN || !isPreProdActive(c)) return false;
+      }
+      return true;
+    });
+    list = [...list].sort((a, b) => {
+      let va: string | number = "", vb: string | number = "";
+      if (sortBy === "name") { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
+      else if (sortBy === "client") { va = (a.clientName || "").toLowerCase(); vb = (b.clientName || "").toLowerCase(); }
+      else if (sortBy === "startDate") { va = a.startDate || ""; vb = b.startDate || ""; }
+      else if (sortBy === "endDate") { va = a.endDate || ""; vb = b.endDate || ""; }
+      else if (sortBy === "status") { va = a.status; vb = b.status; }
+      else if (sortBy === "restaurants") { va = a.activeRestaurants; vb = b.activeRestaurants; }
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [campaignsList, search, filterStatus, filterAtrasadas, filterBonificada, filterRiscoSla, sortBy, sortDir]);
 
   function effectivePricing(c: typeof campaignsList[0]) {
     const qVolume = (c as any).quotationCoasterVolume ? parseInt((c as any).quotationCoasterVolume) : null;
@@ -439,20 +514,14 @@ export default function Campaigns() {
     return { ...base, fromQuotation: false };
   }
 
-  const activeCount = campaignsList.filter((c) => ["active", "briefing", "design", "aprovacao", "producao", "transito", "executar", "distribuicao", "veiculacao"].includes(c.status)).length;
-  const totals = useMemo(() => {
-    let totalContract = 0;
-    let totalProfit = 0;
-    let totalMonthly = 0;
-    for (const c of campaignsList) {
-      if ((c as any).isBonificada) continue;
-      const p = effectivePricing(c);
-      totalContract += p.contractTotal;
-      totalProfit += p.contractProfit;
-      totalMonthly += p.monthlyRevenue;
-    }
-    return { totalContract, totalProfit, totalMonthly };
-  }, [campaignsList]);
+  const kpis = useMemo(() => ({
+    total:       campaignsList.filter((c) => c.status !== "archived").length,
+    preProducao: campaignsList.filter((c) => ["briefing","design","aprovacao"].includes(c.status)).length,
+    producao:    campaignsList.filter((c) => ["producao","distribuicao"].includes(c.status)).length,
+    veiculacao:  campaignsList.filter((c) => c.status === "veiculacao").length,
+    atrasadas:   campaignsList.filter((c) => c.status !== "archived" && isOverdue(c.endDate)).length,
+    riscoSla:    campaignsList.filter((c) => { const pp = getPreProdDays(c); return isPreProdActive(c) && pp !== null && pp >= SLA_WARN; }).length,
+  }), [campaignsList]);
 
   if (view === "kanban") {
     return (
@@ -504,41 +573,90 @@ export default function Campaigns() {
       }
     >
 
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          <div className="bg-card border border-border/30 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold font-mono">{campaignsList.length}</p>
+        {/* ── Painel de indicadores ── */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Indicadores de Gestão</span>
           </div>
-          <div className="bg-card border border-border/30 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Em Produção</p>
-            <p className="text-2xl font-bold font-mono text-orange-400">{campaignsList.filter((c) => c.status === "producao").length}</p>
-          </div>
-          <div className="bg-card border border-border/30 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Ativas</p>
-            <p className="text-2xl font-bold font-mono text-primary">{activeCount}</p>
-          </div>
-          <div className="bg-card border border-border/30 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Faturamento Mensal</p>
-            <p className="text-lg font-bold font-mono text-primary">{formatCurrency(totals.totalMonthly)}</p>
-          </div>
-          <div className="bg-card border border-border/30 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Valor Total Contratos</p>
-            <p className="text-lg font-bold font-mono">{formatCurrency(totals.totalContract)}</p>
-          </div>
-          <div className="bg-card border border-border/30 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Lucro Total Contratos</p>
-            <p className="text-lg font-bold font-mono text-emerald-400">{formatCurrency(totals.totalProfit)}</p>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-muted-foreground"><Package className="w-3 h-3" /><span className="text-[10px] uppercase tracking-wide">Ativas</span></div>
+              <p className="text-2xl font-bold leading-none">{kpis.total}</p>
+              <p className="text-[9px] text-muted-foreground/60">não arquivadas</p>
+            </div>
+            <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-violet-400"><Layers className="w-3 h-3" /><span className="text-[10px] uppercase tracking-wide">Pré-prod</span></div>
+              <p className={`text-2xl font-bold leading-none ${kpis.preProducao > 0 ? "text-violet-400" : "text-muted-foreground"}`}>{kpis.preProducao}</p>
+              <p className="text-[9px] text-muted-foreground/60">briefing → aprovação</p>
+            </div>
+            <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-amber-400"><Printer className="w-3 h-3" /><span className="text-[10px] uppercase tracking-wide">Produção</span></div>
+              <p className={`text-2xl font-bold leading-none ${kpis.producao > 0 ? "text-amber-400" : "text-muted-foreground"}`}>{kpis.producao}</p>
+              <p className="text-[9px] text-muted-foreground/60">produção + distribuição</p>
+            </div>
+            <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-emerald-400"><Radio className="w-3 h-3" /><span className="text-[10px] uppercase tracking-wide">Veiculação</span></div>
+              <p className={`text-2xl font-bold leading-none ${kpis.veiculacao > 0 ? "text-emerald-400" : "text-muted-foreground"}`}>{kpis.veiculacao}</p>
+              <p className="text-[9px] text-muted-foreground/60">campanhas ao vivo</p>
+            </div>
+            <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+              <div className={`flex items-center gap-1.5 ${kpis.atrasadas > 0 ? "text-red-400" : "text-muted-foreground"}`}><AlertTriangle className="w-3 h-3" /><span className="text-[10px] uppercase tracking-wide">Atrasadas</span></div>
+              <p className={`text-2xl font-bold leading-none ${kpis.atrasadas > 0 ? "text-red-400" : "text-muted-foreground"}`}>{kpis.atrasadas}</p>
+              <p className="text-[9px] text-muted-foreground/60">prazo de fim vencido</p>
+            </div>
+            <div className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+              <div className={`flex items-center gap-1.5 ${kpis.riscoSla > 0 ? "text-amber-400" : "text-muted-foreground"}`}><Timer className="w-3 h-3" /><span className="text-[10px] uppercase tracking-wide">Risco SLA</span></div>
+              <p className={`text-2xl font-bold leading-none ${kpis.riscoSla > 0 ? "text-amber-400" : "text-muted-foreground"}`}>{kpis.riscoSla}</p>
+              <p className="text-[9px] text-muted-foreground/60">pré-prod ≥ 3 dias</p>
+            </div>
           </div>
         </div>
 
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar campanha..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-card border-border/30"
-          />
+        {/* ── Barra de filtros e ordenação ── */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-48">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input placeholder="Buscar campanha ou cliente…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-8 text-sm bg-card border-border/30" />
+          </div>
+
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="h-8 text-xs w-40 bg-card border-border/30"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os status</SelectItem>
+              {Object.entries(STATUS_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-1">
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+              <SelectTrigger className="h-8 text-xs w-36 bg-card border-border/30"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="endDate">Prazo de fim</SelectItem>
+                <SelectItem value="startDate">Início</SelectItem>
+                <SelectItem value="name">Nome</SelectItem>
+                <SelectItem value="client">Cliente</SelectItem>
+                <SelectItem value="status">Etapa</SelectItem>
+                <SelectItem value="restaurants">Restaurantes</SelectItem>
+              </SelectContent>
+            </Select>
+            <button onClick={() => setSortDir((d) => d === "asc" ? "desc" : "asc")} className="h-8 w-8 flex items-center justify-center rounded-md border border-border/30 bg-card hover:bg-muted text-muted-foreground transition-colors">
+              {sortDir === "asc" ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
+          <button onClick={() => setFilterAtrasadas((v) => !v)} className={`flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs border transition-colors ${filterAtrasadas ? "bg-red-500/20 border-red-500/40 text-red-400" : "bg-card border-border/30 text-muted-foreground hover:text-foreground"}`}>
+            <AlertTriangle className="w-3 h-3" /> Atrasadas
+          </button>
+          <button onClick={() => setFilterRiscoSla((v) => !v)} className={`flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs border transition-colors ${filterRiscoSla ? "bg-amber-500/20 border-amber-500/40 text-amber-400" : "bg-card border-border/30 text-muted-foreground hover:text-foreground"}`}>
+            <Timer className="w-3 h-3" /> Risco SLA
+          </button>
+          <button onClick={() => setFilterBonificada((v) => !v)} className={`flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs border transition-colors ${filterBonificada ? "bg-amber-500/20 border-amber-500/40 text-amber-400" : "bg-card border-border/30 text-muted-foreground hover:text-foreground"}`}>
+            <Gift className="w-3 h-3" /> Bonificadas
+          </button>
+          {filtered.length !== campaignsList.length && (
+            <span className="text-xs text-muted-foreground ml-1">{filtered.length} de {campaignsList.length}</span>
+          )}
         </div>
 
         <div className="space-y-3">
@@ -555,79 +673,90 @@ export default function Campaigns() {
           ) : (
             filtered.map((c) => {
               const isBonificada = (c as any).isBonificada;
-              const pricing = isBonificada ? null : effectivePricing(c);
+              const overdue = isOverdue(c.endDate);
+              const daysInStage = getDaysInStage(c);
+              const preProdDays = getPreProdDays(c);
+              const preProdActive = isPreProdActive(c);
+              const preProdIsCrit = preProdActive && preProdDays !== null && preProdDays >= SLA_CRIT;
+              const preProdIsWarn = preProdActive && preProdDays !== null && preProdDays >= SLA_WARN;
+              const totalCoasters = c.coastersPerRestaurant * c.activeRestaurants;
 
               return (
-                <div key={c.id} className="bg-card border border-border/30 rounded-lg overflow-hidden">
-                  <div
-                    className="p-4 cursor-pointer hover:bg-card/80 transition-colors"
-                    onClick={() => setLocation(`/campanhas/${c.id}`)}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-sm truncate">{c.name}</h3>
-                            {(c as any).campaignNumber && (
-                              <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{(c as any).campaignNumber}</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {c.clientName || "—"}
-                            {c.clientCompany ? ` · ${c.clientCompany}` : ""}
-                            {c.productName ? ` · ${c.productName}` : ""}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="hidden md:flex items-center gap-6 text-sm">
-                        {isBonificada ? (
-                          <div className="text-right">
-                            <p className="text-xs text-amber-400 font-medium">Bonificada — sem receita</p>
-                          </div>
-                        ) : pricing && (
-                          <>
-                            <div className="text-right">
-                              <p className="text-xs text-muted-foreground">
-                                Contrato{pricing.fromQuotation && <span className="ml-1 text-violet-400 text-[10px]">cotação</span>}
-                              </p>
-                              <p className="font-mono font-semibold">{formatCurrency(pricing.contractTotal)}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs text-muted-foreground">Lucro</p>
-                              <p className={`font-mono font-semibold ${pricing.contractProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{formatCurrency(pricing.contractProfit)}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs text-muted-foreground">Margem</p>
-                              <p className={`font-mono font-semibold ${pricing.grossMargin >= 15 ? "text-emerald-400" : "text-red-400"}`}>
-                                {pricing.grossMargin.toFixed(1)}%
-                              </p>
-                            </div>
-                          </>
+                <div
+                  key={c.id}
+                  className={`bg-card border rounded-lg p-4 cursor-pointer hover:shadow-md transition-all group ${overdue ? "border-red-500/40 hover:border-red-500/60" : "border-border/30 hover:border-border/60"}`}
+                  onClick={() => setLocation(`/campanhas/${c.id}`)}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    {/* ── Identidade ── */}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-sm">{c.name}</h3>
+                        {(c as any).campaignNumber && (
+                          <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">{(c as any).campaignNumber}</span>
                         )}
-                        <div className="text-center">
-                          <p className="text-xs text-muted-foreground">Rest.</p>
-                          <p className="font-mono">{c.activeRestaurants}</p>
-                        </div>
+                        {isBonificada && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full"><Gift className="w-2.5 h-2.5" /> Bonificada</span>
+                        )}
                       </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Building2 className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{c.clientName || "—"}{c.clientCompany ? ` · ${c.clientCompany}` : ""}</span>
+                        {c.productName && <><span className="text-border">·</span><span className="truncate">{c.productName}</span></>}
+                      </div>
+                    </div>
 
+                    {/* ── Metadados operacionais ── */}
+                    <div className="hidden md:flex items-center gap-5 shrink-0">
+                      <div className="text-right space-y-0.5">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Período</p>
+                        <p className={`text-xs font-medium ${overdue ? "text-red-400" : ""}`}>
+                          {c.startDate ? new Date(c.startDate + "T12:00:00").toLocaleDateString("pt-BR", { month: "short", day: "numeric" }) : "—"}
+                          {" → "}
+                          {c.endDate ? new Date(c.endDate + "T12:00:00").toLocaleDateString("pt-BR", { month: "short", day: "numeric", year: "2-digit" }) : "—"}
+                        </p>
+                        {overdue && <p className="text-[10px] text-red-400 flex items-center justify-end gap-0.5"><AlertTriangle className="w-2.5 h-2.5" /> Atrasada</p>}
+                      </div>
+                      <div className="text-right space-y-0.5">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Restaurantes</p>
+                        <p className="text-xs font-medium font-mono">{c.activeRestaurants} rest.</p>
+                        <p className="text-[10px] text-muted-foreground">{totalCoasters.toLocaleString("pt-BR")} un.</p>
+                      </div>
+                    </div>
+
+                    {/* ── Status + chips + ações ── */}
+                    <div className="flex flex-col items-end gap-2 shrink-0">
                       <div className="flex items-center gap-2">
-                        {(c as any).isBonificada && (
-                          <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/30 gap-1">
-                            <Gift className="w-3 h-3" /> Bonificada
-                          </Badge>
-                        )}
-                        <Badge variant="outline" className={STATUS_COLORS[c.status] || ""}>
+                        <Badge variant="outline" className={`text-[10px] ${STATUS_COLORS[c.status] || ""}`}>
                           {STATUS_LABELS[c.status] || c.status}
                         </Badge>
-                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(c)}>
-                            <Pencil className="w-3.5 h-3.5" />
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(c)}>
+                            <Pencil className="w-3 h-3" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteId(c.id)}>
-                            <Trash2 className="w-3.5 h-3.5" />
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteId(c.id)}>
+                            <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
+                      </div>
+                      <div className="flex items-center gap-1 flex-wrap justify-end">
+                        {daysInStage !== null && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted/60 border border-border/20 px-1.5 py-0.5 rounded-full">
+                            <Clock className="w-2.5 h-2.5" />
+                            Nesta etapa: {daysInStage === 0 ? "hoje" : `${daysInStage}d`}
+                          </span>
+                        )}
+                        {preProdDays !== null && (
+                          <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+                            !preProdActive ? "text-sky-400 bg-sky-500/10 border-sky-500/30"
+                              : preProdIsCrit ? "text-red-400 bg-red-500/20 border-red-500/40"
+                              : preProdIsWarn ? "text-amber-400 bg-amber-500/20 border-amber-500/40"
+                              : "text-muted-foreground bg-muted/60 border-border/20"
+                          }`}>
+                            {!preProdActive ? <CheckCircle2 className="w-2.5 h-2.5" /> : preProdIsCrit ? <AlertTriangle className="w-2.5 h-2.5" /> : <Timer className="w-2.5 h-2.5" />}
+                            Pré-produção: {preProdDays}d
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
