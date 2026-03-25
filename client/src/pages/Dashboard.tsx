@@ -103,6 +103,22 @@ function formatRelativeDate(d: string | Date): string {
   return new Date(d as string).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
+const ACTION_LABELS: Record<string, string> = {
+  briefing:    "Movida para Briefing",
+  design:      "Movida para Design",
+  aprovacao:   "Enviada para Aprovação",
+  producao:    "Entrou em Produção",
+  distribuicao:"Em Distribuição",
+  veiculacao:  "Em Veiculação",
+  active:      "Ativada",
+  archived:    "Arquivada",
+  inativa:     "Marcada como Inativa",
+  draft:       "Rascunho criado",
+  quotation:   "Cotação vinculada",
+  paused:      "Pausada",
+  completed:   "Concluída",
+};
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -158,7 +174,7 @@ export default function Dashboard() {
     campaigns
       .filter((c) => {
         const pp = getPreProdDays(c as any);
-        return PRE_PROD_STAGES.has(c.status) && pp !== null && pp >= SLA_WARN;
+        return PRE_PROD_STAGES.has(c.status) && pp !== null && pp >= SLA_WARN && !isOverdue(c.endDate);
       })
       .map((c) => ({ ...c, pp: getPreProdDays(c as any)! }))
       .sort((a, b) => b.pp - a.pp)
@@ -362,36 +378,45 @@ export default function Dashboard() {
           <p className="text-sm text-muted-foreground text-center py-4">Nenhuma atividade</p>
         ) : (
           <div className="space-y-1">
-            {recent.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => navigate(`/campanhas/${c.id}`)}
-                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-muted/50 transition-colors text-left group"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-medium truncate">{c.name}</span>
-                    {(c as any).campaignNumber && (
-                      <span className="text-[10px] font-mono text-muted-foreground shrink-0">{(c as any).campaignNumber}</span>
-                    )}
+            {recent.map((c) => {
+              const actionLabel = ACTION_LABELS[c.status] || `Atualizada → ${STATUS_LABELS[c.status] || c.status}`;
+              const overdueFlag = isOverdue(c.endDate) && c.status !== "archived";
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => navigate(`/campanhas/${c.id}`)}
+                  className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-muted/50 transition-colors text-left group border-b border-border/10 last:border-0"
+                >
+                  {/* Indicador de cor lateral */}
+                  <div className={`w-1 self-stretch rounded-full shrink-0 ${STATUS_COLORS[c.status]?.split(" ")[0] || "bg-muted"}`} />
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-medium truncate">{c.name}</span>
+                      {(c as any).campaignNumber && (
+                        <span className="text-[10px] font-mono text-muted-foreground shrink-0 bg-muted px-1 rounded">{(c as any).campaignNumber}</span>
+                      )}
+                    </div>
+                    {/* Ação realizada */}
+                    <p className="text-[11px] text-foreground/70 font-medium mt-0.5">{actionLabel}</p>
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <Building2 className="w-2.5 h-2.5" />{c.clientName}
+                      <span className="text-border mx-0.5">·</span>
+                      <Calendar className="w-2.5 h-2.5" />{formatRelativeDate((c as any).updatedAt || c.createdAt)}
+                    </p>
                   </div>
-                  <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <Building2 className="w-2.5 h-2.5" />{c.clientName}
-                    <span className="text-border mx-0.5">·</span>
-                    <Calendar className="w-2.5 h-2.5" />{formatRelativeDate((c as any).updatedAt || c.createdAt)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {isOverdue(c.endDate) && c.status !== "archived" && (
-                    <span className="text-[10px] text-red-400 font-medium">Atrasada</span>
-                  )}
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${STATUS_COLORS[c.status] || "bg-muted text-muted-foreground"}`}>
-                    {STATUS_LABELS[c.status] || c.status}
-                  </span>
-                  <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-              </button>
-            ))}
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {overdueFlag && (
+                      <span className="text-[10px] text-red-400 font-semibold flex items-center gap-0.5">
+                        <AlertTriangle className="w-2.5 h-2.5" /> Atrasada
+                      </span>
+                    )}
+                    <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
