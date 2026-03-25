@@ -1,7 +1,7 @@
 import { internalProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { serviceOrders, campaigns, clients, quotations, campaignHistory, products, invoices } from "../drizzle/schema";
+import { serviceOrders, campaigns, clients, quotations, campaignHistory, products, invoices, serviceOrderTrackings } from "../drizzle/schema";
 import { eq, and, desc, sql, inArray, ilike } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -251,5 +251,64 @@ export const serviceOrderRouter = router({
       }
 
       return updated;
+    }),
+
+  listTrackings: internalProcedure
+    .input(z.object({ serviceOrderId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      return db
+        .select()
+        .from(serviceOrderTrackings)
+        .where(eq(serviceOrderTrackings.serviceOrderId, input.serviceOrderId))
+        .orderBy(serviceOrderTrackings.createdAt);
+    }),
+
+  addTracking: internalProcedure
+    .input(z.object({
+      serviceOrderId: z.number(),
+      trackingCode: z.string().min(1),
+      freightProvider: z.string().optional(),
+      expectedDate: z.string().optional(),
+      label: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const [created] = await db.insert(serviceOrderTrackings).values({
+        serviceOrderId: input.serviceOrderId,
+        trackingCode: input.trackingCode,
+        freightProvider: input.freightProvider || null,
+        expectedDate: input.expectedDate || null,
+        label: input.label || null,
+      }).returning();
+      return created;
+    }),
+
+  updateTracking: internalProcedure
+    .input(z.object({
+      id: z.number(),
+      trackingCode: z.string().min(1).optional(),
+      freightProvider: z.string().optional(),
+      expectedDate: z.string().optional(),
+      label: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const { id, ...data } = input;
+      const [updated] = await db
+        .update(serviceOrderTrackings)
+        .set(data)
+        .where(eq(serviceOrderTrackings.id, id))
+        .returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Rastreamento não encontrado" });
+      return updated;
+    }),
+
+  deleteTracking: internalProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      await db.delete(serviceOrderTrackings).where(eq(serviceOrderTrackings.id, input.id));
+      return { success: true };
     }),
 });

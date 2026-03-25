@@ -561,6 +561,23 @@ export const serviceOrders = pgTable("service_orders", {
 export type ServiceOrder = typeof serviceOrders.$inferSelect;
 export type InsertServiceOrder = typeof serviceOrders.$inferInsert;
 
+// ─── Service Order Trackings (multiple tracking codes per OS) ─────────────────
+
+export const serviceOrderTrackings = pgTable("service_order_trackings", {
+  id: serial("id").primaryKey(),
+  serviceOrderId: integer("serviceOrderId").notNull().references(() => serviceOrders.id, { onDelete: "cascade" }),
+  trackingCode: varchar("trackingCode", { length: 100 }).notNull(),
+  freightProvider: varchar("freightProvider", { length: 150 }),
+  expectedDate: date("expectedDate"),
+  label: varchar("label", { length: 100 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_so_trackings_so_id").on(t.serviceOrderId),
+]);
+
+export type ServiceOrderTracking = typeof serviceOrderTrackings.$inferSelect;
+export type InsertServiceOrderTracking = typeof serviceOrderTrackings.$inferInsert;
+
 // ─── Quotation ↔ Restaurant (junction) ───────────────────────────────────────
 
 export const quotationRestaurants = pgTable("quotation_restaurants", {

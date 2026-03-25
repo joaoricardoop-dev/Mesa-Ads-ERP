@@ -265,6 +265,16 @@ export default function CampaignDetail() {
   const [freightProv, setFreightProv] = useState("");
   const [freightDate, setFreightDate] = useState("");
   const [freightEditing, setFreightEditing] = useState(false);
+  const [addTrackingForSoId, setAddTrackingForSoId] = useState<number | null>(null);
+  const [newTrackCode, setNewTrackCode] = useState("");
+  const [newTrackProv, setNewTrackProv] = useState("");
+  const [newTrackDate, setNewTrackDate] = useState("");
+  const [newTrackLabel, setNewTrackLabel] = useState("");
+  const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
+  const [editTrackCode, setEditTrackCode] = useState("");
+  const [editTrackProv, setEditTrackProv] = useState("");
+  const [editTrackDate, setEditTrackDate] = useState("");
+  const [editTrackLabel, setEditTrackLabel] = useState("");
 
   const utils = trpc.useUtils();
   const { data: campaign, isLoading } = trpc.campaign.get.useQuery({ id: campaignId }, { enabled: campaignId > 0 });
@@ -286,6 +296,47 @@ export default function CampaignDetail() {
       utils.serviceOrder.list.invalidate();
       setFreightEditing(false);
       toast.success("Rastreamento de frete atualizado.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const { data: prodTrackings = [], refetch: refetchProdTrackings } = trpc.serviceOrder.listTrackings.useQuery(
+    { serviceOrderId: prodSo?.id ?? 0 },
+    { enabled: !!prodSo?.id }
+  );
+  const { data: distTrackings = [], refetch: refetchDistTrackings } = trpc.serviceOrder.listTrackings.useQuery(
+    { serviceOrderId: distSo?.id ?? 0 },
+    { enabled: !!distSo?.id }
+  );
+
+  const invalidateTrackings = () => {
+    refetchProdTrackings();
+    refetchDistTrackings();
+  };
+
+  const addTrackingMutation = trpc.serviceOrder.addTracking.useMutation({
+    onSuccess: () => {
+      invalidateTrackings();
+      setAddTrackingForSoId(null);
+      setNewTrackCode(""); setNewTrackProv(""); setNewTrackDate(""); setNewTrackLabel("");
+      toast.success("Rastreamento adicionado.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const updateTrackingMutation = trpc.serviceOrder.updateTracking.useMutation({
+    onSuccess: () => {
+      invalidateTrackings();
+      setEditingTrackId(null);
+      toast.success("Rastreamento atualizado.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const deleteTrackingMutation = trpc.serviceOrder.deleteTracking.useMutation({
+    onSuccess: () => {
+      invalidateTrackings();
+      toast.success("Rastreamento removido.");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -1032,74 +1083,101 @@ export default function CampaignDetail() {
               {prodSo && (
                 <div className="border border-amber-500/20 rounded-md p-3 space-y-3 bg-amber-500/5">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rastreamento de Frete · {prodSo.orderNumber}</p>
-                    {!freightEditing && (
-                      <button
-                        onClick={() => {
-                          setFreightCode((prodSo as any).trackingCode || "");
-                          setFreightProv((prodSo as any).freightProvider || "");
-                          setFreightDate((prodSo as any).freightExpectedDate || "");
-                          setFreightEditing(true);
-                        }}
-                        className="text-[10px] text-muted-foreground hover:text-foreground underline"
-                      >
-                        Editar
-                      </button>
-                    )}
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rastreamentos de Frete · {prodSo.orderNumber}</p>
+                    <button
+                      onClick={() => { setAddTrackingForSoId(prodSo.id); setNewTrackCode(""); setNewTrackProv(""); setNewTrackDate(""); setNewTrackLabel(""); }}
+                      className="text-[10px] text-amber-400 hover:text-amber-300 underline"
+                    >
+                      + Adicionar
+                    </button>
                   </div>
-                  {freightEditing ? (
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+
+                  {prodTrackings.length === 0 && addTrackingForSoId !== prodSo.id && (
+                    <p className="text-xs text-muted-foreground italic">Nenhum rastreamento cadastrado.</p>
+                  )}
+
+                  {(prodTrackings as any[]).map((t: any) => (
+                    <div key={t.id} className="rounded border border-border/20 bg-background/50 p-2 space-y-2">
+                      {editingTrackId === t.id ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Rótulo</Label>
+                              <Input value={editTrackLabel} onChange={e => setEditTrackLabel(e.target.value)} placeholder="ex: Lote 1" className="h-7 text-xs bg-background border-border/30" />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Código</Label>
+                              <Input value={editTrackCode} onChange={e => setEditTrackCode(e.target.value)} placeholder="ex: BR123456789BR" className="h-7 text-xs bg-background border-border/30" />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Transportadora</Label>
+                              <Input value={editTrackProv} onChange={e => setEditTrackProv(e.target.value)} placeholder="ex: Correios" className="h-7 text-xs bg-background border-border/30" />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Previsão</Label>
+                              <Input type="date" value={editTrackDate} onChange={e => setEditTrackDate(e.target.value)} className="h-7 text-xs bg-background border-border/30" />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" className="h-6 text-xs bg-amber-600 hover:bg-amber-700" disabled={updateTrackingMutation.isPending}
+                              onClick={() => updateTrackingMutation.mutate({ id: t.id, trackingCode: editTrackCode, freightProvider: editTrackProv || undefined, expectedDate: editTrackDate || undefined, label: editTrackLabel || undefined })}>
+                              Salvar
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEditingTrackId(null)}>Cancelar</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 flex-1">
+                            {t.label && <div><p className="text-[10px] text-muted-foreground">Rótulo</p><p className="text-xs font-medium">{t.label}</p></div>}
+                            <div><p className="text-[10px] text-muted-foreground">Código</p><p className="text-xs font-mono">{t.trackingCode}</p></div>
+                            <div><p className="text-[10px] text-muted-foreground">Transportadora</p><p className="text-xs">{t.freightProvider || "—"}</p></div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground">Previsão</p>
+                              {t.expectedDate ? (
+                                <div className="flex items-center gap-1">
+                                  <p className="text-xs">{new Date(t.expectedDate).toLocaleDateString("pt-BR")}</p>
+                                  {t.expectedDate < new Date().toISOString().split("T")[0] && <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />}
+                                </div>
+                              ) : <p className="text-xs">—</p>}
+                            </div>
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            <button onClick={() => { setEditingTrackId(t.id); setEditTrackCode(t.trackingCode); setEditTrackProv(t.freightProvider || ""); setEditTrackDate(t.expectedDate || ""); setEditTrackLabel(t.label || ""); }} className="text-[10px] text-muted-foreground hover:text-foreground underline">Editar</button>
+                            <button onClick={() => deleteTrackingMutation.mutate({ id: t.id })} className="text-[10px] text-red-400 hover:text-red-300 underline ml-2">Remover</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {addTrackingForSoId === prodSo.id && (
+                    <div className="rounded border border-amber-500/30 bg-amber-500/5 p-2 space-y-2">
+                      <p className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">Novo Rastreamento</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                         <div className="space-y-1">
-                          <Label className="text-xs">Código de Rastreio</Label>
-                          <Input value={freightCode} onChange={e => setFreightCode(e.target.value)} placeholder="ex: BR123456789BR" className="h-8 text-xs bg-background border-border/30" />
+                          <Label className="text-xs">Rótulo</Label>
+                          <Input value={newTrackLabel} onChange={e => setNewTrackLabel(e.target.value)} placeholder="ex: Lote 1" className="h-7 text-xs bg-background border-border/30" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Código *</Label>
+                          <Input value={newTrackCode} onChange={e => setNewTrackCode(e.target.value)} placeholder="ex: BR123456789BR" className="h-7 text-xs bg-background border-border/30" />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs">Transportadora</Label>
-                          <Input value={freightProv} onChange={e => setFreightProv(e.target.value)} placeholder="ex: Correios, Jadlog..." className="h-8 text-xs bg-background border-border/30" />
+                          <Input value={newTrackProv} onChange={e => setNewTrackProv(e.target.value)} placeholder="ex: Correios" className="h-7 text-xs bg-background border-border/30" />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs">Previsão de Entrega</Label>
-                          <Input type="date" value={freightDate} onChange={e => setFreightDate(e.target.value)} className="h-8 text-xs bg-background border-border/30" />
+                          <Label className="text-xs">Previsão</Label>
+                          <Input type="date" value={newTrackDate} onChange={e => setNewTrackDate(e.target.value)} className="h-7 text-xs bg-background border-border/30" />
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs gap-1 bg-amber-600 hover:bg-amber-700"
-                          disabled={updateSoFreightMutation.isPending}
-                          onClick={() => updateSoFreightMutation.mutate({
-                            id: prodSo.id,
-                            trackingCode: freightCode || undefined,
-                            freightProvider: freightProv || undefined,
-                            freightExpectedDate: freightDate || undefined,
-                          })}
-                        >
-                          Salvar
+                        <Button size="sm" className="h-6 text-xs bg-amber-600 hover:bg-amber-700" disabled={!newTrackCode || addTrackingMutation.isPending}
+                          onClick={() => addTrackingMutation.mutate({ serviceOrderId: prodSo.id, trackingCode: newTrackCode, freightProvider: newTrackProv || undefined, expectedDate: newTrackDate || undefined, label: newTrackLabel || undefined })}>
+                          Adicionar
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setFreightEditing(false)}>Cancelar</Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <p className="text-[10px] text-muted-foreground mb-0.5">Código</p>
-                        <p className="text-xs font-mono">{(prodSo as any).trackingCode || "—"}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground mb-0.5">Transportadora</p>
-                        <p className="text-xs">{(prodSo as any).freightProvider || "—"}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground mb-0.5">Previsão de Entrega</p>
-                        {(prodSo as any).freightExpectedDate ? (
-                          <div className="flex items-center gap-1">
-                            <p className="text-xs">{new Date((prodSo as any).freightExpectedDate).toLocaleDateString("pt-BR")}</p>
-                            {(prodSo as any).freightExpectedDate < new Date().toISOString().split("T")[0] && (
-                              <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
-                            )}
-                          </div>
-                        ) : <p className="text-xs">—</p>}
+                        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setAddTrackingForSoId(null)}>Cancelar</Button>
                       </div>
                     </div>
                   )}
@@ -1165,74 +1243,101 @@ export default function CampaignDetail() {
               {distSo && (
                 <div className="border border-orange-500/20 rounded-md p-3 space-y-3 bg-orange-500/5">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rastreamento de Frete · {distSo.orderNumber}</p>
-                    {!freightEditing && (
-                      <button
-                        onClick={() => {
-                          setFreightCode((distSo as any).trackingCode || "");
-                          setFreightProv((distSo as any).freightProvider || "");
-                          setFreightDate((distSo as any).freightExpectedDate || "");
-                          setFreightEditing(true);
-                        }}
-                        className="text-[10px] text-muted-foreground hover:text-foreground underline"
-                      >
-                        Editar
-                      </button>
-                    )}
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rastreamentos de Frete · {distSo.orderNumber}</p>
+                    <button
+                      onClick={() => { setAddTrackingForSoId(distSo.id); setNewTrackCode(""); setNewTrackProv(""); setNewTrackDate(""); setNewTrackLabel(""); }}
+                      className="text-[10px] text-orange-400 hover:text-orange-300 underline"
+                    >
+                      + Adicionar
+                    </button>
                   </div>
-                  {freightEditing ? (
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+
+                  {distTrackings.length === 0 && addTrackingForSoId !== distSo.id && (
+                    <p className="text-xs text-muted-foreground italic">Nenhum rastreamento cadastrado.</p>
+                  )}
+
+                  {(distTrackings as any[]).map((t: any) => (
+                    <div key={t.id} className="rounded border border-border/20 bg-background/50 p-2 space-y-2">
+                      {editingTrackId === t.id ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Rótulo</Label>
+                              <Input value={editTrackLabel} onChange={e => setEditTrackLabel(e.target.value)} placeholder="ex: Lote 1" className="h-7 text-xs bg-background border-border/30" />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Código</Label>
+                              <Input value={editTrackCode} onChange={e => setEditTrackCode(e.target.value)} placeholder="ex: BR123456789BR" className="h-7 text-xs bg-background border-border/30" />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Transportadora</Label>
+                              <Input value={editTrackProv} onChange={e => setEditTrackProv(e.target.value)} placeholder="ex: Correios" className="h-7 text-xs bg-background border-border/30" />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Previsão</Label>
+                              <Input type="date" value={editTrackDate} onChange={e => setEditTrackDate(e.target.value)} className="h-7 text-xs bg-background border-border/30" />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" className="h-6 text-xs bg-orange-600 hover:bg-orange-700" disabled={updateTrackingMutation.isPending}
+                              onClick={() => updateTrackingMutation.mutate({ id: t.id, trackingCode: editTrackCode, freightProvider: editTrackProv || undefined, expectedDate: editTrackDate || undefined, label: editTrackLabel || undefined })}>
+                              Salvar
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEditingTrackId(null)}>Cancelar</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 flex-1">
+                            {t.label && <div><p className="text-[10px] text-muted-foreground">Rótulo</p><p className="text-xs font-medium">{t.label}</p></div>}
+                            <div><p className="text-[10px] text-muted-foreground">Código</p><p className="text-xs font-mono">{t.trackingCode}</p></div>
+                            <div><p className="text-[10px] text-muted-foreground">Transportadora</p><p className="text-xs">{t.freightProvider || "—"}</p></div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground">Previsão</p>
+                              {t.expectedDate ? (
+                                <div className="flex items-center gap-1">
+                                  <p className="text-xs">{new Date(t.expectedDate).toLocaleDateString("pt-BR")}</p>
+                                  {t.expectedDate < new Date().toISOString().split("T")[0] && <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />}
+                                </div>
+                              ) : <p className="text-xs">—</p>}
+                            </div>
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            <button onClick={() => { setEditingTrackId(t.id); setEditTrackCode(t.trackingCode); setEditTrackProv(t.freightProvider || ""); setEditTrackDate(t.expectedDate || ""); setEditTrackLabel(t.label || ""); }} className="text-[10px] text-muted-foreground hover:text-foreground underline">Editar</button>
+                            <button onClick={() => deleteTrackingMutation.mutate({ id: t.id })} className="text-[10px] text-red-400 hover:text-red-300 underline ml-2">Remover</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {addTrackingForSoId === distSo.id && (
+                    <div className="rounded border border-orange-500/30 bg-orange-500/5 p-2 space-y-2">
+                      <p className="text-[10px] uppercase tracking-wider text-orange-400 font-semibold">Novo Rastreamento</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                         <div className="space-y-1">
-                          <Label className="text-xs">Código de Rastreio</Label>
-                          <Input value={freightCode} onChange={e => setFreightCode(e.target.value)} placeholder="ex: BR123456789BR" className="h-8 text-xs bg-background border-border/30" />
+                          <Label className="text-xs">Rótulo</Label>
+                          <Input value={newTrackLabel} onChange={e => setNewTrackLabel(e.target.value)} placeholder="ex: Lote 1" className="h-7 text-xs bg-background border-border/30" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Código *</Label>
+                          <Input value={newTrackCode} onChange={e => setNewTrackCode(e.target.value)} placeholder="ex: BR123456789BR" className="h-7 text-xs bg-background border-border/30" />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs">Transportadora</Label>
-                          <Input value={freightProv} onChange={e => setFreightProv(e.target.value)} placeholder="ex: Correios, Jadlog..." className="h-8 text-xs bg-background border-border/30" />
+                          <Input value={newTrackProv} onChange={e => setNewTrackProv(e.target.value)} placeholder="ex: Correios" className="h-7 text-xs bg-background border-border/30" />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs">Previsão de Entrega</Label>
-                          <Input type="date" value={freightDate} onChange={e => setFreightDate(e.target.value)} className="h-8 text-xs bg-background border-border/30" />
+                          <Label className="text-xs">Previsão</Label>
+                          <Input type="date" value={newTrackDate} onChange={e => setNewTrackDate(e.target.value)} className="h-7 text-xs bg-background border-border/30" />
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs gap-1 bg-teal-600 hover:bg-teal-700"
-                          disabled={updateSoFreightMutation.isPending}
-                          onClick={() => updateSoFreightMutation.mutate({
-                            id: distSo.id,
-                            trackingCode: freightCode || undefined,
-                            freightProvider: freightProv || undefined,
-                            freightExpectedDate: freightDate || undefined,
-                          })}
-                        >
-                          Salvar
+                        <Button size="sm" className="h-6 text-xs bg-orange-600 hover:bg-orange-700" disabled={!newTrackCode || addTrackingMutation.isPending}
+                          onClick={() => addTrackingMutation.mutate({ serviceOrderId: distSo.id, trackingCode: newTrackCode, freightProvider: newTrackProv || undefined, expectedDate: newTrackDate || undefined, label: newTrackLabel || undefined })}>
+                          Adicionar
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setFreightEditing(false)}>Cancelar</Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <p className="text-[10px] text-muted-foreground mb-0.5">Código</p>
-                        <p className="text-xs font-mono">{(distSo as any).trackingCode || "—"}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground mb-0.5">Transportadora</p>
-                        <p className="text-xs">{(distSo as any).freightProvider || "—"}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground mb-0.5">Previsão</p>
-                        {(distSo as any).freightExpectedDate ? (
-                          <div className="flex items-center gap-1">
-                            <p className="text-xs">{new Date((distSo as any).freightExpectedDate).toLocaleDateString("pt-BR")}</p>
-                            {(distSo as any).freightExpectedDate < new Date().toISOString().split("T")[0] && (
-                              <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
-                            )}
-                          </div>
-                        ) : <p className="text-xs">—</p>}
+                        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setAddTrackingForSoId(null)}>Cancelar</Button>
                       </div>
                     </div>
                   )}
