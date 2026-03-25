@@ -104,19 +104,28 @@ function formatRelativeDate(d: string | Date): string {
 }
 
 const ACTION_LABELS: Record<string, string> = {
-  briefing:    "Movida para Briefing",
-  design:      "Movida para Design",
-  aprovacao:   "Enviada para Aprovação",
-  producao:    "Entrou em Produção",
-  distribuicao:"Em Distribuição",
-  veiculacao:  "Em Veiculação",
-  active:      "Ativada",
-  archived:    "Arquivada",
-  inativa:     "Marcada como Inativa",
-  draft:       "Rascunho criado",
-  quotation:   "Cotação vinculada",
-  paused:      "Pausada",
-  completed:   "Concluída",
+  created:                "Cotação criada",
+  created_from_quotation: "Campanha criada a partir da cotação",
+  approved:               "Cotação aprovada — campanha ativada",
+  archived:               "Campanha arquivada",
+  paused:                 "Campanha pausada",
+  resumed:                "Campanha retomada",
+  completed:              "Campanha concluída",
+  reactivated:            "Campanha reativada",
+  updated:                "Campanha atualizada",
+  restaurants_updated:    "Restaurantes atualizados",
+  briefing_complete:      "Briefing concluído",
+  design_submitted:       "Design enviado para aprovação",
+  design_approved:        "Design aprovado",
+  art_uploaded:           "Arte enviada — em produção",
+  production_complete:    "Produção concluída",
+  material_received:      "Material recebido",
+  distribution_complete:  "Distribuição concluída",
+  veiculacao_started:     "Veiculação iniciada",
+  finalized:              "Campanha finalizada",
+  proof_added:            "Comprovante adicionado",
+  active:                 "Campanha ativada",
+  inativa:                "Campanha encerrada",
 };
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -377,7 +386,7 @@ export default function Dashboard() {
         ) : recentHistory.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">Nenhuma atividade</p>
         ) : (
-          <div className="space-y-1">
+          <div className="max-h-80 overflow-y-auto space-y-1">
             {recentHistory.map((h) => {
               const actionLabel = ACTION_LABELS[h.action] || h.action;
               return (
