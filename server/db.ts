@@ -165,6 +165,12 @@ export async function listCampaigns() {
       isBonificada: campaigns.isBonificada,
       productId: campaigns.productId,
       quotationId: campaigns.quotationId,
+      proposalSignedAt: campaigns.proposalSignedAt,
+      briefingEnteredAt: campaigns.briefingEnteredAt,
+      designEnteredAt: campaigns.designEnteredAt,
+      aprovacaoEnteredAt: campaigns.aprovacaoEnteredAt,
+      producaoEnteredAt: campaigns.producaoEnteredAt,
+      distribuicaoEnteredAt: campaigns.distribuicaoEnteredAt,
       createdAt: campaigns.createdAt,
       updatedAt: campaigns.updatedAt,
       clientName: clients.name,
@@ -218,7 +224,19 @@ export async function createCampaign(data: Omit<InsertCampaign, "id" | "createdA
 export async function updateCampaign(id: number, data: Partial<InsertCampaign>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(campaigns).set({ ...data, updatedAt: new Date() }).where(eq(campaigns.id, id));
+  const extra: Partial<InsertCampaign> = {};
+  if (data.status) {
+    const now = new Date();
+    const stageMap: Record<string, Partial<InsertCampaign>> = {
+      briefing:     { briefingEnteredAt:    now },
+      design:       { designEnteredAt:      now },
+      aprovacao:    { aprovacaoEnteredAt:   now },
+      producao:     { producaoEnteredAt:    now },
+      distribuicao: { distribuicaoEnteredAt: now },
+    };
+    Object.assign(extra, stageMap[data.status] ?? {});
+  }
+  await db.update(campaigns).set({ ...data, ...extra, updatedAt: new Date() }).where(eq(campaigns.id, id));
 }
 
 export async function deleteCampaign(id: number) {

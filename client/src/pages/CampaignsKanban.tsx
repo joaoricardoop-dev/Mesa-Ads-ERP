@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import {
@@ -18,6 +17,8 @@ import {
   ExternalLink,
   CheckCircle2,
   Clock,
+  Timer,
+  Flame,
 } from "lucide-react";
 import {
   Select,
@@ -28,18 +29,36 @@ import {
 } from "@/components/ui/select";
 
 const STAGES = [
-  { key: "briefing", label: "Briefing", color: "bg-sky-500", light: "bg-sky-500/10 border-sky-500/30", text: "text-sky-400", dot: "bg-sky-500" },
-  { key: "design", label: "Design", color: "bg-purple-500", light: "bg-purple-500/10 border-purple-500/30", text: "text-purple-400", dot: "bg-purple-500" },
-  { key: "aprovacao", label: "Aprovação", color: "bg-orange-500", light: "bg-orange-500/10 border-orange-500/30", text: "text-orange-400", dot: "bg-orange-500" },
-  { key: "producao", label: "Produção", color: "bg-amber-500", light: "bg-amber-500/10 border-amber-500/30", text: "text-amber-400", dot: "bg-amber-500" },
-  { key: "distribuicao", label: "Distribuição", color: "bg-teal-500", light: "bg-teal-500/10 border-teal-500/30", text: "text-teal-400", dot: "bg-teal-500" },
-  { key: "veiculacao", label: "Veiculação", color: "bg-emerald-500", light: "bg-emerald-500/10 border-emerald-500/30", text: "text-emerald-400", dot: "bg-emerald-500" },
-  { key: "archived", label: "Arquivado", color: "bg-gray-500", light: "bg-gray-500/10 border-gray-500/30", text: "text-gray-400", dot: "bg-gray-500" },
+  { key: "briefing",     label: "Briefing",     light: "bg-sky-500/10 border-sky-500/30",      text: "text-sky-400",     dot: "bg-sky-500" },
+  { key: "design",       label: "Design",        light: "bg-purple-500/10 border-purple-500/30",text: "text-purple-400",  dot: "bg-purple-500" },
+  { key: "aprovacao",    label: "Aprovação",     light: "bg-orange-500/10 border-orange-500/30",text: "text-orange-400",  dot: "bg-orange-500" },
+  { key: "producao",     label: "Produção",      light: "bg-amber-500/10 border-amber-500/30",  text: "text-amber-400",   dot: "bg-amber-500" },
+  { key: "distribuicao", label: "Distribuição",  light: "bg-teal-500/10 border-teal-500/30",    text: "text-teal-400",    dot: "bg-teal-500" },
+  { key: "veiculacao",   label: "Veiculação",    light: "bg-emerald-500/10 border-emerald-500/30",text: "text-emerald-400",dot: "bg-emerald-500" },
+  { key: "archived",     label: "Arquivado",     light: "bg-gray-500/10 border-gray-500/30",    text: "text-gray-400",    dot: "bg-gray-500" },
 ] as const;
 
 type StageKey = typeof STAGES[number]["key"];
 
 const KANBAN_STATUSES: StageKey[] = ["briefing", "design", "aprovacao", "producao", "distribuicao", "veiculacao", "archived"];
+
+const SLA_STAGES = new Set(["briefing", "design", "aprovacao"]);
+const SLA_WARN_DAYS = 3;
+const SLA_CRIT_DAYS = 5;
+
+const STAGE_ENTERED_AT: Partial<Record<StageKey, keyof KanbanCampaign>> = {
+  briefing:     "briefingEnteredAt",
+  design:       "designEnteredAt",
+  aprovacao:    "aprovacaoEnteredAt",
+  producao:     "producaoEnteredAt",
+  distribuicao: "distribuicaoEnteredAt",
+};
+
+function daysSince(ts: Date | string | null | undefined): number | null {
+  if (!ts) return null;
+  const ms = Date.now() - new Date(ts).getTime();
+  return Math.floor(ms / 86_400_000);
+}
 
 function isOverdue(endDate: string | null | undefined): boolean {
   if (!endDate) return false;
@@ -59,6 +78,41 @@ interface KanbanCampaign {
   materialReceivedDate?: string | null;
   isBonificada?: boolean | null;
   campaignNumber?: string | null;
+  briefingEnteredAt?: Date | string | null;
+  designEnteredAt?: Date | string | null;
+  aprovacaoEnteredAt?: Date | string | null;
+  producaoEnteredAt?: Date | string | null;
+  distribuicaoEnteredAt?: Date | string | null;
+  updatedAt?: Date | string | null;
+}
+
+function getDaysInStage(c: KanbanCampaign): number | null {
+  const fieldKey = STAGE_ENTERED_AT[c.status as StageKey];
+  if (fieldKey) {
+    const d = daysSince(c[fieldKey] as string | null);
+    if (d !== null) return d;
+  }
+  return daysSince(c.updatedAt);
+}
+
+function getSlaElapsed(c: KanbanCampaign): number | null {
+  if (!SLA_STAGES.has(c.status)) return null;
+  return daysSince(c.briefingEnteredAt);
+}
+
+function SlaChip({ days }: { days: number }) {
+  if (days < SLA_WARN_DAYS) return null;
+  const isCrit = days >= SLA_CRIT_DAYS;
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
+      isCrit
+        ? "bg-red-500/20 border-red-500/40 text-red-400"
+        : "bg-amber-500/20 border-amber-500/40 text-amber-400"
+    }`}>
+      {isCrit ? <Flame className="w-2.5 h-2.5" /> : <Timer className="w-2.5 h-2.5" />}
+      SLA {days}d
+    </span>
+  );
 }
 
 function CampaignCard({
@@ -77,6 +131,8 @@ function CampaignCard({
   const hasMaterial = !!campaign.materialReceivedDate;
   const canMovePrev = stageIndex > 0;
   const canMoveNext = stageIndex < KANBAN_STATUSES.length - 1;
+  const daysInStage = getDaysInStage(campaign);
+  const slaElapsed = getSlaElapsed(campaign);
 
   return (
     <div
@@ -114,7 +170,7 @@ function CampaignCard({
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span className="font-mono">{(campaign.coastersPerRestaurant * campaign.activeRestaurants).toLocaleString("pt-BR")} un.</span>
         <span className="text-border">·</span>
-        <span>{campaign.activeRestaurants} restaurantes</span>
+        <span>{campaign.activeRestaurants} rest.</span>
       </div>
 
       {campaign.endDate && (
@@ -125,15 +181,22 @@ function CampaignCard({
       )}
 
       <div className="flex items-center gap-1 flex-wrap">
+        {daysInStage !== null && (
+          <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-full">
+            <Clock className="w-2.5 h-2.5" />
+            {daysInStage === 0 ? "hoje" : daysInStage === 1 ? "1 dia" : `${daysInStage} dias`}
+          </span>
+        )}
+        {slaElapsed !== null && <SlaChip days={slaElapsed} />}
         {hasMaterial && (
-          <Badge className="text-[10px] h-4 px-1.5 bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
-            <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" /> Material
-          </Badge>
+          <span className="inline-flex items-center gap-0.5 text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full">
+            <CheckCircle2 className="w-2.5 h-2.5" /> Material
+          </span>
         )}
         {campaign.isBonificada && (
-          <Badge className="text-[10px] h-4 px-1.5 bg-amber-500/20 text-amber-400 border-amber-500/30">
-            <Gift className="w-2.5 h-2.5 mr-0.5" /> Bonificada
-          </Badge>
+          <span className="inline-flex items-center gap-0.5 text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full">
+            <Gift className="w-2.5 h-2.5" /> Bonificada
+          </span>
         )}
       </div>
 
@@ -164,19 +227,14 @@ export default function CampaignsKanban() {
   const [filterClient, setFilterClient] = useState("all");
   const [filterOverdue, setFilterOverdue] = useState(false);
   const [filterBonificada, setFilterBonificada] = useState(false);
+  const [filterSla, setFilterSla] = useState(false);
   const [movingId, setMovingId] = useState<number | null>(null);
 
   const { data: campaigns = [], refetch } = trpc.campaign.list.useQuery();
 
   const updateMutation = trpc.campaign.update.useMutation({
-    onSuccess: () => {
-      refetch();
-      setMovingId(null);
-    },
-    onError: (err: any) => {
-      toast.error(err.message ?? "Erro ao mover campanha");
-      setMovingId(null);
-    },
+    onSuccess: () => { refetch(); setMovingId(null); },
+    onError: (err: any) => { toast.error(err.message ?? "Erro ao mover campanha"); setMovingId(null); },
   });
 
   const handleMove = (id: number, newStatus: StageKey) => {
@@ -184,17 +242,14 @@ export default function CampaignsKanban() {
     updateMutation.mutate({ id, status: newStatus });
   };
 
-  const kanbanCampaigns = useMemo(() => {
-    return (campaigns as KanbanCampaign[]).filter((c) =>
-      KANBAN_STATUSES.includes(c.status as StageKey)
-    );
-  }, [campaigns]);
+  const kanbanCampaigns = useMemo(() =>
+    (campaigns as KanbanCampaign[]).filter((c) => KANBAN_STATUSES.includes(c.status as StageKey)),
+    [campaigns]
+  );
 
   const uniqueClients = useMemo(() => {
     const seen = new Map<string, string>();
-    kanbanCampaigns.forEach((c) => {
-      if (c.clientName) seen.set(c.clientName, c.clientCompany || c.clientName);
-    });
+    kanbanCampaigns.forEach((c) => { if (c.clientName) seen.set(c.clientName, c.clientCompany || c.clientName); });
     return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1]));
   }, [kanbanCampaigns]);
 
@@ -205,25 +260,27 @@ export default function CampaignsKanban() {
       if (filterClient !== "all" && c.clientName !== filterClient) return false;
       if (filterOverdue && !isOverdue(c.endDate)) return false;
       if (filterBonificada && !c.isBonificada) return false;
+      if (filterSla) {
+        const sla = getSlaElapsed(c);
+        if (sla === null || sla < SLA_WARN_DAYS) return false;
+      }
       return true;
     });
-  }, [kanbanCampaigns, search, filterClient, filterOverdue, filterBonificada]);
+  }, [kanbanCampaigns, search, filterClient, filterOverdue, filterBonificada, filterSla]);
 
   const byStage = useMemo(() => {
     const map: Record<StageKey, KanbanCampaign[]> = {
       briefing: [], design: [], aprovacao: [], producao: [],
       distribuicao: [], veiculacao: [], archived: [],
     };
-    filtered.forEach((c) => {
-      if (c.status in map) map[c.status as StageKey].push(c);
-    });
+    filtered.forEach((c) => { if (c.status in map) map[c.status as StageKey].push(c); });
     return map;
   }, [filtered]);
 
-  const totalAtivas = kanbanCampaigns.filter((c) => c.status !== "archived").length;
-  const emProducao = kanbanCampaigns.filter((c) => c.status === "producao").length;
-  const atrasadas = kanbanCampaigns.filter((c) => c.status !== "archived" && isOverdue(c.endDate)).length;
-  const veiculando = kanbanCampaigns.filter((c) => c.status === "veiculacao").length;
+  const totalAtivas   = kanbanCampaigns.filter((c) => c.status !== "archived").length;
+  const emProducao    = kanbanCampaigns.filter((c) => c.status === "producao").length;
+  const atrasadas     = kanbanCampaigns.filter((c) => c.status !== "archived" && isOverdue(c.endDate)).length;
+  const emRiscoSla    = kanbanCampaigns.filter((c) => { const s = getSlaElapsed(c); return s !== null && s >= SLA_WARN_DAYS; }).length;
 
   return (
     <div className="flex flex-col">
@@ -242,8 +299,8 @@ export default function CampaignsKanban() {
             <p className={`text-xl font-bold ${atrasadas > 0 ? "text-red-400" : "text-muted-foreground"}`}>{atrasadas}</p>
           </div>
           <div className="bg-card border border-border/30 rounded-lg px-3 py-2">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Em Veiculação</p>
-            <p className="text-xl font-bold text-emerald-400">{veiculando}</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Risco SLA</p>
+            <p className={`text-xl font-bold ${emRiscoSla > 0 ? "text-amber-400" : "text-muted-foreground"}`}>{emRiscoSla}</p>
           </div>
         </div>
 
@@ -273,6 +330,18 @@ export default function CampaignsKanban() {
           )}
 
           <button
+            onClick={() => setFilterSla((v) => !v)}
+            className={`flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs border transition-colors ${
+              filterSla
+                ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                : "bg-background border-border/30 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Timer className="w-3 h-3" />
+            Risco SLA
+          </button>
+
+          <button
             onClick={() => setFilterOverdue((v) => !v)}
             className={`flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs border transition-colors ${
               filterOverdue
@@ -297,9 +366,7 @@ export default function CampaignsKanban() {
           </button>
 
           {filtered.length !== kanbanCampaigns.length && (
-            <span className="text-xs text-muted-foreground">
-              {filtered.length} de {kanbanCampaigns.length}
-            </span>
+            <span className="text-xs text-muted-foreground">{filtered.length} de {kanbanCampaigns.length}</span>
           )}
         </div>
       </div>
@@ -308,6 +375,11 @@ export default function CampaignsKanban() {
         <div className="flex gap-3 p-4 min-w-max" style={{ height: "calc(100vh - 280px)" }}>
           {STAGES.map((stage, stageIndex) => {
             const cards = byStage[stage.key];
+            const hasSlaRisk = SLA_STAGES.has(stage.key as any);
+            const slaRiskCount = hasSlaRisk
+              ? cards.filter((c) => { const s = getSlaElapsed(c); return s !== null && s >= SLA_WARN_DAYS; }).length
+              : 0;
+
             return (
               <div
                 key={stage.key}
@@ -317,11 +389,22 @@ export default function CampaignsKanban() {
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${stage.dot}`} />
                     <span className={`text-sm font-semibold ${stage.text}`}>{stage.label}</span>
+                    {slaRiskCount > 0 && (
+                      <span className="text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1 py-0.5 rounded-full">
+                        {slaRiskCount} SLA
+                      </span>
+                    )}
                   </div>
                   <span className={`text-xs font-mono font-bold ${stage.text} bg-current/10 px-1.5 py-0.5 rounded`}>
                     {cards.length}
                   </span>
                 </div>
+
+                {hasSlaRisk && (
+                  <div className={`px-3 py-1 text-[10px] border-b border-current/10 ${stage.text} opacity-60`}>
+                    SLA: <span className="text-amber-400">⚠ ≥3d</span> · <span className="text-red-400">🔥 ≥5d</span>
+                  </div>
+                )}
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0 scrollbar-hide">
                   {cards.length === 0 ? (
