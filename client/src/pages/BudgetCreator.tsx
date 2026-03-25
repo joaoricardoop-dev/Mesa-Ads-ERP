@@ -59,6 +59,7 @@ interface BudgetItemState {
   isCustomProduct?: boolean;
   customValues?: CustomProductValues;
   discountPriceTiers?: DiscountPriceTier[];
+  isBonificada?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -242,6 +243,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
   const isCoaster = selectedProduct?.temDistribuicaoPorLocal === true;
   const isPriceBased = item.pricingMode === "price_based";
   const isFixedQty = item.entryType === "fixed_quantities";
+  const isDisplayBatch = selectedProduct?.tipo === "telas" || selectedProduct?.tipo === "display";
 
   const { data: tiersRaw, isLoading: tiersLoading } = trpc.product.getTiers.useQuery(
     { productId: item.productId! },
@@ -306,7 +308,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
     onUpdate(item.id, patch);
   }, [onUpdate, item.id]);
 
-  const isBonificada = globalParams.isBonificada;
+  const isBonificada = globalParams.isBonificada || !!item.isBonificada;
   const usePillTiers = item.hasTiers && item.tiers.length > 0 && item.tiers.length <= 8;
 
   return (
@@ -329,7 +331,12 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
           <div className="flex items-center gap-1">
             {item.productId && !item.isCustomProduct && (
               <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-mono">
-                {item.semanas}sem
+                {isDisplayBatch ? `${item.semanas / 4}bt` : `${item.semanas}sem`}
+              </Badge>
+            )}
+            {item.isBonificada && !globalParams.isBonificada && (
+              <Badge className="text-[10px] h-5 px-1.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800">
+                Bonif.
               </Badge>
             )}
             <Button
@@ -510,26 +517,64 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
             </div>
           )}
 
-          {/* Duration chips */}
+          {/* Duration — batch input for telas/display, chips for everything else */}
           {!item.isCustomProduct && item.productId && (
             <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Duração</Label>
-              <div className="flex gap-1.5 flex-wrap">
-                {SEMANAS_OPTIONS.map((s) => (
+              <Label className="text-xs text-muted-foreground mb-1.5 block">
+                {isDisplayBatch ? "Duração (batches)" : "Duração"}
+              </Label>
+              {isDisplayBatch ? (
+                <div className="flex items-center gap-2">
                   <button
-                    key={s}
                     type="button"
-                    onClick={() => onUpdate(item.id, { semanas: s })}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                      item.semanas === s
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                        : "bg-background text-muted-foreground border-border/50 hover:border-primary/40 hover:text-foreground"
-                    }`}
+                    onClick={() => onUpdate(item.id, { semanas: Math.max(4, item.semanas - 4) })}
+                    className="h-7 w-7 rounded border border-border/50 flex items-center justify-center text-sm font-medium bg-background hover:bg-muted transition-colors"
                   >
-                    {s}sem
+                    −
                   </button>
-                ))}
-              </div>
+                  <span className="min-w-[70px] text-center text-sm font-semibold tabular-nums">
+                    {item.semanas / 4} {item.semanas / 4 === 1 ? "batch" : "batches"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onUpdate(item.id, { semanas: item.semanas + 4 })}
+                    className="h-7 w-7 rounded border border-border/50 flex items-center justify-center text-sm font-medium bg-background hover:bg-muted transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-1.5 flex-wrap">
+                  {SEMANAS_OPTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => onUpdate(item.id, { semanas: s })}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                        item.semanas === s
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-background text-muted-foreground border-border/50 hover:border-primary/40 hover:text-foreground"
+                      }`}
+                    >
+                      {s}sem
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Per-item bonification toggle */}
+          {!item.isCustomProduct && item.productId && !globalParams.isBonificada && (
+            <div className="flex items-center justify-between py-1">
+              <Label className="text-xs text-muted-foreground cursor-pointer" htmlFor={`bonif-${item.id}`}>
+                Bonificar este item
+              </Label>
+              <Switch
+                id={`bonif-${item.id}`}
+                checked={!!item.isBonificada}
+                onCheckedChange={(v) => onUpdate(item.id, { isBonificada: v })}
+              />
             </div>
           )}
 
@@ -743,9 +788,18 @@ function BudgetSummaryPanel({ items, globalParams, clientName, onGerarCotacao, i
       });
   }, [items]);
 
+  const calcsForTotals = useMemo(() => {
+    return itemCalcs.map(({ item, calc }) => {
+      if (item.isBonificada) {
+        return { ...calc, precoComDescDuracao: 0, precoSemDesconto: 0, descPrazoVal: 0, descFaixaPrecoVal: 0, descPrazoPerc: 0, descFaixaPrecoPerc: 0 } as ItemCalcResult;
+      }
+      return calc as ItemCalcResult;
+    });
+  }, [itemCalcs]);
+
   const totals = useMemo(
-    () => calcBudgetTotals(itemCalcs.map((c) => c.calc) as ItemCalcResult[], globalParams),
-    [itemCalcs, globalParams]
+    () => calcBudgetTotals(calcsForTotals, globalParams),
+    [calcsForTotals, globalParams]
   );
 
   const hasItems = itemCalcs.length > 0;
@@ -775,21 +829,28 @@ function BudgetSummaryPanel({ items, globalParams, clientName, onGerarCotacao, i
               <Separator />
               <div className="space-y-2">
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Itens</p>
-                {itemCalcs.map(({ item, input, calc }) => (
-                  <div key={item.id} className="flex items-start justify-between gap-2 text-xs">
-                    <div className="min-w-0">
-                      <p className="font-medium leading-tight truncate">{item.productName}</p>
-                      <p className="text-muted-foreground text-[11px]">
-                        {input.volume.toLocaleString("pt-BR")} un. · {item.semanas}sem
-                        {calc.descPrazoPerc > 0 ? ` · −${(calc.descPrazoPerc * 100).toFixed(0)}%` : ""}
-                        {calc.descFaixaPrecoPerc > 0 ? ` · faixa −${(calc.descFaixaPrecoPerc * 100).toFixed(0)}%` : ""}
-                      </p>
+                {itemCalcs.map(({ item, input, calc }) => {
+                  const itemBonif = globalParams.isBonificada || !!item.isBonificada;
+                  return (
+                    <div key={item.id} className="flex items-start justify-between gap-2 text-xs">
+                      <div className="min-w-0">
+                        <p className="font-medium leading-tight truncate">{item.productName}</p>
+                        <p className="text-muted-foreground text-[11px]">
+                          {input.volume.toLocaleString("pt-BR")} un. · {item.semanas}sem
+                          {calc.descPrazoPerc > 0 ? ` · −${(calc.descPrazoPerc * 100).toFixed(0)}%` : ""}
+                          {calc.descFaixaPrecoPerc > 0 ? ` · faixa −${(calc.descFaixaPrecoPerc * 100).toFixed(0)}%` : ""}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {itemBonif ? (
+                          <span className="text-green-600 dark:text-green-400 font-semibold font-mono">R$ 0,00</span>
+                        ) : (
+                          <span className="font-mono font-medium">{fmtBRL(calc.precoComDescDuracao)}</span>
+                        )}
+                      </div>
                     </div>
-                    <span className={`text-right shrink-0 font-mono font-medium ${globalParams.isBonificada ? "line-through text-muted-foreground" : ""}`}>
-                      {fmtBRL(calc.precoComDescDuracao)}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <Separator />
@@ -963,10 +1024,15 @@ export default function BudgetCreator() {
     return items.filter((item) => item.isCustomProduct && item.customValues);
   }, [items]);
 
-  const totals = useMemo(
-    () => calcBudgetTotals(itemCalcs.map((c) => c.calc) as ItemCalcResult[], globalParams),
-    [itemCalcs, globalParams]
-  );
+  const totals = useMemo(() => {
+    const calcsForTotals = itemCalcs.map(({ item, calc }) => {
+      if (item.isBonificada) {
+        return { ...calc, precoComDescDuracao: 0, precoSemDesconto: 0, descPrazoVal: 0, descFaixaPrecoVal: 0, descPrazoPerc: 0, descFaixaPrecoPerc: 0 } as ItemCalcResult;
+      }
+      return calc as ItemCalcResult;
+    });
+    return calcBudgetTotals(calcsForTotals, globalParams);
+  }, [itemCalcs, globalParams]);
 
   const customTotalValue = useMemo(() => {
     return customItems.reduce((sum, item) => {
@@ -1048,7 +1114,7 @@ export default function BudgetCreator() {
 
         for (const { item, input, calc } of itemCalcs) {
           let unitPriceFinal: string;
-          if (isBonificada) {
+          if (isBonificada || item.isBonificada) {
             unitPriceFinal = "0";
           } else {
             const itemTotal = calc.precoComDescDuracao * discountRatio;
