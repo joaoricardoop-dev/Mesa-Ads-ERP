@@ -33,16 +33,42 @@ declare global {
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const SAO_PAULO_CENTER = { lat: -23.5505, lng: -46.6333 };
 
+declare global {
+  interface Window {
+    gm_authFailure?: () => void;
+    _gmapsAuthFailed?: boolean;
+  }
+}
+
 function loadMapScript(): Promise<void> {
+  if (window._gmapsAuthFailed) {
+    window._gmapsLoading = undefined;
+    window._gmapsAuthFailed = false;
+    delete window.google;
+  }
   if (window.google?.maps) return Promise.resolve();
   if (window._gmapsLoading) return window._gmapsLoading;
+
   window._gmapsLoading = new Promise<void>((resolve, reject) => {
+    window.gm_authFailure = () => {
+      window._gmapsAuthFailed = true;
+      window._gmapsLoading = undefined;
+      reject(new Error(
+        "Chave da API do Google Maps inválida ou sem permissão. " +
+        "Verifique se a API 'Maps JavaScript API' está ativada no Google Cloud Console " +
+        "e se as restrições de HTTP Referrer permitem o domínio atual."
+      ));
+    };
+
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,geocoding`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Falha ao carregar Google Maps"));
+    script.onerror = () => {
+      window._gmapsLoading = undefined;
+      reject(new Error("Falha ao carregar o script do Google Maps. Verifique sua conexão ou a chave de API."));
+    };
     document.head.appendChild(script);
   });
   return window._gmapsLoading;
@@ -109,6 +135,7 @@ export default function RestaurantsMap() {
   const [geocodingId, setGeocodingId] = useState<number | null>(null);
   const [geocodingAll, setGeocodingAll] = useState(false);
   const [geocodingProgress, setGeocodingProgress] = useState(0);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   const { data: restaurants = [], refetch } = trpc.activeRestaurant.list.useQuery();
   const saveCoordsMutation = trpc.activeRestaurant.saveCoordinates.useMutation({
@@ -174,7 +201,12 @@ export default function RestaurantsMap() {
   useEffect(() => {
     let cancelled = false;
     async function init() {
-      await loadMapScript();
+      try {
+        await loadMapScript();
+      } catch (err: any) {
+        if (!cancelled) setMapError(err.message || "Erro ao carregar o Google Maps");
+        return;
+      }
       if (cancelled || !mapContainer.current) return;
       if (!mapRef.current) {
         mapRef.current = new window.google!.maps.Map(mapContainer.current, {
@@ -324,6 +356,31 @@ export default function RestaurantsMap() {
       <div className="flex-1 relative overflow-hidden flex">
         {/* Map */}
         <div ref={mapContainer} className="flex-1 h-full" />
+        {mapError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/90 z-20">
+            <div className="max-w-md mx-4 p-6 rounded-xl border border-destructive/40 bg-card text-center space-y-4">
+              <MapPin className="w-10 h-10 text-destructive mx-auto opacity-60" />
+              <div>
+                <p className="font-semibold text-foreground mb-1">Erro ao carregar o mapa</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{mapError}</p>
+              </div>
+              <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3 text-left space-y-1">
+                <p className="font-medium text-foreground">Como resolver:</p>
+                <p>1. Acesse o <strong>Google Cloud Console</strong></p>
+                <p>2. Ative a <strong>Maps JavaScript API</strong> e <strong>Geocoding API</strong></p>
+                <p>3. Verifique as restrições da chave — adicione o domínio <strong>*.replit.dev</strong> e <strong>*.replit.app</strong></p>
+                <p>4. Certifique-se que o faturamento está ativado</p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setMapError(null); window._gmapsLoading = undefined; window._gmapsAuthFailed = false; }}
+              >
+                Tentar novamente
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Right panel */}
         <div className="w-80 h-full flex flex-col bg-card/95 border-l border-border/30 shrink-0 z-10">
