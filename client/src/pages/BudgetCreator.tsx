@@ -1113,14 +1113,12 @@ export default function BudgetCreator() {
         const discountRatio = totals.subtotalPostDuration > 0 ? totals.total / totals.subtotalPostDuration : 1;
 
         for (const { item, input, calc } of itemCalcs) {
-          let unitPriceFinal: string;
-          if (isBonificada || item.isBonificada) {
-            unitPriceFinal = "0";
-          } else {
-            const itemTotal = calc.precoComDescDuracao * discountRatio;
-            const unitPrice = input.volume > 0 ? itemTotal / input.volume : 0;
-            unitPriceFinal = unitPrice.toFixed(4);
-          }
+          const isItemBonif = isBonificada || !!item.isBonificada;
+          // Always save the real calculated unit price so fields remain meaningful
+          // Only the totalPrice is zeroed out on the server when bonificada=true
+          const itemTotal = calc.precoComDescDuracao * discountRatio;
+          const unitPrice = input.volume > 0 ? itemTotal / input.volume : 0;
+          const unitPriceFinal = unitPrice.toFixed(4);
 
           await addItem.mutateAsync({
             quotationId: quotation.id,
@@ -1128,6 +1126,7 @@ export default function BudgetCreator() {
             quantity: input.volume,
             unitPrice: unitPriceFinal,
             notes: `${item.productName} · ${item.semanas}sem`,
+            bonificada: isItemBonif,
           });
         }
 

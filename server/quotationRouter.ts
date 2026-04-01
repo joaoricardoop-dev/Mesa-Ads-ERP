@@ -908,6 +908,7 @@ export const quotationRouter = router({
       quantityPerLocation: z.number().optional(),
       unitPrice: z.string().optional(),
       notes: z.string().optional(),
+      bonificada: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -929,7 +930,8 @@ export const quotationRouter = router({
       }
 
       const unitPrice = input.unitPrice ?? unitCost;
-      const totalPrice = unitPrice ? String(parseFloat(unitPrice) * input.quantity) : null;
+      // When bonificada: keep the real unit price for reference, but zero out the contract total
+      const totalPrice = input.bonificada ? "0.00" : (unitPrice ? String(parseFloat(unitPrice) * input.quantity) : null);
 
       const [item] = await db.insert(quotationItems).values({
         quotationId: input.quotationId,

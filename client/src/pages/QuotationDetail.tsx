@@ -489,7 +489,7 @@ export default function QuotationDetail() {
                               : "—"}
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-semibold">
-                            {quotation.isBonificada ? (
+                            {quotation.isBonificada || (Number(item.totalPrice ?? 0) === 0 && Number(item.unitPrice ?? 0) > 0) ? (
                               <span className="text-amber-500 text-xs">Bonif.</span>
                             ) : item.totalPrice && Number(item.totalPrice) > 0 ? (
                               formatCurrency(Number(item.totalPrice))
