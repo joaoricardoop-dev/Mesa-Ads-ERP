@@ -152,14 +152,20 @@ export default function Dashboard() {
     let contractTotal = 0;
     for (const c of campaigns) {
       if ((c as any).isBonificada || c.status === "archived") continue;
-      const monthly = calcMonthlyRevenue(c as any);
+      const osTotal = Number((c as any).osAnuncianteTotalValue ?? 0);
+      const duration = c.contractDuration || 1;
+      const monthly = osTotal > 0 ? osTotal / duration : 0;
       monthlyTotal += monthly;
-      contractTotal += monthly * c.contractDuration;
+      contractTotal += osTotal > 0 ? osTotal : 0;
     }
     const activeBilling = campaigns.filter(
       (c) => !(c as any).isBonificada && ["veiculacao","producao","distribuicao"].includes(c.status)
     );
-    const activeMontly = activeBilling.reduce((s, c) => s + calcMonthlyRevenue(c as any), 0);
+    const activeMontly = activeBilling.reduce((s, c) => {
+      const osTotal = Number((c as any).osAnuncianteTotalValue ?? 0);
+      const duration = (c as any).contractDuration || 1;
+      return s + (osTotal > 0 ? osTotal / duration : 0);
+    }, 0);
     return { monthlyTotal, contractTotal, activeMontly };
   }, [campaigns]);
 

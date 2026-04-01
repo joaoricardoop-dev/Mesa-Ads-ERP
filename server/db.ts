@@ -17,6 +17,7 @@ import {
   budgetItems,
   products,
   quotations,
+  serviceOrders,
   type InsertRestaurant,
   type InsertClient,
   type InsertCampaign,
@@ -179,6 +180,15 @@ export async function listCampaigns() {
       quotationTotalValue: quotations.totalValue,
       quotationCoasterVolume: quotations.coasterVolume,
       quotationUnitPrice: quotations.unitPrice,
+      osAnuncianteTotalValue: sql<string | null>`(
+        SELECT so."totalValue"::text
+        FROM service_orders so
+        WHERE so."campaignId" = ${campaigns.id}
+          AND so.type = 'anunciante'
+          AND so.status = 'assinada'
+        ORDER BY so."createdAt" ASC
+        LIMIT 1
+      )`,
     })
     .from(campaigns)
     .leftJoin(clients, eq(campaigns.clientId, clients.id))
