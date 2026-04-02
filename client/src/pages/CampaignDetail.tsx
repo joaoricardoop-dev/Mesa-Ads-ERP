@@ -68,6 +68,7 @@ import {
   ExternalLink,
   Plus,
   ChevronRight,
+  Pencil,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -178,6 +179,7 @@ function calcCampaignPricing(c: {
   contractDuration: number;
   batchSize: number;
   batchCost: string | number;
+  freightCost?: string | number | null;
 }) {
   const n = c.activeRestaurants;
   const coasters = c.coastersPerRestaurant;
@@ -186,9 +188,10 @@ function calcCampaignPricing(c: {
   const impressionsPerRest = coasters * c.usagePerDay * c.daysPerMonth;
   const sellerRate = Number(c.sellerCommission) / 100;
   const taxRateDecimal = Number(c.taxRate) / 100;
+  const freightPerRest = n > 0 ? Number(c.freightCost || 0) / n : 0;
 
   const restCommFixed = c.commissionType === "fixed" ? Number(c.fixedCommission) * coasters : 0;
-  const custoPD = productionCostPerRest + restCommFixed;
+  const custoPD = productionCostPerRest + restCommFixed + freightPerRest;
   const restVarRate = c.commissionType === "variable" ? Number(c.restaurantCommission) / 100 : 0;
   const totalVarRate = sellerRate + taxRateDecimal + restVarRate;
   const denominator = 1 - totalVarRate;
@@ -206,13 +209,14 @@ function calcCampaignPricing(c: {
     : sellingPricePerRest * (Number(c.restaurantCommission) / 100);
   const sellerCommPerRest = sellingPricePerRest * sellerRate;
   const taxPerRest = sellingPricePerRest * taxRateDecimal;
-  const totalCostsPerRest = productionCostPerRest + restCommPerRest + sellerCommPerRest + taxPerRest;
+  const totalCostsPerRest = productionCostPerRest + freightPerRest + restCommPerRest + sellerCommPerRest + taxPerRest;
   const profitPerRest = sellingPricePerRest - totalCostsPerRest;
   const grossMargin = sellingPricePerRest > 0 ? (profitPerRest / sellingPricePerRest) * 100 : 0;
 
   const totalCoasters = coasters * n;
   const totalImpressions = impressionsPerRest * n;
   const totalProductionCost = productionCostPerRest * n;
+  const totalFreight = freightPerRest * n;
   const totalRestComm = restCommPerRest * n;
   const totalSellerComm = sellerCommPerRest * n;
   const totalTax = taxPerRest * n;
@@ -235,6 +239,8 @@ function calcCampaignPricing(c: {
     totalCoasters,
     totalImpressions,
     totalProductionCost,
+    totalFreight,
+    freightPerRest,
     totalRestComm,
     totalSellerComm,
     totalTax,
@@ -295,6 +301,25 @@ export default function CampaignDetail() {
   const [editTrackProv, setEditTrackProv] = useState("");
   const [editTrackDate, setEditTrackDate] = useState("");
   const [editTrackLabel, setEditTrackLabel] = useState("");
+  const [editingParams, setEditingParams] = useState(false);
+  const [paramsForm, setParamsForm] = useState<{
+    coastersPerRestaurant: string;
+    usagePerDay: string;
+    daysPerMonth: string;
+    activeRestaurants: string;
+    pricingType: string;
+    markupPercent: string;
+    fixedPrice: string;
+    commissionType: string;
+    restaurantCommission: string;
+    fixedCommission: string;
+    sellerCommission: string;
+    taxRate: string;
+    contractDuration: string;
+    batchSize: string;
+    batchCost: string;
+    freightCost: string;
+  } | null>(null);
 
   const utils = trpc.useUtils();
   const { data: campaign, isLoading } = trpc.campaign.get.useQuery({ id: campaignId }, { enabled: campaignId > 0 });
@@ -705,18 +730,21 @@ export default function CampaignDetail() {
     const n = campaign.activeRestaurants || 1;
     const monthlyRevenue = contractRevenue / (campaign.contractDuration || 1);
     const sellingPricePerRest = monthlyRevenue / n;
+    // Freight: fixed campaign cost distributed per restaurant
+    const freightPerRest = n > 0 ? Number((campaign as any).freightCost || 0) / n : 0;
     // Commissions applied to actual agreed revenue
     const restCommPerRest = sellingPricePerRest * (Number(campaign.restaurantCommission) / 100);
     const sellerCommPerRest = sellingPricePerRest * (Number(campaign.sellerCommission) / 100);
     const taxPerRest = sellingPricePerRest * (Number(campaign.taxRate) / 100);
     // Production cost: use campaign's coastersPerRestaurant as originally modeled
     const productionCostPerRest = pBase.productionCostPerRest;
-    const totalCostsPerRest = productionCostPerRest + restCommPerRest + sellerCommPerRest + taxPerRest;
+    const totalCostsPerRest = productionCostPerRest + freightPerRest + restCommPerRest + sellerCommPerRest + taxPerRest;
     const profitPerRest = sellingPricePerRest - totalCostsPerRest;
     const totalRestComm = restCommPerRest * n;
     const totalSellerComm = sellerCommPerRest * n;
     const totalTax = taxPerRest * n;
     const totalProductionCost = productionCostPerRest * n;
+    const totalFreight = freightPerRest * n;
     const totalCosts = totalCostsPerRest * n;
     const monthlyProfit = profitPerRest * n;
     const grossMargin = sellingPricePerRest > 0 ? (profitPerRest / sellingPricePerRest) * 100 : 0;
@@ -726,12 +754,14 @@ export default function CampaignDetail() {
       restCommPerRest,
       sellerCommPerRest,
       taxPerRest,
+      freightPerRest,
       productionCostPerRest,
       profitPerRest,
       totalCostsPerRest,
       totalRestComm,
       totalSellerComm,
       totalTax,
+      totalFreight,
       totalProductionCost,
       totalCosts,
       monthlyRevenue,
@@ -2340,25 +2370,158 @@ export default function CampaignDetail() {
                 </div>
               )}
               <div className="bg-card border border-border/30 rounded-lg p-5">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Parâmetros Financeiros da Campanha</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
-                  <ParamRow label="Coasters/Restaurante" value={campaign.coastersPerRestaurant.toLocaleString("pt-BR")} />
-                  <ParamRow label="Uso Médio/Dia" value={`${campaign.usagePerDay}x`} />
-                  <ParamRow label="Dias por Mês" value={`${campaign.daysPerMonth}`} />
-                  <ParamRow label="Restaurantes Ativos" value={`${campaign.activeRestaurants}`} />
-                  <ParamRow label="Tipo de Precificação" value={campaign.pricingType === "variable" ? "Markup (%)" : "Preço Fixo (R$)"} />
-                  <ParamRow label={campaign.pricingType === "variable" ? "Markup" : "Preço Fixo"}
-                    value={campaign.pricingType === "variable" ? `${Number(campaign.markupPercent)}%` : formatCurrency(Number(campaign.fixedPrice))}
-                  />
-                  <ParamRow label="Tipo Comissão Rest." value={campaign.commissionType === "variable" ? "Variável (%)" : "Fixo (R$/un)"} />
-                  <ParamRow label={campaign.commissionType === "variable" ? "Comissão Rest." : "Comissão Fixa"}
-                    value={campaign.commissionType === "variable" ? `${Number(campaign.restaurantCommission)}%` : `R$ ${Number(campaign.fixedCommission).toFixed(4)}/un`}
-                  />
-                  <ParamRow label="Comissão Vendedor" value={`${Number(campaign.sellerCommission)}%`} />
-                  <ParamRow label="Alíquota Impostos" value={`${Number(campaign.taxRate)}%`} />
-                  <ParamRow label="Lote Produção" value={`${campaign.batchSize.toLocaleString("pt-BR")} un`} />
-                  <ParamRow label="Custo Lote" value={formatCurrency(Number(campaign.batchCost))} />
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Parâmetros Financeiros da Campanha</h3>
+                  {!editingParams ? (
+                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => {
+                      setParamsForm({
+                        coastersPerRestaurant: String(campaign.coastersPerRestaurant),
+                        usagePerDay: String(campaign.usagePerDay),
+                        daysPerMonth: String(campaign.daysPerMonth),
+                        activeRestaurants: String(campaign.activeRestaurants),
+                        pricingType: campaign.pricingType,
+                        markupPercent: String(Number(campaign.markupPercent)),
+                        fixedPrice: String(Number(campaign.fixedPrice)),
+                        commissionType: campaign.commissionType,
+                        restaurantCommission: String(Number(campaign.restaurantCommission)),
+                        fixedCommission: String(Number(campaign.fixedCommission)),
+                        sellerCommission: String(Number(campaign.sellerCommission)),
+                        taxRate: String(Number(campaign.taxRate)),
+                        contractDuration: String(campaign.contractDuration),
+                        batchSize: String(campaign.batchSize),
+                        batchCost: String(Number(campaign.batchCost)),
+                        freightCost: String(Number((campaign as any).freightCost || 0)),
+                      });
+                      setEditingParams(true);
+                    }}>
+                      <Pencil className="w-3 h-3" /> Editar
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setEditingParams(false); setParamsForm(null); }}>Cancelar</Button>
+                      <Button size="sm" className="h-7 text-xs gap-1" disabled={updateMutation.isPending} onClick={() => {
+                        if (!paramsForm) return;
+                        updateMutation.mutate({
+                          id: campaignId,
+                          coastersPerRestaurant: parseInt(paramsForm.coastersPerRestaurant),
+                          usagePerDay: parseInt(paramsForm.usagePerDay),
+                          daysPerMonth: parseInt(paramsForm.daysPerMonth),
+                          activeRestaurants: parseInt(paramsForm.activeRestaurants),
+                          pricingType: paramsForm.pricingType,
+                          markupPercent: paramsForm.markupPercent,
+                          fixedPrice: paramsForm.fixedPrice,
+                          commissionType: paramsForm.commissionType,
+                          restaurantCommission: paramsForm.restaurantCommission,
+                          fixedCommission: paramsForm.fixedCommission,
+                          sellerCommission: paramsForm.sellerCommission,
+                          taxRate: paramsForm.taxRate,
+                          contractDuration: parseInt(paramsForm.contractDuration),
+                          batchSize: parseInt(paramsForm.batchSize),
+                          batchCost: paramsForm.batchCost,
+                          freightCost: paramsForm.freightCost,
+                        }, { onSuccess: () => { setEditingParams(false); setParamsForm(null); toast.success("Parâmetros salvos"); } });
+                      }}>
+                        {updateMutation.isPending ? "Salvando..." : "Salvar"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
+                {!editingParams ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+                    <ParamRow label="Coasters/Restaurante" value={campaign.coastersPerRestaurant.toLocaleString("pt-BR")} />
+                    <ParamRow label="Uso Médio/Dia" value={`${campaign.usagePerDay}x`} />
+                    <ParamRow label="Dias por Mês" value={`${campaign.daysPerMonth}`} />
+                    <ParamRow label="Restaurantes Ativos" value={`${campaign.activeRestaurants}`} />
+                    <ParamRow label="Tipo de Precificação" value={campaign.pricingType === "variable" ? "Markup (%)" : "Preço Fixo (R$)"} />
+                    <ParamRow label={campaign.pricingType === "variable" ? "Markup" : "Preço Fixo"}
+                      value={campaign.pricingType === "variable" ? `${Number(campaign.markupPercent)}%` : formatCurrency(Number(campaign.fixedPrice))}
+                    />
+                    <ParamRow label="Tipo Comissão Rest." value={campaign.commissionType === "variable" ? "Variável (%)" : "Fixo (R$/un)"} />
+                    <ParamRow label={campaign.commissionType === "variable" ? "Comissão Rest." : "Comissão Fixa"}
+                      value={campaign.commissionType === "variable" ? `${Number(campaign.restaurantCommission)}%` : `R$ ${Number(campaign.fixedCommission).toFixed(4)}/un`}
+                    />
+                    <ParamRow label="Comissão Vendedor" value={`${Number(campaign.sellerCommission)}%`} />
+                    <ParamRow label="Alíquota Impostos" value={`${Number(campaign.taxRate)}%`} />
+                    <ParamRow label="Lote Produção" value={`${campaign.batchSize.toLocaleString("pt-BR")} un`} />
+                    <ParamRow label="Custo Lote" value={formatCurrency(Number(campaign.batchCost))} />
+                    <ParamRow label="Custo Frete (mensal)" value={formatCurrency(Number((campaign as any).freightCost || 0))} />
+                  </div>
+                ) : paramsForm && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
+                    {([
+                      { label: "Coasters/Rest.", key: "coastersPerRestaurant", type: "int" },
+                      { label: "Uso Médio/Dia", key: "usagePerDay", type: "int" },
+                      { label: "Dias por Mês", key: "daysPerMonth", type: "int" },
+                      { label: "Restaurantes Ativos", key: "activeRestaurants", type: "int" },
+                    ] as const).map(({ label, key }) => (
+                      <div key={key}>
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</Label>
+                        <Input className="h-8 text-sm mt-1" type="number" value={paramsForm[key]} onChange={e => setParamsForm(f => f ? { ...f, [key]: e.target.value } : f)} />
+                      </div>
+                    ))}
+                    <div>
+                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Tipo Precificação</Label>
+                      <select className="w-full h-8 text-sm mt-1 rounded-md border border-input bg-background px-2" value={paramsForm.pricingType} onChange={e => setParamsForm(f => f ? { ...f, pricingType: e.target.value } : f)}>
+                        <option value="variable">Markup (%)</option>
+                        <option value="fixed">Preço Fixo (R$)</option>
+                      </select>
+                    </div>
+                    {paramsForm.pricingType === "variable" ? (
+                      <div>
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Markup (%)</Label>
+                        <Input className="h-8 text-sm mt-1" type="number" step="0.01" value={paramsForm.markupPercent} onChange={e => setParamsForm(f => f ? { ...f, markupPercent: e.target.value } : f)} />
+                      </div>
+                    ) : (
+                      <div>
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Preço Fixo (R$)</Label>
+                        <Input className="h-8 text-sm mt-1" type="number" step="0.01" value={paramsForm.fixedPrice} onChange={e => setParamsForm(f => f ? { ...f, fixedPrice: e.target.value } : f)} />
+                      </div>
+                    )}
+                    <div>
+                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Tipo Comissão Rest.</Label>
+                      <select className="w-full h-8 text-sm mt-1 rounded-md border border-input bg-background px-2" value={paramsForm.commissionType} onChange={e => setParamsForm(f => f ? { ...f, commissionType: e.target.value } : f)}>
+                        <option value="variable">Variável (%)</option>
+                        <option value="fixed">Fixo (R$/un)</option>
+                      </select>
+                    </div>
+                    {paramsForm.commissionType === "variable" ? (
+                      <div>
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Comissão Rest. (%)</Label>
+                        <Input className="h-8 text-sm mt-1" type="number" step="0.01" value={paramsForm.restaurantCommission} onChange={e => setParamsForm(f => f ? { ...f, restaurantCommission: e.target.value } : f)} />
+                      </div>
+                    ) : (
+                      <div>
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Comissão Fixa (R$/un)</Label>
+                        <Input className="h-8 text-sm mt-1" type="number" step="0.0001" value={paramsForm.fixedCommission} onChange={e => setParamsForm(f => f ? { ...f, fixedCommission: e.target.value } : f)} />
+                      </div>
+                    )}
+                    {([
+                      { label: "Comissão Vendedor (%)", key: "sellerCommission" },
+                      { label: "Alíquota Impostos (%)", key: "taxRate" },
+                    ] as const).map(({ label, key }) => (
+                      <div key={key}>
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</Label>
+                        <Input className="h-8 text-sm mt-1" type="number" step="0.01" value={paramsForm[key]} onChange={e => setParamsForm(f => f ? { ...f, [key]: e.target.value } : f)} />
+                      </div>
+                    ))}
+                    <div>
+                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Duração Contrato (meses)</Label>
+                      <Input className="h-8 text-sm mt-1" type="number" value={paramsForm.contractDuration} onChange={e => setParamsForm(f => f ? { ...f, contractDuration: e.target.value } : f)} />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Lote Produção (un)</Label>
+                      <Input className="h-8 text-sm mt-1" type="number" value={paramsForm.batchSize} onChange={e => setParamsForm(f => f ? { ...f, batchSize: e.target.value } : f)} />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Custo Lote (R$)</Label>
+                      <Input className="h-8 text-sm mt-1" type="number" step="0.01" value={paramsForm.batchCost} onChange={e => setParamsForm(f => f ? { ...f, batchCost: e.target.value } : f)} />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Custo Frete Mensal (R$)</Label>
+                      <Input className="h-8 text-sm mt-1" type="number" step="0.01" value={paramsForm.freightCost} onChange={e => setParamsForm(f => f ? { ...f, freightCost: e.target.value } : f)} />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2367,6 +2530,7 @@ export default function CampaignDetail() {
                   <div className="space-y-2">
                     <FinRow label="Custo Unitário Coaster" value={`R$ ${p.unitCost.toFixed(4)}`} />
                     <FinRow label="Custo Produção" value={formatCurrency(p.productionCostPerRest)} />
+                    {p.freightPerRest > 0 && <FinRow label="Frete (rateado)" value={formatCurrency(p.freightPerRest)} />}
                     <FinRow label="Comissão Restaurante" value={formatCurrency(p.restCommPerRest)} sub={campaign.commissionType === "variable" ? `${Number(campaign.restaurantCommission)}%` : `R$ ${Number(campaign.fixedCommission).toFixed(2)}/un`} />
                     <FinRow label="Comissão Vendedor" value={formatCurrency(p.sellerCommPerRest)} sub={`${Number(campaign.sellerCommission)}%`} />
                     <FinRow label="Impostos" value={formatCurrency(p.taxPerRest)} sub={`${Number(campaign.taxRate)}%`} />
@@ -2383,6 +2547,7 @@ export default function CampaignDetail() {
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Total Campanha (Mensal × {campaign.activeRestaurants} rest.)</h3>
                   <div className="space-y-2">
                     <FinRow label="Custo Produção" value={formatCurrency(p.totalProductionCost)} />
+                    {p.totalFreight > 0 && <FinRow label="Custo Frete" value={formatCurrency(p.totalFreight)} />}
                     <FinRow label="Comissões Restaurantes" value={formatCurrency(p.totalRestComm)} />
                     <FinRow label="Comissões Vendedores" value={formatCurrency(p.totalSellerComm)} />
                     <FinRow label="Impostos" value={formatCurrency(p.totalTax)} />

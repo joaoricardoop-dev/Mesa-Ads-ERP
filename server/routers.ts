@@ -1360,6 +1360,7 @@ export const appRouter = router({
           contractDuration: z.number().int().optional(),
           batchSize: z.number().int().optional(),
           batchCost: z.string().optional(),
+          freightCost: z.string().optional(),
           budgetId: z.number().nullable().optional(),
           isBonificada: z.boolean().optional(),
         })

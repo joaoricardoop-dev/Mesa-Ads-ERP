@@ -58,6 +58,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_lat_lng_to_active_restaurants",
     sql: `ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "lat" numeric(10, 7); ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "lng" numeric(10, 7);`,
   },
+  {
+    name: "add_freight_cost_to_campaigns",
+    sql: `ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "freightCost" numeric(12, 2) DEFAULT '0' NOT NULL;`,
+  },
 ];
 
 export async function runMigrations() {
