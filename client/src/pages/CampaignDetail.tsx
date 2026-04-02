@@ -674,9 +674,13 @@ export default function CampaignDetail() {
   const allocationPct = expectedTotalCoasters > 0 ? (totalCoastersDistributed / expectedTotalCoasters) * 100 : 0;
   const restaurantsMissing = campaign.activeRestaurants - restaurantsConfigured;
 
-  // When a linked quotation has a totalValue, use it as the revenue source of truth
+  // Revenue source of truth: prefer signed OS de anunciante, fallback to quotation
+  const osAnuncianteTotalValue = (campaign as any).osAnuncianteTotalValue ? parseFloat((campaign as any).osAnuncianteTotalValue) : null;
   const quotationTotalValue = (campaign as any).quotationTotalValue ? parseFloat((campaign as any).quotationTotalValue) : null;
-  const hasQuotationRevenue = !campaign.isBonificada && quotationTotalValue && quotationTotalValue > 0;
+  const contractRevenueTruth = osAnuncianteTotalValue && osAnuncianteTotalValue > 0
+    ? osAnuncianteTotalValue
+    : quotationTotalValue;
+  const hasQuotationRevenue = !campaign.isBonificada && contractRevenueTruth && contractRevenueTruth > 0;
 
   // Effective coasters per restaurant: prefer quotation volume over stored campaign value
   // (campaign.coastersPerRestaurant may be the default 500 even when quotation specifies different volume)
@@ -696,8 +700,8 @@ export default function CampaignDetail() {
 
   let p: typeof pBase;
   if (hasQuotationRevenue) {
-    // Revenue source of truth = quotation's agreed total value
-    const contractRevenue = quotationTotalValue!;
+    // Revenue source of truth: OS de anunciante assinada, ou cotação vinculada
+    const contractRevenue = contractRevenueTruth!;
     const n = campaign.activeRestaurants || 1;
     const monthlyRevenue = contractRevenue / (campaign.contractDuration || 1);
     const sellingPricePerRest = monthlyRevenue / n;

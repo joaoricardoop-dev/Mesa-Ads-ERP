@@ -208,6 +208,15 @@ export async function getCampaign(id: number) {
       quotationTotalValue: quotations.totalValue,
       quotationCoasterVolume: quotations.coasterVolume,
       quotationUnitPrice: quotations.unitPrice,
+      osAnuncianteTotalValue: sql<string | null>`(
+        SELECT so."totalValue"::text
+        FROM service_orders so
+        WHERE so."campaignId" = ${id}
+          AND so.type = 'anunciante'
+          AND so.status = 'assinada'
+        ORDER BY so."createdAt" ASC
+        LIMIT 1
+      )`,
     })
     .from(campaigns)
     .leftJoin(products, eq(campaigns.productId, products.id))
@@ -221,6 +230,7 @@ export async function getCampaign(id: number) {
     quotationTotalValue: result[0].quotationTotalValue,
     quotationCoasterVolume: result[0].quotationCoasterVolume,
     quotationUnitPrice: result[0].quotationUnitPrice,
+    osAnuncianteTotalValue: result[0].osAnuncianteTotalValue,
   };
 }
 
