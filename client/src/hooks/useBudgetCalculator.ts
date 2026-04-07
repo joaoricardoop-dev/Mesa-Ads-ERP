@@ -38,6 +38,10 @@ export interface GlobalBudgetParams {
   descontoParceiro: boolean;
   isBonificada: boolean;
   descontoManualPercent: number;
+  /** BV da agência/parceiro em % (0–99.9). Gross-up sobre o total. */
+  agencyBVPercent?: number;
+  /** IRPJ ponderado pelos itens, em decimal (ex: 0.06). Usado no gross-up do BV. */
+  agencyBVWeightedIrpj?: number;
 }
 
 export interface DiscountPriceTier {
@@ -73,6 +77,8 @@ export interface BudgetTotals {
   descManualPerc: number;
   descManualVal: number;
   total: number;
+  agencyBVVal: number;
+  totalFinal: number;
 }
 
 // ─── Calculation ───────────────────────────────────────────────────────────────
@@ -164,10 +170,10 @@ export function calcBudgetTotals(
   itemCalcs: ItemCalcResult[],
   params: GlobalBudgetParams
 ): BudgetTotals {
-  const { formaPagamento, descontoParceiro, isBonificada, descontoManualPercent } = params;
+  const { formaPagamento, descontoParceiro, isBonificada, descontoManualPercent, agencyBVPercent = 0, agencyBVWeightedIrpj = 0 } = params;
 
   if (isBonificada) {
-    return { subtotalPostDuration: 0, ajPagPerc: 0, ajPagamentoVal: 0, descParceiroPerc: 0, descParceiroVal: 0, descManualPerc: 0, descManualVal: 0, total: 0 };
+    return { subtotalPostDuration: 0, ajPagPerc: 0, ajPagamentoVal: 0, descParceiroPerc: 0, descParceiroVal: 0, descManualPerc: 0, descManualVal: 0, total: 0, agencyBVVal: 0, totalFinal: 0 };
   }
 
   const subtotalPostDuration = itemCalcs.reduce((sum, c) => sum + c.precoComDescDuracao, 0);
@@ -181,7 +187,14 @@ export function calcBudgetTotals(
   const descManualVal = aposDescParceiro * descManualPerc;
   const total = aposDescParceiro - descManualVal;
 
-  return { subtotalPostDuration, ajPagPerc, ajPagamentoVal, descParceiroPerc, descParceiroVal, descManualPerc, descManualVal, total };
+  // Gross-up de BV: totalFinal = total × (1 − irpj) / (1 − bv − irpj)
+  const bv = Math.min(Math.max(agencyBVPercent, 0), 99.9) / 100;
+  const irpj = Math.min(Math.max(agencyBVWeightedIrpj, 0), 0.999);
+  const den = 1 - bv - irpj;
+  const agencyBVVal = (bv > 0 && den > 0) ? total * (1 - irpj) / den - total : 0;
+  const totalFinal = total + agencyBVVal;
+
+  return { subtotalPostDuration, ajPagPerc, ajPagamentoVal, descParceiroPerc, descParceiroVal, descManualPerc, descManualVal, total, agencyBVVal, totalFinal };
 }
 
 // ─── Formatting ────────────────────────────────────────────────────────────────

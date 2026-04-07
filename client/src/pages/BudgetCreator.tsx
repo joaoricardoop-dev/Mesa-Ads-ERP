@@ -877,13 +877,19 @@ function BudgetSummaryPanel({ items, globalParams, clientName, onGerarCotacao, i
                     <span className="font-mono">−{fmtBRL(totals.descManualVal)}</span>
                   </div>
                 )}
+                {totals.agencyBVVal > 0 && (
+                  <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                    <span>BV Agência (+{(globalParams.agencyBVPercent ?? 0).toFixed(1)}%)</span>
+                    <span className="font-mono">+{fmtBRL(totals.agencyBVVal)}</span>
+                  </div>
+                )}
               </div>
 
               <Separator />
               <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
                 <span className="font-mono text-primary">
-                  {globalParams.isBonificada ? "R$ 0,00" : fmtBRL(totals.total)}
+                  {globalParams.isBonificada ? "R$ 0,00" : fmtBRL(totals.totalFinal)}
                 </span>
               </div>
               {globalParams.isBonificada && (
@@ -947,12 +953,11 @@ export default function BudgetCreator() {
   const createQuotation = trpc.quotation.create.useMutation();
   const addItem = trpc.quotation.addItem.useMutation();
 
-  const globalParams: GlobalBudgetParams = useMemo(() => ({
-    formaPagamento,
-    descontoParceiro,
-    isBonificada,
-    descontoManualPercent: descontoManual,
-  }), [formaPagamento, descontoParceiro, isBonificada, descontoManual]);
+  const agencyBVPercent = useMemo(() => {
+    const v = parseFloat(agencyCommissionPercent);
+    return isNaN(v) ? 0 : Math.min(Math.max(v, 0), 99.9);
+  }, [agencyCommissionPercent]);
+
 
   const selectedClient = useMemo(() => {
     if (!clientId) return null;
@@ -1020,6 +1025,22 @@ export default function BudgetCreator() {
       });
   }, [items]);
 
+  const agencyBVWeightedIrpj = useMemo(() => {
+    const valid = itemCalcs.filter(c => c.calc.precoComDescDuracao > 0);
+    const totalPrice = valid.reduce((s, c) => s + c.calc.precoComDescDuracao, 0);
+    if (totalPrice <= 0) return DEFAULT_PREMISSAS.irpj / 100;
+    return valid.reduce((s, c) => s + c.calc.precoComDescDuracao * (c.item.premissas.irpj / 100), 0) / totalPrice;
+  }, [itemCalcs]);
+
+  const globalParams: GlobalBudgetParams = useMemo(() => ({
+    formaPagamento,
+    descontoParceiro,
+    isBonificada,
+    descontoManualPercent: descontoManual,
+    agencyBVPercent,
+    agencyBVWeightedIrpj,
+  }), [formaPagamento, descontoParceiro, isBonificada, descontoManual, agencyBVPercent, agencyBVWeightedIrpj]);
+
   const customItems = useMemo(() => {
     return items.filter((item) => item.isCustomProduct && item.customValues);
   }, [items]);
@@ -1074,7 +1095,7 @@ export default function BudgetCreator() {
           notes: notes || undefined,
           isBonificada,
           hasPartnerDiscount: descontoParceiro,
-          partnerId: descontoParceiro ? partnerId : null,
+          partnerId: (descontoParceiro || agencyBVPercent > 0) ? partnerId : null,
           isCustomProduct: true,
           customProductName: cv.customProductName,
           customProjectCost: cv.customProjectCost,
@@ -1092,7 +1113,7 @@ export default function BudgetCreator() {
       } else {
         const totalVolume = itemCalcs.reduce((sum, c) => sum + c.input.volume, 0);
         const firstProductId = itemCalcs[0].item.productId!;
-        const regularTotal = isBonificada ? 0 : totals.total;
+        const regularTotal = isBonificada ? 0 : totals.totalFinal;
         const totalValue = (regularTotal + customTotalValue).toFixed(2);
 
         const quotation = await createQuotation.mutateAsync({
@@ -1106,7 +1127,7 @@ export default function BudgetCreator() {
           isBonificada,
           hasPartnerDiscount: descontoParceiro,
           productId: firstProductId,
-          partnerId: descontoParceiro ? partnerId : null,
+          partnerId: (descontoParceiro || agencyBVPercent > 0) ? partnerId : null,
           agencyCommissionPercent: agencyCommissionPercent || null,
         });
 
@@ -1248,11 +1269,11 @@ export default function BudgetCreator() {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Com. Agência (%)</Label>
+                    <Label className="text-xs text-muted-foreground mb-1 block">BV Agência (%)</Label>
                     <Input
                       type="number"
                       min={0}
-                      max={100}
+                      max={99.9}
                       step={0.5}
                       value={agencyCommissionPercent}
                       onChange={(e) => setAgencyCommissionPercent(e.target.value)}
@@ -1277,9 +1298,9 @@ export default function BudgetCreator() {
                   </div>
                 </div>
 
-                {descontoParceiro && (
+                {(descontoParceiro || agencyBVPercent > 0) && (
                   <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Parceiro</Label>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Parceiro / Agência</Label>
                     <Select
                       value={partnerId ? String(partnerId) : ""}
                       onValueChange={(v) => setPartnerId(Number(v))}

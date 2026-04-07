@@ -557,8 +557,11 @@ export default function QuotationDetail() {
                     )}
                     {(quotation as any).agencyCommissionPercent && Number((quotation as any).agencyCommissionPercent) > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Comissão de Agência</span>
-                        <span className="font-mono text-amber-500">{Number((quotation as any).agencyCommissionPercent).toFixed(1)}%</span>
+                        <span className="text-muted-foreground">BV Agência/Parceiro</span>
+                        <span className="font-mono text-amber-500">
+                          {Number((quotation as any).agencyCommissionPercent).toFixed(1)}%
+                          {(quotation as any).partnerName ? ` · ${(quotation as any).partnerName}` : ""}
+                        </span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm pt-1 border-t border-border/20 mt-2">
