@@ -471,7 +471,12 @@ export default function QuotationDetail() {
                   )}
                 </div>
 
-                {quotationItemsList.length > 0 ? (
+                {quotationItemsList.length > 0 ? (() => {
+                  const bvPercent = Number((quotation as any).agencyCommissionPercent ?? 0);
+                  const rawItemsTotal = quotationItemsList.reduce((s, i) => s + Number(i.totalPrice || 0), 0);
+                  const totalValue = Number(quotation.totalValue || 0);
+                  const bvScale = bvPercent > 0 && rawItemsTotal > 0 ? totalValue / rawItemsTotal : 1;
+                  return (
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-muted/30 text-xs text-muted-foreground">
@@ -524,7 +529,8 @@ export default function QuotationDetail() {
                       </tr>
                     </tfoot>
                   </table>
-                ) : (quotation as any).isCustomProduct ? (
+                  );
+                })() : (quotation as any).isCustomProduct ? (
                   <div className="px-4 py-4 space-y-1.5">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full uppercase tracking-wider">

@@ -187,11 +187,11 @@ export function calcBudgetTotals(
   const descManualVal = aposDescParceiro * descManualPerc;
   const total = aposDescParceiro - descManualVal;
 
-  // Gross-up de BV: totalFinal = total × (1 − irpj) / (1 − bv − irpj)
+  // Gross-up de BV: totalFinal = total / (1 − bv − irpj)
   const bv = Math.min(Math.max(agencyBVPercent, 0), 99.9) / 100;
   const irpj = Math.min(Math.max(agencyBVWeightedIrpj, 0), 0.999);
   const den = 1 - bv - irpj;
-  const agencyBVVal = (bv > 0 && den > 0) ? total * (1 - irpj) / den - total : 0;
+  const agencyBVVal = (bv > 0 && den > 0) ? total / den - total : 0;
   const totalFinal = total + agencyBVVal;
 
   return { subtotalPostDuration, ajPagPerc, ajPagamentoVal, descParceiroPerc, descParceiroVal, descManualPerc, descManualVal, total, agencyBVVal, totalFinal };
