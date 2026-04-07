@@ -124,6 +124,15 @@ export default function QuotationDetail() {
   const { data: allocatedRestaurants = [] } = trpc.quotation.getRestaurants.useQuery({ quotationId });
   const { data: quotationItemsList = [] } = trpc.quotation.listItems.useQuery({ quotationId }, { enabled: !isNaN(quotationId) });
 
+  const bvScale = (() => {
+    if (!quotation) return 1;
+    const bvPct = Number((quotation as any).agencyCommissionPercent ?? 0);
+    if (bvPct <= 0) return 1;
+    const rawTotal = quotationItemsList.reduce((s, i) => s + Number(i.totalPrice || 0), 0);
+    const finalTotal = Number(quotation.totalValue || 0);
+    return rawTotal > 0 ? finalTotal / rawTotal : 1;
+  })();
+
   const updateMutation = trpc.quotation.update.useMutation({
     onSuccess: () => { utils.quotation.get.invalidate({ id: quotationId }); utils.quotation.list.invalidate(); setEditOpen(false); toast.success("Cotação atualizada!"); },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -269,6 +278,7 @@ export default function QuotationDetail() {
         customPartnerCommission: (quotation as any).customPartnerCommission ? Number((quotation as any).customPartnerCommission) : undefined,
         customSellerCommission: (quotation as any).customSellerCommission ? Number((quotation as any).customSellerCommission) : undefined,
         customFinalPrice: (quotation as any).customFinalPrice ? Number((quotation as any).customFinalPrice) : undefined,
+        agencyCommissionPercent: (quotation as any).agencyCommissionPercent ? Number((quotation as any).agencyCommissionPercent) : undefined,
       });
       toast.success("PDF da proposta gerado!");
     } catch {
@@ -485,14 +495,14 @@ export default function QuotationDetail() {
                           </td>
                           <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">
                             {item.unitPrice && Number(item.unitPrice) > 0
-                              ? `R$ ${Number(item.unitPrice).toFixed(4)}`
+                              ? `R$ ${(Number(item.unitPrice) * bvScale).toFixed(4)}`
                               : "—"}
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-semibold">
                             {quotation.isBonificada || (Number(item.totalPrice ?? 0) === 0 && Number(item.unitPrice ?? 0) > 0) ? (
                               <span className="text-amber-500 text-xs">Bonif.</span>
                             ) : item.totalPrice && Number(item.totalPrice) > 0 ? (
-                              formatCurrency(Number(item.totalPrice))
+                              formatCurrency(Number(item.totalPrice) * bvScale)
                             ) : "—"}
                           </td>
                         </tr>

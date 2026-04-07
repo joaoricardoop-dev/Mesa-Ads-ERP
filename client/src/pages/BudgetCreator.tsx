@@ -829,28 +829,35 @@ function BudgetSummaryPanel({ items, globalParams, clientName, onGerarCotacao, i
               <Separator />
               <div className="space-y-2">
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Itens</p>
-                {itemCalcs.map(({ item, input, calc }) => {
-                  const itemBonif = globalParams.isBonificada || !!item.isBonificada;
-                  return (
-                    <div key={item.id} className="flex items-start justify-between gap-2 text-xs">
-                      <div className="min-w-0">
-                        <p className="font-medium leading-tight truncate">{item.productName}</p>
-                        <p className="text-muted-foreground text-[11px]">
-                          {input.volume.toLocaleString("pt-BR")} un. · {item.semanas}sem
-                          {calc.descPrazoPerc > 0 ? ` · −${(calc.descPrazoPerc * 100).toFixed(0)}%` : ""}
-                          {calc.descFaixaPrecoPerc > 0 ? ` · faixa −${(calc.descFaixaPrecoPerc * 100).toFixed(0)}%` : ""}
-                        </p>
+                {(() => {
+                  const bvScale = !globalParams.isBonificada && (globalParams.agencyBVPercent ?? 0) > 0 && totals.total > 0
+                    ? totals.totalFinal / totals.total
+                    : 1;
+                  return itemCalcs.map(({ item, input, calc }) => {
+                    const itemBonif = globalParams.isBonificada || !!item.isBonificada;
+                    const displayPrice = itemBonif ? 0 : calc.precoComDescDuracao * bvScale;
+                    return (
+                      <div key={item.id} className="flex items-start justify-between gap-2 text-xs">
+                        <div className="min-w-0">
+                          <p className="font-medium leading-tight truncate">{item.productName}</p>
+                          <p className="text-muted-foreground text-[11px]">
+                            {input.volume.toLocaleString("pt-BR")} un. · {item.semanas}sem
+                            {calc.descPrazoPerc > 0 ? ` · −${(calc.descPrazoPerc * 100).toFixed(0)}%` : ""}
+                            {calc.descFaixaPrecoPerc > 0 ? ` · faixa −${(calc.descFaixaPrecoPerc * 100).toFixed(0)}%` : ""}
+                            {!itemBonif && bvScale > 1 ? ` · BV +${((globalParams.agencyBVPercent ?? 0)).toFixed(1)}%` : ""}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          {itemBonif ? (
+                            <span className="text-green-600 dark:text-green-400 font-semibold font-mono">R$ 0,00</span>
+                          ) : (
+                            <span className="font-mono font-medium">{fmtBRL(displayPrice)}</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        {itemBonif ? (
-                          <span className="text-green-600 dark:text-green-400 font-semibold font-mono">R$ 0,00</span>
-                        ) : (
-                          <span className="font-mono font-medium">{fmtBRL(calc.precoComDescDuracao)}</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
 
               <Separator />

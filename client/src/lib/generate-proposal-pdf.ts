@@ -31,6 +31,7 @@ interface ProposalPDFData {
     coasters: number;
   }>;
   validityDays?: number;
+  agencyCommissionPercent?: number;
   hasPartnerDiscount?: boolean;
   productName?: string;
   productUnitLabelPlural?: string;
@@ -355,6 +356,10 @@ export function generateProposalPdf(data: ProposalPDFData) {
 
     const items = data.items!;
     const totalVolume = items.reduce((s, i) => s + i.volume, 0);
+    const rawItemsTotal = items.reduce((s, i) => s + i.totalPrice, 0);
+    const bvScaleFactor = (data.agencyCommissionPercent ?? 0) > 0 && rawItemsTotal > 0
+      ? contractTotal / rawItemsTotal
+      : 1;
 
     autoTable(doc, {
       startY: y,
@@ -363,8 +368,8 @@ export function generateProposalPdf(data: ProposalPDFData) {
         item.productName,
         `${item.semanas} sem.`,
         fmtNumber(item.volume) + " un.",
-        isBonificada ? "—" : `R$ ${item.unitPrice.toFixed(4)}`,
-        isBonificada ? "Bonificado" : fmtCurrency(item.totalPrice),
+        isBonificada ? "—" : `R$ ${(item.unitPrice * bvScaleFactor).toFixed(4)}`,
+        isBonificada ? "Bonificado" : fmtCurrency(item.totalPrice * bvScaleFactor),
       ]),
       foot: [[
         `${items.length} produto${items.length !== 1 ? "s" : ""}`,
