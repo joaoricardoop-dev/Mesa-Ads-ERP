@@ -31,7 +31,6 @@ interface ProposalPDFData {
     coasters: number;
   }>;
   validityDays?: number;
-  pixDiscountPercent?: number;
   hasPartnerDiscount?: boolean;
   productName?: string;
   productUnitLabelPlural?: string;
@@ -266,8 +265,6 @@ export function generateProposalPdf(data: ProposalPDFData) {
   const monthlyTotal = data.monthlyTotal > 0 ? data.monthlyTotal : data.pricePerRestaurant * numRest;
   const pricePerRestaurant = data.pricePerRestaurant > 0 ? data.pricePerRestaurant : (monthlyTotal / numRest);
   const contractTotal = data.contractTotal > 0 ? data.contractTotal : monthlyTotal * data.contractDuration;
-  const pixDiscount = data.pixDiscountPercent ?? 5;
-
   const cycles = data.contractDuration;
   const semanas = data.semanas ?? (cycles * 4);
 
@@ -826,13 +823,11 @@ export function generateProposalPdf(data: ProposalPDFData) {
 
   y = drawSectionTitle(doc, "FORMAS DE PAGAMENTO", y, margin);
 
-  const pixTotal = contractTotal * (1 - pixDiscount / 100);
-  const pixSaving = contractTotal - pixTotal;
   const boletoParcela = data.contractDuration > 0 ? contractTotal / data.contractDuration : contractTotal;
 
   const paymentBoxHeight = 34;
   const paymentBoxGap = 6;
-  const threeBoxWidth = (contentWidth - paymentBoxGap * 2) / 3;
+  const twoBoxWidth = (contentWidth - paymentBoxGap) / 2;
 
   const drawPaymentBox = (
     xPos: number, yPos: number, width: number,
@@ -878,7 +873,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
   };
 
   drawPaymentBox(
-    margin, y, threeBoxWidth,
+    margin, y, twoBoxWidth,
     "💳", "Cartão de Crédito",
     "Parcela única sem juros",
     fmtCurrency(contractTotal),
@@ -887,21 +882,12 @@ export function generateProposalPdf(data: ProposalPDFData) {
   );
 
   drawPaymentBox(
-    margin + threeBoxWidth + paymentBoxGap, y, threeBoxWidth,
+    margin + twoBoxWidth + paymentBoxGap, y, twoBoxWidth,
     "📄", "Boleto Bancário",
     `Parcelado em ${data.contractDuration}x`,
     fmtCurrency(boletoParcela) + "/mês",
     `${data.contractDuration}x de ${fmtCurrency(boletoParcela)}`,
     false,
-  );
-
-  drawPaymentBox(
-    margin + (threeBoxWidth + paymentBoxGap) * 2, y, threeBoxWidth,
-    "⚡", "PIX à Vista",
-    `${pixDiscount}% de desconto adicional`,
-    fmtCurrency(pixTotal),
-    `Economia de ${fmtCurrency(pixSaving)}`,
-    true,
   );
 
   y += paymentBoxHeight + 10;
