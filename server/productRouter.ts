@@ -123,6 +123,22 @@ export const productRouter = router({
       return rows[0];
     }),
 
+  setAdvertiserVisibility: adminProcedure
+    .input(z.object({
+      productId: z.number(),
+      visibleToAdvertisers: z.boolean(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const rows = await db
+        .update(products)
+        .set({ visibleToAdvertisers: input.visibleToAdvertisers, updatedAt: new Date() })
+        .where(eq(products.id, input.productId))
+        .returning();
+      if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado" });
+      return rows[0];
+    }),
+
   listForPartners: adminProcedure.query(async () => {
     const db = await getDatabase();
     return db.select().from(products).where(eq(products.isActive, true)).orderBy(asc(products.name));

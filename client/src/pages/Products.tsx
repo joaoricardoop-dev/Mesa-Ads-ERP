@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Users, Tag } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Users, Tag, Megaphone } from "lucide-react";
 import { SEMANAS_OPTIONS } from "@/hooks/useBudgetCalculator";
 
 type TipoProduct = "impressos" | "eletronicos" | "telas";
@@ -325,6 +325,7 @@ export default function Products() {
                 <TableHead>Com. Com.</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Parceiros</TableHead>
+                <TableHead>Anunciantes</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -539,6 +540,11 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
+  const setAdvertiserVisibilityMutation = trpc.product.setAdvertiserVisibility.useMutation({
+    onSuccess: () => utils.product.list.invalidate(),
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
   const tipoLabel = tipoLabels[p.tipo as TipoProduct] ?? p.tipo ?? "—";
   const tipoColor = tipoColors[p.tipo as TipoProduct] ?? "bg-muted text-muted-foreground border-border";
 
@@ -576,6 +582,21 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
             />
             {p.visibleToPartners && (
               <Users className="w-3.5 h-3.5 text-emerald-400" />
+            )}
+          </div>
+        </TableCell>
+        <TableCell onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={!!p.visibleToAdvertisers}
+              onCheckedChange={(checked) =>
+                setAdvertiserVisibilityMutation.mutate({ productId: p.id, visibleToAdvertisers: checked })
+              }
+              disabled={setAdvertiserVisibilityMutation.isPending}
+              aria-label="Visível para anunciantes"
+            />
+            {p.visibleToAdvertisers && (
+              <Megaphone className="w-3.5 h-3.5 text-blue-400" />
             )}
           </div>
         </TableCell>

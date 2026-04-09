@@ -2514,7 +2514,7 @@ export const appRouter = router({
         const db = await getDatabase();
         if (!db) return { hasPartner: false, products: [] };
         const { clients, products: productsTable, productPricingTiers, productDiscountPriceTiers } = await import("../drizzle/schema");
-        const { eq, asc } = await import("drizzle-orm");
+        const { eq, asc, and } = await import("drizzle-orm");
 
         const [client] = await db.select({ partnerId: clients.partnerId, showAgencyPricing: clients.showAgencyPricing }).from(clients).where(eq(clients.id, user.clientId)).limit(1);
         const hasPartner = client?.showAgencyPricing === true
@@ -2526,7 +2526,7 @@ export const appRouter = router({
         const visibleProducts = await db
           .select()
           .from(productsTable)
-          .where(eq(productsTable.isActive, true))
+          .where(and(eq(productsTable.isActive, true), eq(productsTable.visibleToAdvertisers, true)))
           .orderBy(asc(productsTable.name));
 
         const productsWithTiers = await Promise.all(

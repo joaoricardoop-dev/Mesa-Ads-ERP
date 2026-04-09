@@ -70,6 +70,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_show_agency_pricing_to_clients",
     sql: `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "show_agency_pricing" boolean;`,
   },
+  {
+    name: "add_visible_to_advertisers_to_products",
+    sql: `ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "visibleToAdvertisers" boolean DEFAULT false NOT NULL;`,
+  },
 ];
 
 export async function runMigrations() {

@@ -838,6 +838,7 @@ export const products = pgTable("products", {
   pricingMode: pricingModeEnum("pricingMode").default("cost_based").notNull(),
   entryType: entryTypeEnum("entryType").default("tiers").notNull(),
   visibleToPartners: boolean("visibleToPartners").default(false).notNull(),
+  visibleToAdvertisers: boolean("visibleToAdvertisers").default(false).notNull(),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
