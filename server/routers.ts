@@ -1118,17 +1118,19 @@ export const appRouter = router({
         const email = input.email.toLowerCase().trim();
         const firstName = input.firstName?.trim() || client.name;
 
+        const appUrl = process.env.APP_URL || `https://${process.env.REPLIT_DEV_DOMAIN}` || "";
+
         try {
-          const invitation = await clerkClient.invitations.createInvitation({
+          await clerkClient.invitations.createInvitation({
             emailAddress: email,
             publicMetadata: {
               role: "anunciante",
               clientId: input.clientId,
               firstName,
             },
-            redirectUrl: undefined,
+            redirectUrl: appUrl ? `${appUrl}/` : undefined,
           });
-          return { success: true, invitationId: invitation.id };
+          return { success: true as const, message: `Convite enviado para ${email}.` };
         } catch (err: any) {
           if (err?.errors?.[0]?.code === "form_identifier_exists") {
             throw new TRPCError({ code: "CONFLICT", message: "Já existe um convite pendente ou usuário com este e-mail." });

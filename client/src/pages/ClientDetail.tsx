@@ -901,9 +901,15 @@ export default function ClientDetail() {
                 <Button variant="outline" size="sm" className="gap-2" onClick={handleImpersonate}>
                   <Eye className="w-4 h-4" /> Entrar como Anunciante
                 </Button>
-                <Button variant="outline" size="sm" className="gap-2" onClick={openInviteDialog}>
-                  <UserPlus className="w-4 h-4" /> Convidar para o Portal
-                </Button>
+                {linkedUsers.length > 0 ? (
+                  <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium px-2">
+                    <CheckCircle2 className="w-4 h-4" /> Acesso ativo
+                  </span>
+                ) : (
+                  <Button variant="outline" size="sm" className="gap-2" onClick={openInviteDialog}>
+                    <UserPlus className="w-4 h-4" /> Convidar para o Portal
+                  </Button>
+                )}
                 <Button size="sm" className="gap-2" onClick={() => setIsLinkUserDialogOpen(true)}>
                   <Plus className="w-4 h-4" /> Vincular Usuário
                 </Button>
