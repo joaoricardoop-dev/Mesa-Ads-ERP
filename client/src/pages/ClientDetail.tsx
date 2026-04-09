@@ -140,6 +140,9 @@ export default function ClientDetail() {
 
   const [isLinkUserDialogOpen, setIsLinkUserDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteFirstName, setInviteFirstName] = useState("");
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", role: "", notes: "", isPrimary: false });
@@ -183,6 +186,16 @@ export default function ClientDetail() {
       utils.advertiser.getLinkedUsers.invalidate({ clientId });
       setIsLinkUserDialogOpen(false);
       setSelectedUserId("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const inviteUserMutation = trpc.advertiser.inviteUser.useMutation({
+    onSuccess: () => {
+      toast.success("Convite enviado com sucesso! O usuário receberá um e-mail para acessar o portal.");
+      setInviteDialogOpen(false);
+      setInviteEmail("");
+      setInviteFirstName("");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -269,6 +282,12 @@ export default function ClientDetail() {
     const won = quotationsData.filter((q: any) => q.status === "win").length;
     return Math.round((won / quotationsData.length) * 100);
   }, [quotationsData]);
+
+  const openInviteDialog = () => {
+    setInviteEmail(client?.contactEmail || "");
+    setInviteFirstName(client?.name || "");
+    setInviteDialogOpen(true);
+  };
 
   const handleImpersonate = () => {
     if (typeof window !== "undefined") {
@@ -878,9 +897,12 @@ export default function ClientDetail() {
               <h3 className="font-semibold flex items-center gap-2">
                 <Users className="w-4 h-4 text-primary" /> Usuários Vinculados ({linkedUsers.length})
               </h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button variant="outline" size="sm" className="gap-2" onClick={handleImpersonate}>
                   <Eye className="w-4 h-4" /> Entrar como Anunciante
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2" onClick={openInviteDialog}>
+                  <UserPlus className="w-4 h-4" /> Convidar para o Portal
                 </Button>
                 <Button size="sm" className="gap-2" onClick={() => setIsLinkUserDialogOpen(true)}>
                   <Plus className="w-4 h-4" /> Vincular Usuário
@@ -891,7 +913,7 @@ export default function ClientDetail() {
               <div className="p-12 text-center text-muted-foreground">
                 <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p>Nenhum usuário vinculado</p>
-                <p className="text-xs mt-1">Vincule usuários para que eles acessem o portal do anunciante</p>
+                <p className="text-xs mt-1">Use "Convidar para o Portal" para enviar um e-mail de acesso ao anunciante</p>
               </div>
             ) : (
               <div className="divide-y">
@@ -928,6 +950,53 @@ export default function ClientDetail() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={inviteDialogOpen} onOpenChange={(open) => { if (!open) { setInviteDialogOpen(false); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-primary" /> Convidar para o Portal do Anunciante
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Será enviado um e-mail de convite para <strong>{client?.name}</strong> acessar o portal do anunciante.
+            </p>
+            <div className="space-y-2">
+              <Label>Nome</Label>
+              <Input
+                value={inviteFirstName}
+                onChange={e => setInviteFirstName(e.target.value)}
+                placeholder="Nome do contato"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>E-mail <span className="text-destructive">*</span></Label>
+              <Input
+                type="email"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                placeholder="email@empresa.com.br"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!inviteEmail.trim() || inviteUserMutation.isPending}
+              onClick={() => inviteUserMutation.mutate({
+                clientId,
+                email: inviteEmail.trim(),
+                firstName: inviteFirstName.trim() || undefined,
+              })}
+            >
+              {inviteUserMutation.isPending ? "Enviando..." : "Enviar Convite"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isLinkUserDialogOpen} onOpenChange={(open) => { if (!open) { setIsLinkUserDialogOpen(false); setSelectedUserId(""); } }}>
         <DialogContent>

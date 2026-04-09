@@ -1101,6 +1101,42 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteClient(input.id)),
 
+    inviteUser: internalProcedure
+      .input(z.object({
+        clientId: z.number(),
+        email: z.string().email(),
+        firstName: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const client = await getClient(input.clientId);
+        if (!client) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado." });
+        }
+
+        const { createClerkClient } = await import("@clerk/express");
+        const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+        const email = input.email.toLowerCase().trim();
+        const firstName = input.firstName?.trim() || client.name;
+
+        try {
+          const invitation = await clerkClient.invitations.createInvitation({
+            emailAddress: email,
+            publicMetadata: {
+              role: "anunciante",
+              clientId: input.clientId,
+              firstName,
+            },
+            redirectUrl: undefined,
+          });
+          return { success: true, invitationId: invitation.id };
+        } catch (err: any) {
+          if (err?.errors?.[0]?.code === "form_identifier_exists") {
+            throw new TRPCError({ code: "CONFLICT", message: "Já existe um convite pendente ou usuário com este e-mail." });
+          }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err?.message || "Erro ao enviar convite." });
+        }
+      }),
+
     getCampaigns: internalProcedure
       .input(z.object({ clientId: z.number(), includeChildren: z.boolean().optional() }))
       .query(async ({ input }) => {
