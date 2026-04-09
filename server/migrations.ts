@@ -62,6 +62,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_freight_cost_to_campaigns",
     sql: `ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "freightCost" numeric(12, 2) DEFAULT '0' NOT NULL;`,
   },
+  {
+    name: "add_partner_id_to_clients",
+    sql: `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "partnerId" integer REFERENCES "partners"("id") ON DELETE SET NULL;`,
+  },
 ];
 
 export async function runMigrations() {

@@ -2466,6 +2466,38 @@ export const appRouter = router({
         return updateClient(user.clientId, input);
       }),
 
+    getPriceTable: anuncianteProcedure
+      .query(async ({ ctx }) => {
+        const user = ctx.user;
+        if (!user || !user.clientId) return { hasPartner: false, products: [] };
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return { hasPartner: false, products: [] };
+        const { clients, products: productsTable, productPricingTiers, productDiscountPriceTiers } = await import("../drizzle/schema");
+        const { eq, asc } = await import("drizzle-orm");
+
+        const [client] = await db.select({ partnerId: clients.partnerId }).from(clients).where(eq(clients.id, user.clientId)).limit(1);
+        const hasPartner = !!client?.partnerId;
+
+        const visibleProducts = await db
+          .select()
+          .from(productsTable)
+          .where(eq(productsTable.isActive, true))
+          .orderBy(asc(productsTable.name));
+
+        const productsWithTiers = await Promise.all(
+          visibleProducts.map(async (p) => {
+            const [tiers, discountTiers] = await Promise.all([
+              db.select().from(productPricingTiers).where(eq(productPricingTiers.productId, p.id)).orderBy(asc(productPricingTiers.volumeMin)),
+              db.select().from(productDiscountPriceTiers).where(eq(productDiscountPriceTiers.productId, p.id)).orderBy(asc(productDiscountPriceTiers.priceMin)),
+            ]);
+            return { ...p, tiers, discountTiers };
+          })
+        );
+
+        return { hasPartner, products: productsWithTiers };
+      }),
+
     completeOnboarding: anuncianteProcedure
       .input(z.object({
         name: z.string().min(1),

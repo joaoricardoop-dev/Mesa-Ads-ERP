@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -41,8 +41,268 @@ import {
   ImageIcon,
   AlertCircle,
   Sparkles,
+  ShoppingBag,
+  Tag,
+  Eye,
+  ChevronDown,
+  Info,
 } from "lucide-react";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
+
+// ─── Price Table Utilities ────────────────────────────────────────────────────
+
+const SEMANAS_OPTIONS = [4, 8, 12, 16, 20, 24];
+
+const DESCONTOS_PRAZO: Record<number, number> = {
+  4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11,
+};
+
+const BV_PADRAO_AGENCIA = 0.20;
+
+const TIPO_LABELS: Record<string, string> = {
+  coaster: "Porta-Copos",
+  display: "Display",
+  cardapio: "Cardápio",
+  totem: "Totem",
+  adesivo: "Adesivo",
+  porta_guardanapo: "Porta-Guardanapo",
+  impressos: "Impresso",
+  eletronicos: "Eletrônico",
+  telas: "Tela",
+  outro: "Outro",
+};
+
+function fmtBRL(val: number) {
+  return val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function fmtBRL4(val: number) {
+  return val.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 4, maximumFractionDigits: 4 });
+}
+
+function calcUnitPriceAdv(params: {
+  custoUnitario: number; frete: number; margem: number; artes: number; volume: number;
+  irpj: number; comRestaurante: number; comComercialProduto: number; comParceiro: number;
+  pricingMode?: string; precoBaseTier?: number;
+}) {
+  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercialProduto, comParceiro, pricingMode = "cost_based", precoBaseTier = 0 } = params;
+  if (pricingMode === "price_based") {
+    if (precoBaseTier <= 0) return 0;
+    const den = 1 - comParceiro - irpj;
+    const total = den > 0 ? precoBaseTier / den : precoBaseTier;
+    return volume > 0 ? total / volume : 0;
+  }
+  const denominadorBase = 1 - margem - irpj - comRestaurante - comComercialProduto;
+  const custoTotal = custoUnitario * artes * volume + frete;
+  const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
+  const den = 1 - comParceiro - irpj;
+  const precoTotal = den > 0 ? precoBase / den : precoBase;
+  return volume > 0 ? precoTotal / volume : 0;
+}
+
+function applyDiscountTierAdv(price: number, discountTiers: any[]): number {
+  if (!discountTiers || discountTiers.length === 0) return price;
+  const tier = discountTiers.find((t: any) => price >= parseFloat(String(t.priceMin)) && price <= parseFloat(String(t.priceMax)));
+  if (!tier) return price;
+  return price * (1 - parseFloat(String(tier.discountPercent)) / 100);
+}
+
+function impressoesEstimadas(volume: number) {
+  return volume * 3 * 26;
+}
+
+function fmtImpr(n: number) {
+  if (n >= 1_000_000) return `≈${(n / 1_000_000).toFixed(1).replace(".", ",")}M`;
+  if (n >= 1_000) return `≈${(n / 1_000).toFixed(0).replace(".", ",")} mil`;
+  return `≈${n}`;
+}
+
+// ─── Product Card (Produtos tab) ──────────────────────────────────────────────
+
+function ProductCard({ product }: { product: any }) {
+  const volumes = useMemo(() =>
+    (product.tiers ?? []).map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
+    [product.tiers]
+  );
+  const defaultVol = product.defaultQtyPerLocation ?? (volumes[0] ?? 500);
+  const impressoes = impressoesEstimadas(defaultVol);
+
+  return (
+    <div className="bg-card border border-border/30 rounded-xl p-5 flex flex-col gap-3 hover:border-primary/30 transition-colors">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+            <Package className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm">{product.name}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {TIPO_LABELS[product.tipo] ?? product.tipo}
+            </p>
+          </div>
+        </div>
+        {volumes.length > 0 && (
+          <span className="text-[10px] font-mono text-muted-foreground border border-border/40 rounded px-2 py-0.5 shrink-0">
+            a partir de {volumes[0].toLocaleString("pt-BR")} {product.unitLabelPlural}
+          </span>
+        )}
+      </div>
+
+      {product.description && (
+        <p className="text-xs text-muted-foreground leading-relaxed">{product.description}</p>
+      )}
+
+      <div className="flex items-center gap-1.5 text-xs text-sky-400 bg-sky-500/10 border border-sky-500/20 rounded-lg px-3 py-2">
+        <Eye className="w-3.5 h-3.5 shrink-0" />
+        <span>
+          {defaultVol.toLocaleString("pt-BR")} {product.unitLabelPlural} → {fmtImpr(impressoes)} impressões/mês/restaurante
+        </span>
+      </div>
+
+      {volumes.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {volumes.map((v: number) => (
+            <span key={v} className="text-[10px] font-mono text-muted-foreground bg-muted/50 rounded px-2 py-0.5">
+              {v.toLocaleString("pt-BR")} {product.unitLabel}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Price Table (Tabela de Preços tab) ───────────────────────────────────────
+
+function AdvertiserProductTable({ product, hasPartner }: { product: any; hasPartner: boolean }) {
+  const [expanded, setExpanded] = useState(true);
+  const tiers = product.tiers ?? [];
+  const discountTiers = product.discountTiers ?? [];
+
+  const irpj = parseFloat(product.irpj ?? "6") / 100;
+  const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
+  const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
+  const comParceiro = hasPartner ? BV_PADRAO_AGENCIA : 0;
+
+  const volumes = useMemo(
+    () => tiers.map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
+    [tiers]
+  );
+
+  if (tiers.length === 0) {
+    return (
+      <div className="bg-card border border-border/30 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4">
+          <Package className="w-4 h-4 text-primary" />
+          <span className="font-semibold text-sm">{product.name}</span>
+          <span className="text-[10px] text-muted-foreground border border-border/30 rounded px-2 py-0.5">Tabela não configurada</span>
+        </div>
+      </div>
+    );
+  }
+
+  const smallestVol = volumes[0];
+  const smallestTier = tiers.find((t: any) => t.volumeMin === smallestVol);
+  const baseUnitPrice4sem = smallestTier
+    ? calcUnitPriceAdv({
+        custoUnitario: parseFloat(smallestTier.custoUnitario),
+        frete: parseFloat(smallestTier.frete),
+        margem: parseFloat(smallestTier.margem) / 100,
+        artes: smallestTier.artes ?? 1,
+        volume: smallestVol,
+        irpj, comRestaurante, comComercialProduto, comParceiro,
+        pricingMode: product.pricingMode,
+        precoBaseTier: parseFloat(smallestTier.precoBase ?? "0"),
+      })
+    : 0;
+
+  return (
+    <div className="bg-card border border-border/30 rounded-xl overflow-hidden">
+      <button
+        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-accent/20 transition-colors"
+        onClick={() => setExpanded(v => !v)}
+      >
+        <Package className="w-4 h-4 text-primary shrink-0" />
+        <span className="font-semibold text-sm flex-1">{product.name}</span>
+        <span className="text-xs text-muted-foreground hidden sm:block">{product.unitLabelPlural}</span>
+        {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+      </button>
+
+      {expanded && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-t border-border/20 bg-muted/30">
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">
+                  Volume · Impressões/mês
+                </th>
+                <th className="px-4 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Preço/un</th>
+                {SEMANAS_OPTIONS.map(s => (
+                  <th key={s} className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
+                    {s} sem.
+                    {DESCONTOS_PRAZO[s] ? (
+                      <span className="block text-emerald-400 font-normal">-{DESCONTOS_PRAZO[s]}%</span>
+                    ) : null}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {volumes.map((vol: number) => {
+                const tier = tiers.find((t: any) => t.volumeMin === vol);
+                if (!tier) return null;
+                const unitPrice4sem = calcUnitPriceAdv({
+                  custoUnitario: parseFloat(tier.custoUnitario),
+                  frete: parseFloat(tier.frete),
+                  margem: parseFloat(tier.margem) / 100,
+                  artes: tier.artes ?? 1,
+                  volume: vol,
+                  irpj, comRestaurante, comComercialProduto, comParceiro,
+                  pricingMode: product.pricingMode,
+                  precoBaseTier: parseFloat(tier.precoBase ?? "0"),
+                });
+                const discountVol = baseUnitPrice4sem > 0 && vol > smallestVol
+                  ? (1 - unitPrice4sem / baseUnitPrice4sem) : 0;
+                const impr = impressoesEstimadas(vol);
+
+                return (
+                  <tr key={vol} className="border-t border-border/10 hover:bg-accent/10 transition-colors">
+                    <td className="px-4 py-2.5 font-mono font-medium whitespace-nowrap">
+                      <span>{vol.toLocaleString("pt-BR")} {product.unitLabelPlural}</span>
+                      {discountVol > 0 && (
+                        <span className="ml-1.5 text-emerald-400 text-[10px]">-{(discountVol * 100).toFixed(0)}% vol.</span>
+                      )}
+                      <br />
+                      <span className="text-[10px] text-sky-400 font-normal">{fmtImpr(impr)} impressões</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-mono">{fmtBRL4(unitPrice4sem)}</td>
+                    {SEMANAS_OPTIONS.map(s => {
+                      const nPer = s / 4;
+                      const precoBruto = unitPrice4sem * vol * nPer;
+                      const precoPosFaixa = applyDiscountTierAdv(precoBruto, discountTiers);
+                      const dsc = (DESCONTOS_PRAZO[s] ?? 0) / 100;
+                      const precoTotal = precoPosFaixa * (1 - dsc);
+                      const precoUnit = vol > 0 ? precoTotal / (vol * nPer) : 0;
+                      return (
+                        <td key={s} className="px-3 py-2.5 text-right font-mono">
+                          <span className="font-semibold">{fmtBRL4(precoUnit)}</span>
+                          <br />
+                          <span className="text-muted-foreground text-[10px]">{fmtBRL(precoTotal)}</span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<string, { label: string; dot: string; icon: typeof CircleDot }> = {
   draft:       { label: "Rascunho",      dot: "bg-zinc-500",    icon: CircleDot },
@@ -340,13 +600,15 @@ function CampaignDetail({ campaign, onBack }: { campaign: any; onBack: () => voi
   );
 }
 
-type NavSection = "campanhas" | "cotacoes" | "os" | "financeiro" | "perfil";
+type NavSection = "campanhas" | "cotacoes" | "os" | "financeiro" | "produtos" | "tabela" | "perfil";
 
 const NAV_TABS: { key: NavSection; label: string; icon: typeof CircleDot }[] = [
   { key: "campanhas",  label: "Campanhas",        icon: Megaphone },
   { key: "cotacoes",   label: "Cotações",          icon: FileText },
   { key: "os",         label: "Ordens de Serviço", icon: FileSignature },
   { key: "financeiro", label: "Financeiro",        icon: Receipt },
+  { key: "produtos",   label: "Produtos",          icon: ShoppingBag },
+  { key: "tabela",     label: "Tabela de Preços",  icon: Tag },
   { key: "perfil",     label: "Meu Perfil",        icon: Building2 },
 ];
 
@@ -357,6 +619,7 @@ export default function AnunciantePortal() {
   const { data: quotations = [] } = trpc.portal.myQuotations.useQuery();
   const { data: serviceOrders = [] } = trpc.portal.myServiceOrders.useQuery();
   const { data: invoices = [] } = trpc.portal.myInvoices.useQuery();
+  const { data: priceTableData } = trpc.portal.getPriceTable.useQuery();
 
   const [activeTab, setActiveTab] = useState<NavSection>("campanhas");
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
@@ -713,6 +976,66 @@ export default function AnunciantePortal() {
                 })
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === "produtos" && (
+          <div className="space-y-6">
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-sky-500/5 border border-sky-500/20">
+              <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-muted-foreground">
+                <p className="font-medium text-sky-300 mb-0.5">Estimativa de impressões</p>
+                <p>Baseada em 3 utilizações/dia × 26 dias úteis/mês por porta-copos distribuídos. Valores reais podem variar conforme o perfil dos estabelecimentos.</p>
+              </div>
+            </div>
+
+            {!priceTableData || priceTableData.products.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
+                <ShoppingBag className="w-10 h-10 opacity-20" />
+                <p className="text-sm">Nenhum produto disponível</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {priceTableData.products.map((p: any) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "tabela" && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 flex-wrap">
+              {priceTableData?.hasPartner ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+                  <Tag className="w-3.5 h-3.5" />
+                  Inclui comissão de agência (+{(BV_PADRAO_AGENCIA * 100).toFixed(0)}% BV)
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+                  <Tag className="w-3.5 h-3.5" />
+                  Preço direto — sem comissão de agência
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Info className="w-3 h-3" />
+                Estimativa: 3 usos/dia × 26 dias/mês por porta-copos
+              </div>
+            </div>
+
+            {!priceTableData || priceTableData.products.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
+                <Tag className="w-10 h-10 opacity-20" />
+                <p className="text-sm">Tabela de preços indisponível</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {priceTableData.products.map((p: any) => (
+                  <AdvertiserProductTable key={p.id} product={p} hasPartner={priceTableData.hasPartner} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
