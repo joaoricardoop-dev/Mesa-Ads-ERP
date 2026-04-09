@@ -72,6 +72,19 @@ const TIPO_LABELS: Record<string, string> = {
   outro: "Outro",
 };
 
+const TIPO_ICONS: Record<string, typeof CircleDot> = {
+  coaster:         Boxes,
+  display:         ImageIcon,
+  cardapio:        FileText,
+  totem:           Radio,
+  adesivo:         Tag,
+  porta_guardanapo:Package,
+  impressos:       Package,
+  eletronicos:     Sparkles,
+  telas:           ImageIcon,
+  outro:           Package,
+};
+
 function fmtBRL(val: number) {
   return val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -126,13 +139,14 @@ function ProductCard({ product }: { product: any }) {
   );
   const defaultVol = product.defaultQtyPerLocation ?? (volumes[0] ?? 500);
   const impressoes = impressoesEstimadas(defaultVol);
+  const TipoIcon = TIPO_ICONS[product.tipo] ?? Package;
 
   return (
     <div className="bg-card border border-border/30 rounded-xl p-5 flex flex-col gap-3 hover:border-primary/30 transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-lg bg-primary/10 shrink-0">
-            <Package className="w-4 h-4 text-primary" />
+            <TipoIcon className="w-4 h-4 text-primary" />
           </div>
           <div>
             <p className="font-semibold text-sm">{product.name}</p>
