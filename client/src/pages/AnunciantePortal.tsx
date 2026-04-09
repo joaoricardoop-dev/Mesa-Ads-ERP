@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import {
   Building2,
@@ -46,6 +47,7 @@ import {
   Eye,
   ChevronDown,
   Info,
+  LayoutDashboard,
 } from "lucide-react";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
 
@@ -83,6 +85,19 @@ const TIPO_ICONS: Record<string, typeof CircleDot> = {
   eletronicos:     Sparkles,
   telas:           ImageIcon,
   outro:           Package,
+};
+
+const TIPO_COLORS: Record<string, { bg: string; text: string; border: string; gradient: string; hoverBorder: string }> = {
+  coaster:          { bg: "bg-primary/10",    text: "text-primary",    border: "border-primary/20",    gradient: "from-primary/5 to-primary/10",       hoverBorder: "hover:border-primary/40" },
+  display:          { bg: "bg-violet-500/10", text: "text-violet-400", border: "border-violet-500/20", gradient: "from-violet-500/5 to-violet-500/10",  hoverBorder: "hover:border-violet-500/40" },
+  cardapio:         { bg: "bg-blue-500/10",   text: "text-blue-400",   border: "border-blue-500/20",   gradient: "from-blue-500/5 to-blue-500/10",      hoverBorder: "hover:border-blue-500/40" },
+  totem:            { bg: "bg-orange-500/10", text: "text-orange-400", border: "border-orange-500/20", gradient: "from-orange-500/5 to-orange-500/10",  hoverBorder: "hover:border-orange-500/40" },
+  adesivo:          { bg: "bg-pink-500/10",   text: "text-pink-400",   border: "border-pink-500/20",   gradient: "from-pink-500/5 to-pink-500/10",      hoverBorder: "hover:border-pink-500/40" },
+  porta_guardanapo: { bg: "bg-teal-500/10",   text: "text-teal-400",   border: "border-teal-500/20",   gradient: "from-teal-500/5 to-teal-500/10",     hoverBorder: "hover:border-teal-500/40" },
+  impressos:        { bg: "bg-cyan-500/10",   text: "text-cyan-400",   border: "border-cyan-500/20",   gradient: "from-cyan-500/5 to-cyan-500/10",      hoverBorder: "hover:border-cyan-500/40" },
+  eletronicos:      { bg: "bg-amber-500/10",  text: "text-amber-400",  border: "border-amber-500/20",  gradient: "from-amber-500/5 to-amber-500/10",    hoverBorder: "hover:border-amber-500/40" },
+  telas:            { bg: "bg-indigo-500/10", text: "text-indigo-400", border: "border-indigo-500/20", gradient: "from-indigo-500/5 to-indigo-500/10",  hoverBorder: "hover:border-indigo-500/40" },
+  outro:            { bg: "bg-zinc-500/10",   text: "text-zinc-400",   border: "border-zinc-500/20",   gradient: "from-zinc-500/5 to-zinc-500/10",      hoverBorder: "hover:border-zinc-500/40" },
 };
 
 function fmtBRL(val: number) {
@@ -130,59 +145,267 @@ function fmtImpr(n: number) {
   return `≈${n}`;
 }
 
-// ─── Product Card (Produtos tab) ──────────────────────────────────────────────
+// ─── Product Price Detail Sheet ───────────────────────────────────────────────
 
-function ProductCard({ product }: { product: any }) {
+function ProductPriceSheet({ product, hasPartner, open, onClose }: {
+  product: any; hasPartner: boolean; open: boolean; onClose: () => void;
+}) {
+  const tiers = product.tiers ?? [];
+  const discountTiers = product.discountTiers ?? [];
+  const TipoIcon = TIPO_ICONS[product.tipo] ?? Package;
+  const colors = TIPO_COLORS[product.tipo] ?? TIPO_COLORS.outro;
+
+  const irpj = parseFloat(product.irpj ?? "6") / 100;
+  const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
+  const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
+  const comParceiro = hasPartner ? BV_PADRAO_AGENCIA : 0;
+
+  const volumes = useMemo(
+    () => tiers.map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
+    [tiers]
+  );
+
+  const smallestVol = volumes[0];
+  const smallestTier = tiers.find((t: any) => t.volumeMin === smallestVol);
+  const baseUnitPrice4sem = smallestTier
+    ? calcUnitPriceAdv({
+        custoUnitario: parseFloat(smallestTier.custoUnitario),
+        frete: parseFloat(smallestTier.frete),
+        margem: parseFloat(smallestTier.margem) / 100,
+        artes: smallestTier.artes ?? 1,
+        volume: smallestVol,
+        irpj, comRestaurante, comComercialProduto, comParceiro,
+        pricingMode: product.pricingMode,
+        precoBaseTier: parseFloat(smallestTier.precoBase ?? "0"),
+      })
+    : 0;
+
+  return (
+    <Sheet open={open} onOpenChange={onClose}>
+      <SheetContent className="w-full sm:max-w-3xl overflow-y-auto">
+        <SheetHeader className="pb-4 border-b">
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl ${colors.bg}`}>
+              <TipoIcon className={`w-5 h-5 ${colors.text}`} />
+            </div>
+            <div>
+              <SheetTitle className="text-lg">{product.name}</SheetTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">{TIPO_LABELS[product.tipo] ?? product.tipo}</p>
+            </div>
+          </div>
+          {product.description && (
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{product.description}</p>
+          )}
+        </SheetHeader>
+
+        <div className="py-5 space-y-5">
+          <div className="flex items-center gap-2 flex-wrap">
+            {hasPartner ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+                <Tag className="w-3.5 h-3.5" />
+                Inclui comissão de agência (+{(BV_PADRAO_AGENCIA * 100).toFixed(0)}% BV)
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+                <Tag className="w-3.5 h-3.5" />
+                Preço direto — sem comissão de agência
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Info className="w-3 h-3" />
+              Estimativa: 3 usos/dia × 26 dias/mês por unidade
+            </div>
+          </div>
+
+          {tiers.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
+              <Package className="w-8 h-8 opacity-20" />
+              <p className="text-sm">Tabela de preços não configurada</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border/30">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-muted/30">
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
+                      Volume · Impressões/mês
+                    </th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground whitespace-nowrap">Preço/un</th>
+                    {SEMANAS_OPTIONS.map(s => (
+                      <th key={s} className="px-3 py-3 text-right font-medium text-muted-foreground whitespace-nowrap">
+                        {s} sem.
+                        {DESCONTOS_PRAZO[s] ? (
+                          <span className="block text-emerald-400 font-normal">-{DESCONTOS_PRAZO[s]}%</span>
+                        ) : null}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {volumes.map((vol: number) => {
+                    const tier = tiers.find((t: any) => t.volumeMin === vol);
+                    if (!tier) return null;
+                    const unitPrice4sem = calcUnitPriceAdv({
+                      custoUnitario: parseFloat(tier.custoUnitario),
+                      frete: parseFloat(tier.frete),
+                      margem: parseFloat(tier.margem) / 100,
+                      artes: tier.artes ?? 1,
+                      volume: vol,
+                      irpj, comRestaurante, comComercialProduto, comParceiro,
+                      pricingMode: product.pricingMode,
+                      precoBaseTier: parseFloat(tier.precoBase ?? "0"),
+                    });
+                    const discountVol = baseUnitPrice4sem > 0 && vol > smallestVol
+                      ? (1 - unitPrice4sem / baseUnitPrice4sem) : 0;
+                    const impr = impressoesEstimadas(vol);
+
+                    return (
+                      <tr key={vol} className="border-t border-border/10 hover:bg-accent/10 transition-colors">
+                        <td className="px-4 py-2.5 font-mono font-medium whitespace-nowrap">
+                          <span>{vol.toLocaleString("pt-BR")} {product.unitLabelPlural}</span>
+                          {discountVol > 0 && (
+                            <span className="ml-1.5 text-emerald-400 text-[10px]">-{(discountVol * 100).toFixed(0)}% vol.</span>
+                          )}
+                          <br />
+                          <span className="text-[10px] text-sky-400 font-normal">{fmtImpr(impr)} impressões</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-mono">{fmtBRL4(unitPrice4sem)}</td>
+                        {SEMANAS_OPTIONS.map(s => {
+                          const nPer = s / 4;
+                          const precoBruto = unitPrice4sem * vol * nPer;
+                          const precoPosFaixa = applyDiscountTierAdv(precoBruto, discountTiers);
+                          const dsc = (DESCONTOS_PRAZO[s] ?? 0) / 100;
+                          const precoTotal = precoPosFaixa * (1 - dsc);
+                          const precoUnit = vol > 0 ? precoTotal / (vol * nPer) : 0;
+                          return (
+                            <td key={s} className="px-3 py-2.5 text-right font-mono">
+                              <span className="font-semibold">{fmtBRL4(precoUnit)}</span>
+                              <br />
+                              <span className="text-muted-foreground text-[10px]">{fmtBRL(precoTotal)}</span>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ─── Product Card (Produtos tab — shopping style) ─────────────────────────────
+
+function ShoppingProductCard({
+  product,
+  hasPartner,
+  onViewDetails,
+}: {
+  product: any;
+  hasPartner: boolean;
+  onViewDetails: () => void;
+}) {
   const volumes = useMemo(() =>
     (product.tiers ?? []).map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
     [product.tiers]
   );
+
   const defaultVol = product.defaultQtyPerLocation ?? (volumes[0] ?? 500);
   const impressoes = impressoesEstimadas(defaultVol);
   const TipoIcon = TIPO_ICONS[product.tipo] ?? Package;
+  const colors = TIPO_COLORS[product.tipo] ?? TIPO_COLORS.outro;
+
+  const irpj = parseFloat(product.irpj ?? "6") / 100;
+  const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
+  const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
+  const comParceiro = hasPartner ? BV_PADRAO_AGENCIA : 0;
+
+  const tiers = product.tiers ?? [];
+  const discountTiers = product.discountTiers ?? [];
+  const smallestVol = volumes[0];
+  const smallestTier = tiers.find((t: any) => t.volumeMin === smallestVol);
+
+  const minMonthlyPrice = useMemo(() => {
+    if (!smallestTier || smallestVol == null) return null;
+    const unitPrice = calcUnitPriceAdv({
+      custoUnitario: parseFloat(smallestTier.custoUnitario),
+      frete: parseFloat(smallestTier.frete),
+      margem: parseFloat(smallestTier.margem) / 100,
+      artes: smallestTier.artes ?? 1,
+      volume: smallestVol,
+      irpj, comRestaurante, comComercialProduto, comParceiro,
+      pricingMode: product.pricingMode,
+      precoBaseTier: parseFloat(smallestTier.precoBase ?? "0"),
+    });
+    const precoBruto = unitPrice * smallestVol * 1;
+    const precoPosFaixa = applyDiscountTierAdv(precoBruto, discountTiers);
+    return precoPosFaixa;
+  }, [smallestTier, smallestVol, irpj, comRestaurante, comComercialProduto, comParceiro, discountTiers]);
 
   return (
-    <div className="bg-card border border-border/30 rounded-xl p-5 flex flex-col gap-3 hover:border-primary/30 transition-colors">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-primary/10 shrink-0">
-            <TipoIcon className="w-4 h-4 text-primary" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm">{product.name}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              {TIPO_LABELS[product.tipo] ?? product.tipo}
-            </p>
-          </div>
+    <button
+      type="button"
+      onClick={onViewDetails}
+      className={`group text-left w-full bg-card border border-border/30 rounded-2xl overflow-hidden ${colors.hoverBorder} hover:shadow-xl hover:shadow-black/10 transition-all duration-300 flex flex-col cursor-pointer`}
+    >
+      <div className={`bg-gradient-to-br ${colors.gradient} border-b border-border/20 px-6 py-8 flex flex-col items-center justify-center gap-4`}>
+        <div className={`w-16 h-16 rounded-2xl ${colors.bg} border ${colors.border} flex items-center justify-center shadow-lg`}>
+          <TipoIcon className={`w-8 h-8 ${colors.text}`} />
         </div>
-        {volumes.length > 0 && (
-          <span className="text-[10px] font-mono text-muted-foreground border border-border/40 rounded px-2 py-0.5 shrink-0">
-            a partir de {volumes[0].toLocaleString("pt-BR")} {product.unitLabelPlural}
+        <div className="text-center">
+          <h3 className="font-bold text-base leading-tight">{product.name}</h3>
+          <span className={`text-[11px] font-medium mt-1 inline-block px-2.5 py-0.5 rounded-full ${colors.bg} ${colors.text}`}>
+            {TIPO_LABELS[product.tipo] ?? product.tipo}
           </span>
-        )}
-      </div>
-
-      {product.description && (
-        <p className="text-xs text-muted-foreground leading-relaxed">{product.description}</p>
-      )}
-
-      <div className="flex items-center gap-1.5 text-xs text-sky-400 bg-sky-500/10 border border-sky-500/20 rounded-lg px-3 py-2">
-        <Eye className="w-3.5 h-3.5 shrink-0" />
-        <span>
-          {defaultVol.toLocaleString("pt-BR")} {product.unitLabelPlural} → {fmtImpr(impressoes)} impressões/mês/restaurante
-        </span>
-      </div>
-
-      {volumes.length > 1 && (
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {volumes.map((v: number) => (
-            <span key={v} className="text-[10px] font-mono text-muted-foreground bg-muted/50 rounded px-2 py-0.5">
-              {v.toLocaleString("pt-BR")} {product.unitLabel}
-            </span>
-          ))}
         </div>
-      )}
-    </div>
+      </div>
+
+      <div className="px-5 py-4 flex flex-col gap-3 flex-1">
+        {product.description && (
+          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{product.description}</p>
+        )}
+
+        <div className="flex items-center gap-1.5 text-xs text-sky-400 bg-sky-500/8 border border-sky-500/15 rounded-lg px-3 py-2">
+          <Eye className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            {defaultVol.toLocaleString("pt-BR")} {product.unitLabelPlural} → {fmtImpr(impressoes)} impressões/mês
+          </span>
+        </div>
+
+        {minMonthlyPrice != null && minMonthlyPrice > 0 && (
+          <div className="flex items-baseline gap-1">
+            <span className="text-[10px] text-muted-foreground">a partir de</span>
+            <span className="text-lg font-bold text-foreground">{fmtBRL(minMonthlyPrice)}</span>
+            <span className="text-[10px] text-muted-foreground">/mês</span>
+          </div>
+        )}
+
+        {volumes.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {volumes.map((v: number) => (
+              <span key={v} className="text-[10px] font-mono text-muted-foreground bg-muted/50 rounded-md px-2 py-0.5">
+                {v.toLocaleString("pt-BR")} {product.unitLabel}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-auto pt-3 border-t border-border/20 flex gap-2">
+          <div className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs border border-border rounded-md px-3 py-1.5 bg-background hover:bg-accent transition-colors pointer-events-none">
+            <Tag className="w-3.5 h-3.5" />
+            Ver preços
+          </div>
+          <div className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs rounded-md px-3 py-1.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors pointer-events-none">
+            <ShoppingBag className="w-3.5 h-3.5" />
+            Solicitar cotação
+          </div>
+        </div>
+      </div>
+    </button>
   );
 }
 
@@ -614,7 +837,7 @@ function CampaignDetail({ campaign, onBack }: { campaign: any; onBack: () => voi
   );
 }
 
-type NavSection = "campanhas" | "cotacoes" | "os" | "financeiro" | "produtos" | "tabela" | "perfil";
+type NavSection = "home" | "campanhas" | "cotacoes" | "os" | "financeiro" | "produtos" | "tabela" | "perfil";
 
 const NAV_TABS: { key: NavSection; label: string; icon: typeof CircleDot }[] = [
   { key: "campanhas",  label: "Campanhas",        icon: Megaphone },
@@ -626,22 +849,38 @@ const NAV_TABS: { key: NavSection; label: string; icon: typeof CircleDot }[] = [
   { key: "perfil",     label: "Meu Perfil",        icon: Building2 },
 ];
 
+type HomeSectionCard = {
+  key: NavSection;
+  label: string;
+  description: string;
+  icon: typeof CircleDot;
+  badgeCount?: number;
+  badgeLabel?: string;
+  color: string;
+  bgColor: string;
+};
+
 export default function AnunciantePortal() {
   const { user } = useAuth();
   const { data: profile, isLoading: profileLoading } = trpc.portal.myProfile.useQuery();
-  const { data: campaigns = [] } = trpc.portal.myCampaigns.useQuery();
-  const { data: quotations = [] } = trpc.portal.myQuotations.useQuery();
-  const { data: serviceOrders = [] } = trpc.portal.myServiceOrders.useQuery();
-  const { data: invoices = [] } = trpc.portal.myInvoices.useQuery();
+  const { data: campaignsData = [] } = trpc.portal.myCampaigns.useQuery();
+  const campaigns: any[] = campaignsData;
+  const { data: quotationsData = [] } = trpc.portal.myQuotations.useQuery();
+  const quotations: any[] = quotationsData;
+  const { data: serviceOrdersData = [] } = trpc.portal.myServiceOrders.useQuery();
+  const serviceOrders: any[] = serviceOrdersData;
+  const { data: invoicesData = [] } = trpc.portal.myInvoices.useQuery();
+  const invoices: any[] = invoicesData;
   const { data: priceTableData } = trpc.portal.getPriceTable.useQuery();
 
-  const [activeTab, setActiveTab] = useState<NavSection>("campanhas");
+  const [activeTab, setActiveTab] = useState<NavSection>("home");
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     contactEmail: "", contactPhone: "", instagram: "",
     address: "", addressNumber: "", neighborhood: "", city: "", state: "", cep: "",
   });
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
   const utils = trpc.useUtils();
   const updateProfileMutation = trpc.portal.updateProfile.useMutation({
@@ -659,15 +898,96 @@ export default function AnunciantePortal() {
     setEditOpen(true);
   };
 
-  const activeCampaigns = campaigns.filter((c: any) =>
+  const activeCampaigns = campaigns.filter((c) =>
     ["veiculacao", "active", "executar", "producao", "transito", "distribuicao", "briefing", "design", "aprovacao"].includes(c.status)
   );
-  const pendingInvoices = invoices.filter((i: any) => i.status === "emitida" || i.status === "vencida");
+  const pendingInvoices = invoices.filter((i) => i.status === "emitida" || i.status === "vencida");
   const totalInvoiced = invoices
-    .filter((i: any) => i.status !== "cancelada")
-    .reduce((sum: number, i: any) => sum + (parseFloat(i.amount) || 0), 0);
+    .filter((i) => i.status !== "cancelada")
+    .reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+  const pendingOS = serviceOrders.filter((os) => os.status === "enviada");
+  const pendingQuotations = quotations.filter((q) => q.status === "enviada" || q.status === "ativa");
 
-  const selectedCampaign = campaigns.find((c: any) => c.id === selectedCampaignId) ?? null;
+  const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId) ?? null;
+  const selectedProduct = priceTableData?.products.find((p: any) => p.id === selectedProductId) ?? null;
+
+  const navigateTo = (section: NavSection) => {
+    setActiveTab(section);
+    setSelectedCampaignId(null);
+  };
+
+  const homeCards: HomeSectionCard[] = [
+    {
+      key: "campanhas",
+      label: "Campanhas",
+      description: "Acompanhe suas campanhas em veiculação, produção e histórico completo.",
+      icon: Megaphone,
+      badgeCount: activeCampaigns.length,
+      badgeLabel: activeCampaigns.length === 1 ? "campanha ativa" : "campanhas ativas",
+      color: "text-primary",
+      bgColor: "bg-primary/10",
+    },
+    {
+      key: "cotacoes",
+      label: "Cotações",
+      description: "Veja suas cotações enviadas, aprovadas e em análise.",
+      icon: FileText,
+      badgeCount: pendingQuotations.length,
+      badgeLabel: pendingQuotations.length === 1 ? "cotação pendente" : "cotações pendentes",
+      color: "text-blue-400",
+      bgColor: "bg-blue-500/10",
+    },
+    {
+      key: "os",
+      label: "Ordens de Serviço",
+      description: "Contratos e ordens de serviço para assinatura e acompanhamento.",
+      icon: FileSignature,
+      badgeCount: pendingOS.length,
+      badgeLabel: pendingOS.length === 1 ? "aguardando assinatura" : "aguardando assinatura",
+      color: "text-violet-400",
+      bgColor: "bg-violet-500/10",
+    },
+    {
+      key: "financeiro",
+      label: "Financeiro",
+      description: "Faturas emitidas, pagas e pendentes de pagamento.",
+      icon: Receipt,
+      badgeCount: pendingInvoices.length,
+      badgeLabel: pendingInvoices.length === 1 ? "fatura pendente" : "faturas pendentes",
+      color: "text-amber-400",
+      bgColor: "bg-amber-500/10",
+    },
+    {
+      key: "produtos",
+      label: "Produtos",
+      description: "Catálogo de produtos disponíveis para sua campanha publicitária.",
+      icon: ShoppingBag,
+      badgeCount: priceTableData?.products.length ?? 0,
+      badgeLabel: "produtos disponíveis",
+      color: "text-teal-400",
+      bgColor: "bg-teal-500/10",
+    },
+    {
+      key: "tabela",
+      label: "Tabela de Preços",
+      description: "Tabela consolidada com preços, volumes e descontos por prazo.",
+      icon: Tag,
+      badgeCount: priceTableData?.products.length ?? 0,
+      badgeLabel: "produtos com tabela",
+      color: "text-cyan-400",
+      bgColor: "bg-cyan-500/10",
+    },
+    {
+      key: "perfil",
+      label: "Meu Perfil",
+      description: "Dados cadastrais da sua empresa e informações de contato.",
+      icon: Building2,
+      badgeCount: undefined,
+      badgeLabel: "atualizado",
+      color: "text-zinc-400",
+      bgColor: "bg-zinc-500/10",
+    },
+  ];
 
   if (profileLoading) {
     return (
@@ -733,14 +1053,25 @@ export default function AnunciantePortal() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 border-b">
+        <div className="flex items-center gap-1 border-b overflow-x-auto">
+          <button
+            onClick={() => navigateTo("home")}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === "home"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            Início
+          </button>
           {NAV_TABS.map(tab => {
             const Icon = tab.icon;
             const active = activeTab === tab.key;
             return (
               <button
                 key={tab.key}
-                onClick={() => { setActiveTab(tab.key); setSelectedCampaignId(null); }}
+                onClick={() => navigateTo(tab.key)}
                 className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   active
                     ? "border-primary text-foreground"
@@ -754,11 +1085,97 @@ export default function AnunciantePortal() {
           })}
         </div>
 
+        {activeTab === "home" && (
+          <div className="space-y-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded-lg bg-primary/10">
+                    <Megaphone className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Campanhas ativas</p>
+                </div>
+                <p className="text-2xl font-bold tabular-nums">{activeCampaigns.length}</p>
+              </div>
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded-lg bg-blue-500/10">
+                    <FileText className="w-3.5 h-3.5 text-blue-400" />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Cotações</p>
+                </div>
+                <p className="text-2xl font-bold tabular-nums">{quotations.length}</p>
+              </div>
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded-lg bg-amber-500/10">
+                    <Receipt className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Faturas pendentes</p>
+                </div>
+                <p className="text-2xl font-bold tabular-nums">{pendingInvoices.length}</p>
+              </div>
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded-lg bg-violet-500/10">
+                    <FileSignature className="w-3.5 h-3.5 text-violet-400" />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">OS pendentes</p>
+                </div>
+                <p className="text-2xl font-bold tabular-nums">{pendingOS.length}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">Navegação rápida</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {homeCards.map((card) => {
+                  const Icon = card.icon;
+                  return (
+                    <button
+                      key={card.key}
+                      onClick={() => navigateTo(card.key)}
+                      className="group text-left rounded-2xl border border-border/30 bg-card hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 p-5 flex flex-col gap-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className={`p-2.5 rounded-xl ${card.bgColor} shrink-0`}>
+                          <Icon className={`w-5 h-5 ${card.color}`} />
+                        </div>
+                        {card.badgeCount != null && card.badgeLabel && (
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${card.badgeCount > 0 ? "bg-primary/10 text-primary border-primary/20" : "bg-muted/50 text-muted-foreground border-border/30"} border shrink-0 mt-0.5`}>
+                            {card.badgeCount} {card.badgeLabel}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm group-hover:text-primary transition-colors">{card.label}</p>
+                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{card.description}</p>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-primary transition-colors mt-auto">
+                        <span>Acessar</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === "campanhas" && (
           selectedCampaign ? (
             <CampaignDetail campaign={selectedCampaign} onBack={() => setSelectedCampaignId(null)} />
           ) : (
             <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                <button onClick={() => navigateTo("home")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Início
+                </button>
+                <ChevronRight className="w-3.5 h-3.5 opacity-40" />
+                <span className="text-foreground/80">Campanhas</span>
+              </div>
               {campaigns.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
                   <Megaphone className="w-10 h-10 opacity-20" />
@@ -766,7 +1183,7 @@ export default function AnunciantePortal() {
                   <p className="text-xs opacity-60">Suas campanhas aparecerão aqui assim que forem criadas</p>
                 </div>
               ) : (
-                campaigns.map((campaign: any) => {
+                campaigns.map((campaign) => {
                   const meta = STATUS_META[campaign.status] ?? STATUS_META.draft;
                   const Icon = meta.icon;
                   const isActive = ["veiculacao", "active", "executar", "producao", "transito", "distribuicao", "briefing", "design", "aprovacao"].includes(campaign.status);
@@ -830,13 +1247,21 @@ export default function AnunciantePortal() {
 
         {activeTab === "cotacoes" && (
           <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+              <button onClick={() => navigateTo("home")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Início
+              </button>
+              <ChevronRight className="w-3.5 h-3.5 opacity-40" />
+              <span className="text-foreground/80">Cotações</span>
+            </div>
             {quotations.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
                 <FileText className="w-10 h-10 opacity-20" />
                 <p className="text-sm">Nenhuma cotação encontrada</p>
               </div>
             ) : (
-              quotations.map((q: any) => {
+              quotations.map((q) => {
                 const cfg = Q_STATUS[q.status] ?? Q_STATUS.rascunho;
                 return (
                   <div key={q.id} className="rounded-xl border bg-card p-4 flex items-center gap-4">
@@ -869,13 +1294,21 @@ export default function AnunciantePortal() {
 
         {activeTab === "os" && (
           <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+              <button onClick={() => navigateTo("home")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Início
+              </button>
+              <ChevronRight className="w-3.5 h-3.5 opacity-40" />
+              <span className="text-foreground/80">Ordens de Serviço</span>
+            </div>
             {serviceOrders.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
                 <FileSignature className="w-10 h-10 opacity-20" />
                 <p className="text-sm">Nenhuma ordem de serviço encontrada</p>
               </div>
             ) : (
-              serviceOrders.map((os: any) => {
+              serviceOrders.map((os) => {
                 const cfg = OS_STATUS[os.status] ?? OS_STATUS.rascunho;
                 return (
                   <div key={os.id} className="rounded-xl border bg-card p-4">
@@ -917,7 +1350,7 @@ export default function AnunciantePortal() {
                               coasterVolume: os.coasterVolume || 0,
                               periodStart: os.periodStart || "",
                               periodEnd: os.periodEnd || "",
-                              restaurants: (os as any).restaurantNames || [],
+                              restaurants: os.restaurantNames || [],
                               signerName: os.signedByName || "",
                               signerCpf: os.signedByCpf || "",
                               signedAt: new Date(os.signedAt).toISOString(),
@@ -939,6 +1372,14 @@ export default function AnunciantePortal() {
 
         {activeTab === "financeiro" && (
           <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <button onClick={() => navigateTo("home")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Início
+              </button>
+              <ChevronRight className="w-3.5 h-3.5 opacity-40" />
+              <span className="text-foreground/80">Financeiro</span>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="rounded-xl border bg-card p-4">
                 <p className="text-xs text-muted-foreground mb-1">Total faturado</p>
@@ -947,7 +1388,7 @@ export default function AnunciantePortal() {
               <div className="rounded-xl border bg-card p-4">
                 <p className="text-xs text-muted-foreground mb-1">Faturas pagas</p>
                 <p className="text-2xl font-bold text-emerald-400">
-                  {invoices.filter((i: any) => i.status === "paga").length}
+                  {invoices.filter((i) => i.status === "paga").length}
                 </p>
               </div>
               <div className="rounded-xl border bg-card p-4">
@@ -963,7 +1404,7 @@ export default function AnunciantePortal() {
                   <p className="text-sm">Nenhuma fatura encontrada</p>
                 </div>
               ) : (
-                invoices.map((inv: any) => {
+                invoices.map((inv) => {
                   const cfg = INV_STATUS[inv.status] ?? INV_STATUS.emitida;
                   return (
                     <div key={inv.id} className="rounded-xl border bg-card p-4 flex items-center gap-4">
@@ -995,6 +1436,15 @@ export default function AnunciantePortal() {
 
         {activeTab === "produtos" && (
           <div className="space-y-6">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <button onClick={() => navigateTo("home")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Início
+              </button>
+              <ChevronRight className="w-3.5 h-3.5 opacity-40" />
+              <span className="text-foreground/80">Produtos</span>
+            </div>
+
             <div className="flex items-start gap-3 p-4 rounded-xl bg-sky-500/5 border border-sky-500/20">
               <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
               <div className="text-xs text-muted-foreground">
@@ -1009,17 +1459,39 @@ export default function AnunciantePortal() {
                 <p className="text-sm">Nenhum produto disponível</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {priceTableData.products.map((p: any) => (
-                  <ProductCard key={p.id} product={p} />
+                  <ShoppingProductCard
+                    key={p.id}
+                    product={p}
+                    hasPartner={priceTableData.hasPartner}
+                    onViewDetails={() => setSelectedProductId(p.id)}
+                  />
                 ))}
               </div>
+            )}
+
+            {selectedProduct && (
+              <ProductPriceSheet
+                product={selectedProduct}
+                hasPartner={priceTableData?.hasPartner ?? false}
+                open={!!selectedProductId}
+                onClose={() => setSelectedProductId(null)}
+              />
             )}
           </div>
         )}
 
         {activeTab === "tabela" && (
           <div className="space-y-6">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <button onClick={() => navigateTo("home")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Início
+              </button>
+              <ChevronRight className="w-3.5 h-3.5 opacity-40" />
+              <span className="text-foreground/80">Tabela de Preços</span>
+            </div>
             <div className="flex items-center gap-3 flex-wrap">
               {priceTableData?.hasPartner ? (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
@@ -1055,7 +1527,15 @@ export default function AnunciantePortal() {
 
         {activeTab === "perfil" && (
           <div className="rounded-xl border bg-card">
-            <div className="flex items-center justify-between p-5 border-b">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4 px-5 pt-5">
+              <button onClick={() => navigateTo("home")} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Início
+              </button>
+              <ChevronRight className="w-3.5 h-3.5 opacity-40" />
+              <span className="text-foreground/80">Meu Perfil</span>
+            </div>
+            <div className="flex items-center justify-between p-5 border-b border-t">
               <div>
                 <p className="font-semibold">Dados da Empresa</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Informações cadastrais do anunciante</p>
