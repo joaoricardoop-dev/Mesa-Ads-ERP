@@ -471,7 +471,7 @@ function AuthenticatedApp() {
 
   if (isAnunciante) {
     return (
-      <div className="h-screen flex overflow-hidden">
+      <div className="h-screen flex overflow-hidden min-h-0">
         <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)}>
           <AnuncianteRouter key={devClientIdOverride ?? "no-client"} />
         </DashboardLayout>
@@ -482,7 +482,7 @@ function AuthenticatedApp() {
 
   if (isRestaurante) {
     return (
-      <div className="h-screen flex overflow-hidden">
+      <div className="h-screen flex overflow-hidden min-h-0">
         <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)}>
           <RestauranteRouter />
         </DashboardLayout>
@@ -507,7 +507,7 @@ function AuthenticatedApp() {
   }
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <div className="h-screen flex overflow-hidden min-h-0">
       <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)} onImpersonate={setImpersonation}>
         <Router />
       </DashboardLayout>

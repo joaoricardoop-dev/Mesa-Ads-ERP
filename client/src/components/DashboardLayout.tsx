@@ -538,7 +538,7 @@ function DashboardLayoutContent({
         />
       </div>
 
-      <SidebarInset>
+      <SidebarInset className="min-h-0 overflow-hidden">
         {impersonation && (
           <div className="flex items-center justify-between px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 flex-shrink-0">
             <div className="flex items-center gap-2">
@@ -570,7 +570,7 @@ function DashboardLayoutContent({
             </button>
           </div>
         </div>
-        <main className="flex-1 overflow-hidden">{children}</main>
+        <main className="flex-1 min-h-0 overflow-y-auto">{children}</main>
       </SidebarInset>
     </>
   );
