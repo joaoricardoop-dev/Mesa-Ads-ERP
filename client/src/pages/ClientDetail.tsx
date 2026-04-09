@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -60,6 +61,9 @@ import {
   Network,
   UserPlus,
   Search,
+  Handshake,
+  ToggleRight,
+  Save,
 } from "lucide-react";
 
 const CAMPAIGN_STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof CircleDot }> = {
@@ -179,6 +183,29 @@ export default function ClientDetail() {
     { enabled: !!client?.parentId }
   );
   const { data: allClients = [] } = trpc.advertiser.list.useQuery(undefined, { enabled: linkParentOpen || linkChildOpen });
+  const { data: agencyPartners = [] } = trpc.partner.list.useQuery({ type: "agencia" });
+
+  const [portalConfig, setPortalConfig] = useState<{
+    partnerId: number | null;
+    showAgencyPricing: boolean | null;
+  }>({ partnerId: null, showAgencyPricing: null });
+
+  useEffect(() => {
+    if (client) {
+      setPortalConfig({
+        partnerId: client.partnerId ?? null,
+        showAgencyPricing: client.showAgencyPricing ?? null,
+      });
+    }
+  }, [client]);
+
+  const savePortalConfigMutation = trpc.advertiser.update.useMutation({
+    onSuccess: () => {
+      toast.success("Configurações do portal salvas.");
+      utils.advertiser.get.invalidate({ id: clientId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const linkUserMutation = trpc.advertiser.linkUser.useMutation({
     onSuccess: () => {
@@ -520,6 +547,86 @@ export default function ClientDetail() {
                 <InfoRow label="E-mail" value={client.contactEmail} icon={Mail} />
                 <InfoRow label="Telefone" value={client.contactPhone} icon={Phone} />
                 <InfoRow label="Instagram" value={client.instagram} icon={Instagram} />
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-card p-5 space-y-4 md:col-span-2">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <Handshake className="w-4 h-4 text-primary" /> Configurações do Portal do Anunciante
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Agência Parceira</Label>
+                  <p className="text-xs text-muted-foreground">Vincule uma agência a este anunciante. Usado para fins de relacionamento e como padrão de exibição de preços.</p>
+                  <Select
+                    value={portalConfig.partnerId ? String(portalConfig.partnerId) : "none"}
+                    onValueChange={(v) => setPortalConfig(prev => ({ ...prev, partnerId: v === "none" ? null : Number(v) }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sem agência vinculada" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <span className="text-muted-foreground">Sem agência vinculada</span>
+                      </SelectItem>
+                      {agencyPartners.map((p: any) => (
+                        <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <ToggleRight className="w-4 h-4 text-primary" /> Tabela de Preços no Portal
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Controla se o anunciante vê os preços com comissão de agência (+20% BV) no portal.</p>
+                  <div className="space-y-3 pt-1">
+                    <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+                      <div>
+                        <p className="text-sm font-medium">Exibir preços com comissão de agência</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {portalConfig.showAgencyPricing === null
+                            ? "Automático: segue a agência vinculada acima"
+                            : portalConfig.showAgencyPricing
+                            ? "Ativo: preços com BV de agência sempre visíveis"
+                            : "Inativo: preços sem BV de agência mesmo com agência vinculada"}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={portalConfig.showAgencyPricing === true || (portalConfig.showAgencyPricing === null && !!portalConfig.partnerId)}
+                        onCheckedChange={(checked) => setPortalConfig(prev => ({ ...prev, showAgencyPricing: checked }))}
+                      />
+                    </div>
+                    {portalConfig.showAgencyPricing !== null && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground h-7"
+                        onClick={() => setPortalConfig(prev => ({ ...prev, showAgencyPricing: null }))}
+                      >
+                        Redefinir para automático
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <Button
+                  size="sm"
+                  className="gap-2"
+                  disabled={savePortalConfigMutation.isPending}
+                  onClick={() => savePortalConfigMutation.mutate({
+                    id: clientId,
+                    partnerId: portalConfig.partnerId,
+                    showAgencyPricing: portalConfig.showAgencyPricing,
+                  })}
+                >
+                  <Save className="w-4 h-4" />
+                  {savePortalConfigMutation.isPending ? "Salvando..." : "Salvar configurações"}
+                </Button>
               </div>
             </div>
           </div>

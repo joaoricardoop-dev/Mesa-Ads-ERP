@@ -1090,6 +1090,8 @@ export const appRouter = router({
           cep: z.string().optional(),
           segment: z.string().optional(),
           status: z.enum(["active", "inactive"]).optional(),
+          partnerId: z.number().nullable().optional(),
+          showAgencyPricing: z.boolean().nullable().optional(),
         })
       )
       .mutation(({ input }) => {
@@ -2514,8 +2516,12 @@ export const appRouter = router({
         const { clients, products: productsTable, productPricingTiers, productDiscountPriceTiers } = await import("../drizzle/schema");
         const { eq, asc } = await import("drizzle-orm");
 
-        const [client] = await db.select({ partnerId: clients.partnerId }).from(clients).where(eq(clients.id, user.clientId)).limit(1);
-        const hasPartner = !!client?.partnerId;
+        const [client] = await db.select({ partnerId: clients.partnerId, showAgencyPricing: clients.showAgencyPricing }).from(clients).where(eq(clients.id, user.clientId)).limit(1);
+        const hasPartner = client?.showAgencyPricing === true
+          ? true
+          : client?.showAgencyPricing === false
+          ? false
+          : !!client?.partnerId;
 
         const visibleProducts = await db
           .select()
