@@ -5,6 +5,7 @@ import { useRestaurantAllocation, type AllocationEntry } from "@/hooks/useRestau
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/format";
+import { calcTelaImpressions, TELAS_INSERCOES } from "@/hooks/useBudgetCalculator";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -184,6 +185,7 @@ export default function QuotationPreview() {
       ratingMultiplier: r.ratingMultiplier,
       commissionPercent: r.commissionPercent,
       monthlyDrinksSold: r.monthlyDrinksSold,
+      monthlyCustomers: r.monthlyCustomers,
       status: r.status,
     })),
     [restaurantsList]
@@ -202,7 +204,20 @@ export default function QuotationPreview() {
 
   const allocCommission = allocation.isValid ? allocation.weightedCommission : undefined;
 
-  const simulator = useSimulator(selectedBudget, allocCommission, tiersForSimulator, paramsForSimulator);
+  const isTelasProduct = selectedProduct?.tipo === "telas";
+
+  const avgMonthlyCustomersForSimulator = useMemo(() => {
+    if (!isTelasProduct || !allocation.hasAllocations) return undefined;
+    const allocated = allocation.allocations.filter(a => a.coasters > 0);
+    if (allocated.length === 0) return undefined;
+    const sum = allocated.reduce((acc, a) => {
+      const rest = restaurantsForAllocation.find(r => r.id === a.restaurantId);
+      return acc + (rest?.monthlyCustomers ?? 0);
+    }, 0);
+    return Math.round(sum / allocated.length);
+  }, [isTelasProduct, allocation.hasAllocations, allocation.allocations, restaurantsForAllocation]);
+
+  const simulator = useSimulator(selectedBudget, allocCommission, tiersForSimulator, paramsForSimulator, isTelasProduct ? selectedProduct?.tipo : undefined, avgMonthlyCustomersForSimulator);
   const pr = simulator.perRestaurant;
   const ue = simulator.unitEconomics;
   const inputs = simulator.inputs;
@@ -255,6 +270,7 @@ export default function QuotationPreview() {
   const handleExportPdf = () => {
     if (selectedClientId === "none" && selectedLeadId === "none") { toast.error("Selecione um cliente ou lead antes de exportar"); return; }
     try {
+    const mc = avgMonthlyCustomersForSimulator ?? 3000;
     generateProposalPdf({
       clientName: selectedClient?.name || selectedLead?.name || "Cliente",
       clientCompany: selectedClient?.company || selectedLead?.company || undefined,
@@ -268,13 +284,20 @@ export default function QuotationPreview() {
       pricePerRestaurant: pr.sellingPrice,
       monthlyTotal: revenue,
       contractTotal: ue.contractValue,
-      includesProduction: true,
+      includesProduction: !isTelasProduct,
       hasPartnerDiscount,
       restaurants: allocatedRestaurants.map(r => ({
         name: r.name,
         neighborhood: r.neighborhood,
         coasters: r.coasters,
       })),
+      ...(isTelasProduct ? {
+        isTelas: true,
+        productName: selectedProduct?.name,
+        telasMonthlyCustomers: mc,
+        telasImpressions30s: TELAS_INSERCOES[30] * mc,
+        telasImpressions15s: TELAS_INSERCOES[15] * mc,
+      } : {}),
     });
     toast.success("PDF da proposta gerado!");
     } catch {
@@ -486,6 +509,65 @@ export default function QuotationPreview() {
                 <SummaryCard label="Valor do Contrato" value={formatCurrency(ue.contractValue)} sub={`${d} meses · Lucro: ${formatCurrency(ue.contractProfit)}`} icon={<BarChart3 className="w-3.5 h-3.5" />} accent />
               </div>
 
+              {selectedProduct?.tipo === "telas" && (
+                <div className="bg-card border border-primary/20 rounded-xl overflow-hidden">
+                  <div className="px-5 py-3 border-b border-border/20">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-primary" />
+                      Impressões por Duração de Spot
+                    </h3>
+                    <p className="text-[10px] text-muted-foreground">Fórmula: inserções/dia × clientes/mês (por restaurante)</p>
+                  </div>
+                  <div className="px-5 py-4 grid grid-cols-2 gap-4">
+                    {([30, 15] as const).map((spot) => {
+                      const customersRef = avgMonthlyCustomersForSimulator ?? 3000;
+                      const isEstimated = avgMonthlyCustomersForSimulator == null;
+                      return (
+                        <div
+                          key={spot}
+                          className={`rounded-lg border p-4 space-y-2 ${
+                            spot === 30
+                              ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/40"
+                              : "bg-violet-50 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800/40"
+                          }`}
+                        >
+                          <div className={`text-sm font-bold ${spot === 30 ? "text-blue-700 dark:text-blue-400" : "text-violet-700 dark:text-violet-400"}`}>
+                            Spot {spot}s
+                          </div>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <div className="flex justify-between">
+                              <span>Inserções/dia</span>
+                              <span className="font-mono font-semibold">{TELAS_INSERCOES[spot]}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Clientes/mês {isEstimated ? "(estimativa)" : "(média rest.)"}</span>
+                              <span className="font-mono">{formatNumber(customersRef)}</span>
+                            </div>
+                            <div className="flex justify-between border-t border-border/20 pt-1 mt-1">
+                              <span className="font-medium">Impressões/mês/rest.</span>
+                              <span className={`font-mono font-bold ${spot === 30 ? "text-blue-700 dark:text-blue-400" : "text-violet-700 dark:text-violet-400"}`}>
+                                {formatNumber(calcTelaImpressions(spot, customersRef, inputs.daysPerMonth))}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Impressões totais ({n} rest.)</span>
+                              <span className={`font-mono font-semibold ${spot === 30 ? "text-blue-700 dark:text-blue-400" : "text-violet-700 dark:text-violet-400"}`}>
+                                {formatNumber(calcTelaImpressions(spot, customersRef, inputs.daysPerMonth) * n)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {avgMonthlyCustomersForSimulator == null && (
+                    <p className="text-[10px] text-muted-foreground px-5 pb-3">
+                      * Estimativa com 3.000 clientes/mês. Aloque restaurantes acima para ver valores reais.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="bg-card border border-border/30 rounded-xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-border/20">
                   <h3 className="text-sm font-semibold">Orçamento da Cotação</h3>
@@ -636,7 +718,11 @@ export default function QuotationPreview() {
                   <ParamRow label="Restaurantes" value={String(n)} />
                   <ParamRow label="Uso Médio/Dia" value={`${inputs.usagePerDay}x`} />
                   <ParamRow label="Dias/Mês" value={String(inputs.daysPerMonth)} />
-                  <ParamRow label="Impressões/Rest./Mês" value={formatNumber(pr.impressions)} />
+                  {selectedProduct?.tipo === "telas" ? (
+                    <ParamRow label="Impressões/Rest./Mês" value="Ver painel acima" />
+                  ) : (
+                    <ParamRow label="Impressões/Rest./Mês" value={formatNumber(pr.impressions)} />
+                  )}
                   <ParamRow label={`Total ${selectedProduct?.unitLabelPlural ? selectedProduct.unitLabelPlural.charAt(0).toUpperCase() + selectedProduct.unitLabelPlural.slice(1) : "Coasters"}`} value={formatNumber(totalCoasters)} />
                   <ParamRow label={inputs.pricingType === "variable" ? "Markup" : "Preço Fixo"} value={inputs.pricingType === "variable" ? `${inputs.markupPercent}%` : formatCurrency(inputs.fixedPrice)} />
                   <ParamRow label="Duração" value={`${d} meses`} />

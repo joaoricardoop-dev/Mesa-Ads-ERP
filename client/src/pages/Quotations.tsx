@@ -703,12 +703,23 @@ export default function Quotations() {
                                   ? fetchedItems.map(item => {
                                       const semanasMatch = item.notes?.match(/(\d+)sem/);
                                       const itemSemanas = semanasMatch ? parseInt(semanasMatch[1]) : duration * 4;
+                                      const spotMatch = item.notes?.match(/Spot(30|15)s/);
+                                      const insMatch = item.notes?.match(/(\d+)ins\/dia/);
+                                      const cliMatch = item.notes?.match(/(\d+)cli\/mês/);
+                                      const spotSec = spotMatch ? (parseInt(spotMatch[1]) as 15 | 30) : null;
+                                      const insPerDay = insMatch ? parseInt(insMatch[1]) : null;
+                                      const monthlyClients = cliMatch ? parseInt(cliMatch[1]) : null;
+                                      const impressionsPerRestaurant = (insPerDay !== null && monthlyClients !== null)
+                                        ? insPerDay * monthlyClients
+                                        : undefined;
                                       return {
                                         productName: item.productName,
                                         volume: Number(item.quantity),
                                         semanas: itemSemanas,
                                         unitPrice: Number(item.unitPrice || 0),
                                         totalPrice: Number(item.totalPrice || 0),
+                                        spotSeconds: spotSec,
+                                        impressionsPerRestaurant,
                                       };
                                     })
                                   : undefined;

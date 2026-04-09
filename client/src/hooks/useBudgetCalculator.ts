@@ -197,6 +197,30 @@ export function calcBudgetTotals(
   return { subtotalPostDuration, ajPagPerc, ajPagamentoVal, descParceiroPerc, descParceiroVal, descManualPerc, descManualVal, total, agencyBVVal, totalFinal };
 }
 
+// ─── Telas Impressions ─────────────────────────────────────────────────────────
+
+/** Inserções por dia conforme duração do spot */
+export const TELAS_INSERCOES: Record<15 | 30, number> = {
+  30: 50,
+  15: 100,
+};
+
+/**
+ * Calcula impressões mensais para produtos do tipo `telas`.
+ * Fórmula: inserções/dia × visitantes/dia × dias/mês
+ * onde visitantes/dia = monthlyCustomers / daysPerMonth
+ */
+export function calcTelaImpressions(
+  spotSeconds: 15 | 30,
+  monthlyCustomers: number,
+  daysPerMonth: number,
+): number {
+  if (daysPerMonth <= 0) return 0;
+  const insertionsPerDay = TELAS_INSERCOES[spotSeconds];
+  const visitorsPerDay = monthlyCustomers / daysPerMonth;
+  return insertionsPerDay * visitorsPerDay * daysPerMonth;
+}
+
 // ─── Formatting ────────────────────────────────────────────────────────────────
 
 export function fmtBRL(value: number): string {

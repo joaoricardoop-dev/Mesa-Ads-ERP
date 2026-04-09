@@ -20,6 +20,7 @@ interface KPICardsProps {
   contractDuration: number;
   coastersPerRestaurant: number;
   minMargin: number;
+  isTelas?: boolean;
 }
 
 function KPICard({
@@ -93,6 +94,7 @@ export default function KPICards({
   contractDuration,
   coastersPerRestaurant,
   minMargin,
+  isTelas = false,
 }: KPICardsProps) {
   const totalImpressionsMonth = perRestaurant.impressions * activeRestaurants;
 
@@ -135,17 +137,21 @@ export default function KPICards({
       <KPICard
         label="Impressões / Mês"
         value={formatNumber(totalImpressionsMonth)}
-        sub={`${formatNumber(perRestaurant.impressions)} / rest.`}
+        sub={isTelas
+          ? `${formatNumber(perRestaurant.impressions)} impres./rest.`
+          : `${formatNumber(perRestaurant.impressions)} / rest.`}
         icon={<Eye className="w-3.5 h-3.5" />}
         delay={0.2}
       />
-      <KPICard
-        label="Coasters Totais"
-        value={formatNumber(coastersPerRestaurant * activeRestaurants)}
-        sub={`${formatNumber(coastersPerRestaurant)} / rest.`}
-        icon={<Package className="w-3.5 h-3.5" />}
-        delay={0.25}
-      />
+      {!isTelas && (
+        <KPICard
+          label="Coasters Totais"
+          value={formatNumber(coastersPerRestaurant * activeRestaurants)}
+          sub={`${formatNumber(coastersPerRestaurant)} / rest.`}
+          icon={<Package className="w-3.5 h-3.5" />}
+          delay={0.25}
+        />
+      )}
       <KPICard
         label="Restaurantes"
         value={String(activeRestaurants)}

@@ -8,6 +8,9 @@ interface ProposalItem {
   semanas: number;
   unitPrice: number;
   totalPrice: number;
+  spotSeconds?: 15 | 30 | null;
+  impressionsPerRestaurant?: number;
+  numRestaurants?: number;
 }
 
 interface ProposalPDFData {
@@ -51,6 +54,11 @@ interface ProposalPDFData {
   customPartnerCommission?: number;
   customSellerCommission?: number;
   customFinalPrice?: number;
+  /** Telas (screen/TV) product fields */
+  isTelas?: boolean;
+  telasMonthlyCustomers?: number;
+  telasImpressions30s?: number;
+  telasImpressions15s?: number;
 }
 
 const FONT_NAME = "HostGrotesk";
@@ -360,50 +368,73 @@ export function generateProposalPdf(data: ProposalPDFData) {
     const bvScaleFactor = (data.agencyCommissionPercent ?? 0) > 0 && rawItemsTotal > 0
       ? contractTotal / rawItemsTotal
       : 1;
+    const hasTelasItems = items.some(i => i.spotSeconds !== null && i.spotSeconds !== undefined);
 
-    autoTable(doc, {
-      startY: y,
-      head: [["Produto", "Duração", "Volume", "Preço/un.", "Total"]],
-      body: items.map(item => [
-        item.productName,
-        `${item.semanas} sem.`,
-        fmtNumber(item.volume) + " un.",
-        isBonificada ? "—" : `R$ ${(item.unitPrice * bvScaleFactor).toFixed(4)}`,
-        isBonificada ? "Bonificado" : fmtCurrency(item.totalPrice * bvScaleFactor),
-      ]),
-      foot: [[
-        `${items.length} produto${items.length !== 1 ? "s" : ""}`,
-        "",
-        fmtNumber(totalVolume) + " un.",
-        "",
-        isBonificada ? "R$ 0,00" : fmtCurrency(contractTotal),
-      ]],
-      theme: "grid",
-      styles: { font: FONT_NAME, fontSize: 8 },
-      headStyles: {
-        fillColor: [...BLACK],
-        textColor: [...WHITE],
-        fontSize: 8,
-        fontStyle: "bold",
-        font: FONT_NAME,
-      },
-      bodyStyles: { textColor: [40, 40, 40], font: FONT_NAME },
-      footStyles: {
-        fillColor: [...LIGHT_GRAY],
-        textColor: [...BLACK],
-        fontSize: 8,
-        fontStyle: "bold",
-        font: FONT_NAME,
-      },
-      alternateRowStyles: { fillColor: [250, 250, 250] },
-      margin: { left: margin, right: margin },
-      columnStyles: {
-        1: { halign: "center", cellWidth: 22 },
-        2: { halign: "right", cellWidth: 28 },
-        3: { halign: "right", cellWidth: 28 },
-        4: { halign: "right", fontStyle: "bold", cellWidth: 32 },
-      },
-    });
+    if (hasTelasItems) {
+      autoTable(doc, {
+        startY: y,
+        head: [["Produto", "Duração", "Spot", "Impressões/Rest./Mês", "Total"]],
+        body: items.map(item => [
+          item.productName,
+          `${item.semanas} sem.`,
+          item.spotSeconds ? `${item.spotSeconds}s` : "—",
+          item.impressionsPerRestaurant !== undefined ? fmtNumber(item.impressionsPerRestaurant) : "—",
+          isBonificada ? "Bonificado" : fmtCurrency(item.totalPrice * bvScaleFactor),
+        ]),
+        foot: [[
+          `${items.length} produto${items.length !== 1 ? "s" : ""}`,
+          "",
+          "",
+          "",
+          isBonificada ? "R$ 0,00" : fmtCurrency(contractTotal),
+        ]],
+        theme: "grid",
+        styles: { font: FONT_NAME, fontSize: 8 },
+        headStyles: { fillColor: [...BLACK], textColor: [...WHITE], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
+        bodyStyles: { textColor: [40, 40, 40], font: FONT_NAME },
+        footStyles: { fillColor: [...LIGHT_GRAY], textColor: [...BLACK], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
+        alternateRowStyles: { fillColor: [250, 250, 250] },
+        margin: { left: margin, right: margin },
+        columnStyles: {
+          1: { halign: "center", cellWidth: 20 },
+          2: { halign: "center", cellWidth: 16 },
+          3: { halign: "right", cellWidth: 42 },
+          4: { halign: "right", fontStyle: "bold", cellWidth: 32 },
+        },
+      });
+    } else {
+      autoTable(doc, {
+        startY: y,
+        head: [["Produto", "Duração", "Volume", "Preço/un.", "Total"]],
+        body: items.map(item => [
+          item.productName,
+          `${item.semanas} sem.`,
+          fmtNumber(item.volume) + " un.",
+          isBonificada ? "—" : `R$ ${(item.unitPrice * bvScaleFactor).toFixed(4)}`,
+          isBonificada ? "Bonificado" : fmtCurrency(item.totalPrice * bvScaleFactor),
+        ]),
+        foot: [[
+          `${items.length} produto${items.length !== 1 ? "s" : ""}`,
+          "",
+          fmtNumber(totalVolume) + " un.",
+          "",
+          isBonificada ? "R$ 0,00" : fmtCurrency(contractTotal),
+        ]],
+        theme: "grid",
+        styles: { font: FONT_NAME, fontSize: 8 },
+        headStyles: { fillColor: [...BLACK], textColor: [...WHITE], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
+        bodyStyles: { textColor: [40, 40, 40], font: FONT_NAME },
+        footStyles: { fillColor: [...LIGHT_GRAY], textColor: [...BLACK], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
+        alternateRowStyles: { fillColor: [250, 250, 250] },
+        margin: { left: margin, right: margin },
+        columnStyles: {
+          1: { halign: "center", cellWidth: 22 },
+          2: { halign: "right", cellWidth: 28 },
+          3: { halign: "right", cellWidth: 28 },
+          4: { halign: "right", fontStyle: "bold", cellWidth: 32 },
+        },
+      });
+    }
 
     y = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y + 40;
     y += 8;
@@ -421,17 +452,39 @@ export function generateProposalPdf(data: ProposalPDFData) {
     y = checkPageBreak(doc, y, 60);
     y = drawSectionTitle(doc, "DESCRIÇÃO DO SERVIÇO", y, margin);
 
-    y = drawInfoRow(doc, "Formato:", `${prodName} (frente e verso)`, y, margin);
-    y = drawInfoRow(doc, "Volume total:", `${fmtNumber(data.coasterVolume)} ${unitLabel}/mês`, y, margin);
-    if (data.numRestaurants > 0) {
-      y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurante${data.numRestaurants !== 1 ? "s" : ""} parceiro${data.numRestaurants !== 1 ? "s" : ""}`, y, margin);
-      y = drawInfoRow(doc, "Por restaurante:", `${fmtNumber(data.coastersPerRestaurant)} ${unitLabel}/mês`, y, margin);
+    if (data.isTelas) {
+      y = drawInfoRow(doc, "Formato:", `${prodName}`, y, margin);
+      if (data.numRestaurants > 0) {
+        y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurante${data.numRestaurants !== 1 ? "s" : ""} parceiro${data.numRestaurants !== 1 ? "s" : ""}`, y, margin);
+      } else {
+        y = drawInfoRow(doc, "Distribuição:", "A definir", y, margin);
+      }
+      y = drawInfoRow(doc, "Duração:", `${data.contractDuration} ${data.contractDuration === 1 ? "mês" : "meses"}`, y, margin);
+      y += 4;
+      y = checkPageBreak(doc, y, 40);
+      y = drawSectionTitle(doc, "OPÇÕES DE SPOT E IMPRESSÕES", y, margin);
+      if (data.telasMonthlyCustomers) {
+        y = drawInfoRow(doc, "Consumidores/mês (média):", `${fmtNumber(data.telasMonthlyCustomers)} clientes`, y, margin);
+      }
+      if (data.telasImpressions30s !== undefined) {
+        y = drawInfoRow(doc, "Spot 30s (50 inserções/dia):", `${fmtNumber(data.telasImpressions30s)} impressões/mês/restaurante`, y, margin);
+      }
+      if (data.telasImpressions15s !== undefined) {
+        y = drawInfoRow(doc, "Spot 15s (100 inserções/dia):", `${fmtNumber(data.telasImpressions15s)} impressões/mês/restaurante`, y, margin);
+      }
     } else {
-      y = drawInfoRow(doc, "Distribuição:", "A definir", y, margin);
-    }
-    y = drawInfoRow(doc, "Duração:", `${data.contractDuration} ${data.contractDuration === 1 ? "mês" : "meses"}`, y, margin);
-    if (data.includesProduction) {
-      y = drawInfoRow(doc, "Produção:", "Inclusa no valor", y, margin);
+      y = drawInfoRow(doc, "Formato:", `${prodName} (frente e verso)`, y, margin);
+      y = drawInfoRow(doc, "Volume total:", `${fmtNumber(data.coasterVolume)} ${unitLabel}/mês`, y, margin);
+      if (data.numRestaurants > 0) {
+        y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurante${data.numRestaurants !== 1 ? "s" : ""} parceiro${data.numRestaurants !== 1 ? "s" : ""}`, y, margin);
+        y = drawInfoRow(doc, "Por restaurante:", `${fmtNumber(data.coastersPerRestaurant)} ${unitLabel}/mês`, y, margin);
+      } else {
+        y = drawInfoRow(doc, "Distribuição:", "A definir", y, margin);
+      }
+      y = drawInfoRow(doc, "Duração:", `${data.contractDuration} ${data.contractDuration === 1 ? "mês" : "meses"}`, y, margin);
+      if (data.includesProduction) {
+        y = drawInfoRow(doc, "Produção:", "Inclusa no valor", y, margin);
+      }
     }
   }
 

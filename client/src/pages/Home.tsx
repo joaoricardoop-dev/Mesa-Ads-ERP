@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useSimulator, type BudgetOption, loadSavedBudgetId, saveBudgetId } from "@/hooks/useSimulator";
+import { TELAS_INSERCOES } from "@/hooks/useBudgetCalculator";
 import { useRestaurantAllocation } from "@/hooks/useRestaurantAllocation";
 import { trpc } from "@/lib/trpc";
 import { Label } from "@/components/ui/label";
@@ -87,6 +88,9 @@ export default function Home() {
   const [numArts, setNumArts] = useState<number>(1);
   const [paramsOpen, setParamsOpen] = useState(true);
   const [goalSeekOpen, setGoalSeekOpen] = useState(false);
+  const [simulatorProductTipo, setSimulatorProductTipo] = useState<"coasters" | "telas">("coasters");
+  const [simulatorSpotSeconds, setSimulatorSpotSeconds] = useState<15 | 30>(30);
+  const [simulatorAvgMonthlyCustomers, setSimulatorAvgMonthlyCustomers] = useState<number>(3000);
   const [targetMargin, setTargetMargin] = useState("35");
   const [goalResult, setGoalResult] = useState<{ markup: number } | { error: string } | null>(null);
 
@@ -146,7 +150,16 @@ export default function Home() {
 
   const [allocCommission, setAllocCommission] = useState<number | undefined>();
 
-  const simulator = useSimulator(selectedBudget, allocCommission);
+  const isTelasSimulator = simulatorProductTipo === "telas";
+  const simulator = useSimulator(
+    selectedBudget,
+    allocCommission,
+    undefined,
+    undefined,
+    isTelasSimulator ? "telas" : undefined,
+    isTelasSimulator ? simulatorAvgMonthlyCustomers : undefined,
+    isTelasSimulator ? simulatorSpotSeconds : undefined,
+  );
 
   const totalCoasters =
     simulator.inputs.coastersPerRestaurant * simulator.inputs.activeRestaurants;
@@ -267,11 +280,16 @@ export default function Home() {
                   <span className="text-xs font-semibold text-primary uppercase tracking-wider">Operacional</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <CompactField label="Coasters / restaurante">
-                  <div className="flex items-center gap-1.5">
-                    <Input type="number" value={inputs.coastersPerRestaurant} onChange={(e) => updateInput("coastersPerRestaurant", Number(e.target.value))} className="font-mono text-sm bg-background/50 border-border/50 h-8 tabular-nums" min={50} max={5000} step={50} />
-                    <span className="text-[10px] text-muted-foreground">un</span>
-                  </div>
+                <CompactField label="Tipo de Produto">
+                  <Select value={simulatorProductTipo} onValueChange={(v) => setSimulatorProductTipo(v as "coasters" | "telas")}>
+                    <SelectTrigger className="bg-background/50 border-border/50 h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="coasters">Coasters</SelectItem>
+                      <SelectItem value="telas">Telas (TV)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </CompactField>
                 <CompactField label="Restaurantes ativos">
                   <div className="space-y-1">
@@ -281,18 +299,48 @@ export default function Home() {
                     <Slider value={[inputs.activeRestaurants]} onValueChange={([v]) => updateInput("activeRestaurants", v)} min={1} max={100} step={1} />
                   </div>
                 </CompactField>
-                <CompactField label="Uso médio / dia">
-                  <div className="flex items-center gap-1.5">
-                    <Input type="number" value={inputs.usagePerDay} onChange={(e) => updateInput("usagePerDay", Number(e.target.value))} className="font-mono text-sm bg-background/50 border-border/50 h-8 tabular-nums" min={1} max={20} />
-                    <span className="text-[10px] text-muted-foreground">×</span>
-                  </div>
-                </CompactField>
-                <CompactField label="Dias / mês">
-                  <div className="flex items-center gap-1.5">
-                    <Input type="number" value={inputs.daysPerMonth} onChange={(e) => updateInput("daysPerMonth", Number(e.target.value))} className="font-mono text-sm bg-background/50 border-border/50 h-8 tabular-nums" min={1} max={31} />
-                    <span className="text-[10px] text-muted-foreground">dias</span>
-                  </div>
-                </CompactField>
+                {isTelasSimulator ? (
+                  <>
+                    <CompactField label="Spot">
+                      <Select value={String(simulatorSpotSeconds)} onValueChange={(v) => setSimulatorSpotSeconds(Number(v) as 15 | 30)}>
+                        <SelectTrigger className="bg-background/50 border-border/50 h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="30">30s ({TELAS_INSERCOES[30]} ins/dia)</SelectItem>
+                          <SelectItem value="15">15s ({TELAS_INSERCOES[15]} ins/dia)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </CompactField>
+                    <CompactField label="Clientes / mês">
+                      <div className="flex items-center gap-1.5">
+                        <Input type="number" value={simulatorAvgMonthlyCustomers} onChange={(e) => setSimulatorAvgMonthlyCustomers(Number(e.target.value))} className="font-mono text-sm bg-background/50 border-border/50 h-8 tabular-nums" min={0} step={100} />
+                        <span className="text-[10px] text-muted-foreground">cli</span>
+                      </div>
+                    </CompactField>
+                  </>
+                ) : (
+                  <>
+                    <CompactField label="Coasters / restaurante">
+                      <div className="flex items-center gap-1.5">
+                        <Input type="number" value={inputs.coastersPerRestaurant} onChange={(e) => updateInput("coastersPerRestaurant", Number(e.target.value))} className="font-mono text-sm bg-background/50 border-border/50 h-8 tabular-nums" min={50} max={5000} step={50} />
+                        <span className="text-[10px] text-muted-foreground">un</span>
+                      </div>
+                    </CompactField>
+                    <CompactField label="Uso médio / dia">
+                      <div className="flex items-center gap-1.5">
+                        <Input type="number" value={inputs.usagePerDay} onChange={(e) => updateInput("usagePerDay", Number(e.target.value))} className="font-mono text-sm bg-background/50 border-border/50 h-8 tabular-nums" min={1} max={20} />
+                        <span className="text-[10px] text-muted-foreground">×</span>
+                      </div>
+                    </CompactField>
+                    <CompactField label="Dias / mês">
+                      <div className="flex items-center gap-1.5">
+                        <Input type="number" value={inputs.daysPerMonth} onChange={(e) => updateInput("daysPerMonth", Number(e.target.value))} className="font-mono text-sm bg-background/50 border-border/50 h-8 tabular-nums" min={1} max={31} />
+                        <span className="text-[10px] text-muted-foreground">dias</span>
+                      </div>
+                    </CompactField>
+                  </>
+                )}
                 </div>
               </div>
 
@@ -563,6 +611,7 @@ export default function Home() {
           contractDuration={simulator.inputs.contractDuration}
           coastersPerRestaurant={simulator.inputs.coastersPerRestaurant}
           minMargin={simulator.inputs.minMargin}
+          isTelas={isTelasSimulator}
         />
 
         <SimulatorDRE

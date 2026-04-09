@@ -205,6 +205,7 @@ export async function getCampaign(id: number) {
     .select({
       campaign: campaigns,
       productName: products.name,
+      productTipo: products.tipo,
       quotationTotalValue: quotations.totalValue,
       quotationCoasterVolume: quotations.coasterVolume,
       quotationUnitPrice: quotations.unitPrice,
@@ -227,6 +228,7 @@ export async function getCampaign(id: number) {
   return {
     ...result[0].campaign,
     productName: result[0].productName,
+    productTipo: result[0].productTipo,
     quotationTotalValue: result[0].quotationTotalValue,
     quotationCoasterVolume: result[0].quotationCoasterVolume,
     quotationUnitPrice: result[0].quotationUnitPrice,
@@ -281,6 +283,7 @@ export async function getCampaignRestaurants(campaignId: number) {
       restaurantName: restaurants.name,
       restaurantNeighborhood: restaurants.neighborhood,
       restaurantCommission: restaurants.commissionPercent,
+      restaurantMonthlyCustomers: restaurants.monthlyCustomers,
       ratingScore: activeRestaurants.ratingScore,
       ratingTier: activeRestaurants.ratingTier,
       ratingMultiplier: activeRestaurants.ratingMultiplier,
@@ -849,9 +852,13 @@ export async function getRestaurantCampaigns(restaurantId: number) {
       daysPerMonth: campaigns.daysPerMonth,
       activeRestaurants: campaigns.activeRestaurants,
       isBonificada: campaigns.isBonificada,
+      productTipo: products.tipo,
+      restaurantMonthlyCustomers: restaurants.monthlyCustomers,
     })
     .from(campaignRestaurants)
     .leftJoin(campaigns, eq(campaigns.id, campaignRestaurants.campaignId))
+    .leftJoin(products, eq(products.id, campaigns.productId))
+    .leftJoin(restaurants, eq(restaurants.id, campaignRestaurants.restaurantId))
     .where(eq(campaignRestaurants.restaurantId, restaurantId))
     .orderBy(desc(campaigns.startDate));
 

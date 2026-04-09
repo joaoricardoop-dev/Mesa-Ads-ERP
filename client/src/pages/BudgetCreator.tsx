@@ -22,6 +22,8 @@ import {
   fmtBRL,
   fmtBRL4,
   DEFAULT_PREMISSAS,
+  calcTelaImpressions,
+  TELAS_INSERCOES,
   type GlobalBudgetParams,
   type ItemPricingInput,
   type ItemCalcResult,
@@ -60,6 +62,9 @@ interface BudgetItemState {
   customValues?: CustomProductValues;
   discountPriceTiers?: DiscountPriceTier[];
   isBonificada?: boolean;
+  spotSeconds?: 15 | 30 | null;
+  monthlyCustomers?: number;
+  daysPerMonth?: number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -228,12 +233,14 @@ interface BudgetItemCardProps {
   globalParams: GlobalBudgetParams;
   onUpdate: (id: string, patch: Partial<BudgetItemState>) => void;
   onRemove: (id: string) => void;
+  onAddTelasDual?: (itemId: string, baseItem: Partial<BudgetItemState>) => void;
   index: number;
+  defaultDaysPerMonth?: number;
 }
 
 const SEMANAS_OPTIONS = [4, 8, 12, 16, 20, 24];
 
-function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, index }: BudgetItemCardProps) {
+function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, onAddTelasDual, index, defaultDaysPerMonth = 26 }: BudgetItemCardProps) {
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
   const [pricingOpen, setPricingOpen] = useState(false);
@@ -244,6 +251,15 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
   const isPriceBased = item.pricingMode === "price_based";
   const isFixedQty = item.entryType === "fixed_quantities";
   const isDisplayBatch = selectedProduct?.tipo === "telas" || selectedProduct?.tipo === "display";
+  const isTelas = selectedProduct?.tipo === "telas";
+
+  const telaImpressions = useMemo(() => {
+    if (!isTelas || !item.spotSeconds) return null;
+    const mc = item.monthlyCustomers ?? 0;
+    const dp = item.daysPerMonth ?? defaultDaysPerMonth;
+    if (mc <= 0) return null;
+    return calcTelaImpressions(item.spotSeconds, mc, dp);
+  }, [isTelas, item.spotSeconds, item.monthlyCustomers, item.daysPerMonth, defaultDaysPerMonth]);
 
   const { data: tiersRaw, isLoading: tiersLoading } = trpc.product.getTiers.useQuery(
     { productId: item.productId! },
@@ -334,6 +350,17 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                 {isDisplayBatch ? `${item.semanas / 4}bt` : `${item.semanas}sem`}
               </Badge>
             )}
+            {isTelas && item.spotSeconds && (
+              <Badge
+                className={`text-[10px] h-5 px-1.5 font-bold ${
+                  item.spotSeconds === 30
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800"
+                    : "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 border-violet-200 dark:border-violet-800"
+                }`}
+              >
+                Spot {item.spotSeconds}s
+              </Badge>
+            )}
             {item.isBonificada && !globalParams.isBonificada && (
               <Badge className="text-[10px] h-5 px-1.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800">
                 Bonif.
@@ -395,7 +422,7 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                   comissaoRestaurante: parseFloat(prod?.comRestaurante ?? "") || DEFAULT_PREMISSAS.comissaoRestaurante,
                   comissaoComercial: parseFloat(prod?.comComercial ?? "") || DEFAULT_PREMISSAS.comissaoComercial,
                 };
-                onUpdate(item.id, {
+                const baseItemPatch: Partial<BudgetItemState> = {
                   productId: pid,
                   productName: prod?.name ?? "",
                   pricingMode: (prod?.pricingMode as "cost_based" | "price_based") ?? "cost_based",
@@ -407,7 +434,12 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                   isCustomProduct: false,
                   customValues: undefined,
                   premissas: prodPremissas,
-                });
+                };
+                if (prod?.tipo === "telas" && onAddTelasDual) {
+                  onAddTelasDual(item.id, baseItemPatch);
+                } else {
+                  onUpdate(item.id, baseItemPatch);
+                }
               }}
             >
               <SelectTrigger className="h-9 text-sm">
@@ -514,6 +546,48 @@ function BudgetItemCard({ item, productsList, globalParams, onUpdate, onRemove, 
                   className="h-9 text-sm"
                 />
               </div>
+            </div>
+          )}
+
+          {/* Telas: Clientes/mês, dias/mês e impressões calculadas */}
+          {isTelas && item.spotSeconds && !item.isCustomProduct && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Clientes/mês</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={item.monthlyCustomers ?? ""}
+                    onChange={(e) => onUpdate(item.id, { monthlyCustomers: parseInt(e.target.value) || 0 })}
+                    className="h-9 text-sm"
+                    placeholder="Ex: 3000"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Dias/mês</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={item.daysPerMonth ?? defaultDaysPerMonth}
+                    onChange={(e) => onUpdate(item.id, { daysPerMonth: parseInt(e.target.value) || 26 })}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              </div>
+              {telaImpressions !== null && (
+                <div className={`rounded-md px-3 py-2 text-xs border ${
+                  item.spotSeconds === 30
+                    ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/40 text-blue-800 dark:text-blue-300"
+                    : "bg-violet-50 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800/40 text-violet-800 dark:text-violet-300"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Inserções/dia: {TELAS_INSERCOES[item.spotSeconds]}</span>
+                    <span className="font-bold font-mono">{Math.round(telaImpressions).toLocaleString("pt-BR")} impressões/mês</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -956,6 +1030,12 @@ export default function BudgetCreator() {
   const productsList = useMemo(() => (productsRaw ?? []) as { id: number; name: string; defaultSemanas?: number | null; tipo?: string | null; temDistribuicaoPorLocal?: boolean | null; pricingMode?: string | null; entryType?: string | null; irpj?: string | null; comRestaurante?: string | null; comComercial?: string | null }[], [productsRaw]);
 
   const { data: partnersList = [] } = trpc.partner.list.useQuery();
+  const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
+  const networkAvgMonthlyCustomers = useMemo(() => {
+    const withData = restaurantsList.filter((r: any) => r.monthlyCustomers && r.monthlyCustomers > 0);
+    if (withData.length === 0) return 3000;
+    return Math.round(withData.reduce((sum: number, r: any) => sum + r.monthlyCustomers, 0) / withData.length);
+  }, [restaurantsList]);
 
   const createQuotation = trpc.quotation.create.useMutation();
   const addItem = trpc.quotation.addItem.useMutation();
@@ -993,6 +1073,34 @@ export default function BudgetCreator() {
       return next.length === 0 ? [makeBlankItem()] : next;
     });
   }, []);
+
+  const addTelasDual = useCallback((itemId: string, baseItemPatch: Partial<BudgetItemState>) => {
+    setItems((prev) => {
+      const idx = prev.findIndex((item) => item.id === itemId);
+      if (idx === -1) return prev;
+      const defaultMC = prev[idx].monthlyCustomers ?? networkAvgMonthlyCustomers;
+      const item30: BudgetItemState = {
+        ...prev[idx],
+        ...baseItemPatch,
+        id: makeItemId(),
+        productName: `${baseItemPatch.productName ?? prev[idx].productName} — Spot 30s`,
+        spotSeconds: 30,
+        monthlyCustomers: baseItemPatch.monthlyCustomers ?? defaultMC,
+      };
+      const item15: BudgetItemState = {
+        ...prev[idx],
+        ...baseItemPatch,
+        id: makeItemId(),
+        productName: `${baseItemPatch.productName ?? prev[idx].productName} — Spot 15s`,
+        spotSeconds: 15,
+        monthlyCustomers: baseItemPatch.monthlyCustomers ?? defaultMC,
+      };
+      const next = [...prev];
+      next.splice(idx, 1, item30, item15);
+      toast.success(`"${baseItemPatch.productName}" adicionado como Spot 30s e Spot 15s`);
+      return next;
+    });
+  }, [networkAvgMonthlyCustomers]);
 
   const addNewItem = useCallback(() => {
     setItems((prev) => [...prev, makeBlankItem()]);
@@ -1148,12 +1256,15 @@ export default function BudgetCreator() {
           const unitPrice = input.volume > 0 ? itemTotal / input.volume : 0;
           const unitPriceFinal = unitPrice.toFixed(4);
 
+          const telasMeta = item.spotSeconds
+            ? ` · Spot${item.spotSeconds}s · ${TELAS_INSERCOES[item.spotSeconds]}ins/dia · ${item.monthlyCustomers ?? 0}cli/mês`
+            : "";
           await addItem.mutateAsync({
             quotationId: quotation.id,
             productId: item.productId!,
             quantity: input.volume,
             unitPrice: unitPriceFinal,
-            notes: `${item.productName} · ${item.semanas}sem`,
+            notes: `${item.productName} · ${item.semanas}sem${telasMeta}`,
             bonificada: isItemBonif,
           });
         }
@@ -1376,6 +1487,7 @@ export default function BudgetCreator() {
                   globalParams={globalParams}
                   onUpdate={updateItem}
                   onRemove={removeItem}
+                  onAddTelasDual={addTelasDual}
                   index={idx}
                 />
               ))}

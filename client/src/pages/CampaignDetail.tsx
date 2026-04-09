@@ -27,6 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
+
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Legend,
@@ -71,6 +72,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { calcTelaImpressions, TELAS_INSERCOES } from "@/hooks/useBudgetCalculator";
 
 const CARRIER_SLUGS: Record<string, string> = {
   latam: "latam", "latam cargo": "latam", ltm: "latam",
@@ -180,12 +182,18 @@ function calcCampaignPricing(c: {
   batchSize: number;
   batchCost: string | number;
   freightCost?: string | number | null;
+  productTipo?: string | null;
+  avgMonthlyCustomers?: number | null;
 }) {
   const n = c.activeRestaurants;
   const coasters = c.coastersPerRestaurant;
   const unitCost = Number(c.batchCost) / c.batchSize;
   const productionCostPerRest = coasters * unitCost;
-  const impressionsPerRest = coasters * c.usagePerDay * c.daysPerMonth;
+  const isTelas = c.productTipo === "telas";
+  const spotSecondsFromUsage: 15 | 30 = c.usagePerDay === TELAS_INSERCOES[15] ? 15 : 30;
+  const impressionsPerRest = isTelas
+    ? calcTelaImpressions(spotSecondsFromUsage, c.avgMonthlyCustomers ?? 0, c.daysPerMonth)
+    : coasters * c.usagePerDay * c.daysPerMonth;
   const sellerRate = Number(c.sellerCommission) / 100;
   const taxRateDecimal = Number(c.taxRate) / 100;
   const freightPerRest = n > 0 ? Number(c.freightCost || 0) / n : 0;
@@ -720,8 +728,15 @@ export default function CampaignDetail() {
     return campaign.coastersPerRestaurant;
   })();
 
+  // Average monthly customers across configured restaurants with valid data (for telas impression formula)
+  const avgMonthlyCustomers = (() => {
+    const withData = campaignRestaurants.filter(r => (r.restaurantMonthlyCustomers ?? 0) > 0);
+    if (withData.length === 0) return 0;
+    return Math.round(withData.reduce((sum, r) => sum + (r.restaurantMonthlyCustomers ?? 0), 0) / withData.length);
+  })();
+
   // pBase uses the effective per-restaurant coaster count for accurate production cost
-  const pBase = calcCampaignPricing({ ...campaign, coastersPerRestaurant: effectiveCoastersPerRest });
+  const pBase = calcCampaignPricing({ ...campaign, coastersPerRestaurant: effectiveCoastersPerRest, productTipo: campaign.productTipo, avgMonthlyCustomers });
 
   let p: typeof pBase;
   if (hasQuotationRevenue) {
@@ -2736,7 +2751,9 @@ export default function CampaignDetail() {
                 <div className="bg-card border border-border/30 rounded-lg p-3 text-center">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Impressões/Mês</p>
                   <p className="text-lg font-bold font-mono mt-1">
-                    {campaignRestaurants.reduce((sum, r) => sum + r.coastersCount * r.usagePerDay * campaign.daysPerMonth, 0).toLocaleString("pt-BR")}
+                    {campaign.productTipo === "telas"
+                      ? campaignRestaurants.reduce((sum, r) => sum + r.usagePerDay * (r.restaurantMonthlyCustomers ?? 0), 0).toLocaleString("pt-BR")
+                      : campaignRestaurants.reduce((sum, r) => sum + r.coastersCount * r.usagePerDay * campaign.daysPerMonth, 0).toLocaleString("pt-BR")}
                   </p>
                 </div>
               </div>
@@ -2764,8 +2781,10 @@ export default function CampaignDetail() {
                     </thead>
                     <tbody>
                       {campaignRestaurants.map((r) => {
-                        const impressions = r.coastersCount * r.usagePerDay * campaign.daysPerMonth;
-                        const restPricing = calcCampaignPricing({ ...campaign, coastersPerRestaurant: r.coastersCount, usagePerDay: r.usagePerDay, activeRestaurants: 1 });
+                        const impressions = campaign.productTipo === "telas"
+                          ? r.usagePerDay * (r.restaurantMonthlyCustomers ?? 0)
+                          : r.coastersCount * r.usagePerDay * campaign.daysPerMonth;
+                        const restPricing = calcCampaignPricing({ ...campaign, coastersPerRestaurant: r.coastersCount, usagePerDay: r.usagePerDay, activeRestaurants: 1, productTipo: campaign.productTipo, avgMonthlyCustomers: r.restaurantMonthlyCustomers });
                         return (
                           <tr key={r.id} className="border-b border-border/10 hover:bg-muted/5">
                             <td className="p-3 text-sm font-medium">{r.restaurantName || `Rest. #${r.restaurantId}`}</td>
@@ -2794,7 +2813,10 @@ export default function CampaignDetail() {
                         <td className="p-3 text-sm font-mono font-semibold text-right">{totalCoastersDistributed.toLocaleString("pt-BR")}</td>
                         <td className="p-3"></td>
                         <td className="p-3 text-sm font-mono font-semibold text-right">
-                          {campaignRestaurants.reduce((sum, r) => sum + r.coastersCount * r.usagePerDay * campaign.daysPerMonth, 0).toLocaleString("pt-BR")}
+                          {(campaign.productTipo === "telas"
+                            ? campaignRestaurants.reduce((sum, r) => sum + r.usagePerDay * (r.restaurantMonthlyCustomers ?? 0), 0)
+                            : campaignRestaurants.reduce((sum, r) => sum + r.coastersCount * r.usagePerDay * campaign.daysPerMonth, 0)
+                          ).toLocaleString("pt-BR")}
                         </td>
                         <td className="p-3 text-sm font-mono font-semibold text-right text-primary hidden lg:table-cell">{formatCurrency(p.monthlyRevenue)}</td>
                         <td className="p-3 text-sm font-mono font-semibold text-right text-emerald-400 hidden lg:table-cell">{formatCurrency(p.monthlyProfit)}</td>

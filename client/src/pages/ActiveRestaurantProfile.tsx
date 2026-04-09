@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { calcularRating, temCamposRatingCompletos } from "@shared/rating";
+import { calcTelaImpressions, TELAS_INSERCOES } from "@/hooks/useBudgetCalculator";
 import {
   LOCATION_RATING_LABELS,
   VENUE_TYPE_LABELS,
@@ -147,7 +148,10 @@ function calcRestaurantRevenue(c: any) {
   const restComm = c.commissionType === "fixed"
     ? Number(c.fixedCommission) * coasters
     : sellingPrice * (Number(c.restaurantCommission) / 100);
-  const impressions = coasters * (c.usagePerDay || 3) * (c.daysPerMonth || 26);
+  const spotSecondsFromUsage: 15 | 30 = (c.usagePerDay || 0) === TELAS_INSERCOES[15] ? 15 : 30;
+  const impressions = c.productTipo === "telas"
+    ? calcTelaImpressions(spotSecondsFromUsage, c.restaurantMonthlyCustomers ?? 0, c.daysPerMonth || 26)
+    : coasters * (c.usagePerDay || 3) * (c.daysPerMonth || 26);
   return { sellingPrice, restComm, impressions, productionCost };
 }
 

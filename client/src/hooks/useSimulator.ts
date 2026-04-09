@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { calcTelaImpressions, TELAS_INSERCOES } from "@/hooks/useBudgetCalculator";
 
 export type CommissionType = "variable" | "fixed";
 export type PricingType = "variable" | "fixed";
@@ -356,6 +357,9 @@ export function useSimulator(
   restaurantCommissionRate?: number,
   productTiers?: ProductTier[],
   productParams?: ProductParams,
+  productTipo?: string | null,
+  avgMonthlyCustomers?: number,
+  spotSeconds?: 15 | 30 | null,
 ) {
   const [inputs, setInputs] = useState<SimulatorInputs>(loadInputs);
 
@@ -431,8 +435,15 @@ export function useSimulator(
   ]);
 
   const perRestaurant = useMemo<PerRestaurantMetrics>(() => {
-    const impressions =
-      inputs.coastersPerRestaurant * inputs.usagePerDay * inputs.daysPerMonth;
+    const isTelas = productTipo === "telas";
+    const resolvedSpotSeconds: 15 | 30 = (spotSeconds === 15 || spotSeconds === 30)
+      ? spotSeconds
+      : inputs.usagePerDay === TELAS_INSERCOES[15]
+        ? 15
+        : 30;
+    const impressions = isTelas
+      ? calcTelaImpressions(resolvedSpotSeconds, avgMonthlyCustomers ?? 0, inputs.daysPerMonth)
+      : inputs.coastersPerRestaurant * inputs.usagePerDay * inputs.daysPerMonth;
 
     if (isPriceBased && priceBasedTier) {
       const precoBase = parseFloat(priceBasedTier.precoBase ?? "0") || 0;
@@ -473,7 +484,7 @@ export function useSimulator(
       unitProductionCost,
       ...pricing,
     };
-  }, [inputs, effectiveUnitCost, restaurantCommissionRate, isPriceBased, priceBasedTier]);
+  }, [inputs, effectiveUnitCost, restaurantCommissionRate, isPriceBased, priceBasedTier, productTipo, avgMonthlyCustomers, spotSeconds]);
 
   const markupTable = useMemo<MarkupTableRow[]>(() => {
     const production = inputs.coastersPerRestaurant * effectiveUnitCost;
