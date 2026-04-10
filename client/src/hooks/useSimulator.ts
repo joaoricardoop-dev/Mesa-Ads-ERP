@@ -6,6 +6,7 @@ export type PricingType = "variable" | "fixed";
 
 export interface SimulatorInputs {
   coastersPerRestaurant: number;
+  usagesPerCoaster: number;
   usagePerDay: number;
   daysPerMonth: number;
   activeRestaurants: number;
@@ -120,6 +121,7 @@ const BUDGET_STORAGE_KEY = "mesa-ads-simulator-budget-id";
 
 const DEFAULT_INPUTS: SimulatorInputs = {
   coastersPerRestaurant: 500,
+  usagesPerCoaster: 2,
   usagePerDay: 3,
   daysPerMonth: 26,
   activeRestaurants: 10,
@@ -443,7 +445,7 @@ export function useSimulator(
         : 30;
     const impressions = isTelas
       ? calcTelaImpressions(resolvedSpotSeconds, avgMonthlyCustomers ?? 0, inputs.daysPerMonth)
-      : inputs.coastersPerRestaurant * inputs.usagePerDay * inputs.daysPerMonth;
+      : inputs.coastersPerRestaurant * inputs.usagesPerCoaster;
 
     if (isPriceBased && priceBasedTier) {
       const precoBase = parseFloat(priceBasedTier.precoBase ?? "0") || 0;

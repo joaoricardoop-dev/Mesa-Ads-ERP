@@ -16,7 +16,6 @@ import type { SimulatorInputs, CommissionType, PricingType } from "@/hooks/useSi
 import {
   Package,
   Eye,
-  Calendar,
   Store,
   Megaphone,
   Percent,
@@ -250,22 +249,13 @@ export default function InputPanel({ inputs, updateInput, grossMargin = 0 }: Inp
             step={50}
           />
           <InputField
-            label="Uso médio / dia"
-            value={inputs.usagePerDay}
-            onChange={(v) => updateInput("usagePerDay", v)}
+            label="Usos por porta-copo"
+            value={inputs.usagesPerCoaster}
+            onChange={(v) => updateInput("usagesPerCoaster", v)}
             icon={<Eye className="w-3 h-3" />}
-            suffix="x"
+            suffix="usos"
             min={1}
             max={20}
-          />
-          <InputField
-            label="Dias por mês"
-            value={inputs.daysPerMonth}
-            onChange={(v) => updateInput("daysPerMonth", v)}
-            icon={<Calendar className="w-3 h-3" />}
-            suffix="dias"
-            min={1}
-            max={31}
           />
           <InputField
             label="Restaurantes ativos"

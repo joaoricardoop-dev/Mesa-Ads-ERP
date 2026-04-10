@@ -47,7 +47,6 @@ import {
   Clock,
   Tag,
   Eye,
-  Calendar,
 } from "lucide-react";
 import type { SimulatorInputs, PricingType, CommissionType } from "@/hooks/useSimulator";
 
@@ -327,16 +326,10 @@ export default function Home() {
                         <span className="text-[10px] text-muted-foreground">un</span>
                       </div>
                     </CompactField>
-                    <CompactField label="Uso médio / dia">
+                    <CompactField label="Usos por porta-copo">
                       <div className="flex items-center gap-1.5">
-                        <Input type="number" value={inputs.usagePerDay} onChange={(e) => updateInput("usagePerDay", Number(e.target.value))} className="font-mono text-sm bg-background/50 border-border/50 h-8 tabular-nums" min={1} max={20} />
-                        <span className="text-[10px] text-muted-foreground">×</span>
-                      </div>
-                    </CompactField>
-                    <CompactField label="Dias / mês">
-                      <div className="flex items-center gap-1.5">
-                        <Input type="number" value={inputs.daysPerMonth} onChange={(e) => updateInput("daysPerMonth", Number(e.target.value))} className="font-mono text-sm bg-background/50 border-border/50 h-8 tabular-nums" min={1} max={31} />
-                        <span className="text-[10px] text-muted-foreground">dias</span>
+                        <Input type="number" value={inputs.usagesPerCoaster} onChange={(e) => updateInput("usagesPerCoaster", Number(e.target.value))} className="font-mono text-sm bg-background/50 border-border/50 h-8 tabular-nums" min={1} max={20} />
+                        <span className="text-[10px] text-muted-foreground">usos</span>
                       </div>
                     </CompactField>
                   </>

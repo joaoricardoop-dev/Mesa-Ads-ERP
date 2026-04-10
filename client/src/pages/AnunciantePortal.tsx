@@ -135,8 +135,10 @@ function applyDiscountTierAdv(price: number, discountTiers: any[]): number {
   return price * (1 - parseFloat(String(tier.discountPercent)) / 100);
 }
 
+const USOS_POR_PORTA_COPO = 2;
+
 function impressoesEstimadas(volume: number) {
-  return volume * 3 * 26;
+  return volume * USOS_POR_PORTA_COPO;
 }
 
 function fmtImpr(n: number) {
@@ -213,7 +215,7 @@ function ProductPriceSheet({ product, hasPartner, open, onClose }: {
             )}
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Info className="w-3 h-3" />
-              Estimativa: 3 usos/dia × 26 dias/mês por unidade
+              Estimativa: {USOS_POR_PORTA_COPO} usos por porta-copo
             </div>
           </div>
 

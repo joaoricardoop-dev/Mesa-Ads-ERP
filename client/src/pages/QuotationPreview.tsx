@@ -716,8 +716,7 @@ export default function QuotationPreview() {
                 <div className="grid grid-cols-2 gap-x-8">
                   <ParamRow label={`${selectedProduct?.unitLabelPlural ? selectedProduct.unitLabelPlural.charAt(0).toUpperCase() + selectedProduct.unitLabelPlural.slice(1) : "Coasters"}/Restaurante`} value={formatNumber(inputs.coastersPerRestaurant)} />
                   <ParamRow label="Restaurantes" value={String(n)} />
-                  <ParamRow label="Uso Médio/Dia" value={`${inputs.usagePerDay}x`} />
-                  <ParamRow label="Dias/Mês" value={String(inputs.daysPerMonth)} />
+                  <ParamRow label="Usos/Porta-copo" value={`${inputs.usagesPerCoaster}x`} />
                   {selectedProduct?.tipo === "telas" ? (
                     <ParamRow label="Impressões/Rest./Mês" value="Ver painel acima" />
                   ) : (
