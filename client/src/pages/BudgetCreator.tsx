@@ -1020,8 +1020,8 @@ export default function BudgetCreator() {
   const [items, setItems] = useState<BudgetItemState[]>(() => [makeBlankItem()]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const { data: clientsRaw = [] } = trpc.advertiser.list.useQuery();
-  const clientsList = useMemo(() => clientsRaw as ClientInfo[], [clientsRaw]);
+  const { data: clientsData } = trpc.advertiser.list.useQuery();
+  const clientsList = useMemo(() => (clientsData?.items ?? []) as ClientInfo[], [clientsData]);
 
   const { data: leadsRaw } = trpc.lead.list.useQuery({ type: "anunciante" });
   const leadsList = useMemo(() => (leadsRaw as any[]) ?? [], [leadsRaw]);

@@ -345,7 +345,8 @@ export default function PriceTable() {
   const [cotacaoNotes, setCotacaoNotes] = useState("");
   const [cotacaoVolume, setCotacaoVolume] = useState(volume);
 
-  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: clientsData } = trpc.advertiser.list.useQuery();
+  const clientsList = clientsData?.items ?? [];
   const { data: leadsList = [] } = trpc.lead.list.useQuery({ type: "anunciante" });
   const utils = trpc.useUtils();
 

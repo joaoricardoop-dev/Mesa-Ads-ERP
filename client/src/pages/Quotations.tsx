@@ -240,7 +240,8 @@ export default function Quotations() {
 
   const utils = trpc.useUtils();
   const { data: quotationsList = [], isLoading } = trpc.quotation.list.useQuery();
-  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: clientsData } = trpc.advertiser.list.useQuery();
+  const clientsList = clientsData?.items ?? [];
   const { data: productsList = [] } = trpc.product.list.useQuery();
   const { data: partnersList = [] } = trpc.partner.list.useQuery();
   const { data: activeRestaurantsList = [] } = trpc.activeRestaurant.list.useQuery();

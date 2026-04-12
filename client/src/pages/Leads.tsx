@@ -1474,7 +1474,7 @@ export default function Leads() {
                         setFormData((prev) => ({ ...prev, clientId: undefined }));
                         return;
                       }
-                      const client = (clientsList.data ?? []).find((c: any) => c.id === Number(v));
+                      const client = (clientsList.data?.items ?? []).find((c: any) => c.id === Number(v));
                       if (client) {
                         setFormData((prev) => ({
                           ...prev,
@@ -1503,7 +1503,7 @@ export default function Leads() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">-- Novo prospect (sem vínculo)</SelectItem>
-                      {(clientsList.data ?? []).map((c: any) => (
+                      {(clientsList.data?.items ?? []).map((c: any) => (
                         <SelectItem key={c.id} value={String(c.id)}>
                           {c.name}{c.cnpj ? ` — ${c.cnpj}` : ""}
                         </SelectItem>

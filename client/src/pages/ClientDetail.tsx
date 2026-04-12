@@ -182,7 +182,8 @@ export default function ClientDetail() {
     { parentId: client?.parentId! },
     { enabled: !!client?.parentId }
   );
-  const { data: allClients = [] } = trpc.advertiser.list.useQuery(undefined, { enabled: linkParentOpen || linkChildOpen });
+  const { data: allClientsData } = trpc.advertiser.list.useQuery(undefined, { enabled: linkParentOpen || linkChildOpen });
+  const allClients = allClientsData?.items ?? [];
   const { data: agencyPartners = [] } = trpc.partner.list.useQuery({ type: "agencia" });
 
   const [portalConfig, setPortalConfig] = useState<{

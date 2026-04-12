@@ -117,7 +117,8 @@ export default function QuotationDetail() {
 
   const utils = trpc.useUtils();
   const { data: quotation, isLoading } = trpc.quotation.get.useQuery({ id: quotationId }, { enabled: !isNaN(quotationId) });
-  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: clientsData } = trpc.advertiser.list.useQuery();
+  const clientsList = clientsData?.items ?? [];
   const { data: activeRestaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
   const { data: batchesList = [] } = trpc.batch.list.useQuery();
   const { data: os } = trpc.quotation.getOS.useQuery({ quotationId }, { enabled: !!quotation && (quotation.status === "os_gerada" || quotation.status === "win") });

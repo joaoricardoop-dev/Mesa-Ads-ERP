@@ -250,6 +250,8 @@ export default function Campaigns() {
   const [filterBonificada, setFilterBonificada] = useState(false);
   const [sortBy, setSortBy] = useState<"name" | "client" | "startDate" | "endDate" | "status" | "restaurants">("endDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
   const [managingCampaignId, setManagingCampaignId] = useState<number | null>(null);
   const [, setLocation] = useLocation();
   const [restaurantSelections, setRestaurantSelections] = useState<RestaurantSelection[]>([]);
@@ -257,8 +259,18 @@ export default function Campaigns() {
   const [batchYear, setBatchYear] = useState(new Date().getFullYear());
 
   const utils = trpc.useUtils();
-  const { data: campaignsList = [], isLoading } = trpc.campaign.list.useQuery();
-  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: kpiStats } = trpc.campaign.kpiStats.useQuery();
+  const { data: pagedResult, isLoading } = trpc.campaign.list.useQuery({
+    page,
+    pageSize: PAGE_SIZE,
+    search: search.trim() || undefined,
+    status: filterStatus !== "all" ? filterStatus : undefined,
+    filterAtrasadas: filterAtrasadas || undefined,
+    filterBonificada: filterBonificada || undefined,
+    filterRiscoSla: filterRiscoSla || undefined,
+  });
+  const { data: clientsListData } = trpc.advertiser.list.useQuery();
+  const clientsList = clientsListData?.items ?? [];
   const { data: restaurantsList = [] } = trpc.restaurant.list.useQuery();
   const { data: batchesList = [] } = trpc.batch.list.useQuery({ year: batchYear });
   const { data: campaignBatchesData = [] } = trpc.batch.getCampaignBatches.useQuery(
@@ -274,6 +286,7 @@ export default function Campaigns() {
   const updateMutation = trpc.campaign.update.useMutation({
     onSuccess: () => {
       utils.campaign.list.invalidate();
+      utils.campaign.kpiStats.invalidate();
       setIsDialogOpen(false);
       setEditingId(null);
       setForm(emptyForm);
@@ -286,6 +299,7 @@ export default function Campaigns() {
   const deleteMutation = trpc.campaign.delete.useMutation({
     onSuccess: () => {
       utils.campaign.list.invalidate();
+      utils.campaign.kpiStats.invalidate();
       setDeleteId(null);
       toast.success("Campanha removida!");
     },
@@ -377,7 +391,7 @@ export default function Campaigns() {
     }
   };
 
-  const handleEdit = (c: (typeof campaignsList)[0]) => {
+  const handleEdit = (c: (typeof pagedItems)[0]) => {
     setEditingId(c.id);
     setFormErrors({});
     setForm({
@@ -473,7 +487,7 @@ export default function Campaigns() {
     if (!endDate) return false;
     return new Date(endDate + "T23:59:59") < new Date();
   }
-  function getPreProdDays(c: typeof campaignsList[0]) {
+  function getPreProdDays(c: (typeof pagedItems)[0]) {
     if (!(c as any).briefingEnteredAt) return null;
     if (SLA_PRE_STAGES.has(c.status)) return daysSince((c as any).briefingEnteredAt);
     if ((c as any).producaoEnteredAt) {
@@ -481,29 +495,25 @@ export default function Campaigns() {
     }
     return null;
   }
-  function isPreProdActive(c: typeof campaignsList[0]) {
+  function isPreProdActive(c: (typeof pagedItems)[0]) {
     return SLA_PRE_STAGES.has(c.status);
   }
-  function getDaysInStage(c: typeof campaignsList[0]) {
+  function getDaysInStage(c: (typeof pagedItems)[0]) {
     const field = STAGE_AT[c.status];
     if (field) { const d = daysSince((c as any)[field]); if (d !== null) return d; }
     return daysSince((c as any).updatedAt);
   }
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterStatus, filterAtrasadas, filterBonificada, filterRiscoSla]);
+
+  const pagedItems = pagedResult?.items ?? [];
+  const pagedTotal = pagedResult?.total ?? 0;
+  const pagedTotalPages = pagedResult?.totalPages ?? 0;
+
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    let list = campaignsList.filter((c) => {
-      if (q && !c.name.toLowerCase().includes(q) && !(c.clientName || "").toLowerCase().includes(q) && !(c.clientCompany || "").toLowerCase().includes(q)) return false;
-      if (filterStatus !== "all" && c.status !== filterStatus) return false;
-      if (filterAtrasadas && !isOverdue(c.endDate)) return false;
-      if (filterBonificada && !(c as any).isBonificada) return false;
-      if (filterRiscoSla) {
-        const pp = getPreProdDays(c);
-        if (pp === null || pp < SLA_WARN || !isPreProdActive(c)) return false;
-      }
-      return true;
-    });
-    list = [...list].sort((a, b) => {
+    return [...pagedItems].sort((a, b) => {
       let va: string | number = "", vb: string | number = "";
       if (sortBy === "name") { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
       else if (sortBy === "client") { va = (a.clientName || "").toLowerCase(); vb = (b.clientName || "").toLowerCase(); }
@@ -515,10 +525,9 @@ export default function Campaigns() {
       if (va > vb) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-    return list;
-  }, [campaignsList, search, filterStatus, filterAtrasadas, filterBonificada, filterRiscoSla, sortBy, sortDir]);
+  }, [pagedItems, sortBy, sortDir]);
 
-  function effectivePricing(c: typeof campaignsList[0]) {
+  function effectivePricing(c: (typeof pagedItems)[0]) {
     const qVolume = (c as any).quotationCoasterVolume ? parseInt((c as any).quotationCoasterVolume) : null;
     const effectiveCoastersPerRest = (qVolume && qVolume > 0 && c.activeRestaurants > 0)
       ? Math.round(qVolume / c.activeRestaurants)
@@ -536,14 +545,14 @@ export default function Campaigns() {
     return { ...base, fromQuotation: false };
   }
 
-  const kpis = useMemo(() => ({
-    total:       campaignsList.filter((c) => c.status !== "archived").length,
-    preProducao: campaignsList.filter((c) => ["briefing","design","aprovacao"].includes(c.status)).length,
-    producao:    campaignsList.filter((c) => ["producao","distribuicao"].includes(c.status)).length,
-    veiculacao:  campaignsList.filter((c) => c.status === "veiculacao").length,
-    atrasadas:   campaignsList.filter((c) => c.status !== "archived" && isOverdue(c.endDate)).length,
-    riscoSla:    campaignsList.filter((c) => { const pp = getPreProdDays(c); return isPreProdActive(c) && pp !== null && pp >= SLA_WARN; }).length,
-  }), [campaignsList]);
+  const kpis = {
+    total:       kpiStats?.total ?? 0,
+    preProducao: kpiStats?.preProducao ?? 0,
+    producao:    kpiStats?.producao ?? 0,
+    veiculacao:  kpiStats?.veiculacao ?? 0,
+    atrasadas:   kpiStats?.atrasadas ?? 0,
+    riscoSla:    kpiStats?.riscoSla ?? 0,
+  };
 
   if (view === "kanban") {
     return (
@@ -676,8 +685,10 @@ export default function Campaigns() {
           <button onClick={() => setFilterBonificada((v) => !v)} className={`flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs border transition-colors ${filterBonificada ? "bg-amber-500/20 border-amber-500/40 text-amber-400" : "bg-card border-border/30 text-muted-foreground hover:text-foreground"}`}>
             <Gift className="w-3 h-3" /> Bonificadas
           </button>
-          {filtered.length !== campaignsList.length && (
-            <span className="text-xs text-muted-foreground ml-1">{filtered.length} de {campaignsList.length}</span>
+          {pagedTotal > 0 && (
+            <span className="text-xs text-muted-foreground ml-1">
+              {pagedTotal} resultado{pagedTotal !== 1 ? "s" : ""}
+            </span>
           )}
         </div>
 
@@ -788,6 +799,31 @@ export default function Campaigns() {
             })
           )}
         </div>
+
+        {pagedTotalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-xs text-muted-foreground">
+              Mostrando {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, pagedTotal)} de {pagedTotal}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="h-7 px-3 rounded-md text-xs border border-border/30 bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              <span className="text-xs text-muted-foreground">{page} / {pagedTotalPages}</span>
+              <button
+                onClick={() => setPage((p) => Math.min(pagedTotalPages, p + 1))}
+                disabled={page >= pagedTotalPages}
+                className="h-7 px-3 rounded-md text-xs border border-border/30 bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        )}
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-2xl bg-card border-border/30 max-h-[85vh] overflow-y-auto">

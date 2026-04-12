@@ -123,8 +123,10 @@ export default function ServiceOrders() {
 
   const utils = trpc.useUtils();
   const { data: ordersList = [], isLoading } = trpc.serviceOrder.list.useQuery();
-  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
-  const { data: campaignsList = [] } = trpc.campaign.list.useQuery();
+  const { data: clientsData } = trpc.advertiser.list.useQuery();
+  const clientsList = clientsData?.items ?? [];
+  const { data: campaignsData } = trpc.campaign.list.useQuery();
+  const campaignsList = campaignsData?.items ?? [];
   const { data: batchesList = [] } = trpc.batch.list.useQuery({ year: new Date().getFullYear() });
   const { data: campaignBatches = [] } = trpc.batch.getCampaignBatches.useQuery(
     { campaignId: form.campaignId! },

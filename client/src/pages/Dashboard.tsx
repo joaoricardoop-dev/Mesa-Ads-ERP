@@ -132,7 +132,8 @@ const ACTION_LABELS: Record<string, string> = {
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const { data: campaigns = [], isLoading } = trpc.campaign.list.useQuery(undefined, { staleTime: 30000 });
+  const { data: campaignData, isLoading } = trpc.campaign.list.useQuery(undefined, { staleTime: 30000 });
+  const campaigns = campaignData?.items ?? [];
 
   const kpis = useMemo(() => {
     const ativas      = campaigns.filter((c) => c.status !== "archived").length;

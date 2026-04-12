@@ -1,4 +1,4 @@
-import { eq, and, or, gte, lte, sql, desc, isNull } from "drizzle-orm";
+import { eq, and, or, gte, lte, sql, desc, isNull, ilike, count, SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import ws from "ws";
 import { Pool, neonConfig } from "@neondatabase/serverless";
@@ -97,10 +97,32 @@ export async function deleteRestaurant(id: number) {
 
 // ─── Clients ────────────────────────────────────────────────────────────────
 
-export async function listClients() {
+export async function listClients(input?: { page?: number; pageSize?: number; search?: string }) {
+  if (input?.page !== undefined) {
+    return listClientsPaged({ page: input.page, pageSize: input.pageSize ?? 25, search: input.search });
+  }
+  return listClientsPaged({ page: 1, pageSize: 10000 });
+}
+
+export async function listClientsPaged(input: { page: number; pageSize: number; search?: string }) {
   const db = await getDb();
-  if (!db) return [];
-  return db.select().from(clients).orderBy(desc(clients.createdAt));
+  if (!db) return { items: [], total: 0, page: input.page, pageSize: input.pageSize, totalPages: 0 };
+  const { page, pageSize, search } = input;
+  const offset = (page - 1) * pageSize;
+  const whereConditions = search && search.trim()
+    ? or(
+        ilike(clients.name, `%${search.trim()}%`),
+        ilike(clients.company, `%${search.trim()}%`),
+        ilike(clients.razaoSocial, `%${search.trim()}%`),
+        ilike(clients.neighborhood, `%${search.trim()}%`),
+      )
+    : undefined;
+  const [totalResult, items] = await Promise.all([
+    db.select({ value: count() }).from(clients).where(whereConditions),
+    db.select().from(clients).where(whereConditions).orderBy(desc(clients.createdAt)).limit(pageSize).offset(offset),
+  ]);
+  const total = totalResult[0]?.value ?? 0;
+  return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
 }
 
 export async function getClient(id: number) {
@@ -133,69 +155,166 @@ export async function deleteClient(id: number) {
   await db.delete(clients).where(eq(clients.id, id));
 }
 
-// ─── Campaigns ──────────────────────────────────────────────────────────────
+// ─── Campaign KPI Stats ──────────────────────────────────────────────────────
 
-export async function listCampaigns() {
+export async function getCampaignKpiStats() {
   const db = await getDb();
-  if (!db) return [];
-  const result = await db
+  if (!db) return { total: 0, preProducao: 0, producao: 0, veiculacao: 0, atrasadas: 0, riscoSla: 0 };
+  const SLA_WARN_DAYS = 3;
+  const now = new Date();
+  const PRE_PROD_STAGES = ["briefing", "design", "aprovacao"];
+  const rows = await db
     .select({
-      id: campaigns.id,
-      clientId: campaigns.clientId,
-      name: campaigns.name,
-      startDate: campaigns.startDate,
-      endDate: campaigns.endDate,
       status: campaigns.status,
-      notes: campaigns.notes,
-      coastersPerRestaurant: campaigns.coastersPerRestaurant,
-      usagePerDay: campaigns.usagePerDay,
-      daysPerMonth: campaigns.daysPerMonth,
-      activeRestaurants: campaigns.activeRestaurants,
-      pricingType: campaigns.pricingType,
-      markupPercent: campaigns.markupPercent,
-      fixedPrice: campaigns.fixedPrice,
-      commissionType: campaigns.commissionType,
-      restaurantCommission: campaigns.restaurantCommission,
-      fixedCommission: campaigns.fixedCommission,
-      sellerCommission: campaigns.sellerCommission,
-      taxRate: campaigns.taxRate,
-      contractDuration: campaigns.contractDuration,
-      batchSize: campaigns.batchSize,
-      batchCost: campaigns.batchCost,
-      budgetId: campaigns.budgetId,
-      isBonificada: campaigns.isBonificada,
-      productId: campaigns.productId,
-      quotationId: campaigns.quotationId,
-      proposalSignedAt: campaigns.proposalSignedAt,
+      endDate: campaigns.endDate,
       briefingEnteredAt: campaigns.briefingEnteredAt,
-      designEnteredAt: campaigns.designEnteredAt,
-      aprovacaoEnteredAt: campaigns.aprovacaoEnteredAt,
-      producaoEnteredAt: campaigns.producaoEnteredAt,
-      distribuicaoEnteredAt: campaigns.distribuicaoEnteredAt,
-      createdAt: campaigns.createdAt,
-      updatedAt: campaigns.updatedAt,
-      clientName: clients.name,
-      clientCompany: clients.company,
-      productName: products.name,
-      quotationTotalValue: quotations.totalValue,
-      quotationCoasterVolume: quotations.coasterVolume,
-      quotationUnitPrice: quotations.unitPrice,
-      osAnuncianteTotalValue: sql<string | null>`(
-        SELECT so."totalValue"::text
-        FROM service_orders so
-        WHERE so."campaignId" = ${campaigns.id}
-          AND so.type = 'anunciante'
-          AND so.status = 'assinada'
-        ORDER BY so."createdAt" ASC
-        LIMIT 1
-      )`,
     })
     .from(campaigns)
-    .leftJoin(clients, eq(campaigns.clientId, clients.id))
-    .leftJoin(products, eq(campaigns.productId, products.id))
-    .leftJoin(quotations, eq(campaigns.quotationId, quotations.id))
-    .orderBy(desc(campaigns.createdAt));
-  return result;
+    .where(sql`${campaigns.status} != 'archived'`);
+
+  let total = 0, preProducao = 0, producao = 0, veiculacao = 0, atrasadas = 0, riscoSla = 0;
+  for (const c of rows) {
+    total++;
+    if (PRE_PROD_STAGES.includes(c.status)) preProducao++;
+    if (c.status === "producao" || c.status === "distribuicao") producao++;
+    if (c.status === "veiculacao") veiculacao++;
+    if (c.endDate && new Date(c.endDate + "T23:59:59") < now) atrasadas++;
+    if (PRE_PROD_STAGES.includes(c.status) && c.briefingEnteredAt) {
+      const days = Math.floor((now.getTime() - new Date(c.briefingEnteredAt).getTime()) / 86_400_000);
+      if (days >= SLA_WARN_DAYS) riscoSla++;
+    }
+  }
+  return { total, preProducao, producao, veiculacao, atrasadas, riscoSla };
+}
+
+// ─── Client Stats ──────────────────────────────────────────────────────────
+
+export async function getClientStats() {
+  const db = await getDb();
+  if (!db) return { total: 0, active: 0, matrizIds: [] as number[] };
+  const rows = await db.select({ id: clients.id, status: clients.status, parentId: clients.parentId }).from(clients);
+  const total = rows.length;
+  const active = rows.filter((r) => r.status === "active").length;
+  const matrizIds = rows.filter((r) => rows.some((other) => other.parentId === r.id)).map((r) => r.id);
+  return { total, active, matrizIds };
+}
+
+// ─── Campaigns ──────────────────────────────────────────────────────────────
+
+export async function listCampaigns(input?: { page?: number; pageSize?: number; search?: string; status?: string; filterAtrasadas?: boolean; filterBonificada?: boolean; filterRiscoSla?: boolean }) {
+  if (input?.page !== undefined) {
+    return listCampaignsPaged({ page: input.page, pageSize: input.pageSize ?? 25, search: input.search, status: input.status, filterAtrasadas: input.filterAtrasadas, filterBonificada: input.filterBonificada, filterRiscoSla: input.filterRiscoSla });
+  }
+  return listCampaignsPaged({ page: 1, pageSize: 10000 });
+}
+
+export async function listCampaignsPaged(input: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  status?: string;
+  filterAtrasadas?: boolean;
+  filterBonificada?: boolean;
+  filterRiscoSla?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) return { items: [], total: 0, page: input.page, pageSize: input.pageSize, totalPages: 0 };
+  const { page, pageSize, search, status, filterAtrasadas, filterBonificada, filterRiscoSla } = input;
+  const offset = (page - 1) * pageSize;
+  const now = new Date();
+  const SLA_WARN_DAYS = 3;
+
+  const conditions: SQL[] = [];
+  if (search && search.trim()) {
+    const searchClause = or(
+      ilike(campaigns.name, `%${search.trim()}%`),
+      ilike(clients.name, `%${search.trim()}%`),
+      ilike(clients.company, `%${search.trim()}%`),
+    );
+    if (searchClause) conditions.push(searchClause);
+  }
+  if (status && status !== "all") {
+    conditions.push(sql`${campaigns.status} = ${status}`);
+  }
+  if (filterAtrasadas) {
+    conditions.push(sql`${campaigns.endDate} IS NOT NULL AND (${campaigns.endDate}::date + interval '1 day') < ${now.toISOString()}`);
+  }
+  if (filterBonificada) {
+    conditions.push(sql`${campaigns.isBonificada} = true`);
+  }
+  if (filterRiscoSla) {
+    const slaDate = new Date(now.getTime() - SLA_WARN_DAYS * 86_400_000);
+    conditions.push(sql`${campaigns.status} IN ('briefing','design','aprovacao') AND ${campaigns.briefingEnteredAt} IS NOT NULL AND ${campaigns.briefingEnteredAt} <= ${slaDate.toISOString()}`);
+  }
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const selectFields = {
+    id: campaigns.id,
+    clientId: campaigns.clientId,
+    name: campaigns.name,
+    startDate: campaigns.startDate,
+    endDate: campaigns.endDate,
+    status: campaigns.status,
+    notes: campaigns.notes,
+    coastersPerRestaurant: campaigns.coastersPerRestaurant,
+    usagePerDay: campaigns.usagePerDay,
+    daysPerMonth: campaigns.daysPerMonth,
+    activeRestaurants: campaigns.activeRestaurants,
+    pricingType: campaigns.pricingType,
+    markupPercent: campaigns.markupPercent,
+    fixedPrice: campaigns.fixedPrice,
+    commissionType: campaigns.commissionType,
+    restaurantCommission: campaigns.restaurantCommission,
+    fixedCommission: campaigns.fixedCommission,
+    sellerCommission: campaigns.sellerCommission,
+    taxRate: campaigns.taxRate,
+    contractDuration: campaigns.contractDuration,
+    batchSize: campaigns.batchSize,
+    batchCost: campaigns.batchCost,
+    budgetId: campaigns.budgetId,
+    isBonificada: campaigns.isBonificada,
+    productId: campaigns.productId,
+    quotationId: campaigns.quotationId,
+    proposalSignedAt: campaigns.proposalSignedAt,
+    briefingEnteredAt: campaigns.briefingEnteredAt,
+    designEnteredAt: campaigns.designEnteredAt,
+    aprovacaoEnteredAt: campaigns.aprovacaoEnteredAt,
+    producaoEnteredAt: campaigns.producaoEnteredAt,
+    distribuicaoEnteredAt: campaigns.distribuicaoEnteredAt,
+    createdAt: campaigns.createdAt,
+    updatedAt: campaigns.updatedAt,
+    clientName: clients.name,
+    clientCompany: clients.company,
+    productName: products.name,
+    quotationTotalValue: quotations.totalValue,
+    quotationCoasterVolume: quotations.coasterVolume,
+    quotationUnitPrice: quotations.unitPrice,
+    osAnuncianteTotalValue: sql<string | null>`(
+      SELECT so."totalValue"::text
+      FROM service_orders so
+      WHERE so."campaignId" = ${campaigns.id}
+        AND so.type = 'anunciante'
+        AND so.status = 'assinada'
+      ORDER BY so."createdAt" ASC
+      LIMIT 1
+    )`,
+  };
+
+  const [totalResult, items] = await Promise.all([
+    db.select({ value: count() }).from(campaigns).leftJoin(clients, eq(campaigns.clientId, clients.id)).where(whereClause),
+    db.select(selectFields)
+      .from(campaigns)
+      .leftJoin(clients, eq(campaigns.clientId, clients.id))
+      .leftJoin(products, eq(campaigns.productId, products.id))
+      .leftJoin(quotations, eq(campaigns.quotationId, quotations.id))
+      .where(whereClause)
+      .orderBy(desc(campaigns.createdAt))
+      .limit(pageSize)
+      .offset(offset),
+  ]);
+
+  const total = totalResult[0]?.value ?? 0;
+  return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
 }
 
 export async function getCampaign(id: number) {

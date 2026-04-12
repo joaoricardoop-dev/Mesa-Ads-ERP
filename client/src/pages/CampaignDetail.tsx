@@ -362,7 +362,8 @@ export default function CampaignDetail() {
   const { data: campaign, isLoading } = trpc.campaign.get.useQuery({ id: campaignId }, { enabled: campaignId > 0 });
   const { data: campaignRestaurants = [] } = trpc.campaign.getRestaurants.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: historyList = [] } = trpc.campaign.getHistory.useQuery({ campaignId }, { enabled: campaignId > 0 });
-  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: clientsData } = trpc.advertiser.list.useQuery();
+  const clientsList = clientsData?.items ?? [];
   const { data: restaurantsList = [] } = trpc.restaurant.list.useQuery();
   const { data: proofsList = [] } = trpc.campaign.getProofs.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignBatchList = [] } = trpc.batch.getCampaignBatches.useQuery({ campaignId }, { enabled: campaignId > 0 });

@@ -257,7 +257,8 @@ export default function CampaignsKanban() {
   const [filterSla, setFilterSla] = useState(false);
   const [movingId, setMovingId] = useState<number | null>(null);
 
-  const { data: campaigns = [], refetch } = trpc.campaign.list.useQuery();
+  const { data: campaignData, refetch } = trpc.campaign.list.useQuery();
+  const campaigns = campaignData?.items ?? [];
 
   const updateMutation = trpc.campaign.update.useMutation({
     onSuccess: () => { refetch(); setMovingId(null); },

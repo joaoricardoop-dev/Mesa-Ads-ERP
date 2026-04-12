@@ -121,7 +121,8 @@ export default function QuotationPreview() {
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
   const { data: budgetsList = [] } = trpc.budget.listActiveWithItems.useQuery();
-  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: clientsData } = trpc.advertiser.list.useQuery();
+  const clientsList = clientsData?.items ?? [];
   const { data: restaurantsList = [] } = trpc.activeRestaurant.list.useQuery();
   const { data: leadsList = [] } = trpc.lead.list.useQuery({ type: "anunciante" });
   const { data: productsList = [] } = trpc.product.list.useQuery();

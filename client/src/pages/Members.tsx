@@ -136,7 +136,8 @@ export default function Members() {
 
   const utils = trpc.useUtils();
   const { data: membersList = [], isLoading } = trpc.members.list.useQuery();
-  const { data: clientsList = [] } = trpc.advertiser.list.useQuery();
+  const { data: clientsData } = trpc.advertiser.list.useQuery();
+  const clientsList = clientsData?.items ?? [];
   const { data: partnersList = [] } = trpc.partner.list.useQuery();
   const { data: invitationsList = [], isLoading: isLoadingInvitations } = trpc.members.listInvitations.useQuery();
 

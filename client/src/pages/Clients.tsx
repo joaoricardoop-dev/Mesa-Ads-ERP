@@ -1,4 +1,4 @@
-import { useState, Fragment } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { useLocation } from "wouter";
 import { z } from "zod";
 import { trpc } from "@/lib/trpc";
@@ -135,13 +135,25 @@ export default function Clients() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
 
   const utils = trpc.useUtils();
-  const { data: clientsList = [], isLoading } = trpc.advertiser.list.useQuery();
+  const { data: clientStats } = trpc.advertiser.stats.useQuery();
+  const { data: pagedResult, isLoading } = trpc.advertiser.list.useQuery({
+    page,
+    pageSize: PAGE_SIZE,
+    search: search.trim() || undefined,
+  });
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const createMutation = trpc.advertiser.create.useMutation({
     onSuccess: () => {
       utils.advertiser.list.invalidate();
+      utils.advertiser.stats.invalidate();
       setIsDialogOpen(false);
       setForm(emptyForm);
       toast.success("Cliente cadastrado com sucesso!");
@@ -152,6 +164,7 @@ export default function Clients() {
   const updateMutation = trpc.advertiser.update.useMutation({
     onSuccess: () => {
       utils.advertiser.list.invalidate();
+      utils.advertiser.stats.invalidate();
       setIsDialogOpen(false);
       setEditingId(null);
       setForm(emptyForm);
@@ -163,6 +176,7 @@ export default function Clients() {
   const deleteMutation = trpc.advertiser.delete.useMutation({
     onSuccess: () => {
       utils.advertiser.list.invalidate();
+      utils.advertiser.stats.invalidate();
       setDeleteId(null);
       toast.success("Cliente removido!");
     },
@@ -188,7 +202,7 @@ export default function Clients() {
     }
   };
 
-  const handleEdit = (c: (typeof clientsList)[0]) => {
+  const handleEdit = (c: (typeof pagedItems)[0]) => {
     setEditingId(c.id);
     setFormErrors({});
     setForm({
@@ -227,19 +241,13 @@ export default function Clients() {
     }
   };
 
-  const parentIdsSet = new Set(
-    clientsList.filter((c: any) => c.parentId).map((c: any) => c.parentId as number)
-  );
+  const pagedItems = pagedResult?.items ?? [];
+  const pagedTotal = pagedResult?.total ?? 0;
+  const pagedTotalPages = pagedResult?.totalPages ?? 0;
 
-  const filtered = clientsList.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.company || "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.razaoSocial || "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.neighborhood || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const parentIdsSet = new Set(clientStats?.matrizIds ?? []);
 
-  const sorted = [...filtered].sort((a, b) => {
+  const sorted = [...pagedItems].sort((a, b) => {
     const dir = sortDir === "asc" ? 1 : -1;
     switch (sortKey) {
       case "name":
@@ -255,7 +263,7 @@ export default function Clients() {
     }
   });
 
-  const activeCount = clientsList.filter((c) => c.status === "active").length;
+  const activeCount = clientStats?.active ?? 0;
 
   const SortHeader = ({ label, col, className = "" }: { label: string; col: SortKey; className?: string }) => (
     <TableHead
@@ -289,7 +297,7 @@ export default function Clients() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-card border border-border/30 rounded-lg p-4">
           <p className="text-xs text-muted-foreground">Total Clientes</p>
-          <p className="text-2xl font-bold font-mono">{clientsList.length}</p>
+          <p className="text-2xl font-bold font-mono">{clientStats?.total ?? 0}</p>
         </div>
         <div className="bg-card border border-border/30 rounded-lg p-4">
           <p className="text-xs text-muted-foreground">Ativos</p>
@@ -518,6 +526,31 @@ export default function Clients() {
           </TableBody>
         </Table>
       </div>
+
+      {pagedTotalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            Mostrando {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, pagedTotal)} de {pagedTotal}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="h-7 px-3 rounded-md text-xs border border-border/30 bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Anterior
+            </button>
+            <span className="text-xs text-muted-foreground">{page} / {pagedTotalPages}</span>
+            <button
+              onClick={() => setPage((p) => Math.min(pagedTotalPages, p + 1))}
+              disabled={page >= pagedTotalPages}
+              className="h-7 px-3 rounded-md text-xs border border-border/30 bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

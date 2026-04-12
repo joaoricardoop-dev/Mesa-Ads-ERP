@@ -24,11 +24,15 @@ import {
   updateRestaurant,
   deleteRestaurant,
   listClients,
+  listClientsPaged,
+  getClientStats,
   getClient,
   createClient,
   updateClient,
   deleteClient,
   listCampaigns,
+  listCampaignsPaged,
+  getCampaignKpiStats,
   getCampaign,
   createCampaign,
   updateCampaign,
@@ -1044,7 +1048,20 @@ export const appRouter = router({
 
   // ─── Clients (Anunciantes) ────────────────────────────────────────────
   advertiser: router({
-    list: protectedProcedure.query(() => listClients()),
+    list: protectedProcedure
+      .input(z.object({
+        page: z.number().int().min(1).optional(),
+        pageSize: z.number().int().min(1).max(200).optional(),
+        search: z.string().optional(),
+      }).optional())
+      .query(({ input }) => listClients(input ?? undefined)),
+
+    // Keep listPaged as backward-compatible alias
+    listPaged: protectedProcedure
+      .input(z.object({ page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(200).default(25), search: z.string().optional() }))
+      .query(({ input }) => listClientsPaged(input)),
+
+    stats: protectedProcedure.query(() => getClientStats()),
 
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -1341,7 +1358,32 @@ export const appRouter = router({
 
   // ─── Campaigns ────────────────────────────────────────────────────────
   campaign: router({
-    list: protectedProcedure.query(() => listCampaigns()),
+    list: protectedProcedure
+      .input(z.object({
+        page: z.number().int().min(1).optional(),
+        pageSize: z.number().int().min(1).max(200).optional(),
+        search: z.string().optional(),
+        status: z.string().optional(),
+        filterAtrasadas: z.boolean().optional(),
+        filterBonificada: z.boolean().optional(),
+        filterRiscoSla: z.boolean().optional(),
+      }).optional())
+      .query(({ input }) => listCampaigns(input ?? undefined)),
+
+    // Keep listPaged as backward-compatible alias
+    listPaged: protectedProcedure
+      .input(z.object({
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(200).default(25),
+        search: z.string().optional(),
+        status: z.string().optional(),
+        filterAtrasadas: z.boolean().optional(),
+        filterBonificada: z.boolean().optional(),
+        filterRiscoSla: z.boolean().optional(),
+      }))
+      .query(({ input }) => listCampaignsPaged(input)),
+
+    kpiStats: protectedProcedure.query(() => getCampaignKpiStats()),
 
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
