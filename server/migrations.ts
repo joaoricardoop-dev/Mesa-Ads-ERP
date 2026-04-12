@@ -90,6 +90,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_unique_constraint_operational_costs_campaign_id",
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS "idx_operational_costs_campaign_id_unique" ON "operational_costs" ("campaignId");`,
   },
+  {
+    name: "create_media_kit_settings",
+    sql: `CREATE TABLE IF NOT EXISTS "media_kit_settings" ("id" serial PRIMARY KEY, "tagline" varchar(200), "intro" text, "contactName" varchar(100), "contactEmail" varchar(100), "contactPhone" varchar(50), "website" varchar(200), "footerText" text, "updatedAt" timestamp DEFAULT now() NOT NULL); INSERT INTO "media_kit_settings" ("id", "updatedAt") VALUES (1, now()) ON CONFLICT DO NOTHING;`,
+  },
 ];
 
 export async function runMigrations() {

@@ -21,8 +21,10 @@ import {
   Plus,
   ShoppingCart,
   ChevronRight,
+  Download,
 } from "lucide-react";
 import { CampaignBuilder } from "@/components/CampaignBuilder";
+import { generateMediaKitPdf } from "@/lib/generate-mediakit-pdf";
 
 const QUOTATION_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   rascunho: { label: "Rascunho", color: "bg-gray-500/10 text-gray-400 border-gray-500/30" },
@@ -86,6 +88,7 @@ export default function ParceiroPortal() {
   const { data: quotations = [], isLoading: loadingQuotations } = trpc.parceiroPortal.getQuotations.useQuery({ adminPartnerId });
   const { data: myClients = [] } = trpc.parceiroPortal.getMyClients.useQuery({ adminPartnerId });
   const { data: builderProducts = [] } = trpc.parceiroPortal.getPriceTableForBuilder.useQuery({ adminPartnerId });
+  const { data: mediaKitData } = trpc.mediaKit.getPublicData.useQuery();
 
   const [builderOpen, setBuilderOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
@@ -150,6 +153,14 @@ export default function ParceiroPortal() {
               <ShoppingCart className="w-4 h-4" /> Montar Campanha para Cliente
             </Button>
           )}
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={!mediaKitData}
+            onClick={() => mediaKitData && generateMediaKitPdf(mediaKitData)}
+          >
+            <Download className="w-4 h-4" /> Media Kit
+          </Button>
           <Link href="/leads">
             <Button className="gap-2">
               <Plus className="w-4 h-4" /> Indicar Lead

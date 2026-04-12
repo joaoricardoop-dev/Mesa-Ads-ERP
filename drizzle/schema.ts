@@ -1040,4 +1040,18 @@ export const integrationTokens = pgTable("integration_tokens", {
 
 export type IntegrationToken = typeof integrationTokens.$inferSelect;
 
+export const mediaKitSettings = pgTable("media_kit_settings", {
+  id: serial("id").primaryKey(),
+  tagline: varchar("tagline", { length: 200 }),
+  intro: text("intro"),
+  contactName: varchar("contactName", { length: 100 }),
+  contactEmail: varchar("contactEmail", { length: 100 }),
+  contactPhone: varchar("contactPhone", { length: 50 }),
+  website: varchar("website", { length: 200 }),
+  footerText: text("footerText"),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type MediaKitSettings = typeof mediaKitSettings.$inferSelect;
+
 export * from "../shared/models/auth";

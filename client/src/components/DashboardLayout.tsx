@@ -80,6 +80,7 @@ import {
   MessageSquare,
   X,
   Zap,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import { NotificationBell } from "./NotificationPanel";
@@ -171,6 +172,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: FileText, label: "Termos Padrão", path: "/configuracoes/termos", adminOnly: true },
       { icon: Users, label: "Gestão de Usuários", path: "/configuracoes/usuarios", adminOnly: true },
       { icon: Zap, label: "Integrações", path: "/configuracoes/integracoes", adminOnly: true },
+      { icon: BookOpen, label: "Media Kit", path: "/configuracoes/media-kit", adminOnly: true },
     ],
   },
 ];

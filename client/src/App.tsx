@@ -45,6 +45,7 @@ import RestaurantInviteAccept from "./pages/RestaurantInviteAccept";
 import Onboarding from "./pages/Onboarding";
 import TermTemplates from "./pages/TermTemplates";
 import IntegrationSettings from "./pages/IntegrationSettings";
+import MediaKitSettings from "./pages/MediaKitSettings";
 import QuotationSign from "./pages/QuotationSign";
 import Products from "./pages/Products";
 import Partners from "./pages/Partners";
@@ -125,6 +126,7 @@ function Router() {
       <Route path="/membros" component={Members} />
       <Route path="/configuracoes/usuarios" component={Members} />
       <Route path="/configuracoes/integracoes" component={IntegrationSettings} />
+      <Route path="/configuracoes/media-kit" component={MediaKitSettings} />
       <Route path="/produtos" component={Products} />
       <Route path="/biblioteca" component={Library} />
       <Route path="/404" component={NotFound} />

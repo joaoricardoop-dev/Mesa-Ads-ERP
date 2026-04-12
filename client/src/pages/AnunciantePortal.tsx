@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import { generateReportPdf } from "@/lib/generate-report-pdf";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
+import { generateMediaKitPdf } from "@/lib/generate-mediakit-pdf";
 import { CampaignBuilder } from "@/components/CampaignBuilder";
 import {
   SEMANAS_OPTIONS,
@@ -923,6 +924,7 @@ export default function AnunciantePortal() {
   const { data: invoicesData = [] } = trpc.portal.myInvoices.useQuery();
   const invoices: any[] = invoicesData;
   const { data: priceTableData } = trpc.portal.getPriceTable.useQuery();
+  const { data: mediaKitData } = trpc.mediaKit.getPublicData.useQuery();
 
   const [activeTab, setActiveTab] = useState<NavSection>("home");
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
@@ -1077,16 +1079,28 @@ export default function AnunciantePortal() {
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Portal do Anunciante</p>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{profile.company || profile.name}</h1>
             <p className="text-sm text-muted-foreground mt-1">Olá, {user?.firstName || profile.name}</p>
-            {priceTableData && priceTableData.products.length > 0 && (
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              {priceTableData && priceTableData.products.length > 0 && (
+                <Button
+                  onClick={() => setBuilderOpen(true)}
+                  className="gap-2 bg-primary hover:bg-primary/90"
+                  size="sm"
+                >
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  Montar Minha Campanha
+                </Button>
+              )}
               <Button
-                onClick={() => setBuilderOpen(true)}
-                className="mt-3 gap-2 bg-primary hover:bg-primary/90"
+                variant="outline"
                 size="sm"
+                className="gap-2"
+                disabled={!mediaKitData}
+                onClick={() => mediaKitData && generateMediaKitPdf(mediaKitData)}
               >
-                <ShoppingCart className="w-3.5 h-3.5" />
-                Montar Minha Campanha
+                <Download className="w-3.5 h-3.5" />
+                Media Kit
               </Button>
-            )}
+            </div>
           </div>
           <div className="flex items-center gap-5 sm:gap-7 flex-wrap">
             <div>
