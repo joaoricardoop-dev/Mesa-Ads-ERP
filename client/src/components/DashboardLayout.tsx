@@ -134,6 +134,7 @@ const NAV_ENTRIES: NavEntry[] = [
   },
   { icon: Building2, label: "Anunciantes", path: "/clientes" },
   { icon: Megaphone, label: "Campanhas", path: "/campanhas" },
+  { icon: ClipboardList, label: "Ordens de Serviço", path: "/ordens-servico", allowedRoles: ["admin", "manager", "operacoes", "comercial"] },
   {
     icon: Wallet,
     label: "Financeiro",
