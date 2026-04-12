@@ -77,10 +77,13 @@ import {
   Eye,
   Package,
   ChevronsUpDown,
+  MessageSquare,
+  X,
   Zap,
   type LucideIcon,
 } from "lucide-react";
 import { NotificationBell } from "./NotificationPanel";
+import { AIChatBox, type Message } from "./AIChatBox";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
@@ -237,6 +240,29 @@ function DashboardLayoutContent({
     lastName: user.lastName || "",
   });
   const queryClient = useQueryClient();
+
+  const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
+  const isInternalUser = INTERNAL_ROLES.includes(user.role || "");
+
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiMessages, setAiMessages] = useState<Message[]>([
+    { role: "system", content: "Você é um assistente interno da mesa.ads. Ajude a equipe com dúvidas sobre o sistema, campanhas, clientes e operações." },
+  ]);
+  const aiChatMutation = trpc.ai.chat.useMutation({
+    onSuccess: (response) => {
+      setAiMessages((prev) => [...prev, { role: "assistant", content: response }]);
+    },
+    onError: (err) => {
+      setAiMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${err.message}` }]);
+    },
+  });
+
+  const handleAISendMessage = (content: string) => {
+    const newMessages: Message[] = [...aiMessages, { role: "user", content }];
+    setAiMessages(newMessages);
+    aiChatMutation.mutate({ messages: newMessages });
+  };
+
   const updateProfileMutation = trpc.auth.updateProfile.useMutation({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
@@ -573,6 +599,47 @@ function DashboardLayoutContent({
         </div>
         <main className="flex-1 min-h-0 overflow-y-auto">{children}</main>
       </SidebarInset>
+
+      {isInternalUser && (
+        <>
+          {aiOpen && (
+            <div
+              className="fixed bottom-20 right-5 z-50 w-80 shadow-2xl rounded-xl overflow-hidden border border-border/40"
+              style={{ maxHeight: "calc(100vh - 120px)" }}
+            >
+              <div className="flex items-center justify-between px-3 py-2 bg-primary text-primary-foreground">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4" />
+                  <span className="text-sm font-medium">Assistente mesa.ads</span>
+                </div>
+                <button
+                  onClick={() => setAiOpen(false)}
+                  className="h-6 w-6 flex items-center justify-center rounded hover:bg-primary-foreground/20 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <AIChatBox
+                messages={aiMessages}
+                onSendMessage={handleAISendMessage}
+                isLoading={aiChatMutation.isPending}
+                placeholder="Pergunte algo..."
+                height="380px"
+                emptyStateMessage="Como posso ajudar?"
+                suggestedPrompts={["Como ver campanhas ativas?", "Como gerar um orçamento?", "Como adicionar um restaurante?"]}
+              />
+            </div>
+          )}
+
+          <button
+            onClick={() => setAiOpen((v) => !v)}
+            className="fixed bottom-5 right-5 z-50 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
+            aria-label="Assistente IA"
+          >
+            {aiOpen ? <X className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
+          </button>
+        </>
+      )}
     </>
   );
 }

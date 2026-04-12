@@ -2613,6 +2613,20 @@ export const appRouter = router({
         return newClient;
       }),
   }),
+
+  ai: router({
+    chat: protectedProcedure
+      .input(z.object({
+        messages: z.array(z.object({
+          role: z.enum(["system", "user", "assistant"]),
+          content: z.string(),
+        })),
+      }))
+      .mutation(async ({ input }) => {
+        const lastUserMessage = input.messages.filter((m) => m.role === "user").pop();
+        return `Olá! Sou o assistente interno da mesa.ads. Recebi sua mensagem: "${lastUserMessage?.content || ""}". Esta é uma resposta de demonstração — a integração com IA estará disponível em breve.`;
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
