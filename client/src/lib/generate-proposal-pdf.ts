@@ -59,6 +59,8 @@ interface ProposalPDFData {
   telasMonthlyCustomers?: number;
   telasImpressions30s?: number;
   telasImpressions15s?: number;
+  /** IRPJ rate for the product (decimal, e.g. 0.06). Defaults to 6% if not provided. */
+  irpj?: number;
 }
 
 const FONT_NAME = "HostGrotesk";
@@ -69,7 +71,8 @@ const GRAY = [100, 100, 100] as const;
 const LIGHT_GRAY = [240, 240, 240] as const;
 const WHITE = [255, 255, 255] as const;
 
-const PRICING_DEDUCTIONS = { irpj: 0.06, comRestaurante: 0.15, comComercial: 0.10 };
+const DEFAULT_IRPJ = 0.06;
+const PRICING_DEDUCTIONS = { comRestaurante: 0.15, comComercial: 0.10 };
 
 const DEFAULT_CUSTOS_VOLUME: Array<{ vol: number; custoGPC: number; frete: number; artes: number; margem: number }> = [
   { vol: 1000,  custoGPC: 0.4190, frete: 80.38,   artes: 1, margem: 0.50 },
@@ -108,23 +111,23 @@ function getTierForVolume(vol: number) {
   return match;
 }
 
-function calcUnitPriceFromTier(tier: typeof DEFAULT_CUSTOS_VOLUME[0], vol: number): number {
+function calcUnitPriceFromTier(tier: typeof DEFAULT_CUSTOS_VOLUME[0], vol: number, irpjRate: number = DEFAULT_IRPJ): number {
   const custoTotal = tier.custoGPC * tier.artes * vol + tier.frete;
-  const denominadorBase = 1 - tier.margem - PRICING_DEDUCTIONS.irpj - PRICING_DEDUCTIONS.comRestaurante;
+  const denominadorBase = 1 - tier.margem - irpjRate - PRICING_DEDUCTIONS.comRestaurante;
   const comCom = PRICING_DEDUCTIONS.comComercial;
   const precoBase = denominadorBase > 0 ? custoTotal / denominadorBase : 0;
   const precoTotal = comCom < 1 ? precoBase / (1 - comCom) : 0;
   return vol > 0 ? precoTotal / vol : 0;
 }
 
-function getVexaUnitPrice1000(): number {
+function getVexaUnitPrice1000(irpjRate: number = DEFAULT_IRPJ): number {
   const tier = getTierForVolume(1000);
-  return calcUnitPriceFromTier(tier, 1000);
+  return calcUnitPriceFromTier(tier, 1000, irpjRate);
 }
 
-function getVexaUnitPriceForVolume(vol: number): number {
+function getVexaUnitPriceForVolume(vol: number, irpjRate: number = DEFAULT_IRPJ): number {
   const tier = getTierForVolume(vol);
-  return calcUnitPriceFromTier(tier, vol);
+  return calcUnitPriceFromTier(tier, vol, irpjRate);
 }
 
 function getPrazoDiscountPercent(semanas: number): number {
@@ -277,7 +280,8 @@ export function generateProposalPdf(data: ProposalPDFData) {
   const cycles = data.contractDuration;
   const semanas = data.semanas ?? (cycles * 4);
 
-  const vexaUnitPrice1000 = getVexaUnitPrice1000();
+  const irpjRate = data.irpj ?? DEFAULT_IRPJ;
+  const vexaUnitPrice1000 = getVexaUnitPrice1000(irpjRate);
   const listPriceTotal = vexaUnitPrice1000 * data.coasterVolume * cycles;
 
   const hasDetailedDiscounts = data.semanas !== undefined;
@@ -683,7 +687,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
     const hasPartner = data.hasPartnerDiscount === true;
 
     if (hasDetailedDiscounts) {
-      const vexaUnitPriceAtVolume = getVexaUnitPriceForVolume(data.coasterVolume);
+      const vexaUnitPriceAtVolume = getVexaUnitPriceForVolume(data.coasterVolume, irpjRate);
       const priceAfterQty = vexaUnitPriceAtVolume * data.coasterVolume * cycles;
       const qtyDiscountValue = listPriceTotal - priceAfterQty;
       const qtyDiscountPercent = listPriceTotal > 0 ? (qtyDiscountValue / listPriceTotal) * 100 : 0;

@@ -761,6 +761,7 @@ export default function Quotations() {
                                   items: proposalItems,
                                   periodStart: q.periodStart || undefined,
                                   batchWeeks: q.batchWeeks ?? 4,
+                                  irpj: parseFloat((q as any).productIrpj ?? "6") / 100,
                                 });
                                 toast.success("PDF da proposta gerado!");
                               } catch {

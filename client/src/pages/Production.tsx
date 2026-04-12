@@ -526,7 +526,7 @@ export default function Production() {
             variant="outline"
             size="sm"
             className="gap-1.5"
-            onClick={() => { generatePriceTablePDF(); toast.success("PDF gerado!"); }}
+            onClick={() => { generatePriceTablePDF(0.06); toast.success("PDF gerado!"); }}
           >
             <Download className="w-3.5 h-3.5" />
             Tabela de Preços

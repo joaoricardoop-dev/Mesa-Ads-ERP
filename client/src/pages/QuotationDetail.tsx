@@ -291,6 +291,7 @@ export default function QuotationDetail() {
         customSellerCommission: (quotation as any).customSellerCommission ? Number((quotation as any).customSellerCommission) : undefined,
         customFinalPrice: (quotation as any).customFinalPrice ? Number((quotation as any).customFinalPrice) : undefined,
         agencyCommissionPercent: (quotation as any).agencyCommissionPercent ? Number((quotation as any).agencyCommissionPercent) : undefined,
+        irpj: parseFloat((quotation as any).productIrpj ?? "6") / 100,
       });
       toast.success("PDF da proposta gerado!");
     } catch {

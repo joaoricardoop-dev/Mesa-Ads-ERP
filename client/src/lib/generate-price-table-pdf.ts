@@ -129,8 +129,8 @@ function getFreightForQty(qty: number): number {
   return 0;
 }
 
-export function generatePriceTablePDF() {
-  const irpj = 0.15;
+export function generatePriceTablePDF(irpjOverride?: number) {
+  const irpj = irpjOverride ?? 0.06;
   const comissaoRest = 0.15;
   const comissaoComercial = 0.10;
   function getDenominatorBase(m: number) { return 1 - m - irpj - comissaoRest; }
@@ -161,10 +161,11 @@ export function generatePriceTablePDF() {
   doc.text("COMPOSIÇÃO DO PREÇO", pageW - 150, 19);
   doc.setFontSize(8.5);
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text(`Margem: 50%→35% (escalonada)  |  IRPJ: 15%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%`, pageW - 150, 26);
+  doc.text(`Margem: 50%→35% (escalonada)  |  IRPJ: ${(irpj * 100).toFixed(0)}%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%`, pageW - 150, 26);
   doc.setTextColor(...TEXT_GRAY);
   doc.setFontSize(8);
-  doc.text(`Preço = [(Custo + Frete) / (1 − margem − 30%)] / (1 − 10%)`, pageW - 150, 32);
+  const irpjComRestPct = ((irpj + comissaoRest) * 100).toFixed(0);
+  doc.text(`Preço = [(Custo + Frete) / (1 − margem − ${irpjComRestPct}%)] / (1 − 10%)`, pageW - 150, 32);
 
   function drawPriceTable(faces: number, startY: number) {
     const label = faces === 1 ? "1 FACE (frente)" : "2 FACES (frente e verso)";
@@ -287,7 +288,7 @@ export function generatePriceTablePDF() {
   lineY += 6;
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text(`IRPJ (15%): ${fmtBRL(exTotal * irpj)}`, col1X, lineY);
+  doc.text(`IRPJ (${(irpj * 100).toFixed(0)}%): ${fmtBRL(exTotal * irpj)}`, col1X, lineY);
   doc.text(`Com. rest. (15%): ${fmtBRL(exTotal * comissaoRest)}`, col1X + 50, lineY);
   doc.text(`Com. comerc. (10%): ${fmtBRL(exTotal * comissaoComercial)}`, col2X + 32, lineY);
   doc.setFont("helvetica", "bold");
@@ -322,10 +323,10 @@ export function generatePriceTablePDF() {
   doc.text("COMPOSIÇÃO DO PREÇO", pageW - 150, 19);
   doc.setFontSize(8.5);
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text(`Margem: 50%→35% (escalonada)  |  IRPJ: 15%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%`, pageW - 150, 26);
+  doc.text(`Margem: 50%→35% (escalonada)  |  IRPJ: ${(irpj * 100).toFixed(0)}%  |  Com. Rest.: 15%  |  Com. Comerc.: 10%`, pageW - 150, 26);
   doc.setTextColor(...TEXT_GRAY);
   doc.setFontSize(8);
-  doc.text(`Preço = [(Custo × 2 + Frete) / (1 − margem − 30%)] / (1 − 10%)`, pageW - 150, 32);
+  doc.text(`Preço = [(Custo × 2 + Frete) / (1 − margem − ${irpjComRestPct}%)] / (1 − 10%)`, pageW - 150, 32);
 
   drawPriceTable(2, 50);
   drawFooter(doc);
@@ -479,7 +480,7 @@ export function generatePriceTablePDF() {
     { label: "Custo de Produção (GPC)", pct: "variável", desc: "Custo unitário × faces × quantidade" },
     { label: "Frete (Azul Cargo)", pct: "variável", desc: "Custo fixo por faixa de volume" },
     { label: "Margem Bruta (escalonada)", pct: "50%→35%", desc: "Maior volume = menor margem" },
-    { label: "IRPJ (tributário)", pct: "15%", desc: "Imposto sobre receita" },
+    { label: "IRPJ (tributário)", pct: `${(irpj * 100).toFixed(0)}%`, desc: "Imposto sobre receita" },
     { label: "Comissão Restaurante", pct: "15%", desc: "Repasse ao parceiro restaurante" },
     { label: "Comissão Comercial", pct: "10%", desc: "Comissão do vendedor" },
   ];
@@ -509,7 +510,7 @@ export function generatePriceTablePDF() {
   doc.setTextColor(...TEXT_GRAY);
   doc.text("2.", fmLeftX + 4, fmY + 2);
   doc.setTextColor(...TEXT_LIGHT);
-  doc.text("Preço Base = Custo Base / (1 − margem − 0,15 − 0,15)", fmLeftX + 10, fmY + 2);
+  doc.text(`Preço Base = Custo Base / (1 − margem − ${irpj.toFixed(2).replace(".", ",")} − 0,15)`, fmLeftX + 10, fmY + 2);
 
   fmY += 7;
   doc.setTextColor(...TEXT_GRAY);

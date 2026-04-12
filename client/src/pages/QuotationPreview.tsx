@@ -292,6 +292,7 @@ export default function QuotationPreview() {
         neighborhood: r.neighborhood,
         coasters: r.coasters,
       })),
+      irpj: parseFloat(selectedProduct?.irpj ?? "6") / 100,
       ...(isTelasProduct ? {
         isTelas: true,
         productName: selectedProduct?.name,
