@@ -1,7 +1,7 @@
 import { adminProcedure, anuncianteProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { crmNotifications, leads, partners } from "../drizzle/schema";
+import { crmNotifications, leads, partners, clients } from "../drizzle/schema";
 import { eq, isNull, desc, and, gte, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { drizzle } from "drizzle-orm/neon-serverless";
@@ -107,10 +107,12 @@ export const notificationRouter = router({
           leadName: leads.name,
           leadCompany: leads.company,
           partnerName: partners.name,
+          clientName: clients.name,
         })
         .from(crmNotifications)
         .leftJoin(leads, eq(crmNotifications.leadId, leads.id))
         .leftJoin(partners, eq(crmNotifications.partnerId, partners.id))
+        .leftJoin(clients, eq(crmNotifications.clientId, clients.id))
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(crmNotifications.createdAt))
         .limit(input?.limit ?? 50)

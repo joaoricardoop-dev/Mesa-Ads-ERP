@@ -49,7 +49,10 @@ import {
   Info,
   LayoutDashboard,
   ShoppingCart,
+  FileBarChart2,
+  Target,
 } from "lucide-react";
+import { generateReportPdf } from "@/lib/generate-report-pdf";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
 import { CampaignBuilder } from "@/components/CampaignBuilder";
 import {
@@ -554,9 +557,15 @@ function StatusPill({ status, cfg }: { status: string; cfg: { label: string; col
   );
 }
 
-function CampaignDetail({ campaign, onBack }: { campaign: any; onBack: () => void }) {
+function CampaignDetail({ campaign, onBack, clientId }: { campaign: any; onBack: () => void; clientId?: number | null }) {
   const { data: campSOs = [] } = trpc.portal.myCampaignServiceOrders.useQuery({ campaignId: campaign.id });
   const { data: proofs = [] } = trpc.portal.myCampaignProofs.useQuery({ campaignId: campaign.id });
+  const { data: allReports = [] } = trpc.campaignReport.getForPortal.useQuery(
+    { clientId: clientId! },
+    { enabled: !!clientId }
+  );
+  const campaignReports = (allReports as any[]).filter(r => r.campaignId === campaign.id);
+  const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
 
   const serviceOrders = campSOs as CampaignSO[];
   const proofPhotos = proofs as CampaignProof[];
@@ -712,6 +721,98 @@ function CampaignDetail({ campaign, onBack }: { campaign: any; onBack: () => voi
         <div className="flex items-center gap-2.5 text-sm text-muted-foreground px-1">
           <Package className="w-4 h-4 shrink-0" />
           <span>Material recebido nos estabelecimentos em <strong className="text-foreground">{fmtDate(campaign.materialReceivedDate)}</strong></span>
+        </div>
+      )}
+
+      {campaignReports.length > 0 && (
+        <div className="rounded-xl border bg-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-1.5 rounded-lg bg-emerald-500/10">
+              <FileBarChart2 className="w-4 h-4 text-emerald-400" />
+            </div>
+            <p className="text-sm font-semibold">Relatórios de Campanha</p>
+          </div>
+          <div className="space-y-3">
+            {campaignReports.map((report: any) => {
+              const typeLabel = report.reportType === "telas" ? "Telas" : report.reportType === "ativacao" ? "Ativação" : "Coasters";
+              return (
+                <div key={report.id} className="border border-border/30 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-semibold truncate">{report.title}</h4>
+                        <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-400 bg-blue-500/10">{typeLabel}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(report.periodStart).toLocaleDateString("pt-BR")} – {new Date(report.periodEnd).toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 gap-1.5 text-xs shrink-0"
+                      disabled={pdfLoadingId === report.id}
+                      onClick={async () => {
+                        setPdfLoadingId(report.id);
+                        try {
+                          await generateReportPdf({
+                            campaignName: campaign.name ?? "",
+                            clientName: campaign.clientName ?? undefined,
+                            reportTitle: report.title,
+                            periodStart: report.periodStart,
+                            periodEnd: report.periodEnd,
+                            reportType: report.reportType ?? "coaster",
+                            numRestaurants: report.numRestaurants ?? 0,
+                            coastersDistributed: report.coastersDistributed ?? 0,
+                            usagePerDay: report.usagePerDay ?? 3,
+                            daysInPeriod: report.daysInPeriod ?? 30,
+                            numScreens: report.numScreens ?? 0,
+                            spotsPerDay: report.spotsPerDay ?? 0,
+                            spotDurationSeconds: report.spotDurationSeconds ?? 30,
+                            activationEvents: report.activationEvents ?? 0,
+                            peoplePerEvent: report.peoplePerEvent ?? 0,
+                            totalImpressions: report.totalImpressions ?? 0,
+                            notes: report.notes,
+                            photos: report.photos ?? [],
+                            publishedAt: report.publishedAt,
+                          });
+                        } catch {
+                          toast.error("Erro ao gerar PDF do relatório.");
+                        } finally {
+                          setPdfLoadingId(null);
+                        }
+                      }}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      {pdfLoadingId === report.id ? "Gerando..." : "Baixar PDF"}
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5">
+                      <Target className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-xs text-muted-foreground">Impressões:</span>
+                      <span className="text-sm font-bold text-emerald-400 font-mono">{(report.totalImpressions ?? 0).toLocaleString("pt-BR")}</span>
+                    </div>
+                  </div>
+
+                  {report.photos && report.photos.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {(report.photos as any[]).map((photo: any) => (
+                        <div key={photo.id} className="rounded-md overflow-hidden border border-border/20 aspect-square">
+                          <img src={photo.url} alt={photo.caption || ""} className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {report.notes && (
+                    <p className="text-xs text-muted-foreground border-t border-border/20 pt-2">{report.notes}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -1099,7 +1200,7 @@ export default function AnunciantePortal() {
 
         {activeTab === "campanhas" && (
           selectedCampaign ? (
-            <CampaignDetail campaign={selectedCampaign} onBack={() => setSelectedCampaignId(null)} />
+            <CampaignDetail campaign={selectedCampaign} onBack={() => setSelectedCampaignId(null)} clientId={profile?.id ?? null} />
           ) : (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">

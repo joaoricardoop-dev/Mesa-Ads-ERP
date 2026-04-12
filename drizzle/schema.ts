@@ -980,6 +980,50 @@ export const userRestaurants = pgTable("user_restaurants", {
 export type UserRestaurant = typeof userRestaurants.$inferSelect;
 export type InsertUserRestaurant = typeof userRestaurants.$inferInsert;
 
+// ─── Campaign Reports ─────────────────────────────────────────────────────────
+
+export const campaignReports = pgTable("campaign_reports", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  periodStart: date("periodStart").notNull(),
+  periodEnd: date("periodEnd").notNull(),
+  reportType: varchar("reportType", { length: 50 }).notNull().default("coaster"),
+  numRestaurants: integer("numRestaurants").default(0).notNull(),
+  coastersDistributed: integer("coastersDistributed").default(0).notNull(),
+  usagePerDay: integer("usagePerDay").default(3).notNull(),
+  daysInPeriod: integer("daysInPeriod").default(30).notNull(),
+  numScreens: integer("numScreens").default(0).notNull(),
+  spotsPerDay: integer("spotsPerDay").default(0).notNull(),
+  spotDurationSeconds: integer("spotDurationSeconds").default(30).notNull(),
+  activationEvents: integer("activationEvents").default(0).notNull(),
+  peoplePerEvent: integer("peoplePerEvent").default(0).notNull(),
+  totalImpressions: integer("totalImpressions").default(0).notNull(),
+  notes: text("notes"),
+  publishedAt: timestamp("publishedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_campaign_reports_campaign_id").on(t.campaignId),
+  index("idx_campaign_reports_published_at").on(t.publishedAt),
+]);
+
+export type CampaignReport = typeof campaignReports.$inferSelect;
+export type InsertCampaignReport = typeof campaignReports.$inferInsert;
+
+export const campaignReportPhotos = pgTable("campaign_report_photos", {
+  id: serial("id").primaryKey(),
+  reportId: integer("reportId").notNull().references(() => campaignReports.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  caption: varchar("caption", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_campaign_report_photos_report_id").on(t.reportId),
+]);
+
+export type CampaignReportPhoto = typeof campaignReportPhotos.$inferSelect;
+export type InsertCampaignReportPhoto = typeof campaignReportPhotos.$inferInsert;
+
 // ─── Integration Tokens (OAuth2 provider tokens) ──────────────────────────────
 
 export const integrationTokens = pgTable("integration_tokens", {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 
 import { trpc } from "@/lib/trpc";
@@ -70,9 +70,18 @@ import {
   Plus,
   ChevronRight,
   Pencil,
+  FileBarChart2,
+  Send,
+  Trash2,
+  Download,
+  X,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ObjectUploader } from "@/components/ObjectUploader";
 import { calcTelaImpressions, TELAS_INSERCOES } from "@/hooks/useBudgetCalculator";
+import { generateReportPdf } from "@/lib/generate-report-pdf";
 
 const CARRIER_SLUGS: Record<string, string> = {
   latam: "latam", "latam cargo": "latam", ltm: "latam",
@@ -329,6 +338,26 @@ export default function CampaignDetail() {
     freightCost: string;
   } | null>(null);
 
+  const [reportSheetOpen, setReportSheetOpen] = useState(false);
+  const [editingReportId, setEditingReportId] = useState<number | null>(null);
+  const [reportForm, setReportForm] = useState({
+    title: "",
+    periodStart: "",
+    periodEnd: "",
+    reportType: "coaster" as "coaster" | "telas" | "ativacao",
+    numRestaurants: 0,
+    coastersDistributed: 0,
+    usagePerDay: 3,
+    daysInPeriod: 30,
+    numScreens: 0,
+    spotsPerDay: 0,
+    spotDurationSeconds: 30,
+    activationEvents: 0,
+    peoplePerEvent: 0,
+    notes: "",
+  });
+  const [reportPdfLoading, setReportPdfLoading] = useState<number | null>(null);
+
   const utils = trpc.useUtils();
   const { data: campaign, isLoading } = trpc.campaign.get.useQuery({ id: campaignId }, { enabled: campaignId > 0 });
   const { data: campaignRestaurants = [] } = trpc.campaign.getRestaurants.useQuery({ campaignId }, { enabled: campaignId > 0 });
@@ -340,6 +369,7 @@ export default function CampaignDetail() {
   const { data: campaignInvoices = [] } = trpc.financial.listInvoices.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignPayments = [] } = trpc.financial.listPayments.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignSoList = [] } = trpc.serviceOrder.list.useQuery({ campaignId }, { enabled: campaignId > 0 });
+  const { data: campaignReportsList = [], refetch: refetchReports } = trpc.campaignReport.list.useQuery({ campaignId }, { enabled: campaignId > 0 });
 
   const distSo = campaignSoList.find((s: any) => s.type === "distribuicao");
   const prodSo = campaignSoList.find((s: any) => s.type === "producao");
@@ -590,6 +620,120 @@ export default function CampaignDetail() {
   function handleCreateInvoice() {
     if (!invoiceAmount || !invoiceDueDate) { toast.error("Preencha valor e data de vencimento"); return; }
     createInvoiceMutation.mutate({ campaignId, amount: invoiceAmount, dueDate: invoiceDueDate, notes: invoiceNotes || undefined });
+  }
+
+  const createReportMutation = trpc.campaignReport.create.useMutation({
+    onSuccess: () => { refetchReports(); setReportSheetOpen(false); toast.success("Relatório criado com sucesso!"); },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const updateReportMutation = trpc.campaignReport.update.useMutation({
+    onSuccess: () => { refetchReports(); setReportSheetOpen(false); setEditingReportId(null); toast.success("Relatório atualizado!"); },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const publishReportMutation = trpc.campaignReport.publish.useMutation({
+    onSuccess: () => { refetchReports(); toast.success("Relatório publicado para o anunciante!"); },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const deleteReportMutation = trpc.campaignReport.delete.useMutation({
+    onSuccess: () => { refetchReports(); toast.success("Relatório excluído."); },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const addReportPhotoMutation = trpc.campaignReport.addPhoto.useMutation({
+    onSuccess: () => { refetchReports(); toast.success("Foto adicionada!"); },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const deleteReportPhotoMutation = trpc.campaignReport.deletePhoto.useMutation({
+    onSuccess: () => { refetchReports(); toast.success("Foto removida."); },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  function openNewReportSheet() {
+    setEditingReportId(null);
+    setReportForm({
+      title: "", periodStart: "", periodEnd: "",
+      reportType: "coaster", numRestaurants: 0, coastersDistributed: 0,
+      usagePerDay: 3, daysInPeriod: 30, numScreens: 0,
+      spotsPerDay: 0, spotDurationSeconds: 30,
+      activationEvents: 0, peoplePerEvent: 0, notes: "",
+    });
+    setReportSheetOpen(true);
+  }
+
+  function openEditReportSheet(report: any) {
+    setEditingReportId(report.id);
+    setReportForm({
+      title: report.title ?? "",
+      periodStart: report.periodStart ?? "",
+      periodEnd: report.periodEnd ?? "",
+      reportType: (report.reportType ?? "coaster") as "coaster" | "telas" | "ativacao",
+      numRestaurants: report.numRestaurants ?? 0,
+      coastersDistributed: report.coastersDistributed ?? 0,
+      usagePerDay: report.usagePerDay ?? 3,
+      daysInPeriod: report.daysInPeriod ?? 30,
+      numScreens: report.numScreens ?? 0,
+      spotsPerDay: report.spotsPerDay ?? 0,
+      spotDurationSeconds: report.spotDurationSeconds ?? 30,
+      activationEvents: report.activationEvents ?? 0,
+      peoplePerEvent: report.peoplePerEvent ?? 0,
+      notes: report.notes ?? "",
+    });
+    setReportSheetOpen(true);
+  }
+
+  function handleSaveReport() {
+    if (!reportForm.title || !reportForm.periodStart || !reportForm.periodEnd) {
+      toast.error("Preencha título e período do relatório.");
+      return;
+    }
+    if (editingReportId) {
+      updateReportMutation.mutate({ id: editingReportId, campaignId, ...reportForm });
+    } else {
+      createReportMutation.mutate({ campaignId, ...reportForm });
+    }
+  }
+
+  function calcPreviewImpressions() {
+    const f = reportForm;
+    if (f.reportType === "coaster") return f.coastersDistributed * f.usagePerDay * f.daysInPeriod;
+    if (f.reportType === "telas") return f.numScreens * f.spotsPerDay * f.daysInPeriod;
+    if (f.reportType === "ativacao") return f.activationEvents * f.peoplePerEvent;
+    return 0;
+  }
+
+  async function handleDownloadReportPdf(report: any, client: any) {
+    setReportPdfLoading(report.id);
+    try {
+      await generateReportPdf({
+        campaignName: campaign?.name ?? "",
+        clientName: client?.name ?? undefined,
+        reportTitle: report.title,
+        periodStart: report.periodStart,
+        periodEnd: report.periodEnd,
+        reportType: report.reportType ?? "coaster",
+        numRestaurants: report.numRestaurants ?? 0,
+        coastersDistributed: report.coastersDistributed ?? 0,
+        usagePerDay: report.usagePerDay ?? 3,
+        daysInPeriod: report.daysInPeriod ?? 30,
+        numScreens: report.numScreens ?? 0,
+        spotsPerDay: report.spotsPerDay ?? 0,
+        spotDurationSeconds: report.spotDurationSeconds ?? 30,
+        activationEvents: report.activationEvents ?? 0,
+        peoplePerEvent: report.peoplePerEvent ?? 0,
+        totalImpressions: report.totalImpressions ?? 0,
+        notes: report.notes,
+        photos: report.photos ?? [],
+        publishedAt: report.publishedAt,
+      });
+    } catch (err: any) {
+      toast.error("Erro ao gerar PDF do relatório.");
+    } finally {
+      setReportPdfLoading(null);
+    }
   }
 
   const handleStatusAction = (action: string) => {
@@ -1791,6 +1935,7 @@ export default function CampaignDetail() {
                 <TabsTrigger value="restaurantes" className="gap-1.5 text-xs"><Store className="w-3.5 h-3.5" /> Distribuição</TabsTrigger>
                 <TabsTrigger value="cliente" className="gap-1.5 text-xs"><Building2 className="w-3.5 h-3.5" /> Cliente</TabsTrigger>
                 <TabsTrigger value="historico" className="gap-1.5 text-xs"><Clock className="w-3.5 h-3.5" /> Histórico</TabsTrigger>
+                <TabsTrigger value="relatorios" className="gap-1.5 text-xs"><FileBarChart2 className="w-3.5 h-3.5" /> Relatórios</TabsTrigger>
               </TabsList>
             </div>
 
@@ -2911,6 +3056,284 @@ export default function CampaignDetail() {
                   ))}
                 </div>
               )}
+            </TabsContent>
+
+            {/* ─── RELATÓRIOS ─── */}
+            <TabsContent value="relatorios" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Relatórios de Campanha</h3>
+                <Button size="sm" className="gap-1.5 text-xs h-8" onClick={openNewReportSheet}>
+                  <Plus className="w-3.5 h-3.5" /> Novo Relatório
+                </Button>
+              </div>
+
+              {campaignReportsList.length === 0 ? (
+                <div className="bg-card border border-border/30 rounded-lg p-8 text-center text-muted-foreground">
+                  <FileBarChart2 className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm">Nenhum relatório criado ainda</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(campaignReportsList as any[]).map((report) => {
+                    const isPublished = !!report.publishedAt;
+                    const typeLabel = report.reportType === "telas" ? "Telas" : report.reportType === "ativacao" ? "Ativação" : "Coasters";
+                    const clientForReport = clientsList.find((cl) => cl.id === campaign.clientId);
+                    return (
+                      <div key={report.id} className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-semibold truncate">{report.title}</h4>
+                              <Badge variant="outline" className={isPublished ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10" : "border-yellow-500/30 text-yellow-400 bg-yellow-500/10"}>
+                                {isPublished ? "Publicado" : "Rascunho"}
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-400 bg-blue-500/10">{typeLabel}</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {new Date(report.periodStart).toLocaleDateString("pt-BR")} – {new Date(report.periodEnd).toLocaleDateString("pt-BR")}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEditReportSheet(report)} title="Editar">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            {!isPublished && (
+                              <Button size="sm" variant="ghost" className="h-7 px-2 gap-1 text-[10px] text-emerald-400 hover:text-emerald-300" onClick={() => publishReportMutation.mutate({ id: report.id })} disabled={publishReportMutation.isPending} title="Publicar">
+                                <Send className="w-3 h-3" /> Publicar
+                              </Button>
+                            )}
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDownloadReportPdf(report, clientForReport)} disabled={reportPdfLoading === report.id} title="Download PDF">
+                              <Download className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-300" onClick={() => deleteReportMutation.mutate({ id: report.id })} title="Excluir">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          <div className="bg-background/60 rounded-md p-2 border border-border/20">
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Impressões</p>
+                            <p className="text-sm font-bold font-mono text-emerald-400">{(report.totalImpressions ?? 0).toLocaleString("pt-BR")}</p>
+                          </div>
+                          {report.reportType === "coaster" && (
+                            <>
+                              <div className="bg-background/60 rounded-md p-2 border border-border/20">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Restaurantes</p>
+                                <p className="text-sm font-bold font-mono">{report.numRestaurants}</p>
+                              </div>
+                              <div className="bg-background/60 rounded-md p-2 border border-border/20">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Coasters</p>
+                                <p className="text-sm font-bold font-mono">{(report.coastersDistributed ?? 0).toLocaleString("pt-BR")}</p>
+                              </div>
+                            </>
+                          )}
+                          {report.reportType === "telas" && (
+                            <>
+                              <div className="bg-background/60 rounded-md p-2 border border-border/20">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Telas</p>
+                                <p className="text-sm font-bold font-mono">{report.numScreens}</p>
+                              </div>
+                              <div className="bg-background/60 rounded-md p-2 border border-border/20">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Spots/dia</p>
+                                <p className="text-sm font-bold font-mono">{report.spotsPerDay}</p>
+                              </div>
+                            </>
+                          )}
+                          {report.reportType === "ativacao" && (
+                            <>
+                              <div className="bg-background/60 rounded-md p-2 border border-border/20">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Eventos</p>
+                                <p className="text-sm font-bold font-mono">{report.activationEvents}</p>
+                              </div>
+                              <div className="bg-background/60 rounded-md p-2 border border-border/20">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Pessoas/evento</p>
+                                <p className="text-sm font-bold font-mono">{report.peoplePerEvent}</p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        {report.photos && report.photos.length > 0 && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Fotos</p>
+                            <div className="flex flex-wrap gap-2">
+                              {(report.photos as any[]).map((photo) => (
+                                <div key={photo.id} className="relative group">
+                                  <img src={photo.url} alt={photo.caption || ""} className="w-16 h-16 object-cover rounded-md border border-border/30" />
+                                  <button
+                                    onClick={() => deleteReportPhotoMutation.mutate({ id: photo.id })}
+                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white hidden group-hover:flex items-center justify-center"
+                                  >
+                                    <X className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div>
+                          <ObjectUploader
+                            maxNumberOfFiles={5}
+                            maxFileSize={10485760}
+                            onGetUploadParameters={async (file) => {
+                              const res = await fetch("/api/uploads/request-url", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+                              });
+                              const data = await res.json();
+                              return { method: "PUT" as const, url: data.uploadURL };
+                            }}
+                            onComplete={(result) => {
+                              const successful = result.successful ?? [];
+                              for (const f of successful) {
+                                const uploadedUrl = (f as any).uploadURL || (f.response as any)?.uploadURL || "";
+                                const objectPath = uploadedUrl ? new URL(uploadedUrl).pathname.split("?")[0] : "";
+                                const servingUrl = objectPath ? `/objects${objectPath}` : "";
+                                if (servingUrl) {
+                                  addReportPhotoMutation.mutate({ reportId: report.id, url: servingUrl });
+                                }
+                              }
+                            }}
+                            buttonClassName="h-7 text-xs gap-1.5 bg-transparent border border-border/30 text-muted-foreground hover:text-foreground hover:bg-accent/20"
+                          >
+                            <Camera className="w-3 h-3" /> Adicionar Fotos
+                          </ObjectUploader>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <Sheet open={reportSheetOpen} onOpenChange={setReportSheetOpen}>
+                <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+                  <SheetHeader className="pb-4 border-b">
+                    <SheetTitle>{editingReportId ? "Editar Relatório" : "Novo Relatório"}</SheetTitle>
+                  </SheetHeader>
+                  <div className="py-5 space-y-4">
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Título do Relatório</Label>
+                      <Input value={reportForm.title} onChange={e => setReportForm(f => ({ ...f, title: e.target.value }))} placeholder="ex: Relatório Mensal - Outubro 2025" className="bg-background border-border/30 text-sm" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs">Início do Período</Label>
+                        <Input type="date" value={reportForm.periodStart} onChange={e => setReportForm(f => ({ ...f, periodStart: e.target.value }))} className="bg-background border-border/30 text-sm" />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs">Fim do Período</Label>
+                        <Input type="date" value={reportForm.periodEnd} onChange={e => setReportForm(f => ({ ...f, periodEnd: e.target.value }))} className="bg-background border-border/30 text-sm" />
+                      </div>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Tipo de Mídia</Label>
+                      <Select value={reportForm.reportType} onValueChange={(v) => setReportForm(f => ({ ...f, reportType: v as any }))}>
+                        <SelectTrigger className="bg-background border-border/30 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="coaster">Coasters / Porta-Copos</SelectItem>
+                          <SelectItem value="telas">Telas / Digital</SelectItem>
+                          <SelectItem value="ativacao">Ativação</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {reportForm.reportType === "coaster" && (
+                      <div className="space-y-3 p-3 bg-muted/20 rounded-lg border border-border/20">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Métricas de Coaster</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">Restaurantes ativos</Label>
+                            <Input type="number" value={reportForm.numRestaurants} onChange={e => setReportForm(f => ({ ...f, numRestaurants: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30 text-sm" />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">Coasters distribuídos</Label>
+                            <Input type="number" value={reportForm.coastersDistributed} onChange={e => setReportForm(f => ({ ...f, coastersDistributed: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30 text-sm" />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">Usos por dia</Label>
+                            <Input type="number" value={reportForm.usagePerDay} onChange={e => setReportForm(f => ({ ...f, usagePerDay: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30 text-sm" />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">Dias no período</Label>
+                            <Input type="number" value={reportForm.daysInPeriod} onChange={e => setReportForm(f => ({ ...f, daysInPeriod: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30 text-sm" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {reportForm.reportType === "telas" && (
+                      <div className="space-y-3 p-3 bg-muted/20 rounded-lg border border-border/20">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Métricas de Telas</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">Número de telas</Label>
+                            <Input type="number" value={reportForm.numScreens} onChange={e => setReportForm(f => ({ ...f, numScreens: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30 text-sm" />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">Spots por dia</Label>
+                            <Input type="number" value={reportForm.spotsPerDay} onChange={e => setReportForm(f => ({ ...f, spotsPerDay: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30 text-sm" />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">Duração do spot (s)</Label>
+                            <Select value={String(reportForm.spotDurationSeconds)} onValueChange={(v) => setReportForm(f => ({ ...f, spotDurationSeconds: parseInt(v) }))}>
+                              <SelectTrigger className="bg-background border-border/30 text-sm"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="15">15 segundos</SelectItem>
+                                <SelectItem value="30">30 segundos</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">Dias no período</Label>
+                            <Input type="number" value={reportForm.daysInPeriod} onChange={e => setReportForm(f => ({ ...f, daysInPeriod: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30 text-sm" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {reportForm.reportType === "ativacao" && (
+                      <div className="space-y-3 p-3 bg-muted/20 rounded-lg border border-border/20">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Métricas de Ativação</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">Eventos de ativação</Label>
+                            <Input type="number" value={reportForm.activationEvents} onChange={e => setReportForm(f => ({ ...f, activationEvents: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30 text-sm" />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">Pessoas por evento</Label>
+                            <Input type="number" value={reportForm.peoplePerEvent} onChange={e => setReportForm(f => ({ ...f, peoplePerEvent: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30 text-sm" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
+                      <Target className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Impressões estimadas</p>
+                        <p className="text-sm font-bold text-emerald-400 font-mono">{calcPreviewImpressions().toLocaleString("pt-BR")}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Observações (opcional)</Label>
+                      <Textarea value={reportForm.notes} onChange={e => setReportForm(f => ({ ...f, notes: e.target.value }))} placeholder="Destaques, pontos de atenção, contexto do período..." className="bg-background border-border/30 text-sm resize-none" rows={3} />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-border/20">
+                      <Button variant="outline" size="sm" onClick={() => setReportSheetOpen(false)}>Cancelar</Button>
+                      <Button size="sm" onClick={handleSaveReport} disabled={createReportMutation.isPending || updateReportMutation.isPending}>
+                        {(createReportMutation.isPending || updateReportMutation.isPending) ? "Salvando..." : editingReportId ? "Salvar Alterações" : "Criar Relatório"}
+                      </Button>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </TabsContent>
           </Tabs>
         </div>
