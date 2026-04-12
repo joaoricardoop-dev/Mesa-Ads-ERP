@@ -65,14 +65,14 @@ export function calcUnitPriceAdv(params: {
   if (pricingMode === "price_based") {
     if (precoBaseTier <= 0) return 0;
     const den = 1 - comParceiro - irpj;
-    const total = den > 0 ? precoBaseTier / den : precoBaseTier;
+    const total = comParceiro > 0 && den > 0 ? precoBaseTier / den : precoBaseTier;
     return volume > 0 ? total / volume : 0;
   }
   const denominadorBase = 1 - margem - irpj - comRestaurante - comComercialProduto;
   const custoTotal = custoUnitario * artes * volume + frete;
   const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
   const den = 1 - comParceiro - irpj;
-  const precoTotal = den > 0 ? precoBase / den : precoBase;
+  const precoTotal = comParceiro > 0 && den > 0 ? precoBase / den : precoBase;
   return volume > 0 ? precoTotal / volume : 0;
 }
 

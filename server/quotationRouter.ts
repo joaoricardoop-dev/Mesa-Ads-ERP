@@ -1108,14 +1108,14 @@ export const quotationRouter = router({
         if (prod.pricingMode === "price_based") {
           if (precoBase <= 0) return 0;
           const den = 1 - comParceiro - irpj;
-          const total = den > 0 ? precoBase / den : precoBase;
+          const total = comParceiro > 0 && den > 0 ? precoBase / den : precoBase;
           return volume > 0 ? total / volume : 0;
         }
         const denominadorBase = 1 - margem - irpj - comRestaurante - comComercial;
         const custoTotal = custoUnitario * artes * volume + frete;
         const precoCalc = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
         const den = 1 - comParceiro - irpj;
-        const precoTotal = den > 0 ? precoCalc / den : precoCalc;
+        const precoTotal = comParceiro > 0 && den > 0 ? precoCalc / den : precoCalc;
         return volume > 0 ? precoTotal / volume : 0;
       }
 
