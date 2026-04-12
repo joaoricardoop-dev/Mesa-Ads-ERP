@@ -5,9 +5,82 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
-import { FileText, Users, UtensilsCrossed, TrendingUp, Download } from "lucide-react";
+import { Users, UtensilsCrossed, TrendingUp, Download } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { generateFinancialPdf, type FinancialReportData } from "@/lib/generate-financial-pdf";
+
+function fmtNum(v: number) {
+  return v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDateBR(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function fmtMonth(monthStr: string): string {
+  const [y, m] = monthStr.split("-");
+  const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  return `${months[parseInt(m, 10) - 1]}/${y}`;
+}
+
+function exportCsv(startDate: string, endDate: string, data: FinancialReportData) {
+  const rows: string[][] = [];
+
+  rows.push(["RELATÓRIO FINANCEIRO"]);
+  rows.push(["Período:", `${startDate} a ${endDate}`]);
+  rows.push([]);
+
+  rows.push(["RESUMO"]);
+  rows.push(["Receita Total", fmtNum(data.totalRevenue)]);
+  rows.push(["Custos Totais", fmtNum(data.totalCosts)]);
+  rows.push(["Margem Bruta", fmtNum(data.margin)]);
+  rows.push(["Margem %", `${data.marginPercent.toFixed(1)}%`]);
+  rows.push([]);
+
+  rows.push(["FATURAMENTO MENSAL"]);
+  rows.push(["Mês", "Receita"]);
+  for (const m of data.monthlyRevenue) {
+    rows.push([fmtMonth(m.month), fmtNum(m.revenue)]);
+  }
+  const monthlyTotal = data.monthlyRevenue.reduce((s, m) => s + m.revenue, 0);
+  rows.push(["Total", fmtNum(monthlyTotal)]);
+  rows.push([]);
+
+  rows.push(["FATURAS DO PERÍODO"]);
+  rows.push(["Nº Fatura", "Anunciante", "Campanha", "Emissão", "Vencimento", "Pagamento", "Valor", "Método", "Status"]);
+  for (const inv of data.invoiceList) {
+    rows.push([
+      inv.invoiceNumber,
+      inv.clientName,
+      inv.campaignName,
+      fmtDateBR(inv.issueDate),
+      fmtDateBR(inv.dueDate),
+      fmtDateBR(inv.paymentDate),
+      fmtNum(inv.amount),
+      inv.paymentMethod || "",
+      inv.status,
+    ]);
+  }
+  const invoiceTotal = data.invoiceList.reduce((s, inv) => s + inv.amount, 0);
+  rows.push(["Total", "", "", "", "", "", fmtNum(invoiceTotal), "", ""]);
+
+  const csvContent = rows
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
+    .join("\r\n");
+
+  const BOM = "\uFEFF";
+  const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `relatorio-financeiro-${startDate}-${endDate}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 export default function FinancialReport() {
   const now = new Date();
@@ -49,7 +122,11 @@ export default function FinancialReport() {
             variant="outline"
             size="sm"
             className="gap-1.5"
-            onClick={() => toast.info("Exportação em desenvolvimento")}
+            disabled={!data}
+            onClick={() => {
+              if (!data) return;
+              generateFinancialPdf({ startDate, endDate, ...data });
+            }}
           >
             <Download className="w-3.5 h-3.5" />
             PDF
@@ -58,10 +135,14 @@ export default function FinancialReport() {
             variant="outline"
             size="sm"
             className="gap-1.5"
-            onClick={() => toast.info("Exportação em desenvolvimento")}
+            disabled={!data}
+            onClick={() => {
+              if (!data) return;
+              exportCsv(startDate, endDate, { startDate, endDate, ...data });
+            }}
           >
             <Download className="w-3.5 h-3.5" />
-            XLSX
+            CSV
           </Button>
         </div>
       </div>

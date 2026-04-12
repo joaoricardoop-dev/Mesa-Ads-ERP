@@ -734,6 +734,12 @@ export const financialRouter = router({
 
       const totalRevenue = paidInvoices.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
 
+      const periodInvoices = await db
+        .select()
+        .from(invoices)
+        .where(and(gte(invoices.issueDate, input.startDate), lte(invoices.issueDate, input.endDate)))
+        .orderBy(invoices.issueDate);
+
       const costRows = await db.select().from(operationalCosts);
       const costMap: Record<number, { production: number; freight: number }> = {};
       for (const c of costRows) {
@@ -760,8 +766,9 @@ export const financialRouter = router({
         rpByRestaurant[r.restaurantId] = (rpByRestaurant[r.restaurantId] || 0) + parseFloat(r.total);
       }
 
-      const cmpIds = uniqueIds(paidInvoices.map((i) => i.campaignId));
-      const cliIds = uniqueIds(paidInvoices.map((i) => i.clientId));
+      const allInvoicesForLookup = [...paidInvoices, ...periodInvoices];
+      const cmpIds = uniqueIds(allInvoicesForLookup.map((i) => i.campaignId));
+      const cliIds = uniqueIds(allInvoicesForLookup.map((i) => i.clientId));
 
       const campaignMap: Record<number, string> = {};
       const clientMap: Record<number, string> = {};
@@ -812,6 +819,30 @@ export const financialRouter = router({
 
       const totalCosts = Object.values(byCampaign).reduce((s, c) => s + c.costs, 0);
 
+      // ── Monthly billing breakdown (by issueDate of all invoices in period) ─
+      const monthlyMap: Record<string, number> = {};
+      for (const inv of periodInvoices) {
+        const month = inv.issueDate ? inv.issueDate.substring(0, 7) : "unknown";
+        monthlyMap[month] = (monthlyMap[month] || 0) + parseFloat(inv.amount);
+      }
+      const monthlyRevenue = Object.entries(monthlyMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, revenue]) => ({ month, revenue }));
+
+      // ── Invoice list for period (all invoices by issueDate) ───────────────
+      const invoiceList = periodInvoices
+        .map((inv) => ({
+          invoiceNumber: inv.invoiceNumber,
+          clientName: clientMap[inv.clientId] || `Cliente #${inv.clientId}`,
+          campaignName: campaignMap[inv.campaignId] || `Campanha #${inv.campaignId}`,
+          amount: parseFloat(inv.amount),
+          issueDate: inv.issueDate,
+          dueDate: inv.dueDate,
+          paymentDate: inv.paymentDate || null,
+          status: inv.status,
+          paymentMethod: inv.paymentMethod || null,
+        }));
+
       return {
         totalRevenue,
         totalCosts,
@@ -820,6 +851,8 @@ export const financialRouter = router({
         byCampaign: Object.values(byCampaign),
         byClient,
         byRestaurant,
+        monthlyRevenue,
+        invoiceList,
       };
     }),
 
