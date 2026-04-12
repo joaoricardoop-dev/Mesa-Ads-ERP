@@ -1122,6 +1122,7 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => deleteClient(input.id)),
 
+
     inviteUser: internalProcedure
       .input(z.object({
         clientId: z.number(),
