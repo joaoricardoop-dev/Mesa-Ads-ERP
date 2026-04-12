@@ -1559,9 +1559,10 @@ export const appRouter = router({
 
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
+        let productionCostRegistered = false;
         if (db) {
-          const { serviceOrders: soTable } = await import("../drizzle/schema");
-          const { sql: sqlFn } = await import("drizzle-orm");
+          const { serviceOrders: soTable, operationalCosts: ocTable } = await import("../drizzle/schema");
+          const { sql: sqlFn, eq: eqFn } = await import("drizzle-orm");
           const year = new Date().getFullYear();
           const pattern = `OS-PROD-${year}-%`;
           const countResult = await db
@@ -1580,7 +1581,24 @@ export const appRouter = router({
             status: "execucao" as const,
             productId: campaign.productId,
           });
+          // Auto-create operational cost for production if configured (atomic upsert)
+          const productionCost = parseFloat(String(campaign.productionCost || "0"));
+          if (productionCost > 0) {
+            const priorOc = await db.select({ productionCost: ocTable.productionCost })
+              .from(ocTable).where(eqFn(ocTable.campaignId, input.id)).limit(1);
+            const alreadyRegistered = priorOc.length > 0 && parseFloat(priorOc[0].productionCost) > 0;
+            if (!alreadyRegistered) {
+              await db.insert(ocTable)
+                .values({ campaignId: input.id, productionCost: String(productionCost), freightCost: "0" })
+                .onConflictDoUpdate({
+                  target: ocTable.campaignId,
+                  set: { productionCost: String(productionCost), updatedAt: new Date() },
+                });
+              productionCostRegistered = true;
+            }
+          }
         }
+        return { productionCostRegistered };
       }),
 
     receiveMaterial: operacoesProcedure
@@ -1610,8 +1628,9 @@ export const appRouter = router({
 
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
+        let freightCostRegistered = false;
         if (db) {
-          const { serviceOrders: soTable, campaignRestaurants: crTable } = await import("../drizzle/schema");
+          const { serviceOrders: soTable, campaignRestaurants: crTable, operationalCosts: ocTable } = await import("../drizzle/schema");
           const { sql: sqlFn, eq: eqFn } = await import("drizzle-orm");
           const year = new Date().getFullYear();
           const pattern = `OS-DIST-${year}-%`;
@@ -1632,7 +1651,24 @@ export const appRouter = router({
             status: "execucao" as const,
             productId: campaign.productId,
           });
+          // Auto-create operational cost for freight if configured (atomic upsert)
+          const freightCost = parseFloat(String(campaign.freightCost || "0"));
+          if (freightCost > 0) {
+            const priorOc = await db.select({ freightCost: ocTable.freightCost })
+              .from(ocTable).where(eqFn(ocTable.campaignId, input.id)).limit(1);
+            const alreadyRegistered = priorOc.length > 0 && parseFloat(priorOc[0].freightCost) > 0;
+            if (!alreadyRegistered) {
+              await db.insert(ocTable)
+                .values({ campaignId: input.id, productionCost: "0", freightCost: String(freightCost) })
+                .onConflictDoUpdate({
+                  target: ocTable.campaignId,
+                  set: { freightCost: String(freightCost), updatedAt: new Date() },
+                });
+              freightCostRegistered = true;
+            }
+          }
         }
+        return { freightCostRegistered };
       }),
 
     completeDistribution: operacoesProcedure
@@ -1737,8 +1773,9 @@ export const appRouter = router({
         const campaign = await getCampaign(id);
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
+        let productionCostRegistered = false;
         if (db && campaign) {
-          const { serviceOrders: soTable } = await import("../drizzle/schema");
+          const { serviceOrders: soTable, operationalCosts: ocTable } = await import("../drizzle/schema");
           const { sql: sqlFn, eq: eqFn, and: andFn } = await import("drizzle-orm");
           const existing = await db.select({ id: soTable.id }).from(soTable)
             .where(andFn(eqFn(soTable.campaignId, id), eqFn(soTable.type, "producao" as const)))
@@ -1760,7 +1797,24 @@ export const appRouter = router({
               productId: campaign.productId,
             });
           }
+          // Auto-create operational cost for production if configured (atomic upsert)
+          const productionCost = parseFloat(String(campaign.productionCost || "0"));
+          if (productionCost > 0) {
+            const priorOc = await db.select({ productionCost: ocTable.productionCost })
+              .from(ocTable).where(eqFn(ocTable.campaignId, id)).limit(1);
+            const alreadyRegistered = priorOc.length > 0 && parseFloat(priorOc[0].productionCost) > 0;
+            if (!alreadyRegistered) {
+              await db.insert(ocTable)
+                .values({ campaignId: id, productionCost: String(productionCost), freightCost: "0" })
+                .onConflictDoUpdate({
+                  target: ocTable.campaignId,
+                  set: { productionCost: String(productionCost), updatedAt: new Date() },
+                });
+              productionCostRegistered = true;
+            }
+          }
         }
+        return { productionCostRegistered };
       }),
 
     ensureProductionOS: operacoesProcedure

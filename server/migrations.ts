@@ -86,6 +86,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_source_to_quotations",
     sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "source" varchar(50) DEFAULT 'internal';`,
   },
+  {
+    name: "add_unique_constraint_operational_costs_campaign_id",
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS "idx_operational_costs_campaign_id_unique" ON "operational_costs" ("campaignId");`,
+  },
 ];
 
 export async function runMigrations() {

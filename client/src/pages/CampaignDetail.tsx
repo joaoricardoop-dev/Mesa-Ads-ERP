@@ -433,7 +433,7 @@ export default function CampaignDetail() {
   });
 
   const uploadArtMutation = trpc.campaign.uploadArt.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.campaign.get.invalidate();
       utils.campaign.getHistory.invalidate();
       utils.campaign.list.invalidate();
@@ -441,6 +441,9 @@ export default function CampaignDetail() {
       setArtPdfUrl("");
       setArtImageUrls("");
       toast.success("Arte enviada! Campanha em produção.");
+      if (data?.productionCostRegistered) {
+        toast.info("Custo de produção registrado automaticamente no financeiro.");
+      }
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -561,23 +564,29 @@ export default function CampaignDetail() {
   });
 
   const approveDesignMutation = trpc.campaign.approveDesign.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.campaign.get.invalidate();
       utils.campaign.getHistory.invalidate();
       utils.campaign.list.invalidate();
       setConfirmAction(null);
       toast.success("Design aprovado! OS de produção gerada — campanha em produção gráfica.");
+      if (data?.productionCostRegistered) {
+        toast.info("Custo de produção registrado automaticamente no financeiro.");
+      }
     },
     onError: (err: any) => toast.error(err.message),
   });
 
   const receiveMaterialMutation = trpc.campaign.receiveMaterial.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.campaign.get.invalidate();
       utils.campaign.getHistory.invalidate();
       utils.campaign.list.invalidate();
       setConfirmAction(null);
       toast.success("Material recebido! OS de distribuição gerada — campanha em distribuição.");
+      if (data?.freightCostRegistered) {
+        toast.info("Custo de frete registrado automaticamente no financeiro.");
+      }
     },
     onError: (err: any) => toast.error(err.message),
   });
