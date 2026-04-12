@@ -220,6 +220,16 @@ export const serviceOrderRouter = router({
             details: `Campanha criada após assinatura da OS ${updated.orderNumber} (cotação ${q.quotationNumber})`,
           });
 
+          try {
+            const { createCampaignStatusNotification } = await import("./notificationRouter");
+            await createCampaignStatusNotification({
+              campaignId: campaign.id,
+              clientId: campaign.clientId,
+              status: "briefing",
+              message: `A campanha "${campaign.name}" foi aprovada e está em fase de briefing.`,
+            });
+          } catch (err) { console.warn("[serviceOrder.updateStatus] briefing notification failed:", err); }
+
           if (!q.isBonificada && q.totalValue && parseFloat(q.totalValue) > 0) {
             const invYear = new Date().getFullYear();
             const invPrefix = `FAT-${invYear}-`;

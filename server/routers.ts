@@ -1405,9 +1405,32 @@ export const appRouter = router({
           isBonificada: z.boolean().optional(),
         })
       )
-      .mutation(({ input }) => {
+      .mutation(async ({ input }) => {
         const { id, ...rest } = input;
-        return updateCampaign(id, rest);
+        await updateCampaign(id, rest);
+        const NOTIFIABLE_STATUSES: Record<string, string> = {
+          briefing: "Sua campanha foi aprovada e está em fase de briefing.",
+          design: "Sua campanha está em produção de design.",
+          aprovacao: "O design da sua campanha foi enviado para aprovação.",
+          producao: "Sua campanha está em produção gráfica.",
+          distribuicao: "O material da sua campanha está sendo distribuído.",
+          veiculacao: "Sua campanha está em veiculação.",
+          inativa: "Sua campanha foi concluída e arquivada.",
+        };
+        if (rest.status && rest.status in NOTIFIABLE_STATUSES) {
+          try {
+            const notifCampaign = await getCampaign(id);
+            if (notifCampaign?.clientId) {
+              const { createCampaignStatusNotification } = await import("./notificationRouter");
+              await createCampaignStatusNotification({
+                campaignId: id,
+                clientId: notifCampaign.clientId,
+                status: rest.status,
+                message: `${NOTIFIABLE_STATUSES[rest.status].replace("Sua campanha", `A campanha "${notifCampaign.name}"`)}`,
+              });
+            }
+          } catch (err) { console.warn("[campaign.update] notification failed:", err); }
+        }
       }),
 
     delete: protectedProcedure
@@ -1476,6 +1499,18 @@ export const appRouter = router({
         const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         await updateCampaign(input.id, { status: "design", designEnteredAt: new Date() });
         await addCampaignHistory(input.id, "briefing_complete", "Briefing concluído — campanha em produção de design", u?.id, uName);
+        try {
+          const notifCampaign = await getCampaign(input.id);
+          if (notifCampaign?.clientId) {
+            const { createCampaignStatusNotification } = await import("./notificationRouter");
+            await createCampaignStatusNotification({
+              campaignId: input.id,
+              clientId: notifCampaign.clientId,
+              status: "design",
+              message: `Sua campanha "${notifCampaign.name}" está em produção de design.`,
+            });
+          }
+        } catch (err) { console.warn("[completeBriefing] notification failed:", err); }
       }),
 
     submitDesign: operacoesProcedure
@@ -1485,6 +1520,18 @@ export const appRouter = router({
         const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         await updateCampaign(input.id, { status: "aprovacao", aprovacaoEnteredAt: new Date() });
         await addCampaignHistory(input.id, "design_submitted", "Design enviado para aprovação", u?.id, uName);
+        try {
+          const notifCampaign = await getCampaign(input.id);
+          if (notifCampaign?.clientId) {
+            const { createCampaignStatusNotification } = await import("./notificationRouter");
+            await createCampaignStatusNotification({
+              campaignId: input.id,
+              clientId: notifCampaign.clientId,
+              status: "aprovacao",
+              message: `O design da campanha "${notifCampaign.name}" foi enviado para sua aprovação.`,
+            });
+          }
+        } catch (err) { console.warn("[submitDesign] notification failed:", err); }
       }),
 
     approveDesign: operacoesProcedure
@@ -1496,6 +1543,17 @@ export const appRouter = router({
         if (!campaign) throw new Error("Campanha não encontrada");
         await updateCampaign(input.id, { status: "producao", producaoEnteredAt: new Date() });
         await addCampaignHistory(input.id, "design_approved", "Design aprovado — campanha em produção gráfica", u?.id, uName);
+        try {
+          if (campaign.clientId) {
+            const { createCampaignStatusNotification } = await import("./notificationRouter");
+            await createCampaignStatusNotification({
+              campaignId: input.id,
+              clientId: campaign.clientId,
+              status: "producao",
+              message: `O design da campanha "${campaign.name}" foi aprovado e está em produção gráfica.`,
+            });
+          }
+        } catch (err) { console.warn("[approveDesign] notification failed:", err); }
 
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
@@ -1536,6 +1594,17 @@ export const appRouter = router({
           distribuicaoEnteredAt: new Date(),
         });
         await addCampaignHistory(input.id, "material_received", "Material recebido — campanha em distribuição", u?.id, uName);
+        try {
+          if (campaign.clientId) {
+            const { createCampaignStatusNotification } = await import("./notificationRouter");
+            await createCampaignStatusNotification({
+              campaignId: input.id,
+              clientId: campaign.clientId,
+              status: "distribuicao",
+              message: `O material da campanha "${campaign.name}" foi recebido e está em distribuição.`,
+            });
+          }
+        } catch (err) { console.warn("[receiveMaterial] notification failed:", err); }
 
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
@@ -1579,6 +1648,19 @@ export const appRouter = router({
           veiculacaoEndDate: input.veiculacaoEndDate,
         });
         await addCampaignHistory(input.id, "distribution_complete", `Distribuição concluída — veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`, u?.id, uName);
+
+        try {
+          const notifCampaign = await getCampaign(input.id);
+          if (notifCampaign?.clientId) {
+            const { createCampaignStatusNotification } = await import("./notificationRouter");
+            await createCampaignStatusNotification({
+              campaignId: input.id,
+              clientId: notifCampaign.clientId,
+              status: "veiculacao",
+              message: `A campanha "${notifCampaign.name}" entrou em veiculação de ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}.`,
+            });
+          }
+        } catch (err) { console.warn("[completeDistribution] notification failed:", err); }
 
         try {
           const campaign = await getCampaign(input.id);
@@ -1635,6 +1717,19 @@ export const appRouter = router({
         const { id, ...artData } = input;
         await updateCampaign(id, { ...artData, status: "producao" });
         await addCampaignHistory(id, "art_uploaded", "Arte enviada — campanha em produção", u?.id, uName);
+
+        try {
+          const notifCampaign = await getCampaign(id);
+          if (notifCampaign?.clientId) {
+            const { createCampaignStatusNotification } = await import("./notificationRouter");
+            await createCampaignStatusNotification({
+              campaignId: id,
+              clientId: notifCampaign.clientId,
+              status: "producao",
+              message: `A arte da campanha "${notifCampaign.name}" foi enviada e está em produção.`,
+            });
+          }
+        } catch (err) { console.warn("[uploadArt] notification failed:", err); }
 
         // Create production OS automatically when entering producao status
         const campaign = await getCampaign(id);
@@ -1766,6 +1861,19 @@ export const appRouter = router({
         await addCampaignHistory(input.id, "veiculacao_started", `Veiculação iniciada: ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}`, u?.id, uName);
 
         try {
+          const notifCampaign2 = await getCampaign(input.id);
+          if (notifCampaign2?.clientId) {
+            const { createCampaignStatusNotification } = await import("./notificationRouter");
+            await createCampaignStatusNotification({
+              campaignId: input.id,
+              clientId: notifCampaign2.clientId,
+              status: "veiculacao",
+              message: `A campanha "${notifCampaign2.name}" entrou em veiculação de ${input.veiculacaoStartDate} a ${input.veiculacaoEndDate}.`,
+            });
+          }
+        } catch (err) { console.warn("[startVeiculacao] notification failed:", err); }
+
+        try {
           const campaign = await getCampaign(input.id);
           if (campaign) {
             const restaurantList = await getCampaignRestaurants(input.id);
@@ -1821,6 +1929,18 @@ export const appRouter = router({
         if (!campaign) throw new Error("Campanha não encontrada");
         await updateCampaign(input.id, { status: "inativa" });
         await addCampaignHistory(input.id, "finalized", "Campanha finalizada e arquivada", u?.id, uName);
+
+        try {
+          if (campaign.clientId) {
+            const { createCampaignStatusNotification } = await import("./notificationRouter");
+            await createCampaignStatusNotification({
+              campaignId: input.id,
+              clientId: campaign.clientId,
+              status: "inativa",
+              message: `A campanha "${campaign.name}" foi concluída e arquivada.`,
+            });
+          }
+        } catch (err) { console.warn("[finalizeCampaign] notification failed:", err); }
 
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
