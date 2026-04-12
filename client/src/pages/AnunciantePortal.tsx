@@ -109,6 +109,16 @@ function ProductPriceSheet({ product, hasPartner, open, onClose }: {
   return (
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent className="w-full sm:max-w-3xl overflow-y-auto">
+        {product.imagemUrl && (
+          <div className="relative -mx-6 -mt-6 mb-4 h-48 overflow-hidden">
+            <img
+              src={product.imagemUrl}
+              alt={product.name}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+          </div>
+        )}
         <SheetHeader className="pb-4 border-b">
           <div className="flex items-center gap-3">
             <div className={`p-2.5 rounded-xl ${colors.bg}`}>
@@ -278,17 +288,34 @@ function ShoppingProductCard({
       onClick={onViewDetails}
       className={`group text-left w-full bg-card border border-border/30 rounded-2xl overflow-hidden ${colors.hoverBorder} hover:shadow-xl hover:shadow-black/10 transition-all duration-300 flex flex-col cursor-pointer`}
     >
-      <div className={`bg-gradient-to-br ${colors.gradient} border-b border-border/20 px-6 py-8 flex flex-col items-center justify-center gap-4`}>
-        <div className={`w-16 h-16 rounded-2xl ${colors.bg} border ${colors.border} flex items-center justify-center shadow-lg`}>
-          <TipoIcon className={`w-8 h-8 ${colors.text}`} />
+      {product.imagemUrl ? (
+        <div className="relative border-b border-border/20 h-40 overflow-hidden">
+          <img
+            src={product.imagemUrl}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 px-4 pb-3">
+            <h3 className="font-bold text-base leading-tight text-white drop-shadow">{product.name}</h3>
+            <span className={`text-[11px] font-medium mt-0.5 inline-block px-2.5 py-0.5 rounded-full ${colors.bg} ${colors.text}`}>
+              {TIPO_LABELS[product.tipo] ?? product.tipo}
+            </span>
+          </div>
         </div>
-        <div className="text-center">
-          <h3 className="font-bold text-base leading-tight">{product.name}</h3>
-          <span className={`text-[11px] font-medium mt-1 inline-block px-2.5 py-0.5 rounded-full ${colors.bg} ${colors.text}`}>
-            {TIPO_LABELS[product.tipo] ?? product.tipo}
-          </span>
+      ) : (
+        <div className={`bg-gradient-to-br ${colors.gradient} border-b border-border/20 px-6 py-8 flex flex-col items-center justify-center gap-4`}>
+          <div className={`w-16 h-16 rounded-2xl ${colors.bg} border ${colors.border} flex items-center justify-center shadow-lg`}>
+            <TipoIcon className={`w-8 h-8 ${colors.text}`} />
+          </div>
+          <div className="text-center">
+            <h3 className="font-bold text-base leading-tight">{product.name}</h3>
+            <span className={`text-[11px] font-medium mt-1 inline-block px-2.5 py-0.5 rounded-full ${colors.bg} ${colors.text}`}>
+              {TIPO_LABELS[product.tipo] ?? product.tipo}
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="px-5 py-4 flex flex-col gap-3 flex-1">
         {product.description && (

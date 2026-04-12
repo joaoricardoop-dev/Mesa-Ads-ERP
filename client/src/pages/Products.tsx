@@ -29,7 +29,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Users, Tag, Megaphone } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Users, Tag, Megaphone, ImageIcon, X, Upload } from "lucide-react";
+import { ObjectUploader } from "@/components/ObjectUploader";
 import { SEMANAS_OPTIONS } from "@/hooks/useBudgetCalculator";
 
 type TipoProduct = "impressos" | "eletronicos" | "telas";
@@ -100,6 +101,7 @@ interface ProductForm {
   description: string;
   tipo: TipoProduct;
   temDistribuicaoPorLocal: boolean;
+  imagemUrl: string;
   unitLabel: string;
   unitLabelPlural: string;
   defaultQtyPerLocation: string;
@@ -117,6 +119,7 @@ const emptyProduct: ProductForm = {
   description: "",
   tipo: "impressos",
   temDistribuicaoPorLocal: true,
+  imagemUrl: "",
   unitLabel: "unidade",
   unitLabelPlural: "unidades",
   defaultQtyPerLocation: "500",
@@ -185,6 +188,7 @@ export default function Products() {
       description: p.description || "",
       tipo: (p.tipo as TipoProduct) || "impressos",
       temDistribuicaoPorLocal: p.temDistribuicaoPorLocal ?? true,
+      imagemUrl: p.imagemUrl || "",
       unitLabel: p.unitLabel,
       unitLabelPlural: p.unitLabelPlural,
       defaultQtyPerLocation: String(p.defaultQtyPerLocation || 500),
@@ -205,6 +209,7 @@ export default function Products() {
       description: form.description || undefined,
       tipo: form.tipo,
       temDistribuicaoPorLocal: form.temDistribuicaoPorLocal,
+      imagemUrl: form.imagemUrl.trim() !== "" ? form.imagemUrl : null,
       unitLabel: form.unitLabel,
       unitLabelPlural: form.unitLabelPlural,
       defaultQtyPerLocation: parseInt(form.defaultQtyPerLocation) || 500,
@@ -349,11 +354,67 @@ export default function Products() {
 
       {/* Product dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingId ? "Editar Produto" : "Novo Produto"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+            <div>
+              <Label>Foto do Produto</Label>
+              <div className="mt-1.5 flex items-start gap-3">
+                {form.imagemUrl ? (
+                  <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-border/30 shrink-0">
+                    <img src={form.imagemUrl} alt="Foto do produto" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, imagemUrl: "" })}
+                      className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5 hover:bg-black/80 transition-colors"
+                    >
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-24 h-24 rounded-lg border border-dashed border-border/50 flex flex-col items-center justify-center gap-1 bg-muted/20 shrink-0">
+                    <ImageIcon className="w-6 h-6 text-muted-foreground/40" />
+                    <span className="text-[10px] text-muted-foreground/50">Sem foto</span>
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <ObjectUploader
+                    maxNumberOfFiles={1}
+                    maxFileSize={5242880}
+                    onGetUploadParameters={async (file) => {
+                      const res = await fetch("/api/uploads/request-url", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+                      });
+                      const data = await res.json();
+                      return { method: "PUT" as const, url: data.uploadURL };
+                    }}
+                    onComplete={(result) => {
+                      const file = result.successful?.[0];
+                      if (file) {
+                        const uploadedUrl =
+                          (file as { uploadURL?: string }).uploadURL ||
+                          file.response?.uploadURL ||
+                          "";
+                        const objectPath = uploadedUrl ? new URL(uploadedUrl).pathname.split("?")[0] : "";
+                        const servingUrl = objectPath ? `/objects${objectPath}` : "";
+                        if (servingUrl) {
+                          setForm(prev => ({ ...prev, imagemUrl: servingUrl }));
+                          toast.success("Foto carregada");
+                        }
+                      }
+                    }}
+                    buttonClassName="h-8 text-xs gap-1.5 bg-transparent border border-border/50 text-muted-foreground hover:text-foreground hover:bg-accent/20"
+                  >
+                    <Upload className="w-3.5 h-3.5" /> {form.imagemUrl ? "Trocar foto" : "Enviar foto"}
+                  </ObjectUploader>
+                  <p className="text-[10px] text-muted-foreground">Máx. 5 MB. Recomendado: 800×600 px.</p>
+                </div>
+              </div>
+            </div>
             <div>
               <Label>Nome</Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex: Bolacha de Chopp" />
