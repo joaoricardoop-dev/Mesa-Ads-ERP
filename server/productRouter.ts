@@ -1,7 +1,7 @@
 import { protectedProcedure, adminProcedure, internalProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { products, productPricingTiers, productDiscountPriceTiers } from "../drizzle/schema";
+import { products, productPricingTiers, productDiscountPriceTiers, productLocations } from "../drizzle/schema";
 import { eq, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -12,6 +12,8 @@ async function getDatabase() {
 }
 
 const TIPO_ENUM = ["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro", "impressos", "eletronicos", "telas"] as const;
+const IMPRESSION_FORMULA_ENUM = ["por_coaster", "por_tela", "por_visitante", "por_evento", "manual"] as const;
+const DISTRIBUTION_TYPE_ENUM = ["rede", "local_especifico"] as const;
 
 export const productRouter = router({
   // ── Product CRUD ─────────────────────────────────────────────────────────────
@@ -26,7 +28,12 @@ export const productRouter = router({
       const db = await getDatabase();
       const rows = await db.select().from(products).where(eq(products.id, input.id));
       if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado" });
-      return rows[0];
+      const product = rows[0];
+      const locations = await db
+        .select({ restaurantId: productLocations.restaurantId })
+        .from(productLocations)
+        .where(eq(productLocations.productId, input.id));
+      return { ...product, locationIds: locations.map(l => l.restaurantId) };
     }),
 
   create: adminProcedure
@@ -46,11 +53,24 @@ export const productRouter = router({
       pricingMode: z.enum(["cost_based", "price_based"]).default("cost_based"),
       entryType: z.enum(["tiers", "fixed_quantities"]).default("tiers"),
       isActive: z.boolean().default(true),
+      impressionFormulaType: z.enum(IMPRESSION_FORMULA_ENUM).default("por_coaster"),
+      attentionFactor: z.string().default("1.00"),
+      frequencyParam: z.string().default("1.00"),
+      distributionType: z.enum(DISTRIBUTION_TYPE_ENUM).default("rede"),
+      locationIds: z.array(z.number().int()).optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
-      const rows = await db.insert(products).values(input).returning();
-      return rows[0];
+      const { locationIds, ...productData } = input;
+      const rows = await db.insert(products).values(productData).returning();
+      const product = rows[0];
+      const effectiveLocationIds = productData.distributionType === "local_especifico" ? (locationIds ?? []) : [];
+      if (effectiveLocationIds.length > 0) {
+        await db.insert(productLocations).values(
+          effectiveLocationIds.map(restaurantId => ({ productId: product.id, restaurantId }))
+        );
+      }
+      return product;
     }),
 
   update: adminProcedure
@@ -71,13 +91,38 @@ export const productRouter = router({
       pricingMode: z.enum(["cost_based", "price_based"]).optional(),
       entryType: z.enum(["tiers", "fixed_quantities"]).optional(),
       isActive: z.boolean().optional(),
+      impressionFormulaType: z.enum(IMPRESSION_FORMULA_ENUM).optional(),
+      attentionFactor: z.string().optional(),
+      frequencyParam: z.string().optional(),
+      distributionType: z.enum(DISTRIBUTION_TYPE_ENUM).optional(),
+      locationIds: z.array(z.number().int()).optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
-      const { id, ...data } = input;
+      const { id, locationIds, ...data } = input;
       const rows = await db.update(products).set({ ...data, updatedAt: new Date() }).where(eq(products.id, id)).returning();
       if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado" });
+      if (locationIds !== undefined) {
+        const updatedDistributionType = data.distributionType ?? rows[0].distributionType;
+        const effectiveLocationIds = updatedDistributionType === "local_especifico" ? locationIds : [];
+        await db.delete(productLocations).where(eq(productLocations.productId, id));
+        if (effectiveLocationIds.length > 0) {
+          await db.insert(productLocations).values(
+            effectiveLocationIds.map(restaurantId => ({ productId: id, restaurantId }))
+          );
+        }
+      }
       return rows[0];
+    }),
+
+  getLocations: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      return db
+        .select({ restaurantId: productLocations.restaurantId })
+        .from(productLocations)
+        .where(eq(productLocations.productId, input.productId));
     }),
 
   delete: adminProcedure

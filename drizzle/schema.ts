@@ -29,6 +29,8 @@ export const productTypeEnum = pgEnum("product_type", ["coaster", "display", "ca
 export const productionStatusEnum = pgEnum("production_status", ["pending", "producing", "ready", "shipped"]);
 export const pricingModeEnum = pgEnum("pricing_mode", ["cost_based", "price_based"]);
 export const entryTypeEnum = pgEnum("entry_type", ["tiers", "fixed_quantities"]);
+export const impressionFormulaTypeEnum = pgEnum("impression_formula_type", ["por_coaster", "por_tela", "por_visitante", "por_evento", "manual"]);
+export const distributionTypeEnum = pgEnum("distribution_type", ["rede", "local_especifico"]);
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -841,12 +843,32 @@ export const products = pgTable("products", {
   visibleToPartners: boolean("visibleToPartners").default(false).notNull(),
   visibleToAdvertisers: boolean("visibleToAdvertisers").default(false).notNull(),
   isActive: boolean("isActive").default(true).notNull(),
+  impressionFormulaType: impressionFormulaTypeEnum("impression_formula_type").default("por_coaster"),
+  attentionFactor: decimal("attention_factor", { precision: 5, scale: 2 }).default("1.00"),
+  frequencyParam: decimal("frequency_param", { precision: 8, scale: 2 }).default("1.00"),
+  distributionType: distributionTypeEnum("distribution_type").default("rede"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = typeof products.$inferInsert;
+
+// ─── Product ↔ Location (junction for local_especifico products) ──────────────
+
+export const productLocations = pgTable("product_locations", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
+  restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_product_locations_product_id").on(t.productId),
+  index("idx_product_locations_restaurant_id").on(t.restaurantId),
+  unique("uq_product_location").on(t.productId, t.restaurantId),
+]);
+
+export type ProductLocation = typeof productLocations.$inferSelect;
+export type InsertProductLocation = typeof productLocations.$inferInsert;
 
 export const productPricingTiers = pgTable("product_pricing_tiers", {
   id: serial("id").primaryKey(),

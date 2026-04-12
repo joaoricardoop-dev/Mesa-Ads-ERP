@@ -29,11 +29,26 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Users, Tag, Megaphone, ImageIcon, X, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Users, Tag, Megaphone, ImageIcon, X, Upload, MapPin } from "lucide-react";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { SEMANAS_OPTIONS } from "@/hooks/useBudgetCalculator";
 
 type TipoProduct = "impressos" | "eletronicos" | "telas";
+type ImpressionFormulaType = "por_coaster" | "por_tela" | "por_visitante" | "por_evento" | "manual";
+type DistributionType = "rede" | "local_especifico";
+
+const impressionFormulaLabels: Record<ImpressionFormulaType, string> = {
+  por_coaster: "Por Coaster",
+  por_tela: "Por Tela",
+  por_visitante: "Por Visitante",
+  por_evento: "Por Evento",
+  manual: "Manual",
+};
+
+const distributionTypeLabels: Record<DistributionType, string> = {
+  rede: "Rede (geral)",
+  local_especifico: "Local Específico",
+};
 
 const tipoLabels: Record<TipoProduct, string> = {
   impressos: "Impressos",
@@ -94,6 +109,10 @@ interface ProductListItem {
   unitLabelPlural?: string | null;
   defaultQtyPerLocation?: number | null;
   temDistribuicaoPorLocal?: boolean | null;
+  impressionFormulaType?: string | null;
+  attentionFactor?: string | null;
+  frequencyParam?: string | null;
+  distributionType?: string | null;
 }
 
 interface ProductForm {
@@ -112,6 +131,11 @@ interface ProductForm {
   pricingMode: PricingMode;
   entryType: EntryType;
   isActive: boolean;
+  impressionFormulaType: ImpressionFormulaType;
+  attentionFactor: string;
+  frequencyParam: string;
+  distributionType: DistributionType;
+  locationIds: number[];
 }
 
 const emptyProduct: ProductForm = {
@@ -130,6 +154,11 @@ const emptyProduct: ProductForm = {
   pricingMode: "cost_based",
   entryType: "tiers",
   isActive: true,
+  impressionFormulaType: "por_coaster",
+  attentionFactor: "1.00",
+  frequencyParam: "1.00",
+  distributionType: "rede",
+  locationIds: [],
 };
 
 export default function Products() {
@@ -181,8 +210,17 @@ export default function Products() {
     setDialogOpen(true);
   }
 
-  function openEdit(p: any) {
+  async function openEdit(p: any) {
     setEditingId(p.id);
+    let locationIds: number[] = [];
+    try {
+      const locs = await utils.product.getLocations.fetch({ productId: p.id });
+      locationIds = locs.map((l: { restaurantId: number }) => l.restaurantId);
+    } catch (err) {
+      console.error("[Products] Failed to load location IDs:", err);
+      toast.error("Erro ao carregar locais vinculados ao produto");
+      return;
+    }
     setForm({
       name: p.name,
       description: p.description || "",
@@ -199,6 +237,11 @@ export default function Products() {
       pricingMode: (p.pricingMode as PricingMode) || "cost_based",
       entryType: (p.entryType as EntryType) || "tiers",
       isActive: p.isActive,
+      impressionFormulaType: (p.impressionFormulaType as ImpressionFormulaType) || "por_coaster",
+      attentionFactor: p.attentionFactor || "1.00",
+      frequencyParam: p.frequencyParam || "1.00",
+      distributionType: (p.distributionType as DistributionType) || "rede",
+      locationIds,
     });
     setDialogOpen(true);
   }
@@ -220,6 +263,11 @@ export default function Products() {
       pricingMode: form.pricingMode,
       entryType: form.entryType,
       isActive: form.isActive,
+      impressionFormulaType: form.impressionFormulaType,
+      attentionFactor: form.attentionFactor,
+      frequencyParam: form.frequencyParam,
+      distributionType: form.distributionType,
+      locationIds: form.distributionType === "local_especifico" ? form.locationIds : [],
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...payload });
@@ -505,6 +553,66 @@ export default function Products() {
                 </Select>
               </div>
             </div>
+
+            <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
+              <h3 className="text-sm font-semibold text-foreground">Fórmula de Impressões</h3>
+              <div>
+                <Label>Tipo de Fórmula</Label>
+                <Select value={form.impressionFormulaType} onValueChange={v => setForm({ ...form, impressionFormulaType: v as ImpressionFormulaType })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(impressionFormulaLabels) as [ImpressionFormulaType, string][]).map(([val, label]) => (
+                      <SelectItem key={val} value={val}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Fator de Atenção</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.attentionFactor}
+                    onChange={e => setForm({ ...form, attentionFactor: e.target.value })}
+                    placeholder="1.00"
+                  />
+                </div>
+                <div>
+                  <Label>Frequência / Loop</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.frequencyParam}
+                    onChange={e => setForm({ ...form, frequencyParam: e.target.value })}
+                    placeholder="1.00"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label>Tipo de Distribuição</Label>
+                <Select value={form.distributionType} onValueChange={v => setForm({ ...form, distributionType: v as DistributionType, locationIds: [] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(distributionTypeLabels) as [DistributionType, string][]).map(([val, label]) => (
+                      <SelectItem key={val} value={val}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {form.distributionType === "local_especifico" && (
+                <LocationSelector
+                  selectedIds={form.locationIds}
+                  onChange={ids => setForm({ ...form, locationIds: ids })}
+                />
+              )}
+            </div>
+
             <div className="flex items-center gap-3">
               <Switch checked={form.isActive} onCheckedChange={v => setForm({ ...form, isActive: v })} />
               <Label className="text-sm">Produto ativo</Label>
@@ -771,6 +879,65 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
         </TableRow>
       )}
     </>
+  );
+}
+
+function LocationSelector({ selectedIds, onChange }: { selectedIds: number[]; onChange: (ids: number[]) => void }) {
+  const { data: restaurants = [], isLoading } = trpc.activeRestaurant.list.useQuery();
+  const [search, setSearch] = useState("");
+
+  const filtered = (restaurants as any[]).filter((r: any) =>
+    r.name.toLowerCase().includes(search.toLowerCase()) ||
+    r.neighborhood?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  function toggle(id: number) {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter(i => i !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label className="flex items-center gap-1.5">
+        <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+        Locais Vinculados ({selectedIds.length} selecionado{selectedIds.length !== 1 ? "s" : ""})
+      </Label>
+      <Input
+        placeholder="Buscar local..."
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        className="h-8 text-sm"
+      />
+      <div className="border rounded-md max-h-48 overflow-y-auto">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground p-3">Carregando locais...</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground p-3">Nenhum local encontrado</p>
+        ) : (
+          <div className="divide-y">
+            {filtered.map((r: any) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => toggle(r.id)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-accent/30 transition-colors ${selectedIds.includes(r.id) ? "bg-primary/5" : ""}`}
+              >
+                <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selectedIds.includes(r.id) ? "bg-primary border-primary" : "border-border"}`}>
+                  {selectedIds.includes(r.id) && <span className="text-primary-foreground text-[10px] font-bold">✓</span>}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{r.name}</p>
+                  {r.neighborhood && <p className="text-xs text-muted-foreground truncate">{r.neighborhood}</p>}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
