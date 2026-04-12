@@ -1,0 +1,117 @@
+## Resumo Geral — Planejamento Mesa Ads ERP
+
+---
+
+### Bloco 1 — Melhorias de UX por Tipo de Usuário
+
+**Time Interno**
+- Dashboard com cards clicáveis que filtram campanhas (atrasadas, risco de SLA)
+- Pipeline chart interativo — clicar numa barra abre as campanhas daquele estágio
+- Formulário de criação de campanha reorganizado em blocos (Dados → Precificação → Produção)
+- Lista de clientes com colunas úteis: última campanha, receita total, segmento
+- Relatório financeiro com drill-down (clicar num número mostra as campanhas que o compõem)
+- Campo "responsável" por campanha com avatar na listagem
+- Tooltips nos campos técnicos de precificação
+- Stepper visual fixo no topo da CampaignDetail, sempre visível independente da aba ativa
+- CTAs primários de transição de status separados visualmente das ações secundárias
+
+**Anunciante**
+- Campanha ativa como elemento hero do portal (não enterrada numa tabela)
+- Relatórios publicados com visual premium, foto em destaque, impressões em fonte grande
+- Campaign Builder com elemento educativo no início ("como funciona em 3 passos")
+- Card "seu gerente de conta" visível no portal
+- Notificações acionáveis com próximo passo e nome do contato
+
+**Parceiro / Agência**
+- Card explícito de BV estimado no mês + histórico de pagamentos
+- Seletor "montar campanha para qual cliente?" no início do Campaign Builder
+- Linha do tempo por lead: Indicado → Contato → Cotação → Resultado
+
+**Locais (ex-restaurantes)**
+- Aceite de termos com campos pré-preenchidos (sem redigitar CPF e nome)
+- Ação explícita de "confirmar recebimento de material" no portal
+- Card "seu próximo pagamento: R$ X previsto para XX/XX"
+- Dados do perfil visíveis (coasters alocados, avaliação na rede) mesmo sem edição
+- Notificações para novos termos pendentes e chegada de material
+
+---
+
+### Bloco 2 — Cálculo de Impressões Reformulado
+
+**Problema atual:** o sistema conta exibições do anúncio, não impressões reais (pessoas que viram).
+
+**Nova arquitetura:** cada produto tem uma fórmula de impressão configurada no próprio cadastro. O sistema usa os dados reais dos locais vinculados à campanha para calcular dinamicamente.
+
+**Parâmetros por produto:**
+- Tipo de fórmula: `por_coaster`, `por_tela`, `por_visitante`, `por_evento`, `manual`
+- Fator de atenção (0–100%): % do público que realmente processa o anúncio
+- Parâmetro de frequência: usos por coaster (físico) ou duração do loop de conteúdo (digital)
+
+**Fórmula coaster:**
+`qtd_coasters × usos_por_coaster × pessoas_por_mesa × fator_atenção`
+Onde `pessoas_por_mesa` = `seatCount / tableCount` do cadastro do local (fallback configurável se não preenchido)
+
+**Fórmula tela:**
+`clientes_por_dia × aparições_por_visita × fator_atenção`
+Onde `clientes_por_dia` = `monthlyCustomers / diasMês` do local e `aparições_por_visita` = `avgStayMinutes / duração_do_loop`
+
+**Princípio:** campos de local opcionais, com valores de fallback definidos no produto quando não preenchidos.
+
+Todo o resto do sistema (relatórios, campaign builder, simulador, portal do anunciante) lê esses parâmetros do produto — sem lógica hardcoded espalhada pelo código.
+
+---
+
+### Bloco 3 — Workflow de Campanha por Tipo de Produto
+
+**Problema atual:** workflow único briefing → design → aprovação → produção → distribuição → veiculação foi desenhado só para coaster físico.
+
+**Solução:** cada produto define seu próprio template de workflow no cadastro.
+
+**Templates propostos:**
+
+- **Coasters / Impressos / Displays físicos:** briefing → design → aprovação → produção → distribuição → veiculação → concluída
+- **Telas / Eletrônicos (cliente envia conteúdo):** briefing → aprovação de material → material recebido → veiculação → concluída
+- **Ativações / Eventos:** briefing → planejamento → execução → concluída
+- **Cardápio / Totem / Porta-guardanapo:** mesmo fluxo dos físicos, parâmetros diferentes
+
+A CampaignDetail lê o template do produto da campanha e renderiza apenas as etapas configuradas. Ações como "upload de arte" e "confirmar recebimento de material" aparecem só nas etapas relevantes.
+
+---
+
+### Bloco 4 — Renomeação Restaurantes → Locais
+
+- `restaurants` / `activeRestaurants` → **Locais** nos labels e navegação
+- Menu interno: "Restaurantes" → "Locais"
+- Portal do restaurante → **Portal do Local**
+- Tabelas do banco mantidas com nomes originais (evita migração arriscada), apenas labels visuais mudam
+- Sem conflito com "Parceiros" (que continuam sendo as agências/indicadores)
+
+---
+
+### Bloco 5 — Associação Produto ↔ Local
+
+**Dois tipos de produto:**
+
+**Produto de Rede** — disponível para qualquer local. Ex: coasters. A campanha seleciona quais locais incluir.
+
+**Produto de Local Específico** — vinculado a locais físicos fixos que têm aquele recurso instalado. Ex: Tela 55" da Sala VIP. O produto tem uma lista de locais disponíveis.
+
+**Modelo escolhido (Opção C):** produto único com múltiplos locais vinculados, onde o anunciante escolhe quais dos locais disponíveis quer incluir na campanha.
+
+**Impactos:**
+- Cadastro do produto: campo tipo (`rede` ou `local_especifico`) + lista de locais vinculados
+- Campaign Builder: produtos de rede permitem seleção livre de locais; produtos de local específico mostram apenas os locais disponíveis para aquele produto
+- Impressões: calculadas local a local usando dados reais de cada local selecionado, depois somadas
+- Base para gestão de disponibilidade futura (uma tela não pode estar em duas campanhas ao mesmo tempo)
+
+---
+
+Confirmado tudo isso, posso estruturar os prompts. Sugiro dividir em 5 prompts na seguinte ordem de dependência:
+
+1. **Produto reformulado** — fórmula de impressão + tipo de produto + vinculação com locais (base para tudo)
+2. **Renomeação + Workflow por produto** — labels de locais + templates de workflow no cadastro
+3. **Cálculo de impressões dinâmico** — refatorar todos os pontos de cálculo para usar os novos parâmetros
+4. **UX interna** — melhorias de dashboard, CampaignDetail, listas
+5. **UX dos portais** — anunciante, parceiro, local
+
+Quer que eu avance?
