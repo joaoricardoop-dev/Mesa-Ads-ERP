@@ -53,10 +53,13 @@ export const productRouter = router({
       pricingMode: z.enum(["cost_based", "price_based"]).default("cost_based"),
       entryType: z.enum(["tiers", "fixed_quantities"]).default("tiers"),
       isActive: z.boolean().default(true),
-      impressionFormulaType: z.enum(IMPRESSION_FORMULA_ENUM).default("por_coaster"),
+      impressionFormulaType: z.string().optional().nullable().default("por_coaster"),
       attentionFactor: z.string().default("1.00"),
       frequencyParam: z.string().default("1.00"),
       distributionType: z.enum(DISTRIBUTION_TYPE_ENUM).default("rede"),
+      defaultPessoasPorMesa: z.string().default("3.00"),
+      loopDurationSeconds: z.number().int().default(30),
+      frequenciaAparicoes: z.string().default("1.00"),
       locationIds: z.array(z.number().int()).optional(),
     }))
     .mutation(async ({ input }) => {
@@ -91,10 +94,13 @@ export const productRouter = router({
       pricingMode: z.enum(["cost_based", "price_based"]).optional(),
       entryType: z.enum(["tiers", "fixed_quantities"]).optional(),
       isActive: z.boolean().optional(),
-      impressionFormulaType: z.enum(IMPRESSION_FORMULA_ENUM).optional(),
+      impressionFormulaType: z.string().optional().nullable(),
       attentionFactor: z.string().optional(),
       frequencyParam: z.string().optional(),
       distributionType: z.enum(DISTRIBUTION_TYPE_ENUM).optional(),
+      defaultPessoasPorMesa: z.string().optional(),
+      loopDurationSeconds: z.number().int().optional(),
+      frequenciaAparicoes: z.string().optional(),
       locationIds: z.array(z.number().int()).optional(),
     }))
     .mutation(async ({ input }) => {

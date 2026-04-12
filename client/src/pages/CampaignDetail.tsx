@@ -81,6 +81,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { calcTelaImpressions, TELAS_INSERCOES } from "@/hooks/useBudgetCalculator";
+import { calcImpressionesParaLocal } from "@/lib/campaign-builder-utils";
 import { generateReportPdf } from "@/lib/generate-report-pdf";
 
 const CARRIER_SLUGS: Record<string, string> = {
@@ -193,16 +194,34 @@ function calcCampaignPricing(c: {
   freightCost?: string | number | null;
   productTipo?: string | null;
   avgMonthlyCustomers?: number | null;
+  productImpressionParams?: {
+    impressionFormulaType?: string | null;
+    attentionFactor?: string | number | null;
+    defaultPessoasPorMesa?: string | number | null;
+    loopDurationSeconds?: string | number | null;
+    frequenciaAparicoes?: string | number | null;
+  } | null;
+  locationData?: {
+    seatCount?: number | null;
+    tableCount?: number | null;
+    monthlyCustomers?: number | null;
+    avgStayMinutes?: number | null;
+  } | null;
 }) {
   const n = c.activeRestaurants;
   const coasters = c.coastersPerRestaurant;
   const unitCost = Number(c.batchCost) / c.batchSize;
   const productionCostPerRest = coasters * unitCost;
-  const isTelas = c.productTipo === "telas";
-  const spotSecondsFromUsage: 15 | 30 = c.usagePerDay === TELAS_INSERCOES[15] ? 15 : 30;
-  const impressionsPerRest = isTelas
-    ? calcTelaImpressions(spotSecondsFromUsage, c.avgMonthlyCustomers ?? 0, c.daysPerMonth)
-    : coasters * c.usagePerDay * c.daysPerMonth;
+
+  const productParams = c.productImpressionParams ?? null;
+  const formula = productParams?.impressionFormulaType ?? (c.productTipo === "telas" ? "por_tela" : "por_coaster");
+  const impressionsPerRest = calcImpressionesParaLocal({
+    product: productParams ?? { impressionFormulaType: formula },
+    location: c.locationData ?? (c.avgMonthlyCustomers != null ? { monthlyCustomers: c.avgMonthlyCustomers } : null),
+    qtdCoasters: coasters,
+    usosporCoaster: c.usagePerDay,
+    daysPerMonth: c.daysPerMonth,
+  });
   const sellerRate = Number(c.sellerCommission) / 100;
   const taxRateDecimal = Number(c.taxRate) / 100;
   const freightPerRest = n > 0 ? Number(c.freightCost || 0) / n : 0;
@@ -890,7 +909,14 @@ export default function CampaignDetail() {
   })();
 
   // pBase uses the effective per-restaurant coaster count for accurate production cost
-  const pBase = calcCampaignPricing({ ...campaign, coastersPerRestaurant: effectiveCoastersPerRest, productTipo: campaign.productTipo, avgMonthlyCustomers });
+  const productImpressionParams = {
+    impressionFormulaType: (campaign as any).productImpressionFormulaType ?? null,
+    attentionFactor: (campaign as any).productAttentionFactor ?? null,
+    defaultPessoasPorMesa: (campaign as any).productDefaultPessoasPorMesa ?? null,
+    loopDurationSeconds: (campaign as any).productLoopDurationSeconds ?? null,
+    frequenciaAparicoes: (campaign as any).productFrequenciaAparicoes ?? null,
+  };
+  const pBase = calcCampaignPricing({ ...campaign, coastersPerRestaurant: effectiveCoastersPerRest, productTipo: campaign.productTipo, avgMonthlyCustomers, productImpressionParams });
 
   let p: typeof pBase;
   if (hasQuotationRevenue) {
@@ -2906,9 +2932,13 @@ export default function CampaignDetail() {
                 <div className="bg-card border border-border/30 rounded-lg p-3 text-center">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Impressões/Mês</p>
                   <p className="text-lg font-bold font-mono mt-1">
-                    {campaign.productTipo === "telas"
-                      ? campaignRestaurants.reduce((sum, r) => sum + r.usagePerDay * (r.restaurantMonthlyCustomers ?? 0), 0).toLocaleString("pt-BR")
-                      : campaignRestaurants.reduce((sum, r) => sum + r.coastersCount * r.usagePerDay * campaign.daysPerMonth, 0).toLocaleString("pt-BR")}
+                    {campaignRestaurants.reduce((sum, r) => sum + calcImpressionesParaLocal({
+                          product: productImpressionParams,
+                          location: { monthlyCustomers: r.restaurantMonthlyCustomers ?? null, seatCount: (r as any).restaurantSeatCount ?? null, tableCount: (r as any).restaurantTableCount ?? null, avgStayMinutes: (r as any).restaurantAvgStayMinutes ?? null },
+                          qtdCoasters: r.coastersCount,
+                          usosporCoaster: r.usagePerDay,
+                          daysPerMonth: campaign.daysPerMonth,
+                        }), 0).toLocaleString("pt-BR")}
                   </p>
                 </div>
               </div>
@@ -2936,10 +2966,19 @@ export default function CampaignDetail() {
                     </thead>
                     <tbody>
                       {campaignRestaurants.map((r) => {
-                        const impressions = campaign.productTipo === "telas"
-                          ? r.usagePerDay * (r.restaurantMonthlyCustomers ?? 0)
-                          : r.coastersCount * r.usagePerDay * campaign.daysPerMonth;
-                        const restPricing = calcCampaignPricing({ ...campaign, coastersPerRestaurant: r.coastersCount, usagePerDay: r.usagePerDay, activeRestaurants: 1, productTipo: campaign.productTipo, avgMonthlyCustomers: r.restaurantMonthlyCustomers });
+                        const impressions = calcImpressionesParaLocal({
+                          product: productImpressionParams,
+                          location: {
+                            monthlyCustomers: r.restaurantMonthlyCustomers ?? null,
+                            seatCount: (r as any).restaurantSeatCount ?? null,
+                            tableCount: (r as any).restaurantTableCount ?? null,
+                            avgStayMinutes: (r as any).restaurantAvgStayMinutes ?? null,
+                          },
+                          qtdCoasters: r.coastersCount,
+                          usosporCoaster: r.usagePerDay,
+                          daysPerMonth: campaign.daysPerMonth,
+                        });
+                        const restPricing = calcCampaignPricing({ ...campaign, coastersPerRestaurant: r.coastersCount, usagePerDay: r.usagePerDay, activeRestaurants: 1, productTipo: campaign.productTipo, avgMonthlyCustomers: r.restaurantMonthlyCustomers, productImpressionParams, locationData: { monthlyCustomers: r.restaurantMonthlyCustomers ?? null, seatCount: (r as any).restaurantSeatCount ?? null, tableCount: (r as any).restaurantTableCount ?? null, avgStayMinutes: (r as any).restaurantAvgStayMinutes ?? null } });
                         return (
                           <tr key={r.id} className="border-b border-border/10 hover:bg-muted/5">
                             <td className="p-3 text-sm font-medium">{r.restaurantName || `Rest. #${r.restaurantId}`}</td>
@@ -2968,10 +3007,13 @@ export default function CampaignDetail() {
                         <td className="p-3 text-sm font-mono font-semibold text-right">{totalCoastersDistributed.toLocaleString("pt-BR")}</td>
                         <td className="p-3"></td>
                         <td className="p-3 text-sm font-mono font-semibold text-right">
-                          {(campaign.productTipo === "telas"
-                            ? campaignRestaurants.reduce((sum, r) => sum + r.usagePerDay * (r.restaurantMonthlyCustomers ?? 0), 0)
-                            : campaignRestaurants.reduce((sum, r) => sum + r.coastersCount * r.usagePerDay * campaign.daysPerMonth, 0)
-                          ).toLocaleString("pt-BR")}
+                          {campaignRestaurants.reduce((sum, r) => sum + calcImpressionesParaLocal({
+                            product: productImpressionParams,
+                            location: { monthlyCustomers: r.restaurantMonthlyCustomers ?? null, seatCount: (r as any).restaurantSeatCount ?? null, tableCount: (r as any).restaurantTableCount ?? null, avgStayMinutes: (r as any).restaurantAvgStayMinutes ?? null },
+                            qtdCoasters: r.coastersCount,
+                            usosporCoaster: r.usagePerDay,
+                            daysPerMonth: campaign.daysPerMonth,
+                          }), 0).toLocaleString("pt-BR")}
                         </td>
                         <td className="p-3 text-sm font-mono font-semibold text-right text-primary hidden lg:table-cell">{formatCurrency(p.monthlyRevenue)}</td>
                         <td className="p-3 text-sm font-mono font-semibold text-right text-emerald-400 hidden lg:table-cell">{formatCurrency(p.monthlyProfit)}</td>

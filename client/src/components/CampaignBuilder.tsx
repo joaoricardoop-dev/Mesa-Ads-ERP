@@ -326,7 +326,7 @@ function StepProdutos({ products, cart, hasPartner, onAdd, onRemove }: {
             const colors = TIPO_COLORS[product.tipo] ?? TIPO_COLORS.outro;
             const volumes = (product.tiers ?? []).map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b);
             const defaultVol = product.defaultQtyPerLocation ?? volumes[0] ?? 500;
-            const impressoes = impressoesEstimadas(defaultVol);
+            const impressoes = impressoesEstimadas(defaultVol, product);
             const tiers = product.tiers ?? [];
             const discountTiers = product.discountTiers ?? [];
             const smallestVol = volumes[0];
@@ -432,7 +432,7 @@ function StepConfigurar({ cart, hasPartner, onUpdate, onRemove }: {
         const TipoIcon = TIPO_ICONS[item.product.tipo] ?? Package;
         const colors = TIPO_COLORS[item.product.tipo] ?? TIPO_COLORS.outro;
         const volumes = (item.product.tiers ?? []).map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b);
-        const impressoes = impressoesEstimadas(item.volume);
+        const impressoes = impressoesEstimadas(item.volume, item.product);
 
         return (
           <div key={item.product.id} className={`bg-card border ${colors.border} rounded-2xl overflow-hidden`}>

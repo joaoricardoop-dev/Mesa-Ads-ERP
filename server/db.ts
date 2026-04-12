@@ -1,4 +1,5 @@
 import { eq, and, or, gte, lte, sql, desc, isNull, ilike, count, SQL } from "drizzle-orm";
+import { calcImpressionsByLocation } from "@shared/impressions";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import ws from "ws";
 import { Pool, neonConfig } from "@neondatabase/serverless";
@@ -286,6 +287,12 @@ export async function listCampaignsPaged(input: {
     clientName: clients.name,
     clientCompany: clients.company,
     productName: products.name,
+    productTipo: products.tipo,
+    productImpressionFormulaType: products.impressionFormulaType,
+    productAttentionFactor: products.attentionFactor,
+    productDefaultPessoasPorMesa: products.defaultPessoasPorMesa,
+    productLoopDurationSeconds: products.loopDurationSeconds,
+    productFrequenciaAparicoes: products.frequenciaAparicoes,
     quotationTotalValue: quotations.totalValue,
     quotationCoasterVolume: quotations.coasterVolume,
     quotationUnitPrice: quotations.unitPrice,
@@ -325,6 +332,11 @@ export async function getCampaign(id: number) {
       campaign: campaigns,
       productName: products.name,
       productTipo: products.tipo,
+      productImpressionFormulaType: products.impressionFormulaType,
+      productAttentionFactor: products.attentionFactor,
+      productDefaultPessoasPorMesa: products.defaultPessoasPorMesa,
+      productLoopDurationSeconds: products.loopDurationSeconds,
+      productFrequenciaAparicoes: products.frequenciaAparicoes,
       quotationTotalValue: quotations.totalValue,
       quotationCoasterVolume: quotations.coasterVolume,
       quotationUnitPrice: quotations.unitPrice,
@@ -348,6 +360,11 @@ export async function getCampaign(id: number) {
     ...result[0].campaign,
     productName: result[0].productName,
     productTipo: result[0].productTipo,
+    productImpressionFormulaType: result[0].productImpressionFormulaType,
+    productAttentionFactor: result[0].productAttentionFactor,
+    productDefaultPessoasPorMesa: result[0].productDefaultPessoasPorMesa,
+    productLoopDurationSeconds: result[0].productLoopDurationSeconds,
+    productFrequenciaAparicoes: result[0].productFrequenciaAparicoes,
     quotationTotalValue: result[0].quotationTotalValue,
     quotationCoasterVolume: result[0].quotationCoasterVolume,
     quotationUnitPrice: result[0].quotationUnitPrice,
@@ -406,6 +423,9 @@ export async function getCampaignRestaurants(campaignId: number) {
       ratingScore: activeRestaurants.ratingScore,
       ratingTier: activeRestaurants.ratingTier,
       ratingMultiplier: activeRestaurants.ratingMultiplier,
+      restaurantSeatCount: activeRestaurants.seatCount,
+      restaurantTableCount: activeRestaurants.tableCount,
+      restaurantAvgStayMinutes: activeRestaurants.avgStayMinutes,
     })
     .from(campaignRestaurants)
     .leftJoin(restaurants, eq(campaignRestaurants.restaurantId, restaurants.id))
@@ -533,9 +553,15 @@ export async function getMonthlyEconomics(year: number, month: number) {
       isBonificada: campaigns.isBonificada,
       clientName: clients.name,
       clientCompany: clients.company,
+      productImpressionFormulaType: products.impressionFormulaType,
+      productAttentionFactor: products.attentionFactor,
+      productDefaultPessoasPorMesa: products.defaultPessoasPorMesa,
+      productLoopDurationSeconds: products.loopDurationSeconds,
+      productFrequenciaAparicoes: products.frequenciaAparicoes,
     })
     .from(campaigns)
     .leftJoin(clients, eq(campaigns.clientId, clients.id))
+    .leftJoin(products, eq(campaigns.productId, products.id))
     .where(
       sql`${campaigns.startDate} <= ${endStr} AND ${campaigns.endDate} >= ${startOfMonth}`
     );
@@ -555,9 +581,14 @@ export async function getMonthlyEconomics(year: number, month: number) {
         usagePerDay: campaignRestaurants.usagePerDay,
         restaurantName: restaurants.name,
         commissionPercent: restaurants.commissionPercent,
+        restaurantSeatCount: activeRestaurants.seatCount,
+        restaurantTableCount: activeRestaurants.tableCount,
+        restaurantMonthlyCustomers: activeRestaurants.monthlyCustomers,
+        restaurantAvgStayMinutes: activeRestaurants.avgStayMinutes,
       })
       .from(campaignRestaurants)
       .leftJoin(restaurants, eq(campaignRestaurants.restaurantId, restaurants.id))
+      .leftJoin(activeRestaurants, eq(activeRestaurants.parentRestaurantId, campaignRestaurants.restaurantId))
       .where(eq(campaignRestaurants.campaignId, campaign.id));
 
     const campStart = new Date(campaign.startDate);
@@ -608,8 +639,29 @@ export async function getMonthlyEconomics(year: number, month: number) {
     totalProduction += campaignProduction;
     totalProfit += campaignProfit;
 
+    const productImpressionParams = {
+      impressionFormulaType: campaign.productImpressionFormulaType,
+      attentionFactor: campaign.productAttentionFactor,
+      defaultPessoasPorMesa: campaign.productDefaultPessoasPorMesa,
+      loopDurationSeconds: campaign.productLoopDurationSeconds,
+      frequenciaAparicoes: campaign.productFrequenciaAparicoes,
+    };
+    const formula = (productImpressionParams.impressionFormulaType ?? "por_coaster") as "por_coaster" | "por_tela" | "legacy";
+
     const restaurantDetails = campRestaurants.map((r) => {
-      const impressions = r.coastersCount * r.usagePerDay * daysInMonth;
+      const impressions = calcImpressionsByLocation({
+        formula,
+        product: productImpressionParams,
+        location: {
+          seatCount: r.restaurantSeatCount,
+          tableCount: r.restaurantTableCount,
+          monthlyCustomers: r.restaurantMonthlyCustomers,
+          avgStayMinutes: r.restaurantAvgStayMinutes,
+        },
+        qtdCoasters: r.coastersCount,
+        usosporCoaster: r.usagePerDay,
+        daysPerMonth: daysInMonth,
+      });
       return {
         restaurantId: r.restaurantId,
         restaurantName: r.restaurantName,

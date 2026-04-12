@@ -85,8 +85,69 @@ export function applyDiscountTierAdv(price: number, discountTiers: any[]): numbe
 
 export const USOS_POR_PORTA_COPO = 2;
 
-export function impressoesEstimadas(volume: number) {
-  return volume * USOS_POR_PORTA_COPO;
+export interface ProductImpressionParams {
+  impressionFormulaType?: string | null;
+  attentionFactor?: string | number | null;
+  defaultPessoasPorMesa?: string | number | null;
+  loopDurationSeconds?: string | number | null;
+  frequenciaAparicoes?: string | number | null;
+}
+
+export interface LocationDataForImpression {
+  seatCount?: number | null;
+  tableCount?: number | null;
+  monthlyCustomers?: number | null;
+  avgStayMinutes?: number | null;
+}
+
+function parseNum(v: string | number | null | undefined, fallback = 0): number {
+  if (v == null) return fallback;
+  const p = typeof v === "number" ? v : parseFloat(String(v));
+  return isNaN(p) ? fallback : p;
+}
+
+export function calcImpressionesParaLocal(params: {
+  product?: ProductImpressionParams | null;
+  location?: LocationDataForImpression | null;
+  qtdCoasters?: number;
+  usosporCoaster?: number | null;
+  daysPerMonth?: number;
+}): number {
+  const { product, location, qtdCoasters = 0, usosporCoaster, daysPerMonth = 26 } = params;
+  const formula = product?.impressionFormulaType ?? "por_coaster";
+  const atencao = parseNum(product?.attentionFactor, 1);
+  const defaultPPM = parseNum(product?.defaultPessoasPorMesa, 3);
+
+  if (formula === "por_coaster") {
+    const usos = usosporCoaster != null ? parseNum(usosporCoaster) : USOS_POR_PORTA_COPO;
+    let ppm = defaultPPM;
+    if (location?.seatCount && location?.tableCount && location.tableCount > 0) {
+      ppm = location.seatCount / location.tableCount;
+    }
+    return qtdCoasters * usos * ppm * atencao;
+  }
+
+  if (formula === "por_tela") {
+    const monthly = location?.monthlyCustomers ?? 0;
+    if (monthly <= 0) return 0;
+    const clientesPorDia = monthly / (daysPerMonth || 26);
+    const loopSec = parseNum(product?.loopDurationSeconds, 30);
+    const avgStay = location?.avgStayMinutes ?? 0;
+    const aparicoes = loopSec > 0 && avgStay > 0
+      ? (avgStay * 60) / loopSec
+      : parseNum(product?.frequenciaAparicoes, 1);
+    return clientesPorDia * aparicoes * atencao * daysPerMonth;
+  }
+
+  const usos = usosporCoaster != null ? parseNum(usosporCoaster) : USOS_POR_PORTA_COPO;
+  return qtdCoasters * usos;
+}
+
+export function impressoesEstimadas(volume: number, product?: ProductImpressionParams | null): number {
+  if (!product || !product.impressionFormulaType || product.impressionFormulaType === "legacy") {
+    return volume * USOS_POR_PORTA_COPO;
+  }
+  return calcImpressionesParaLocal({ product, qtdCoasters: volume });
 }
 
 export function fmtImpr(n: number) {

@@ -64,6 +64,7 @@ import {
 import { formatCurrency } from "@/lib/format";
 import { useLocation } from "wouter";
 import CampaignsKanban from "./CampaignsKanban";
+import { calcImpressionesParaLocal } from "@/lib/campaign-builder-utils";
 
 interface CampaignForm {
   clientId: number | null;
@@ -178,11 +179,23 @@ function calcCampaignPricing(c: {
   contractDuration: number;
   batchSize: number;
   batchCost: string | number;
+  productImpressionParams?: {
+    impressionFormulaType?: string | null;
+    attentionFactor?: string | number | null;
+    defaultPessoasPorMesa?: string | number | null;
+    loopDurationSeconds?: string | number | null;
+    frequenciaAparicoes?: string | number | null;
+  } | null;
 }) {
   const coasters = c.coastersPerRestaurant;
   const unitCost = Number(c.batchCost) / c.batchSize;
   const productionCost = coasters * unitCost;
-  const impressions = coasters * c.usagePerDay * c.daysPerMonth;
+  const impressions = calcImpressionesParaLocal({
+    product: c.productImpressionParams ?? null,
+    qtdCoasters: coasters,
+    usosporCoaster: c.usagePerDay,
+    daysPerMonth: c.daysPerMonth,
+  });
   const markupPct = Number(c.markupPercent);
   const sellerRate = Number(c.sellerCommission) / 100;
   const taxRateDecimal = Number(c.taxRate) / 100;
@@ -532,7 +545,14 @@ export default function Campaigns() {
     const effectiveCoastersPerRest = (qVolume && qVolume > 0 && c.activeRestaurants > 0)
       ? Math.round(qVolume / c.activeRestaurants)
       : c.coastersPerRestaurant;
-    const base = calcCampaignPricing({ ...c, coastersPerRestaurant: effectiveCoastersPerRest });
+    const productImpressionParams = {
+      impressionFormulaType: (c as any).productImpressionFormulaType ?? null,
+      attentionFactor: (c as any).productAttentionFactor ?? null,
+      defaultPessoasPorMesa: (c as any).productDefaultPessoasPorMesa ?? null,
+      loopDurationSeconds: (c as any).productLoopDurationSeconds ?? null,
+      frequenciaAparicoes: (c as any).productFrequenciaAparicoes ?? null,
+    };
+    const base = calcCampaignPricing({ ...c, coastersPerRestaurant: effectiveCoastersPerRest, productImpressionParams });
     const qTotal = (c as any).quotationTotalValue ? parseFloat((c as any).quotationTotalValue) : null;
     if (qTotal !== null && qTotal > 0) {
       const totalCostsContract = base.totalCosts * c.activeRestaurants * c.contractDuration;

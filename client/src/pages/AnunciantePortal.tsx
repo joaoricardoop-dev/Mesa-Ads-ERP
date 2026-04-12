@@ -193,7 +193,7 @@ function ProductPriceSheet({ product, hasPartner, open, onClose }: {
                     });
                     const discountVol = baseUnitPrice4sem > 0 && vol > smallestVol
                       ? (1 - unitPrice4sem / baseUnitPrice4sem) : 0;
-                    const impr = impressoesEstimadas(vol);
+                    const impr = impressoesEstimadas(vol, product);
 
                     return (
                       <tr key={vol} className="border-t border-border/10 hover:bg-accent/10 transition-colors">
@@ -251,7 +251,7 @@ function ShoppingProductCard({
   );
 
   const defaultVol = product.defaultQtyPerLocation ?? (volumes[0] ?? 500);
-  const impressoes = impressoesEstimadas(defaultVol);
+  const impressoes = impressoesEstimadas(defaultVol, product);
   const TipoIcon = TIPO_ICONS[product.tipo] ?? Package;
   const colors = TIPO_COLORS[product.tipo] ?? TIPO_COLORS.outro;
 
@@ -453,7 +453,7 @@ function AdvertiserProductTable({ product, hasPartner }: { product: any; hasPart
                 });
                 const discountVol = baseUnitPrice4sem > 0 && vol > smallestVol
                   ? (1 - unitPrice4sem / baseUnitPrice4sem) : 0;
-                const impr = impressoesEstimadas(vol);
+                const impr = impressoesEstimadas(vol, product);
 
                 return (
                   <tr key={vol} className="border-t border-border/10 hover:bg-accent/10 transition-colors">
