@@ -31,6 +31,7 @@ export const pricingModeEnum = pgEnum("pricing_mode", ["cost_based", "price_base
 export const entryTypeEnum = pgEnum("entry_type", ["tiers", "fixed_quantities"]);
 export const impressionFormulaTypeEnum = pgEnum("impression_formula_type", ["por_coaster", "por_tela", "por_visitante", "por_evento", "manual"]);
 export const distributionTypeEnum = pgEnum("distribution_type", ["rede", "local_especifico"]);
+export const workflowTemplateEnum = pgEnum("workflow_template", ["fisico", "eletronico_cliente_envia", "ativacao_evento"]);
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -842,6 +843,7 @@ export const products = pgTable("products", {
   entryType: entryTypeEnum("entryType").default("tiers").notNull(),
   visibleToPartners: boolean("visibleToPartners").default(false).notNull(),
   visibleToAdvertisers: boolean("visibleToAdvertisers").default(false).notNull(),
+  workflowTemplate: workflowTemplateEnum("workflowTemplate"),
   isActive: boolean("isActive").default(true).notNull(),
   impressionFormulaType: varchar("impressionFormulaType", { length: 50 }).default("por_coaster").notNull(),
   attentionFactor: decimal("attentionFactor", { precision: 4, scale: 2 }).default("1.00").notNull(),

@@ -153,7 +153,7 @@ const NAV_ENTRIES: NavEntry[] = [
   },
   {
     icon: UtensilsCrossed,
-    label: "Restaurantes",
+    label: "Locais",
     items: [
       { icon: UtensilsCrossed, label: "Lista", path: "/restaurantes" },
       { icon: MapPin, label: "Mapa", path: "/restaurantes/mapa" },
@@ -458,7 +458,7 @@ function DashboardLayoutContent({
                       {user.firstName || user.email || "-"}
                     </p>
                     <p className="text-[10px] text-muted-foreground truncate mt-1">
-                      {{admin: "Administrador", comercial: "Comercial", operacoes: "Operações", financeiro: "Financeiro", manager: "Gerente", anunciante: "Anunciante", restaurante: "Restaurante"}[user.role || ""] || user.role || "—"}
+                      {{admin: "Administrador", comercial: "Comercial", operacoes: "Operações", financeiro: "Financeiro", manager: "Gerente", anunciante: "Anunciante", restaurante: "Local"}[user.role || ""] || user.role || "—"}
                     </p>
                   </div>
                 </button>
@@ -573,7 +573,7 @@ function DashboardLayoutContent({
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-amber-400" />
               <span className="text-xs font-medium text-amber-400">
-                Visualizando como <span className="font-bold">{impersonation.name}</span> — {impersonation.role === "restaurante" ? "Restaurante" : impersonation.role === "parceiro" ? "Parceiro" : "Anunciante"}
+                Visualizando como <span className="font-bold">{impersonation.name}</span> — {impersonation.role === "restaurante" ? "Local" : impersonation.role === "parceiro" ? "Parceiro" : "Anunciante"}
               </span>
             </div>
             <button
@@ -628,7 +628,7 @@ function DashboardLayoutContent({
                 placeholder="Pergunte algo..."
                 height="380px"
                 emptyStateMessage="Como posso ajudar?"
-                suggestedPrompts={["Como ver campanhas ativas?", "Como gerar um orçamento?", "Como adicionar um restaurante?"]}
+                suggestedPrompts={["Como ver campanhas ativas?", "Como gerar um orçamento?", "Como adicionar um local?"]}
               />
             </div>
           )}

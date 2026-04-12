@@ -30,7 +30,7 @@ import { FileText, Plus, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 
 const ROLE_OPTIONS = [
-  { key: "restaurante", label: "Restaurante", color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
+  { key: "restaurante", label: "Local", color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
   { key: "anunciante", label: "Anunciante", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
 ];
 
@@ -227,7 +227,7 @@ export default function TermTemplates() {
               <Input
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="Ex: Termo de Parceria Restaurante"
+                placeholder="Ex: Termo de Parceria Local"
                 className="bg-background border-border/30"
               />
             </div>

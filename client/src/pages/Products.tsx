@@ -92,6 +92,7 @@ const emptyDiscountTier: DiscountTierForm = { priceMin: "", priceMax: "", discou
 
 type PricingMode = "cost_based" | "price_based";
 type EntryType = "tiers" | "fixed_quantities";
+type WorkflowTemplate = "fisico" | "eletronico_cliente_envia" | "ativacao_evento";
 
 interface ProductListItem {
   id: number;
@@ -130,6 +131,7 @@ interface ProductForm {
   comComercial: string;
   pricingMode: PricingMode;
   entryType: EntryType;
+  workflowTemplate: WorkflowTemplate | "";
   isActive: boolean;
   impressionFormulaType: ImpressionFormulaType;
   attentionFactor: string;
@@ -153,6 +155,7 @@ const emptyProduct: ProductForm = {
   comComercial: "10.00",
   pricingMode: "cost_based",
   entryType: "tiers",
+  workflowTemplate: "",
   isActive: true,
   impressionFormulaType: "por_coaster",
   attentionFactor: "1.00",
@@ -236,6 +239,7 @@ export default function Products() {
       comComercial: p.comComercial || "10.00",
       pricingMode: (p.pricingMode as PricingMode) || "cost_based",
       entryType: (p.entryType as EntryType) || "tiers",
+      workflowTemplate: (p.workflowTemplate as WorkflowTemplate) || "",
       isActive: p.isActive,
       impressionFormulaType: (p.impressionFormulaType as ImpressionFormulaType) || "por_coaster",
       attentionFactor: p.attentionFactor || "1.00",
@@ -262,6 +266,7 @@ export default function Products() {
       comComercial: form.comComercial,
       pricingMode: form.pricingMode,
       entryType: form.entryType,
+      workflowTemplate: (form.workflowTemplate as WorkflowTemplate) || null,
       isActive: form.isActive,
       impressionFormulaType: form.impressionFormulaType,
       attentionFactor: form.attentionFactor,
@@ -523,7 +528,7 @@ export default function Products() {
                 <Input value={form.irpj} onChange={e => setForm({ ...form, irpj: e.target.value })} />
               </div>
               <div>
-                <Label>Com. Restaurante (%)</Label>
+                <Label>Com. Local (%)</Label>
                 <Input value={form.comRestaurante} onChange={e => setForm({ ...form, comRestaurante: e.target.value })} />
               </div>
               <div>
@@ -553,7 +558,6 @@ export default function Products() {
                 </Select>
               </div>
             </div>
-
             <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
               <h3 className="text-sm font-semibold text-foreground">Fórmula de Impressões</h3>
               <div>
@@ -613,6 +617,18 @@ export default function Products() {
               )}
             </div>
 
+            <div>
+              <Label>Template de Workflow</Label>
+              <Select value={form.workflowTemplate || "none"} onValueChange={v => setForm({ ...form, workflowTemplate: v === "none" ? "" : v as WorkflowTemplate })}>
+                <SelectTrigger><SelectValue placeholder="Selecionar template..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem template (fluxo padrão)</SelectItem>
+                  <SelectItem value="fisico">Físico (briefing → design → aprovação → produção → distribuição → veiculação → concluída)</SelectItem>
+                  <SelectItem value="eletronico_cliente_envia">Eletrônico/Cliente envia (briefing → aprovação de material → material recebido → veiculação → concluída)</SelectItem>
+                  <SelectItem value="ativacao_evento">Ativação/Evento (briefing → planejamento → execução → concluída)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center gap-3">
               <Switch checked={form.isActive} onCheckedChange={v => setForm({ ...form, isActive: v })} />
               <Label className="text-sm">Produto ativo</Label>

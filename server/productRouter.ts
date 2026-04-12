@@ -14,6 +14,7 @@ async function getDatabase() {
 const TIPO_ENUM = ["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro", "impressos", "eletronicos", "telas"] as const;
 const IMPRESSION_FORMULA_ENUM = ["por_coaster", "por_tela", "por_visitante", "por_evento", "manual"] as const;
 const DISTRIBUTION_TYPE_ENUM = ["rede", "local_especifico"] as const;
+const WORKFLOW_TEMPLATE_ENUM = ["fisico", "eletronico_cliente_envia", "ativacao_evento"] as const;
 
 export const productRouter = router({
   // ── Product CRUD ─────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ export const productRouter = router({
       comComercial: z.string().default("10.00"),
       pricingMode: z.enum(["cost_based", "price_based"]).default("cost_based"),
       entryType: z.enum(["tiers", "fixed_quantities"]).default("tiers"),
+      workflowTemplate: z.enum(WORKFLOW_TEMPLATE_ENUM).nullable().optional(),
       isActive: z.boolean().default(true),
       impressionFormulaType: z.string().optional().nullable().default("por_coaster"),
       attentionFactor: z.string().default("1.00"),
@@ -93,6 +95,7 @@ export const productRouter = router({
       comComercial: z.string().optional(),
       pricingMode: z.enum(["cost_based", "price_based"]).optional(),
       entryType: z.enum(["tiers", "fixed_quantities"]).optional(),
+      workflowTemplate: z.enum(WORKFLOW_TEMPLATE_ENUM).nullable().optional(),
       isActive: z.boolean().optional(),
       impressionFormulaType: z.string().optional().nullable(),
       attentionFactor: z.string().optional(),

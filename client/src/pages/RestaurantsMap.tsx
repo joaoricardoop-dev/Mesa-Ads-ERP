@@ -323,7 +323,7 @@ export default function RestaurantsMap() {
           </Button>
           <div>
             <h1 className="text-base font-bold flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-primary" /> Mapa de Restaurantes
+              <MapPin className="w-4 h-4 text-primary" /> Mapa de Locais
             </h1>
             <p className="text-xs text-muted-foreground">
               {activeCount} ativos · {withCoords} no mapa · {withoutCoords} sem coordenadas

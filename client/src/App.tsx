@@ -296,7 +296,7 @@ function ClerkLoginPage() {
           className="mt-4 text-sm block"
           style={{ color: "hsl(0 0% 50%)" }}
         >
-          É um restaurante parceiro? <span className="text-[#27d803] hover:underline cursor-pointer">Cadastre-se aqui</span>
+          É um local parceiro? <span className="text-[#27d803] hover:underline cursor-pointer">Cadastre-se aqui</span>
         </a>
         <p className="text-center mt-4 text-[11px]" style={{ color: "hsl(0 0% 30%)" }}>
           mesa.ads &copy; {new Date().getFullYear()} &mdash; Plataforma de gestão

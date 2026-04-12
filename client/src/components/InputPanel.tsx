@@ -258,7 +258,7 @@ export default function InputPanel({ inputs, updateInput, grossMargin = 0 }: Inp
             max={20}
           />
           <InputField
-            label="Restaurantes ativos"
+            label="Locais ativos"
             value={inputs.activeRestaurants}
             onChange={(v) => updateInput("activeRestaurants", v)}
             icon={<Store className="w-3 h-3" />}

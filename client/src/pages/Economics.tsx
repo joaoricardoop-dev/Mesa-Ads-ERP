@@ -144,7 +144,7 @@ export default function Economics() {
         </div>
         <div className="bg-card border border-border/30 rounded-lg p-4 col-span-1">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-muted-foreground">Restaurantes</p>
+            <p className="text-xs text-muted-foreground">Locais</p>
             <Store className="w-4 h-4 text-muted-foreground" />
           </div>
           <p className="text-2xl font-bold font-mono">
@@ -334,7 +334,7 @@ export default function Economics() {
                       </div>
                       <div className="bg-background/50 rounded-lg p-3">
                         <p className="text-[10px] text-muted-foreground">
-                          Comissão Restaurantes
+                          Comissão Locais
                         </p>
                         <p className="font-mono text-sm font-bold text-orange-400">
                           {formatCurrency(campaign.commission)}

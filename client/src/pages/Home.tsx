@@ -290,7 +290,7 @@ export default function Home() {
                     </SelectContent>
                   </Select>
                 </CompactField>
-                <CompactField label="Restaurantes ativos">
+                <CompactField label="Locais ativos">
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5">
                       <Input type="number" value={inputs.activeRestaurants} onChange={(e) => updateInput("activeRestaurants", Number(e.target.value))} className="font-mono text-sm bg-background/50 border-border/50 h-8 tabular-nums" min={1} max={100} />

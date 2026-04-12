@@ -234,7 +234,7 @@ export default function FinancialDashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <KpiCard label="A Receber" value={formatCurrency(receivables)} sub={`${data?.receivablesCount || 0} faturas abertas`} icon={Clock} color="text-amber-500" bg="bg-amber-500/10" onClick={() => navigate("/financeiro/faturamento")} />
             <KpiCard label="Inadimplente" value={formatCurrency(overdue)} sub={`${data?.overdueCount || 0} vencidas`} icon={AlertTriangle} color={overdue > 0 ? "text-red-500" : "text-muted-foreground"} bg={overdue > 0 ? "bg-red-500/10" : "bg-muted/10"} onClick={() => navigate("/financeiro/faturamento")} />
-            <KpiCard label="Pagar Restaurantes" value={formatCurrency(pendingRp)} sub={`${data?.pendingRestaurantCount || 0} pendentes`} icon={HandCoins} color={pendingRp > 0 ? "text-orange-500" : "text-muted-foreground"} bg={pendingRp > 0 ? "bg-orange-500/10" : "bg-muted/10"} onClick={() => navigate("/financeiro/pagamentos")} />
+            <KpiCard label="Pagar Locais" value={formatCurrency(pendingRp)} sub={`${data?.pendingRestaurantCount || 0} pendentes`} icon={HandCoins} color={pendingRp > 0 ? "text-orange-500" : "text-muted-foreground"} bg={pendingRp > 0 ? "bg-orange-500/10" : "bg-muted/10"} onClick={() => navigate("/financeiro/pagamentos")} />
             <KpiCard label="Campanhas Ativas" value={String(activeCampaigns)} sub="em execução" icon={Building2} color="text-blue-500" bg="bg-blue-500/10" onClick={() => navigate("/campanhas")} />
           </div>
 

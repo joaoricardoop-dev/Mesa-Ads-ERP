@@ -115,7 +115,7 @@ export default function SimulatorDRE({
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <p className="text-[10px] text-muted-foreground">Restaurantes</p>
+            <p className="text-[10px] text-muted-foreground">Locais</p>
             <p className="text-sm font-mono font-bold">{n}</p>
           </div>
           <div className="text-right">
@@ -159,7 +159,7 @@ export default function SimulatorDRE({
               sub
             />
             <DRERow
-              label="Receita de Comissão Restaurante"
+              label="Receita de Comissão Local"
               perRest={formatCurrency(pr.restaurantCommission)}
               total={formatCurrency(totalRestComm)}
               contract={formatCurrency(totalRestComm * d)}
@@ -225,7 +225,7 @@ export default function SimulatorDRE({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
           <CostCard label="Veiculação" value={formatCurrency(veiculacaoTotal * d)} monthly={formatCurrency(veiculacaoTotal)} />
           <CostCard label="Produção" value={formatCurrency(totalProduction * d)} monthly={formatCurrency(totalProduction)} />
-          <CostCard label="Com. Restaurante" value={formatCurrency(totalRestComm * d)} monthly={formatCurrency(totalRestComm)} />
+          <CostCard label="Com. Local" value={formatCurrency(totalRestComm * d)} monthly={formatCurrency(totalRestComm)} />
           <CostCard label="Com. Agência" value={formatCurrency(totalAgencyComm * d)} monthly={formatCurrency(totalAgencyComm)} />
           <CostCard label="Com. Vendedor" value={formatCurrency(totalSellerComm * d)} monthly={formatCurrency(totalSellerComm)} />
           <CostCard label="Impostos" value={formatCurrency(totalTax * d)} monthly={formatCurrency(totalTax)} />

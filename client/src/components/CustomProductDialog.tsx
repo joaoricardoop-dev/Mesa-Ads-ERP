@@ -218,7 +218,7 @@ export function CustomProductDialog({
             </p>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label className="text-[10px] text-muted-foreground mb-1 block">Restaurante (%)</Label>
+                <Label className="text-[10px] text-muted-foreground mb-1 block">Local (%)</Label>
                 <Input
                   type="number"
                   min={0}

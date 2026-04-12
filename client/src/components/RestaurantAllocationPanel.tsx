@@ -172,11 +172,11 @@ export default function RestaurantAllocationPanel({
               <Store className="w-4 h-4 text-primary" />
             </div>
             <div className="text-left">
-              <h3 className="text-sm font-semibold">Distribuição por Restaurante</h3>
+              <h3 className="text-sm font-semibold">Distribuição por Local</h3>
               <p className="text-xs text-muted-foreground">
                 {hasAllocations
-                  ? `${selectedIds.length} restaurante${selectedIds.length !== 1 ? "s" : ""} · ${allocatedTotal.toLocaleString("pt-BR")} / ${totalCoasters.toLocaleString("pt-BR")} coasters`
-                  : "Selecione restaurantes e aloque coasters para a campanha"}
+                  ? `${selectedIds.length} local${selectedIds.length !== 1 ? "is" : ""} · ${allocatedTotal.toLocaleString("pt-BR")} / ${totalCoasters.toLocaleString("pt-BR")} coasters`
+                  : "Selecione locais e aloque coasters para a campanha"}
               </p>
             </div>
           </div>
@@ -316,7 +316,7 @@ export default function RestaurantAllocationPanel({
                 <table className="w-full">
                   <thead>
                     <tr className="text-[11px] uppercase tracking-wider text-muted-foreground bg-muted/20">
-                      <th className="text-left py-2 px-5 font-medium">Restaurante</th>
+                      <th className="text-left py-2 px-5 font-medium">Local</th>
                       <th className="text-center py-2 px-2 font-medium w-16">Rating</th>
                       <th className="text-center py-2 px-2 font-medium w-28">
                         <div className="flex items-center justify-center gap-1">
@@ -465,7 +465,7 @@ export default function RestaurantAllocationPanel({
               <div className="border-t border-border/20 px-5 py-4 bg-muted/10">
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="w-4 h-4 text-primary" />
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-primary">Detalhamento por Restaurante</h4>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-primary">Detalhamento por Local</h4>
                 </div>
                 <div className="space-y-3">
                   {selectedRestaurants.map(r => {

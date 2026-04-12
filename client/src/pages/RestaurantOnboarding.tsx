@@ -420,7 +420,7 @@ export default function RestaurantOnboarding() {
             </div>
             <h2 className="text-xl font-bold text-white mb-2">Cadastro realizado!</h2>
             <p className="text-sm text-[hsl(0,0%,50%)] mb-6 leading-relaxed">
-              Seu restaurante foi cadastrado com sucesso na rede mesa.ads. Agora você pode acessar a plataforma com o email e senha que criou.
+              Seu local foi cadastrado com sucesso na rede mesa.ads. Agora você pode acessar a plataforma com o email e senha que criou.
             </p>
             <a
               href="/"
@@ -449,7 +449,7 @@ export default function RestaurantOnboarding() {
       <div className="relative w-full max-w-lg px-6">
         <div className="text-center mb-8">
           <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-white mb-1">Cadastro de Restaurante Parceiro</h1>
+          <h1 className="text-2xl font-bold text-white mb-1">Cadastro de Local Parceiro</h1>
           <p className="text-sm text-[hsl(0,0%,50%)]">
             Preencha os dados abaixo para ingressar na rede mesa.ads
           </p>
@@ -562,7 +562,7 @@ export default function RestaurantOnboarding() {
                 <Input value={form.instagram} onChange={(e) => update("instagram", e.target.value)} placeholder="@restaurante" className={inputClass} />
               </div>
               <div>
-                <Label className={labelClass}>Foto de perfil do restaurante (PNG ou JPG)</Label>
+                <Label className={labelClass}>Foto de perfil do local (PNG ou JPG)</Label>
                 <div className="mt-1">
                   {logoPreview ? (
                     <div className="flex items-center gap-3">
@@ -841,7 +841,7 @@ export default function RestaurantOnboarding() {
           {step === 4 && (
             <div className="space-y-4">
               <p className="text-sm text-[hsl(0,0%,50%)] mb-2">
-                Crie suas credenciais para acessar o portal do restaurante na plataforma mesa.ads.
+                Crie suas credenciais para acessar o portal do local na plataforma mesa.ads.
               </p>
               <div>
                 <Label className={labelClass}>E-mail da Conta *</Label>

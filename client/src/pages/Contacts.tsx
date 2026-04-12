@@ -80,7 +80,7 @@ export default function Contacts() {
       c.email || "",
       c.phone || "",
       c.role || "",
-      c.ownerType === "anunciante" ? "Anunciante" : c.ownerType === "restaurante" ? "Restaurante" : "",
+      c.ownerType === "anunciante" ? "Anunciante" : c.ownerType === "restaurante" ? "Local" : "",
       c.clientName || c.restaurantName || "",
       c.isPrimary ? "Sim" : "Não",
       (c.notes || "").replace(/\n/g, " "),
@@ -130,7 +130,7 @@ export default function Contacts() {
           <p className="text-2xl font-bold font-mono text-primary">{advertiserCount}</p>
         </div>
         <div className="bg-card border border-border/30 rounded-lg p-4">
-          <p className="text-xs text-muted-foreground flex items-center gap-1"><UtensilsCrossed className="w-3 h-3" /> Restaurantes</p>
+          <p className="text-xs text-muted-foreground flex items-center gap-1"><UtensilsCrossed className="w-3 h-3" /> Locais</p>
           <p className="text-2xl font-bold font-mono text-orange-500">{restaurantCount}</p>
         </div>
       </div>
@@ -220,7 +220,7 @@ export default function Contacts() {
                         </Badge>
                       ) : c.ownerType === "restaurante" ? (
                         <Badge className="text-[10px] bg-orange-500/10 text-orange-500 border-orange-500/30">
-                          <UtensilsCrossed className="w-3 h-3 mr-1" /> Restaurante
+                          <UtensilsCrossed className="w-3 h-3 mr-1" /> Local
                         </Badge>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>

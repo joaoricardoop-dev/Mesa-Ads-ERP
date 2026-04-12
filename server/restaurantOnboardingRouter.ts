@@ -496,7 +496,7 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
       }
 
       const logoUploadToken = createOnboardingUploadToken(restaurant.id);
-      res.json({ success: true, message: "Restaurante cadastrado com sucesso!", restaurantId: restaurant.id, logoUploadToken });
+      res.json({ success: true, message: "Local cadastrado com sucesso!", restaurantId: restaurant.id, logoUploadToken });
     } catch (err: any) {
       console.error("Submit onboarding error:", err);
       const clerkCode = err?.errors?.[0]?.code;

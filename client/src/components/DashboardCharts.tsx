@@ -102,7 +102,7 @@ export default function DashboardCharts({
 
   const costPieData = [
     { name: "Produção", value: pr.productionCost },
-    { name: "Com. Restaurante", value: pr.restaurantCommission },
+    { name: "Com. Local", value: pr.restaurantCommission },
     { name: "Com. Vendedor", value: pr.sellerCommissionValue },
     { name: "Impostos", value: pr.taxValue },
   ].filter(d => d.value > 0);

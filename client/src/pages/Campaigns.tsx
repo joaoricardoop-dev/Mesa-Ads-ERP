@@ -324,7 +324,7 @@ export default function Campaigns() {
       utils.campaign.getRestaurants.invalidate();
       setIsRestaurantsDialogOpen(false);
       setManagingCampaignId(null);
-      toast.success("Restaurantes da campanha atualizados!");
+      toast.success("Locais da campanha atualizados!");
     },
     onError: (err: any) => toast.error(`Erro: ${err.message}`),
   });
@@ -688,7 +688,7 @@ export default function Campaigns() {
                 <SelectItem value="name">Nome</SelectItem>
                 <SelectItem value="client">Cliente</SelectItem>
                 <SelectItem value="status">Etapa</SelectItem>
-                <SelectItem value="restaurants">Restaurantes</SelectItem>
+                <SelectItem value="restaurants">Locais</SelectItem>
               </SelectContent>
             </Select>
             <button onClick={() => setSortDir((d) => d === "asc" ? "desc" : "asc")} className="h-8 w-8 flex items-center justify-center rounded-md border border-border/30 bg-card hover:bg-muted text-muted-foreground transition-colors">
@@ -771,8 +771,8 @@ export default function Campaigns() {
                         {overdue && <p className="text-[10px] text-red-400 flex items-center justify-end gap-0.5"><AlertTriangle className="w-2.5 h-2.5" /> Atrasada</p>}
                       </div>
                       <div className="text-right space-y-0.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Restaurantes</p>
-                        <p className="text-xs font-medium font-mono">{c.activeRestaurants} rest.</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Locais</p>
+                        <p className="text-xs font-medium font-mono">{c.activeRestaurants} loc.</p>
                         <p className="text-[10px] text-muted-foreground">{totalCoasters.toLocaleString("pt-BR")} un.</p>
                       </div>
                     </div>
@@ -1051,7 +1051,7 @@ export default function Campaigns() {
           <DialogContent className="sm:max-w-2xl bg-card border-border/30 max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Store className="w-5 h-5 text-primary" /> Restaurantes da Campanha
+                <Store className="w-5 h-5 text-primary" /> Locais da Campanha
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3 py-4">

@@ -526,7 +526,7 @@ function BudgetItemCard({ item, globalParams, onUpdate, onRemove, onAddTelasDual
                     <span className="text-right font-mono">{fmtBRL(parseFloat(item.customValues.customFinalPrice) || 0)}</span>
                   </>
                 )}
-                <span className="text-muted-foreground">Com. Restaurante</span>
+                <span className="text-muted-foreground">Com. Local</span>
                 <span className="text-right font-mono">{item.customValues.customRestaurantCommission}%</span>
                 <span className="text-muted-foreground">Com. Parceiro</span>
                 <span className="text-right font-mono">{item.customValues.customPartnerCommission}%</span>

@@ -113,7 +113,7 @@ const ACTION_LABELS: Record<string, string> = {
   completed:              "Campanha concluída",
   reactivated:            "Campanha reativada",
   updated:                "Campanha atualizada",
-  restaurants_updated:    "Restaurantes atualizados",
+  restaurants_updated:    "Locais atualizados",
   briefing_complete:      "Briefing concluído",
   design_submitted:       "Design enviado para aprovação",
   design_approved:        "Design aprovado",

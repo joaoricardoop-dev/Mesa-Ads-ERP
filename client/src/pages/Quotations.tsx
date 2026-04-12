@@ -301,7 +301,7 @@ export default function Quotations() {
   const setRestaurantsMutation = trpc.quotation.setRestaurants.useMutation({
     onSuccess: () => {
       utils.quotation.getRestaurants.invalidate({ quotationId: signOsDialogId! });
-      toast.success("Restaurantes atualizados!");
+      toast.success("Locais atualizados!");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
@@ -710,7 +710,7 @@ export default function Quotations() {
                                 const monthlyTotal = duration > 0 ? totalContractValue / duration : totalContractValue;
                                 const pricePerRest = (numRest > 0 ? numRest : 1) > 0 ? monthlyTotal / (numRest > 0 ? numRest : 1) : monthlyTotal;
                                 const restaurants = fetchedRestaurants.map((r) => ({
-                                  name: r.restaurantName || "Restaurante",
+                                  name: r.restaurantName || "Local",
                                   neighborhood: r.restaurantAddress || "",
                                   coasters: r.coasterQuantity || 0,
                                 }));
@@ -1261,7 +1261,7 @@ export default function Quotations() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border/30 hover:bg-transparent">
-                      <TableHead className="text-xs">Restaurante</TableHead>
+                      <TableHead className="text-xs">Local</TableHead>
                       <TableHead className="text-xs text-center">Comissão</TableHead>
                       <TableHead className="text-xs text-right">Bolachas</TableHead>
                       <TableHead className="text-xs w-[60px]"></TableHead>

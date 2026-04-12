@@ -18,7 +18,7 @@ export default function MarkupTable({ data, currentMarkup, minMargin }: MarkupTa
           Precificação por Markup — Faturamento Mesa Ads
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Receita da Mesa Ads por restaurante, variando markup de 50% a 300% sobre o custo de produção. Comissão é paga ao restaurante parceiro.
+          Receita da Mesa Ads por local, variando markup de 50% a 300% sobre o custo de produção. Comissão é paga ao local parceiro.
         </p>
       </CardHeader>
       <CardContent className="p-0">

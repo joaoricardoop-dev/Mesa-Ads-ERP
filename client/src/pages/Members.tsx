@@ -84,7 +84,7 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof S
     icon: ShieldCheck,
   },
   restaurante: {
-    label: "Restaurante",
+    label: "Local",
     color: "bg-teal-500/20 text-teal-400 border-teal-500/30",
     icon: Shield,
   },
@@ -590,7 +590,7 @@ export default function Members() {
             <div className="bg-background/50 border border-teal-500/20 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Shield className="w-4 h-4 text-teal-400" />
-                <h4 className="text-sm font-semibold text-teal-400">Restaurante</h4>
+                <h4 className="text-sm font-semibold text-teal-400">Local</h4>
               </div>
               <ul className="text-xs text-muted-foreground space-y-1.5">
                 <li>✓ Portal do restaurante</li>

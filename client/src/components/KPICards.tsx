@@ -153,9 +153,9 @@ export default function KPICards({
         />
       )}
       <KPICard
-        label="Restaurantes"
+        label="Locais"
         value={String(activeRestaurants)}
-        sub={`Preço/rest: ${formatCurrency(perRestaurant.sellingPrice)}`}
+        sub={`Preço/local: ${formatCurrency(perRestaurant.sellingPrice)}`}
         icon={<Store className="w-3.5 h-3.5" />}
         delay={0.3}
       />

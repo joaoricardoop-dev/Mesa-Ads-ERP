@@ -389,7 +389,7 @@ export default function ParceiroTabelaPrecos() {
         </p>
         <div className="bg-muted/20 rounded-lg p-3 font-mono text-xs space-y-1">
           <p><span className="text-muted-foreground">Custo total</span> = Custo GPC × Artes × Volume + Frete</p>
-          <p><span className="text-muted-foreground">Denominador base</span> = 1 − Margem − IRPJ − Com. Restaurante − Com. Interna</p>
+          <p><span className="text-muted-foreground">Denominador base</span> = 1 − Margem − IRPJ − Com. Local − Com. Interna</p>
           <p><span className="text-muted-foreground">Preço base (4 sem.)</span> = Custo total ÷ Denominador base</p>
           {billingMode === "bruto" ? (
             <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Preço base ÷ (1 − <span className="text-emerald-400">Sua Com. ({commissionPercent}%)</span> − IRPJ)</p>
@@ -405,7 +405,7 @@ export default function ParceiroTabelaPrecos() {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
-            <span>Com. Restaurante: 15% (por produto)</span>
+            <span>Com. Local: 15% (por produto)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0" />

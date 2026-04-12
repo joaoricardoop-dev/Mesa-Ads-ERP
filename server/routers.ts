@@ -854,7 +854,7 @@ export const appRouter = router({
         const { eq } = await import("drizzle-orm");
 
         const [restaurant] = await db.select({ id: activeRestaurants.id }).from(activeRestaurants).where(eq(activeRestaurants.id, input.restaurantId));
-        if (!restaurant) throw new TRPCError({ code: "NOT_FOUND", message: "Restaurante não encontrado" });
+        if (!restaurant) throw new TRPCError({ code: "NOT_FOUND", message: "Local não encontrado" });
 
         const [existing] = await db.select().from(users).where(eq(users.id, input.userId));
         if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado" });
@@ -1019,7 +1019,7 @@ export const appRouter = router({
         const { randomUUID } = await import("crypto");
 
         const [restaurant] = await db.select({ id: activeRestaurants.id, name: activeRestaurants.name }).from(activeRestaurants).where(eq(activeRestaurants.id, input.restaurantId));
-        if (!restaurant) throw new TRPCError({ code: "NOT_FOUND", message: "Restaurante não encontrado" });
+        if (!restaurant) throw new TRPCError({ code: "NOT_FOUND", message: "Local não encontrado" });
 
         const token = randomUUID();
         const year = new Date().getFullYear();

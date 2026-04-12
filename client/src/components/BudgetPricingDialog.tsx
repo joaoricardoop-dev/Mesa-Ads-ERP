@@ -314,13 +314,13 @@ export function BudgetPricingDialog({
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
               onClick={() => setShowPremissas(!showPremissas)}
             >
-              {showPremissas ? "▾" : "▸"} Premissas ({premissas.irpj}% IRPJ · {premissas.comissaoRestaurante}% Rest. · {premissas.comissaoComercial}% Com.)
+              {showPremissas ? "▾" : "▸"} Premissas ({premissas.irpj}% IRPJ · {premissas.comissaoRestaurante}% Local · {premissas.comissaoComercial}% Com.)
             </button>
             {showPremissas && (
               <div className="grid grid-cols-3 gap-2 mt-2">
                 {[
                   { label: "IRPJ %", key: "irpj" as const },
-                  { label: "Com. Restaurante %", key: "comissaoRestaurante" as const },
+                  { label: "Com. Local %", key: "comissaoRestaurante" as const },
                   { label: "Com. Comercial %", key: "comissaoComercial" as const },
                 ].map(({ label, key }) => (
                   <div key={key}>

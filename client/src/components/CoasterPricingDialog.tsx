@@ -273,7 +273,7 @@ export function CoasterPricingDialog({
               <div className="grid grid-cols-3 gap-3 bg-muted/30 rounded-lg p-3">
                 {([
                   ["IRPJ (%)", "irpj"],
-                  ["Com. Rest. (%)", "comissaoRestaurante"],
+                  ["Com. Local (%)", "comissaoRestaurante"],
                   ["Com. Com. (%)", "comissaoComercial"],
                 ] as [string, keyof ItemPremissas][]).map(([label, key]) => (
                   <div key={key} className="space-y-1">

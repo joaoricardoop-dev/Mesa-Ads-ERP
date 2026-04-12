@@ -202,7 +202,7 @@ export default function ActiveRestaurantsPage() {
     onSuccess: () => {
       utils.activeRestaurant.list.invalidate();
       setIsDialogOpen(false);
-      toast.success("Restaurante cadastrado!");
+      toast.success("Local cadastrado!");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -211,7 +211,7 @@ export default function ActiveRestaurantsPage() {
     onSuccess: () => {
       utils.activeRestaurant.list.invalidate();
       setIsDialogOpen(false);
-      toast.success("Restaurante atualizado!");
+      toast.success("Local atualizado!");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -220,7 +220,7 @@ export default function ActiveRestaurantsPage() {
     onSuccess: () => {
       utils.activeRestaurant.list.invalidate();
       setDeleteId(null);
-      toast.success("Restaurante removido!");
+      toast.success("Local removido!");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -353,11 +353,11 @@ export default function ActiveRestaurantsPage() {
 
   return (
     <PageContainer
-      title="Restaurantes Ativos"
+      title="Locais Ativos"
       description="Rede de parceiros ativa da Mesa Ads"
       actions={
         <Button onClick={() => navigate("/restaurantes/novo")} className="gap-2">
-          <Plus className="w-4 h-4" /> Novo Restaurante
+          <Plus className="w-4 h-4" /> Novo Local
         </Button>
       }
     >
@@ -372,7 +372,7 @@ export default function ActiveRestaurantsPage() {
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative max-w-md flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Buscar restaurante..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card border-border/30" />
+            <Input placeholder="Buscar local..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card border-border/30" />
           </div>
           <Button
             variant={sortBy === "ratingScore" ? "default" : "outline"}
@@ -388,7 +388,7 @@ export default function ActiveRestaurantsPage() {
         <div className="space-y-2">
           {filtered.length === 0 ? (
             <div className="bg-card border border-border/30 rounded-lg p-8 text-center text-muted-foreground">
-              Nenhum restaurante encontrado
+              Nenhum local encontrado
             </div>
           ) : (
             filtered.map((r) => {
@@ -464,7 +464,7 @@ export default function ActiveRestaurantsPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <UtensilsCrossed className="w-5 h-5 text-primary" />
-                {editingId ? "Editar Restaurante" : "Novo Restaurante Ativo"}
+                {editingId ? "Editar Local" : "Novo Local Ativo"}
               </DialogTitle>
             </DialogHeader>
 
@@ -482,7 +482,7 @@ export default function ActiveRestaurantsPage() {
               <TabsContent value="local" className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-xs">Nome do Estabelecimento *</Label>
-                  <Input value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Nome do restaurante" className="bg-background border-border/30" />
+                  <Input value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Nome do local" className="bg-background border-border/30" />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs">Endereço Completo *</Label>
@@ -733,7 +733,7 @@ export default function ActiveRestaurantsPage() {
         <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
           <AlertDialogContent className="bg-card border-border/30">
             <AlertDialogHeader>
-              <AlertDialogTitle>Remover restaurante?</AlertDialogTitle>
+              <AlertDialogTitle>Remover local?</AlertDialogTitle>
               <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

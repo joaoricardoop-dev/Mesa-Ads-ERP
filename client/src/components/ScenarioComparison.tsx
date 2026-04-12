@@ -47,7 +47,7 @@ export default function ScenarioComparison({ scenarios }: ScenarioComparisonProp
           Simulador de Cenários — Mesa Ads
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Comparação de faturamento e lucro da Mesa Ads em 3 cenários de markup. Restaurantes recebem comissão.
+          Comparação de faturamento e lucro da Mesa Ads em 3 cenários de markup. Locais recebem comissão.
         </p>
       </CardHeader>
       <CardContent>

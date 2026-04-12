@@ -140,15 +140,40 @@ const STATUS_COLORS: Record<string, string> = {
   inativa: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
-const WORKFLOW_STEPS = [
+const WORKFLOW_STEPS_FISICO = [
   { key: "briefing", label: "Briefing", step: 1 },
   { key: "design", label: "Design", step: 2 },
   { key: "aprovacao", label: "Aprovação", step: 3 },
   { key: "producao", label: "Produção", step: 4 },
   { key: "distribuicao", label: "Distribuição", step: 5 },
   { key: "veiculacao", label: "Veiculação", step: 6 },
-  { key: "inativa", label: "Arquivado", step: 7 },
+  { key: "inativa", label: "Concluída", step: 7 },
 ];
+
+const WORKFLOW_STEPS_ELETRONICO = [
+  { key: "briefing", label: "Briefing", step: 1 },
+  { key: "aprovacao", label: "Aprovação de Material", step: 2 },
+  { key: "producao", label: "Material Recebido", step: 3 },
+  { key: "veiculacao", label: "Veiculação", step: 4 },
+  { key: "inativa", label: "Concluída", step: 5 },
+];
+
+const WORKFLOW_STEPS_ATIVACAO = [
+  { key: "briefing", label: "Briefing", step: 1 },
+  { key: "producao", label: "Planejamento", step: 2 },
+  { key: "veiculacao", label: "Execução", step: 3 },
+  { key: "inativa", label: "Concluída", step: 4 },
+];
+
+const WORKFLOW_STEPS_DEFAULT = WORKFLOW_STEPS_FISICO;
+
+function getWorkflowSteps(workflowTemplate?: string | null) {
+  if (workflowTemplate === "eletronico_cliente_envia") return WORKFLOW_STEPS_ELETRONICO;
+  if (workflowTemplate === "ativacao_evento") return WORKFLOW_STEPS_ATIVACAO;
+  return WORKFLOW_STEPS_DEFAULT;
+}
+
+const WORKFLOW_STEPS = WORKFLOW_STEPS_DEFAULT;
 
 const HISTORY_LABELS: Record<string, string> = {
   created: "Cotação criada",
@@ -159,7 +184,7 @@ const HISTORY_LABELS: Record<string, string> = {
   completed: "Campanha concluída",
   reactivated: "Campanha reativada",
   updated: "Campanha atualizada",
-  restaurants_updated: "Restaurantes atualizados",
+  restaurants_updated: "Locais atualizados",
   art_uploaded: "Arte enviada",
   production_complete: "Produção concluída",
   material_received: "Material recebido",
@@ -628,7 +653,7 @@ export default function CampaignDetail() {
       utils.campaign.getRestaurants.invalidate();
       setIsRestaurantsDialogOpen(false);
       addHistoryMutation.mutate({ campaignId, action: "restaurants_updated", details: `${restaurantSelections.filter(r => r.selected).length} restaurantes configurados` });
-      toast.success("Restaurantes atualizados!");
+      toast.success("Locais atualizados!");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -976,7 +1001,7 @@ export default function CampaignDetail() {
 
   const costBreakdownData = [
     { name: "Produção", value: p.totalProductionCost, color: "#22c55e" },
-    { name: "Com. Restaurante", value: p.totalRestComm, color: "#3b82f6" },
+    { name: "Com. Local", value: p.totalRestComm, color: "#3b82f6" },
     { name: "Com. Vendedor", value: p.totalSellerComm, color: "#f59e0b" },
     { name: "Impostos", value: p.totalTax, color: "#ef4444" },
     { name: "Lucro", value: Math.max(0, p.monthlyProfit), color: "#8b5cf6" },
@@ -1161,17 +1186,19 @@ export default function CampaignDetail() {
         </div>
 
         <div className="p-4 lg:p-6 space-y-5">
-          {WORKFLOW_STEPS.some(s => s.key === campaign.status) && (
+          {(() => {
+            const workflowSteps = getWorkflowSteps((campaign as any).productWorkflowTemplate);
+            return workflowSteps.some(s => s.key === campaign.status) && (
             <div className="bg-card border border-border/30 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fluxo da Campanha</h3>
                 <span className="text-[10px] text-muted-foreground">
-                  Etapa {WORKFLOW_STEPS.find(s => s.key === campaign.status)?.step || 0} de {WORKFLOW_STEPS.length}
+                  Etapa {workflowSteps.find(s => s.key === campaign.status)?.step || 0} de {workflowSteps.length}
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                {WORKFLOW_STEPS.map((step, i) => {
-                  const currentStep = WORKFLOW_STEPS.find(s => s.key === campaign.status)?.step || 0;
+                {workflowSteps.map((step, i) => {
+                  const currentStep = workflowSteps.find(s => s.key === campaign.status)?.step || 0;
                   const isCompleted = step.step < currentStep;
                   const isCurrent = step.key === campaign.status;
                   return (
@@ -1188,7 +1215,7 @@ export default function CampaignDetail() {
                           {step.label}
                         </span>
                       </div>
-                      {i < WORKFLOW_STEPS.length - 1 && (
+                      {i < workflowSteps.length - 1 && (
                         <div className={`h-0.5 flex-1 mx-1 mb-4 ${step.step < currentStep ? "bg-emerald-500" : "bg-border/30"}`} />
                       )}
                     </div>
@@ -1221,7 +1248,8 @@ export default function CampaignDetail() {
                 </div>
               )}
             </div>
-          )}
+          );
+          })()}
 
           {campaign.status === "briefing" && (
             <div className="bg-card border border-sky-500/30 rounded-lg p-5 space-y-3">
@@ -1651,7 +1679,7 @@ export default function CampaignDetail() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <MiniStat label="Início" value={(campaign as any).veiculacaoStartDate ? new Date((campaign as any).veiculacaoStartDate).toLocaleDateString("pt-BR") : "—"} />
                 <MiniStat label="Fim" value={(campaign as any).veiculacaoEndDate ? new Date((campaign as any).veiculacaoEndDate).toLocaleDateString("pt-BR") : "—"} />
-                <MiniStat label="Restaurantes" value={`${restaurantsConfigured}`} />
+                <MiniStat label="Locais" value={`${restaurantsConfigured}`} />
                 <MiniStat label="Comprovantes" value={`${proofsList.length}`} />
               </div>
 
@@ -1669,7 +1697,7 @@ export default function CampaignDetail() {
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Restaurante</Label>
+                    <Label className="text-xs">Local</Label>
                     <select
                       value={proofRestaurantId || ""}
                       onChange={(e) => setProofRestaurantId(Number(e.target.value) || null)}
@@ -1732,7 +1760,7 @@ export default function CampaignDetail() {
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <MiniStat label="Comprovantes" value={`${proofsList.length}`} />
-                <MiniStat label="Restaurantes" value={`${restaurantsConfigured}`} />
+                <MiniStat label="Locais" value={`${restaurantsConfigured}`} />
                 <MiniStat label="Receita Total" value={formatCurrency(p.contractRevenue)} />
                 <MiniStat label="Lucro Total" value={formatCurrency(p.contractProfit)} />
               </div>
@@ -2118,9 +2146,9 @@ export default function CampaignDetail() {
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Produto Veiculado</p>
                       <p className="text-sm mt-0.5 font-medium">{campaign.productName || "Coaster (Porta-Copo)"}</p>
                     </div>
-                    {/* Restaurantes */}
+                    {/* Locais */}
                     <div>
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Restaurantes</p>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Locais</p>
                       <p className="text-sm mt-0.5 font-medium font-mono">
                         {campaign.activeRestaurants}
                         <span className="text-muted-foreground text-xs font-sans ml-1">estabelecimentos</span>
@@ -2136,7 +2164,7 @@ export default function CampaignDetail() {
                     </div>
                     {/* Coasters por restaurante */}
                     <div>
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Coasters / Restaurante</p>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Coasters / Local</p>
                       <p className="text-sm mt-0.5 font-medium font-mono">
                         {effectiveCoastersPerRest.toLocaleString("pt-BR")}
                         <span className="text-muted-foreground text-xs font-sans ml-1">un</span>
@@ -2395,7 +2423,7 @@ export default function CampaignDetail() {
                   {campaignPayments.length > 0 && (
                     <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
                       <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                        <HandCoins className="w-3 h-3" /> Pagamentos aos Restaurantes
+                        <HandCoins className="w-3 h-3" /> Pagamentos aos Locais
                       </h3>
                       <div className="space-y-1">
                         {campaignPayments.slice(0, 6).map((pay: any) => {
@@ -2528,7 +2556,7 @@ export default function CampaignDetail() {
                 </div>
 
                 <div className="bg-card border border-border/30 rounded-lg p-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Breakdown por Restaurante</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Breakdown por Local</h3>
                   <div className="h-52">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={perRestBarData} layout="vertical">
@@ -2722,7 +2750,7 @@ export default function CampaignDetail() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-card border border-border/30 rounded-lg p-5">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Por Restaurante (Mensal)</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Por Local (Mensal)</h3>
                   <div className="space-y-2">
                     <FinRow label="Custo Unitário Coaster" value={`R$ ${p.unitCost.toFixed(4)}`} />
                     <FinRow label="Custo Produção" value={formatCurrency(p.productionCostPerRest)} />
@@ -2744,7 +2772,7 @@ export default function CampaignDetail() {
                   <div className="space-y-2">
                     <FinRow label="Custo Produção" value={formatCurrency(p.totalProductionCost)} />
                     {p.totalFreight > 0 && <FinRow label="Custo Frete" value={formatCurrency(p.totalFreight)} />}
-                    <FinRow label="Comissões Restaurantes" value={formatCurrency(p.totalRestComm)} />
+                    <FinRow label="Comissões Locais" value={formatCurrency(p.totalRestComm)} />
                     <FinRow label="Comissões Vendedores" value={formatCurrency(p.totalSellerComm)} />
                     <FinRow label="Impostos" value={formatCurrency(p.totalTax)} />
                     <div className="border-t border-border/20 pt-2 mt-2">
@@ -2856,7 +2884,7 @@ export default function CampaignDetail() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <HandCoins className="w-4 h-4 text-muted-foreground" />
-                        <h3 className="text-sm font-semibold">Pagamentos a Restaurantes</h3>
+                        <h3 className="text-sm font-semibold">Pagamentos a Locais</h3>
                         <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{campaignPayments.length}</span>
                       </div>
                       <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/financeiro/pagamentos")}>
@@ -2909,7 +2937,7 @@ export default function CampaignDetail() {
                   </p>
                 </div>
                 <Button size="sm" className="gap-1.5 text-xs h-8" onClick={handleManageRestaurants}>
-                  <Store className="w-3.5 h-3.5" /> Configurar Restaurantes
+                  <Store className="w-3.5 h-3.5" /> Configurar Locais
                 </Button>
               </div>
 
@@ -2922,7 +2950,7 @@ export default function CampaignDetail() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-card border border-border/30 rounded-lg p-3 text-center">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Restaurantes</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground"> Locais</p>
                   <p className={`text-lg font-bold font-mono mt-1 ${restaurantsMissing > 0 ? "text-yellow-400" : "text-emerald-400"}`}>{restaurantsConfigured}/{campaign.activeRestaurants}</p>
                 </div>
                 <div className="bg-card border border-border/30 rounded-lg p-3 text-center">
@@ -2954,7 +2982,7 @@ export default function CampaignDetail() {
                   <table className="w-full min-w-[600px]">
                     <thead>
                       <tr className="border-b border-border/20 bg-muted/10">
-                        <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium p-3">Restaurante</th>
+                        <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium p-3">Local</th>
                         <th className="text-center text-[10px] uppercase tracking-wider text-muted-foreground font-medium p-3 hidden md:table-cell">Rating</th>
                         <th className="text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium p-3 hidden md:table-cell">Bairro</th>
                         <th className="text-right text-[10px] uppercase tracking-wider text-muted-foreground font-medium p-3">Coasters</th>
@@ -3171,7 +3199,7 @@ export default function CampaignDetail() {
                           {report.reportType === "coaster" && (
                             <>
                               <div className="bg-background/60 rounded-md p-2 border border-border/20">
-                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Restaurantes</p>
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground"> Locais</p>
                                 <p className="text-sm font-bold font-mono">{report.numRestaurants}</p>
                               </div>
                               <div className="bg-background/60 rounded-md p-2 border border-border/20">
@@ -3299,7 +3327,7 @@ export default function CampaignDetail() {
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Métricas de Coaster</p>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="grid gap-1.5">
-                            <Label className="text-xs">Restaurantes ativos</Label>
+                            <Label className="text-xs">Locais ativos</Label>
                             <Input type="number" value={reportForm.numRestaurants} onChange={e => setReportForm(f => ({ ...f, numRestaurants: parseInt(e.target.value) || 0 }))} className="bg-background border-border/30 text-sm" />
                           </div>
                           <div className="grid gap-1.5">
@@ -3395,7 +3423,7 @@ export default function CampaignDetail() {
           <DialogContent className="sm:max-w-2xl bg-card border-border/30 max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Store className="w-5 h-5 text-primary" /> Configurar Restaurantes
+                <Store className="w-5 h-5 text-primary" /> Configurar Locais
               </DialogTitle>
             </DialogHeader>
             <div className="flex items-center justify-between px-1 py-2 text-xs">

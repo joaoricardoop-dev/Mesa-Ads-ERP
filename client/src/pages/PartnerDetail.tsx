@@ -383,7 +383,7 @@ export default function PartnerDetail() {
                       <div>
                         <p className="text-sm font-medium">{lead.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {lead.company || "—"} · {lead.type === "anunciante" ? "Anunciante" : "Restaurante"}
+                          {lead.company || "—"} · {lead.type === "anunciante" ? "Anunciante" : "Local"}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">

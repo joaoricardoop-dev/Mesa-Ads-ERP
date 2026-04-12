@@ -274,7 +274,7 @@ export default function PriceTable() {
       { label: "Custo GPC", valor: dados.custoGPC, perc: precoUnit4sem > 0 ? dados.custoGPC / precoUnit4sem : 0 },
       { label: "Frete/un.", valor: volume > 0 ? dados.frete / volume : 0, perc: precoUnit4sem > 0 ? (dados.frete / volume) / precoUnit4sem : 0 },
       { label: "IRPJ", valor: precoUnit4sem * irpj, perc: irpj },
-      { label: "Com. Restaurante", valor: precoUnit4sem * comRest, perc: comRest },
+      { label: "Com. Local", valor: precoUnit4sem * comRest, perc: comRest },
       { label: "Com. Comercial", valor: precoUnit4sem * comCom, perc: comCom },
       { label: "Margem / Lucro", valor: precoUnit4sem * dados.margem, perc: margemLiquida > 0 ? margemLiquida : dados.margem },
     ];
@@ -991,7 +991,7 @@ export default function PriceTable() {
             </div>
           </Section>}
 
-          <Section title="Distribuição de Restaurantes" icon={Store}>
+          <Section title="Distribuição de Locais" icon={Store}>
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
@@ -1052,7 +1052,7 @@ export default function PriceTable() {
                   <table className="w-full text-xs min-w-[400px]">
                     <thead>
                       <tr className="border-b border-border/20">
-                        <th className="text-left p-2 text-[10px] text-muted-foreground font-medium">Restaurante</th>
+                        <th className="text-left p-2 text-[10px] text-muted-foreground font-medium">Local</th>
                         <th className="text-right p-2 text-[10px] text-muted-foreground font-medium">Cap.</th>
                         <th className="text-right p-2 text-[10px] text-muted-foreground font-medium">{selectedProduct?.unitLabelPlural ? selectedProduct.unitLabelPlural.charAt(0).toUpperCase() + selectedProduct.unitLabelPlural.slice(1) : "Bolachas"}</th>
                         <th className="text-center p-2 text-[10px] text-muted-foreground font-medium w-8"></th>

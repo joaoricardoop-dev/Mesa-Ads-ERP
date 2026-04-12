@@ -424,7 +424,7 @@ export default function Leads() {
         });
       }
       setConvertOpen(false);
-      toast.success("Restaurante convertido para ativo!");
+      toast.success("Local convertido para ativo!");
       utils.activeRestaurant.list.invalidate();
     },
     onError: (err: any) => toast.error(`Erro na conversão: ${err.message}`),
@@ -1189,7 +1189,7 @@ export default function Leads() {
             </TabsTrigger>
             <TabsTrigger value="restaurante" className="gap-1.5">
               <UtensilsCrossed className="w-3.5 h-3.5" />
-              Restaurantes
+              Locais
             </TabsTrigger>
           </TabsList>
 
@@ -1400,7 +1400,7 @@ export default function Leads() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Novo Lead — {activeTab === "anunciante" ? "Anunciante" : "Restaurante"}</DialogTitle>
+            <DialogTitle>Novo Lead — {activeTab === "anunciante" ? "Anunciante" : "Local"}</DialogTitle>
           </DialogHeader>
 
           {createStep === "cnpj" && (
@@ -2172,7 +2172,7 @@ export default function Leads() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowRightCircle className="w-5 h-5 text-emerald-400" />
-              Converter para Restaurante Ativo
+              Converter para Local Ativo
             </DialogTitle>
           </DialogHeader>
 

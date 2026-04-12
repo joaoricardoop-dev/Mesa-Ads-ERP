@@ -317,7 +317,7 @@ export default function QuotationSign() {
             <>
               <div>
                 <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-3">
-                  Restaurantes ({data.restaurants.length})
+                  Locais ({data.restaurants.length})
                 </h3>
                 <div className="space-y-1.5">
                   {data.restaurants.map((r: any, i: number) => (

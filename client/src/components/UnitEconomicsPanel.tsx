@@ -25,7 +25,7 @@ export default function UnitEconomicsPanel({
           Unit Economics — Mesa Ads
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Métricas da Mesa Ads por restaurante parceiro. Valores baseados no lucro líquido (após comissão ao restaurante e produção).
+          Métricas da Mesa Ads por local parceiro. Valores baseados no lucro líquido (após comissão ao local e produção).
         </p>
       </CardHeader>
       <CardContent>

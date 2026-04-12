@@ -59,7 +59,7 @@ export default function RestaurantPaymentsPage() {
   });
 
   return (
-    <PageContainer title="Pagamentos a Restaurantes" description="Controle de pagamentos aos parceiros">
+    <PageContainer title="Pagamentos a Locais" description="Controle de pagamentos aos parceiros">
       <div className="flex items-center gap-3 flex-wrap">
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
           <SelectTrigger className="w-[180px]">
@@ -88,7 +88,7 @@ export default function RestaurantPaymentsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/20 bg-muted/5">
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Restaurante</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Local</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Campanha</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Período</th>
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground">Valor</th>

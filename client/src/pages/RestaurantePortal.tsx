@@ -191,9 +191,9 @@ export default function RestaurantePortal() {
       <div className="h-full flex items-center justify-center">
         <div className="text-center space-y-3 max-w-md">
           <UtensilsCrossed className="w-12 h-12 mx-auto text-muted-foreground" />
-          <h2 className="text-xl font-semibold">Portal do Restaurante</h2>
+          <h2 className="text-xl font-semibold">Portal do Local</h2>
           <p className="text-muted-foreground">
-            Seu perfil ainda não foi vinculado a um restaurante. Entre em contato com a equipe Mesa Ads.
+            Seu perfil ainda não foi vinculado a um local. Entre em contato com a equipe Mesa Ads.
           </p>
         </div>
       </div>
@@ -205,7 +205,7 @@ export default function RestaurantePortal() {
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Portal do Restaurante</h1>
+            <h1 className="text-2xl font-bold">Portal do Local</h1>
             <p className="text-muted-foreground">
               Bem-vindo, {user?.firstName || restaurant.contactName || restaurant.name}
             </p>
@@ -287,14 +287,14 @@ export default function RestaurantePortal() {
             <Card>
               <CardHeader>
                 <CardTitle>Campanhas no Estabelecimento</CardTitle>
-                <CardDescription>Campanhas em veiculação ou programadas para o seu restaurante</CardDescription>
+                <CardDescription>Campanhas em veiculação ou programadas para o seu local</CardDescription>
               </CardHeader>
               <CardContent>
                 {campaigns.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <Megaphone className="w-10 h-10 mx-auto mb-3 opacity-40" />
                     <p>Nenhuma campanha encontrada</p>
-                    <p className="text-sm mt-1">As campanhas aparecerão aqui quando forem vinculadas ao seu restaurante</p>
+                    <p className="text-sm mt-1">As campanhas aparecerão aqui quando forem vinculadas ao seu local</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -458,7 +458,7 @@ export default function RestaurantePortal() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Meu Restaurante</CardTitle>
+                    <CardTitle>Meu Local</CardTitle>
                     <CardDescription>Dados cadastrais do estabelecimento</CardDescription>
                   </div>
                   <Button variant="outline" size="sm" onClick={openEditDialog}>

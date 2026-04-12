@@ -643,10 +643,10 @@ export default function QuotationPreview() {
                     <div>
                       <h3 className="text-sm font-semibold flex items-center gap-2">
                         <Store className="w-4 h-4 text-primary" />
-                        Restaurantes Alocados
+                        Locais Alocados
                       </h3>
                       <p className="text-[10px] text-muted-foreground">
-                        {allocatedRestaurants.length} restaurantes · {formatNumber(allocation.allocatedTotal)} {selectedProduct?.unitLabelPlural || "coasters"} alocados
+                        {allocatedRestaurants.length} locais · {formatNumber(allocation.allocatedTotal)} {selectedProduct?.unitLabelPlural || "coasters"} alocados
                       </p>
                     </div>
                     <div className="flex items-center gap-3 text-right">
@@ -660,7 +660,7 @@ export default function QuotationPreview() {
                     <table className="w-full">
                       <thead>
                         <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/20">
-                          <th className="text-left px-5 py-2 font-medium">Restaurante</th>
+                          <th className="text-left px-5 py-2 font-medium">Local</th>
                           <th className="text-left px-3 py-2 font-medium">Bairro</th>
                           <th className="text-right px-3 py-2 font-medium">{selectedProduct?.unitLabelPlural ? selectedProduct.unitLabelPlural.charAt(0).toUpperCase() + selectedProduct.unitLabelPlural.slice(1) : "Coasters"}</th>
                           <th className="text-right px-3 py-2 font-medium">Rating</th>
@@ -716,8 +716,8 @@ export default function QuotationPreview() {
                   <Package className="w-3.5 h-3.5 text-primary" /> Parâmetros Operacionais
                 </h3>
                 <div className="grid grid-cols-2 gap-x-8">
-                  <ParamRow label={`${selectedProduct?.unitLabelPlural ? selectedProduct.unitLabelPlural.charAt(0).toUpperCase() + selectedProduct.unitLabelPlural.slice(1) : "Coasters"}/Restaurante`} value={formatNumber(inputs.coastersPerRestaurant)} />
-                  <ParamRow label="Restaurantes" value={String(n)} />
+                  <ParamRow label={`${selectedProduct?.unitLabelPlural ? selectedProduct.unitLabelPlural.charAt(0).toUpperCase() + selectedProduct.unitLabelPlural.slice(1) : "Coasters"}/Local`} value={formatNumber(inputs.coastersPerRestaurant)} />
+                  <ParamRow label="Locais" value={String(n)} />
                   <ParamRow label="Usos/Porta-copo" value={`${inputs.usagesPerCoaster}x`} />
                   {selectedProduct?.tipo === "telas" ? (
                     <ParamRow label="Impressões/Rest./Mês" value="Ver painel acima" />

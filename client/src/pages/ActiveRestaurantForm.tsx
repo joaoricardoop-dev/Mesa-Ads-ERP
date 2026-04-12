@@ -365,7 +365,7 @@ export default function ActiveRestaurantForm() {
   const createMutation = trpc.activeRestaurant.create.useMutation({
     onSuccess: () => {
       utils.activeRestaurant.list.invalidate();
-      toast.success("Restaurante cadastrado!");
+      toast.success("Local cadastrado!");
       navigate("/restaurantes");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -374,7 +374,7 @@ export default function ActiveRestaurantForm() {
   const updateMutation = trpc.activeRestaurant.update.useMutation({
     onSuccess: () => {
       utils.activeRestaurant.list.invalidate();
-      toast.success("Restaurante atualizado!");
+      toast.success("Local atualizado!");
       navigate("/restaurantes");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -451,10 +451,10 @@ export default function ActiveRestaurantForm() {
             </Button>
             <div>
               <h1 className="text-lg font-bold tracking-tight">
-                {isEditing ? "Editar Restaurante" : "Novo Restaurante Ativo"}
+                {isEditing ? "Editar Local" : "Novo Local Ativo"}
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {step === "cnpj" ? "Comece informando o CNPJ para buscar dados automaticamente" : "Preencha os dados do restaurante parceiro"}
+                {step === "cnpj" ? "Comece informando o CNPJ para buscar dados automaticamente" : "Preencha os dados do local parceiro"}
               </p>
             </div>
           </div>
@@ -792,7 +792,7 @@ export default function ActiveRestaurantForm() {
                 <Button variant="outline" onClick={() => navigate("/restaurantes")}>Cancelar</Button>
                 <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending || !form.name.trim()} className="gap-2 px-6">
                   <CheckCircle2 className="w-4 h-4" />
-                  {isEditing ? "Salvar Alterações" : "Cadastrar Restaurante"}
+                  {isEditing ? "Salvar Alterações" : "Cadastrar Local"}
                 </Button>
               </div>
             </div>

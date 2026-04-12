@@ -33,7 +33,7 @@ export default function DiscountTable({ data, minMargin }: DiscountTableProps) {
             <thead>
               <tr className="border-b border-border/40">
                 <th className="text-left p-3 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                  Restaurantes
+                  Locais
                 </th>
                 <th className="text-right p-3 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
                   Desconto

@@ -231,15 +231,15 @@ export default function FinancialReport() {
             )}
           </Section>
 
-          <Section title="Por Restaurante" icon={UtensilsCrossed}>
+          <Section title="Por Local" icon={UtensilsCrossed}>
             {data.byRestaurant.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhum pagamento a restaurante no período</p>
+              <p className="text-sm text-muted-foreground">Nenhum pagamento a local no período</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border/20">
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Restaurante</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Local</th>
                       <th className="text-right px-3 py-2 font-medium text-muted-foreground">Total Pago</th>
                     </tr>
                   </thead>

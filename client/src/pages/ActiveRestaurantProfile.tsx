@@ -347,7 +347,7 @@ export default function ActiveRestaurantProfile() {
     return (
       <div className="h-full flex flex-col overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-muted-foreground">Restaurante não encontrado</p>
+          <p className="text-muted-foreground">Local não encontrado</p>
           <Button variant="outline" onClick={() => navigate("/restaurantes")}>Voltar</Button>
         </div>
       </div>
@@ -541,7 +541,7 @@ export default function ActiveRestaurantProfile() {
                     <Card title="Classificação" icon={<Star className="w-4 h-4" />}>
                       <div className="text-center py-4">
                         <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-yellow-500 opacity-50" />
-                        <p className="text-sm text-muted-foreground">Classificação pendente — edite o restaurante e preencha o perfil publicitário</p>
+                        <p className="text-sm text-muted-foreground">Classificação pendente — edite o local e preencha o perfil publicitário</p>
                       </div>
                     </Card>
                   );
@@ -932,7 +932,7 @@ export default function ActiveRestaurantProfile() {
             <TabsContent value="termos" className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold">Termos para Restaurante</h3>
+                  <h3 className="text-sm font-semibold">Termos para Local</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">Contratos e termos de parceria</p>
                 </div>
                 <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => {
@@ -1033,7 +1033,7 @@ export default function ActiveRestaurantProfile() {
                         )}
                         {term.restaurantObligations && (
                           <div>
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Obrigações do Restaurante</p>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Obrigações do Local</p>
                             <p className="text-muted-foreground whitespace-pre-wrap">{term.restaurantObligations}</p>
                           </div>
                         )}
@@ -1247,7 +1247,7 @@ export default function ActiveRestaurantProfile() {
                       window.dispatchEvent(new CustomEvent("impersonation-change", { detail: imp }));
                     }}
                   >
-                    <Eye className="w-3.5 h-3.5" /> Entrar como Restaurante
+                    <Eye className="w-3.5 h-3.5" /> Entrar como Local
                   </Button>
                   <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => { setInviteEmail(""); setIsInviteDialogOpen(true); }}>
                     <Send className="w-3.5 h-3.5" /> Convidar Novo Usuário
@@ -1307,7 +1307,7 @@ export default function ActiveRestaurantProfile() {
               <div className="pt-4 border-t border-border/20">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h3 className="text-sm font-semibold">Acesso Adicional (Multi-Restaurante)</h3>
+                    <h3 className="text-sm font-semibold">Acesso Adicional (Multi-Local)</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">Usuários de outros restaurantes com acesso adicional a este estabelecimento</p>
                   </div>
                   <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => { setMultiAccessUserId(""); setIsAddMultiAccessOpen(true); }}>
@@ -1400,7 +1400,7 @@ export default function ActiveRestaurantProfile() {
       <Dialog open={isLinkUserDialogOpen} onOpenChange={setIsLinkUserDialogOpen}>
         <DialogContent className="sm:max-w-md bg-card border-border/30">
           <DialogHeader>
-            <DialogTitle className="text-base">Vincular Conta ao Restaurante</DialogTitle>
+            <DialogTitle className="text-base">Vincular Conta ao Local</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
@@ -1708,7 +1708,7 @@ export default function ActiveRestaurantProfile() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Obrigações do Restaurante</Label>
+              <Label className="text-xs">Obrigações do Local</Label>
               <textarea value={termForm.restaurantObligations} onChange={(e) => setTermForm(p => ({ ...p, restaurantObligations: e.target.value }))} rows={2} className="w-full rounded-md border border-border/30 bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" />
             </div>
             <div className="space-y-1.5">

@@ -227,7 +227,7 @@ export default function QuotationDetail() {
       const pricePerRest = monthlyTotal / effectiveNumRest;
 
       const restaurants = fetchedRestaurants.map((r: any) => ({
-        name: r.restaurantName || "Restaurante",
+        name: r.restaurantName || "Local",
         neighborhood: r.restaurantAddress || "",
         coasters: r.coasterQuantity || 0,
       }));
@@ -568,7 +568,7 @@ export default function QuotationDetail() {
                     )}
                     {(quotation as any).customRestaurantCommission && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Comissão Restaurante</span>
+                        <span className="text-muted-foreground">Comissão Local</span>
                         <span className="font-mono">{Number((quotation as any).customRestaurantCommission).toFixed(1)}%</span>
                       </div>
                     )}
