@@ -51,6 +51,8 @@ import {
   ShoppingCart,
   FileBarChart2,
   Target,
+  UserCircle,
+  Bell,
 } from "lucide-react";
 import { generateReportPdf } from "@/lib/generate-report-pdf";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
@@ -752,90 +754,151 @@ function CampaignDetail({ campaign, onBack, clientId }: { campaign: any; onBack:
       )}
 
       {campaignReports.length > 0 && (
-        <div className="rounded-xl border bg-card p-5">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-border/20">
             <div className="p-1.5 rounded-lg bg-emerald-500/10">
               <FileBarChart2 className="w-4 h-4 text-emerald-400" />
             </div>
             <p className="text-sm font-semibold">Relatórios de Campanha</p>
           </div>
-          <div className="space-y-3">
+          <div className="divide-y divide-border/10">
             {campaignReports.map((report: any) => {
               const typeLabel = report.reportType === "telas" ? "Telas" : report.reportType === "ativacao" ? "Ativação" : "Coasters";
+              const featuredPhoto = report.photos && report.photos.length > 0 ? report.photos[0] : null;
+              const totalImpressions = report.totalImpressions ?? 0;
               return (
-                <div key={report.id} className="border border-border/30 rounded-lg p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-sm font-semibold truncate">{report.title}</h4>
-                        <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-400 bg-blue-500/10">{typeLabel}</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(report.periodStart).toLocaleDateString("pt-BR")} – {new Date(report.periodEnd).toLocaleDateString("pt-BR")}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 gap-1.5 text-xs shrink-0"
-                      disabled={pdfLoadingId === report.id}
-                      onClick={async () => {
-                        setPdfLoadingId(report.id);
-                        try {
-                          await generateReportPdf({
-                            campaignName: campaign.name ?? "",
-                            clientName: campaign.clientName ?? undefined,
-                            reportTitle: report.title,
-                            periodStart: report.periodStart,
-                            periodEnd: report.periodEnd,
-                            reportType: report.reportType ?? "coaster",
-                            numRestaurants: report.numRestaurants ?? 0,
-                            coastersDistributed: report.coastersDistributed ?? 0,
-                            usagePerDay: report.usagePerDay ?? 3,
-                            daysInPeriod: report.daysInPeriod ?? 30,
-                            numScreens: report.numScreens ?? 0,
-                            spotsPerDay: report.spotsPerDay ?? 0,
-                            spotDurationSeconds: report.spotDurationSeconds ?? 30,
-                            activationEvents: report.activationEvents ?? 0,
-                            peoplePerEvent: report.peoplePerEvent ?? 0,
-                            totalImpressions: report.totalImpressions ?? 0,
-                            notes: report.notes,
-                            photos: report.photos ?? [],
-                            publishedAt: report.publishedAt,
-                          });
-                        } catch {
-                          toast.error("Erro ao gerar PDF do relatório.");
-                        } finally {
-                          setPdfLoadingId(null);
-                        }
-                      }}
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      {pdfLoadingId === report.id ? "Gerando..." : "Baixar PDF"}
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5">
-                      <Target className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-xs text-muted-foreground">Impressões:</span>
-                      <span className="text-sm font-bold text-emerald-400 font-mono">{(report.totalImpressions ?? 0).toLocaleString("pt-BR")}</span>
-                    </div>
-                  </div>
-
-                  {report.photos && report.photos.length > 0 && (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {(report.photos as any[]).map((photo: any) => (
-                        <div key={photo.id} className="rounded-md overflow-hidden border border-border/20 aspect-square">
-                          <img src={photo.url} alt={photo.caption || ""} className="w-full h-full object-cover" />
+                <div key={report.id} className="overflow-hidden">
+                  {featuredPhoto && (
+                    <div className="relative h-44 overflow-hidden">
+                      <img
+                        src={featuredPhoto.url}
+                        alt={featuredPhoto.caption || ""}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 px-5 pb-4">
+                        <div className="flex items-end justify-between gap-3">
+                          <div>
+                            <p className="text-white font-bold text-lg leading-tight">{report.title}</p>
+                            <p className="text-white/60 text-xs mt-0.5">
+                              {new Date(report.periodStart).toLocaleDateString("pt-BR")} – {new Date(report.periodEnd).toLocaleDateString("pt-BR")}
+                            </p>
+                          </div>
+                          {totalImpressions > 0 && (
+                            <div className="text-right shrink-0">
+                              <p className="text-[10px] text-white/50 uppercase tracking-wider">Impressões</p>
+                              <p className="text-3xl font-black text-emerald-400 font-mono tabular-nums leading-none">
+                                {totalImpressions >= 1000000
+                                  ? (totalImpressions / 1000000).toFixed(1) + "M"
+                                  : totalImpressions >= 1000
+                                  ? (totalImpressions / 1000).toFixed(0) + "k"
+                                  : totalImpressions.toLocaleString("pt-BR")}
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      ))}
+                      </div>
                     </div>
                   )}
+                  <div className="px-5 py-4 space-y-3">
+                    {!featuredPhoto && (
+                      <div className="flex items-start justify-between gap-2 flex-wrap">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-semibold">{report.title}</h4>
+                            <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-400 bg-blue-500/10">{typeLabel}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {new Date(report.periodStart).toLocaleDateString("pt-BR")} – {new Date(report.periodEnd).toLocaleDateString("pt-BR")}
+                          </p>
+                        </div>
+                        {totalImpressions > 0 && (
+                          <div className="text-right">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Impressões</p>
+                            <p className="text-2xl font-black text-emerald-400 font-mono tabular-nums">
+                              {totalImpressions >= 1000000
+                                ? (totalImpressions / 1000000).toFixed(1) + "M"
+                                : totalImpressions >= 1000
+                                ? (totalImpressions / 1000).toFixed(0) + "k"
+                                : totalImpressions.toLocaleString("pt-BR")}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                  {report.notes && (
-                    <p className="text-xs text-muted-foreground border-t border-border/20 pt-2">{report.notes}</p>
-                  )}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {featuredPhoto && (
+                        <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-400 bg-blue-500/10">{typeLabel}</Badge>
+                      )}
+                      {report.numRestaurants > 0 && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Target className="w-3 h-3" /> {report.numRestaurants} estabelecimentos
+                        </span>
+                      )}
+                      {report.coastersDistributed > 0 && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Boxes className="w-3 h-3" /> {report.coastersDistributed.toLocaleString("pt-BR")} bolachas
+                        </span>
+                      )}
+                    </div>
+
+                    {report.photos && report.photos.length > 1 && (
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                        {(report.photos as any[]).slice(featuredPhoto ? 1 : 0, featuredPhoto ? 6 : 5).map((photo: any) => (
+                          <div key={photo.id} className="rounded-lg overflow-hidden border border-border/20 aspect-square">
+                            <img src={photo.url} alt={photo.caption || ""} className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {report.notes && (
+                      <p className="text-xs text-muted-foreground border-t border-border/20 pt-2">{report.notes}</p>
+                    )}
+
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1.5 text-xs"
+                        disabled={pdfLoadingId === report.id}
+                        onClick={async () => {
+                          setPdfLoadingId(report.id);
+                          try {
+                            await generateReportPdf({
+                              campaignName: campaign.name ?? "",
+                              clientName: campaign.clientName ?? undefined,
+                              reportTitle: report.title,
+                              periodStart: report.periodStart,
+                              periodEnd: report.periodEnd,
+                              reportType: report.reportType ?? "coaster",
+                              numRestaurants: report.numRestaurants ?? 0,
+                              coastersDistributed: report.coastersDistributed ?? 0,
+                              usagePerDay: report.usagePerDay ?? 3,
+                              daysInPeriod: report.daysInPeriod ?? 30,
+                              numScreens: report.numScreens ?? 0,
+                              spotsPerDay: report.spotsPerDay ?? 0,
+                              spotDurationSeconds: report.spotDurationSeconds ?? 30,
+                              activationEvents: report.activationEvents ?? 0,
+                              peoplePerEvent: report.peoplePerEvent ?? 0,
+                              totalImpressions: report.totalImpressions ?? 0,
+                              notes: report.notes,
+                              photos: report.photos ?? [],
+                              publishedAt: report.publishedAt,
+                            });
+                          } catch {
+                            toast.error("Erro ao gerar PDF do relatório.");
+                          } finally {
+                            setPdfLoadingId(null);
+                          }
+                        }}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        {pdfLoadingId === report.id ? "Gerando..." : "Baixar PDF"}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -1164,7 +1227,145 @@ export default function AnunciantePortal() {
         </div>
 
         {activeTab === "home" && (
-          <div className="space-y-8">
+          <div className="space-y-6">
+
+            {activeCampaigns.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+                  {activeCampaigns.length === 1 ? "Campanha em Andamento" : "Campanhas em Andamento"}
+                </p>
+                <div className="space-y-3">
+                  {activeCampaigns.slice(0, 2).map((campaign) => {
+                    const meta = STATUS_META[campaign.status] ?? STATUS_META.draft;
+                    const isVeiculando = ["veiculacao", "active", "executar"].includes(campaign.status);
+                    return (
+                      <button
+                        key={campaign.id}
+                        type="button"
+                        onClick={() => { setActiveTab("campanhas"); setSelectedCampaignId(campaign.id); }}
+                        className="w-full text-left group"
+                      >
+                        <div className={`relative overflow-hidden rounded-2xl border ${isVeiculando ? "border-emerald-500/30 bg-gradient-to-r from-emerald-950/40 via-card to-card" : "border-primary/20 bg-gradient-to-r from-primary/5 via-card to-card"} hover:shadow-xl hover:shadow-black/10 transition-all duration-300`}>
+                          <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl ${meta.dot}`} />
+                          <div className="pl-6 pr-5 py-5">
+                            <div className="flex items-start justify-between gap-4 flex-wrap">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                                    isVeiculando
+                                      ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10"
+                                      : "border-primary/30 text-primary bg-primary/10"
+                                  }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${meta.dot} ${isVeiculando ? "animate-pulse" : ""}`} />
+                                    {meta.label}
+                                  </span>
+                                  {campaign.isBonificada && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                      <Sparkles className="w-2.5 h-2.5" /> Bonificada
+                                    </span>
+                                  )}
+                                </div>
+                                <h3 className="text-base font-bold group-hover:text-primary transition-colors truncate">{campaign.name}</h3>
+                                <div className="flex items-center gap-4 mt-2 flex-wrap">
+                                  {campaign.coasterVolume && (
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Bolachas</p>
+                                      <p className="text-lg font-bold tabular-nums">{campaign.coasterVolume.toLocaleString("pt-BR")}</p>
+                                    </div>
+                                  )}
+                                  {campaign.startDate && (
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Início</p>
+                                      <p className="text-sm font-semibold">{fmtDate(campaign.startDate)}</p>
+                                    </div>
+                                  )}
+                                  {campaign.endDate && (
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Término</p>
+                                      <p className="text-sm font-semibold">{fmtDate(campaign.endDate)}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 self-center">
+                                <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">Ver detalhes</span>
+                                <ChevronRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {activeCampaigns.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => navigateTo("campanhas")}
+                      className="w-full text-xs text-center text-muted-foreground hover:text-primary transition-colors py-2"
+                    >
+                      Ver todas as {activeCampaigns.length} campanhas ativas →
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {(pendingOS.length > 0 || pendingInvoices.length > 0 || pendingQuotations.length > 0) && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Bell className="w-4 h-4 text-amber-400" />
+                  <p className="text-sm font-semibold text-amber-300">Ações pendentes</p>
+                </div>
+                <div className="space-y-2">
+                  {pendingOS.map((os) => (
+                    <button
+                      key={os.id}
+                      type="button"
+                      onClick={() => navigateTo("os")}
+                      className="w-full text-left flex items-center gap-3 p-3 rounded-lg bg-amber-500/8 hover:bg-amber-500/15 transition-colors border border-amber-500/15"
+                    >
+                      <div className="p-1.5 rounded-lg bg-amber-500/15 shrink-0">
+                        <FileSignature className="w-3.5 h-3.5 text-amber-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-amber-200 truncate">
+                          OS {os.orderNumber} aguarda sua assinatura
+                        </p>
+                        <p className="text-xs text-amber-400/70 mt-0.5">
+                          Próximo passo: assinar o contrato para liberar a campanha
+                        </p>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 text-amber-400/50 shrink-0" />
+                    </button>
+                  ))}
+                  {pendingInvoices.slice(0, 2).map((inv: any) => (
+                    <button
+                      key={inv.id}
+                      type="button"
+                      onClick={() => navigateTo("financeiro")}
+                      className="w-full text-left flex items-center gap-3 p-3 rounded-lg bg-amber-500/8 hover:bg-amber-500/15 transition-colors border border-amber-500/15"
+                    >
+                      <div className="p-1.5 rounded-lg bg-amber-500/15 shrink-0">
+                        <Receipt className="w-3.5 h-3.5 text-amber-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-amber-200 truncate">
+                          Fatura {inv.invoiceNumber} {inv.status === "vencida" ? "vencida" : "pendente"}
+                          {inv.amount ? ` — ${fmt(inv.amount)}` : ""}
+                        </p>
+                        <p className="text-xs text-amber-400/70 mt-0.5">
+                          {inv.status === "vencida"
+                            ? "Vencida em " + fmtDate(inv.dueDate) + " — regularize o pagamento"
+                            : "Vence em " + fmtDate(inv.dueDate) + " — efetue o pagamento"}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 text-amber-400/50 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="rounded-xl border bg-card p-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -1203,6 +1404,35 @@ export default function AnunciantePortal() {
                 <p className="text-2xl font-bold tabular-nums">{pendingOS.length}</p>
               </div>
             </div>
+
+            {profile?.accountManagerName && (
+              <div className="rounded-xl border border-border/30 bg-card p-5 flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-primary/10 shrink-0">
+                  <UserCircle className="w-6 h-6 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Seu gerente de conta</p>
+                  <p className="font-semibold">{profile.accountManagerName}</p>
+                  {profile.accountManagerPhone && (
+                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                      <Phone className="w-3 h-3" /> {profile.accountManagerPhone}
+                    </p>
+                  )}
+                </div>
+                {profile.accountManagerPhone && (
+                  <a
+                    href={`https://wa.me/${profile.accountManagerPhone.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Button size="sm" variant="outline" className="gap-1.5 text-xs shrink-0">
+                      <Phone className="w-3.5 h-3.5" /> WhatsApp
+                    </Button>
+                  </a>
+                )}
+              </div>
+            )}
 
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">Navegação rápida</p>

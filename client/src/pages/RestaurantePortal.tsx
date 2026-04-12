@@ -40,6 +40,9 @@ import {
   AlertCircle,
   ShieldCheck,
   Download,
+  Bell,
+  Star,
+  Boxes,
 } from "lucide-react";
 
 const campaignStatusConfig: Record<string, { label: string; color: string; icon: typeof CircleDot }> = {
@@ -153,7 +156,10 @@ export default function RestaurantePortal() {
 
   const openAcceptDialog = (type: "template" | "term", id: number, title: string, content: string) => {
     setAcceptingItem({ type, id, title, content });
-    setAcceptForm({ name: "", cpf: "", accepted: false });
+    const prefillName = user?.firstName && user?.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user?.firstName || restaurant?.contactName || "";
+    setAcceptForm({ name: prefillName, cpf: "", accepted: false });
     setAcceptDialogOpen(true);
   };
 
@@ -169,11 +175,16 @@ export default function RestaurantePortal() {
   const activeCampaigns = campaigns.filter((c: any) =>
     ["veiculacao", "active", "executar", "producao", "transito"].includes(c.status)
   );
+  const campaignsAwaitingMaterialConfirm = campaigns.filter((c: any) =>
+    c.status === "executar" && !c.materialReceivedDate
+  );
   const signedTerms = terms.filter((t: any) => t.status === "assinado" || t.status === "vigente");
 
   const pendingTemplates = pendingData?.templates || [];
   const pendingTermsList = pendingData?.terms || [];
   const totalPending = pendingTemplates.length + pendingTermsList.length;
+
+  const totalNotifications = totalPending + campaignsAwaitingMaterialConfirm.length;
 
   if (isLoading) {
     return (
@@ -217,6 +228,33 @@ export default function RestaurantePortal() {
             </Badge>
           </div>
         </div>
+
+        {totalNotifications > 0 && (
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <Bell className="w-4 h-4 text-amber-400" />
+              <p className="text-sm font-semibold text-amber-300">
+                {totalNotifications} {totalNotifications === 1 ? "ação pendente" : "ações pendentes"}
+              </p>
+            </div>
+            {totalPending > 0 && (
+              <div className="flex items-center gap-3 text-sm text-amber-200 bg-amber-500/8 rounded-lg px-3 py-2 border border-amber-500/15">
+                <FileText className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  {totalPending} {totalPending === 1 ? "termo pendente" : "termos pendentes"} aguardando seu aceite
+                </span>
+              </div>
+            )}
+            {campaignsAwaitingMaterialConfirm.length > 0 && (
+              <div className="flex items-center gap-3 text-sm text-amber-200 bg-amber-500/8 rounded-lg px-3 py-2 border border-amber-500/15">
+                <Package className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  Material da campanha chegou — confirme o recebimento na aba Campanhas
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
@@ -301,23 +339,44 @@ export default function RestaurantePortal() {
                     {campaigns.map((campaign: any) => {
                       const cfg = campaignStatusConfig[campaign.status] || campaignStatusConfig.draft;
                       const Icon = cfg.icon;
+                      const needsMaterialConfirm = campaign.status === "executar" && !campaign.materialReceivedDate;
                       return (
-                        <div key={campaign.id} className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-                          <div className="flex items-center gap-4">
-                            <div className={`p-2 rounded-lg ${cfg.color}`}>
-                              <Icon className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <p className="font-medium">{campaign.name}</p>
-                              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                                {campaign.campaignNumber && (
-                                  <span className="font-mono">{campaign.campaignNumber}</span>
-                                )}
-                                <span>{formatDate(campaign.startDate)} — {formatDate(campaign.endDate)}</span>
+                        <div key={campaign.id} className={`p-4 rounded-lg border bg-card transition-colors ${needsMaterialConfirm ? "border-amber-500/30 bg-amber-500/5" : "hover:bg-accent/50"}`}>
+                          <div className="flex items-center justify-between gap-4 flex-wrap">
+                            <div className="flex items-center gap-4">
+                              <div className={`p-2 rounded-lg ${cfg.color}`}>
+                                <Icon className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{campaign.name}</p>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                                  {campaign.campaignNumber && (
+                                    <span className="font-mono">{campaign.campaignNumber}</span>
+                                  )}
+                                  <span>{formatDate(campaign.startDate)} — {formatDate(campaign.endDate)}</span>
+                                </div>
                               </div>
                             </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge className={cfg.color}>{cfg.label}</Badge>
+                              {needsMaterialConfirm && (
+                                <Button
+                                  size="sm"
+                                  className="gap-1.5 text-xs bg-amber-500 hover:bg-amber-600 text-white"
+                                  onClick={() => toast.info("Para confirmar o recebimento, entre em contato com a equipe Mesa Ads.")}
+                                >
+                                  <Package className="w-3.5 h-3.5" />
+                                  Confirmar recebimento
+                                </Button>
+                              )}
+                              {campaign.materialReceivedDate && (
+                                <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Material recebido em {formatDate(campaign.materialReceivedDate)}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <Badge className={cfg.color}>{cfg.label}</Badge>
                         </div>
                       );
                     })}
@@ -453,13 +512,44 @@ export default function RestaurantePortal() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="profile" className="mt-4">
+          <TabsContent value="profile" className="mt-4 space-y-4">
+            {((restaurant as any).coastersAllocated || (restaurant as any).ratingScore || (restaurant as any).ratingTier) && (
+              <div className="grid grid-cols-2 gap-4">
+                {(restaurant as any).coastersAllocated && (
+                  <div className="rounded-xl border border-border/30 bg-card p-4 flex items-center gap-3">
+                    <div className="p-2.5 rounded-lg bg-primary/10 shrink-0">
+                      <Boxes className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Bolachas alocadas</p>
+                      <p className="text-xl font-bold tabular-nums">{(restaurant as any).coastersAllocated?.toLocaleString("pt-BR")}</p>
+                      <p className="text-[10px] text-muted-foreground">por ciclo</p>
+                    </div>
+                  </div>
+                )}
+                {(restaurant as any).ratingTier && (
+                  <div className="rounded-xl border border-border/30 bg-card p-4 flex items-center gap-3">
+                    <div className="p-2.5 rounded-lg bg-amber-500/10 shrink-0">
+                      <Star className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Avaliação na rede</p>
+                      <p className="text-xl font-bold capitalize text-amber-400">{(restaurant as any).ratingTier}</p>
+                      {(restaurant as any).ratingScore && (
+                        <p className="text-[10px] text-muted-foreground">Score: {parseFloat((restaurant as any).ratingScore).toFixed(1)}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Meu Local</CardTitle>
-                    <CardDescription>Dados cadastrais do estabelecimento</CardDescription>
+                    <CardTitle>Meu Estabelecimento</CardTitle>
+                    <CardDescription>Dados cadastrais do local</CardDescription>
                   </div>
                   <Button variant="outline" size="sm" onClick={openEditDialog}>
                     <Pencil className="w-4 h-4 mr-2" />

@@ -22,6 +22,12 @@ import {
   ShoppingCart,
   ChevronRight,
   Download,
+  CircleDot,
+  Phone,
+  Trophy,
+  XCircle,
+  History,
+  CalendarDays,
 } from "lucide-react";
 import { CampaignBuilder } from "@/components/CampaignBuilder";
 
@@ -45,9 +51,69 @@ const STAGE_LABELS: Record<string, { label: string; color: string }> = {
   perdido: { label: "Perdido", color: "bg-red-500/10 text-red-400 border-red-500/30" },
 };
 
+const LEAD_TIMELINE_STAGES = [
+  { key: "novo",       label: "Indicado",  icon: CircleDot },
+  { key: "contato",    label: "Contato",   icon: Phone },
+  { key: "proposta",   label: "Cotação",   icon: FileText },
+  { key: "ganho",      label: "Fechado",   icon: Trophy },
+];
+
+const STAGE_ORDER: Record<string, number> = {
+  novo: 0, contato: 1, qualificado: 1, proposta: 2, negociacao: 2, ganho: 3, perdido: -1,
+};
+
 function formatDate(d: string | Date | null | undefined) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("pt-BR");
+}
+
+function LeadTimeline({ stage }: { stage: string }) {
+  const currentIdx = STAGE_ORDER[stage] ?? 0;
+  const isPerdido = stage === "perdido";
+
+  return (
+    <div className="flex items-center gap-0 mt-2">
+      {LEAD_TIMELINE_STAGES.map((s, i) => {
+        const done = currentIdx > i && !isPerdido;
+        const current = currentIdx === i && !isPerdido;
+        const StageIcon = s.icon;
+        return (
+          <div key={s.key} className="flex items-center flex-1 min-w-0">
+            <div className="flex flex-col items-center relative flex-1">
+              {i > 0 && (
+                <div className={`absolute right-1/2 left-0 h-0.5 top-3 ${done || current ? "bg-primary" : "bg-border"}`} style={{ marginRight: "50%" }} />
+              )}
+              {i < LEAD_TIMELINE_STAGES.length - 1 && (
+                <div className={`absolute left-1/2 right-0 h-0.5 top-3 ${done ? "bg-primary" : "bg-border"}`} style={{ marginLeft: "50%" }} />
+              )}
+              <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center ${
+                done
+                  ? "bg-primary"
+                  : current
+                  ? "bg-primary/20 border-2 border-primary"
+                  : "bg-muted/50 border border-border"
+              }`}>
+                {done ? (
+                  <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
+                ) : (
+                  <StageIcon className={`w-3 h-3 ${current ? "text-primary" : "text-muted-foreground/30"}`} />
+                )}
+              </div>
+              <p className={`mt-1 text-[9px] text-center leading-tight ${
+                current ? "text-primary font-semibold" : done ? "text-muted-foreground" : "text-muted-foreground/30"
+              }`}>{s.label}</p>
+            </div>
+          </div>
+        );
+      })}
+      {isPerdido && (
+        <div className="flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20">
+          <XCircle className="w-3 h-3 text-red-400" />
+          <span className="text-[9px] text-red-400 font-medium">Perdido</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function KpiCard({
@@ -110,6 +176,28 @@ export default function ParceiroPortal() {
 
   const hasPartner = true;
 
+  const now = new Date();
+  const currentMonth = now.toLocaleString("pt-BR", { month: "long", year: "numeric" });
+  const commissionPercent = dashboard?.partner?.commissionPercent ?? 0;
+
+  const thisMonthWon = (quotations as any[]).filter((q: any) => {
+    if (q.status !== "win") return false;
+    const d = q.createdAt ? new Date(q.createdAt) : null;
+    return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const thisMonthRevenue = thisMonthWon.reduce((s: number, q: any) => s + Number(q.totalValue || 0), 0);
+  const bvEstimadoMes = thisMonthRevenue * Number(commissionPercent) / 100;
+
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthName = lastMonthDate.toLocaleString("pt-BR", { month: "long" });
+  const lastMonthWon = (quotations as any[]).filter((q: any) => {
+    if (q.status !== "win") return false;
+    const d = q.createdAt ? new Date(q.createdAt) : null;
+    return d && d.getMonth() === lastMonthDate.getMonth() && d.getFullYear() === lastMonthDate.getFullYear();
+  });
+  const lastMonthRevenue = lastMonthWon.reduce((s: number, q: any) => s + Number(q.totalValue || 0), 0);
+  const bvLastMonth = lastMonthRevenue * Number(commissionPercent) / 100;
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
@@ -166,6 +254,50 @@ export default function ParceiroPortal() {
           </Link>
         </div>
       </div>
+
+      {!loadingDash && dashboard && (
+        <div className="rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-950/30 via-card to-card overflow-hidden">
+          <div className="px-5 py-4 flex items-center gap-3 border-b border-amber-500/15">
+            <div className="p-2 rounded-lg bg-amber-500/15">
+              <DollarSign className="w-4 h-4 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-amber-300">BV Estimado do Mês</p>
+              <p className="text-xs text-muted-foreground capitalize">{currentMonth}</p>
+            </div>
+          </div>
+          <div className="px-5 py-4 flex items-center gap-6 flex-wrap">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Estimativa {now.toLocaleString("pt-BR", { month: "short" })}</p>
+              <p className="text-3xl font-black text-amber-400 font-mono tabular-nums">{formatCurrency(bvEstimadoMes)}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {thisMonthWon.length} negócio{thisMonthWon.length !== 1 ? "s" : ""} fechado{thisMonthWon.length !== 1 ? "s" : ""} · {commissionPercent}% de {formatCurrency(thisMonthRevenue)}
+              </p>
+            </div>
+            <div className="w-px h-10 bg-border hidden sm:block" />
+            <div className="flex items-center gap-4 flex-wrap">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">
+                  <History className="w-3 h-3 inline mr-1" />
+                  {lastMonthName}
+                </p>
+                <p className="text-lg font-bold font-mono text-muted-foreground">{formatCurrency(bvLastMonth)}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {lastMonthWon.length} negócio{lastMonthWon.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">
+                  <CalendarDays className="w-3 h-3 inline mr-1" />
+                  Total acumulado
+                </p>
+                <p className="text-lg font-bold font-mono">{formatCurrency(dashboard?.commissionEstimated ?? 0)}</p>
+                <p className="text-[10px] text-muted-foreground">{dashboard?.wonDeals ?? 0} negócios no total</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loadingDash ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -224,16 +356,19 @@ export default function ParceiroPortal() {
               {recentLeads.map((lead: any) => {
                 const stage = STAGE_LABELS[lead.stage] || { label: lead.stage, color: "" };
                 return (
-                  <div key={lead.id} className="flex items-center justify-between px-5 py-3">
-                    <div>
-                      <p className="text-sm font-medium">{lead.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {lead.company || "—"} · {formatDate(lead.createdAt)}
-                      </p>
+                  <div key={lead.id} className="px-5 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{lead.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {lead.company || "—"} · {formatDate(lead.createdAt)}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className={`text-xs shrink-0 ${stage.color}`}>
+                        {stage.label}
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className={`text-xs ${stage.color}`}>
-                      {stage.label}
-                    </Badge>
+                    <LeadTimeline stage={lead.stage} />
                   </div>
                 );
               })}
