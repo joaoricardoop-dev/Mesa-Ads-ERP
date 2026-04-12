@@ -1185,18 +1185,12 @@ export default function CampaignDetail() {
           </div>
         </div>
 
-        <div className="p-4 lg:p-6 space-y-5">
-          {(() => {
-            const workflowSteps = getWorkflowSteps((campaign as any).productWorkflowTemplate);
-            return workflowSteps.some(s => s.key === campaign.status) && (
-            <div className="bg-card border border-border/30 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fluxo da Campanha</h3>
-                <span className="text-[10px] text-muted-foreground">
-                  Etapa {workflowSteps.find(s => s.key === campaign.status)?.step || 0} de {workflowSteps.length}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
+        {/* ── Stepper sticky (dynamic template-aware) ───────────────────── */}
+        {(() => {
+          const workflowSteps = getWorkflowSteps((campaign as any).productWorkflowTemplate);
+          return workflowSteps.some(s => s.key === campaign.status) && (
+            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/20 px-4 lg:px-6 py-3">
+              <div className="flex items-center gap-1 mb-1.5">
                 {workflowSteps.map((step, i) => {
                   const currentStep = workflowSteps.find(s => s.key === campaign.status)?.step || 0;
                   const isCompleted = step.step < currentStep;
@@ -1204,52 +1198,66 @@ export default function CampaignDetail() {
                   return (
                     <div key={step.key} className="flex items-center flex-1 last:flex-none">
                       <div className="flex flex-col items-center flex-1 last:flex-none">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-all ${
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold border-2 transition-all ${
                           isCompleted ? "bg-emerald-500 border-emerald-500 text-white" :
-                          isCurrent ? "bg-primary border-primary text-primary-foreground" :
+                          isCurrent ? "bg-primary border-primary text-primary-foreground ring-2 ring-primary/30" :
                           "bg-muted border-border/30 text-muted-foreground"
                         }`}>
-                          {isCompleted ? <CheckCircle2 className="w-3.5 h-3.5" /> : step.step}
+                          {isCompleted ? <CheckCircle2 className="w-3 h-3" /> : step.step}
                         </div>
-                        <span className={`text-[9px] mt-1 text-center ${isCurrent ? "font-semibold text-primary" : "text-muted-foreground"}`}>
+                        <span className={`text-[8px] mt-0.5 text-center leading-tight ${isCurrent ? "font-semibold text-primary" : "text-muted-foreground"}`}>
                           {step.label}
                         </span>
                       </div>
                       {i < workflowSteps.length - 1 && (
-                        <div className={`h-0.5 flex-1 mx-1 mb-4 ${step.step < currentStep ? "bg-emerald-500" : "bg-border/30"}`} />
+                        <div className={`h-0.5 flex-1 mx-0.5 mb-3.5 ${step.step < currentStep ? "bg-emerald-500" : "bg-border/30"}`} />
                       )}
                     </div>
                   );
                 })}
               </div>
-
-              {slaStages.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-border/20">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Duração por Etapa</p>
-                  <div className="flex flex-wrap gap-2">
-                    {slaStages.map(s => {
-                      const overdue = s.days !== null && s.days > s.threshold;
-                      const color = s.days === null ? "bg-muted/40 text-muted-foreground border-border/20" :
-                        overdue ? "bg-red-500/10 text-red-400 border-red-500/30" :
-                        s.days > s.threshold * 0.7 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" :
-                        "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
-                      return (
-                        <div key={s.key} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium ${color}`}>
-                          {overdue && <AlertTriangle className="w-3 h-3 shrink-0" />}
-                          <span>{s.label}</span>
-                          <span className="font-mono font-bold">
-                            {s.days !== null ? `${s.days}d` : s.isCurrent ? "…" : "—"}
-                          </span>
-                          {s.isCurrent && <span className="text-[9px] opacity-70">em curso</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                <span>Etapa {workflowSteps.find(s => s.key === campaign.status)?.step || 0} de {workflowSteps.length}</span>
+                {slaStages.filter(s => s.isCurrent).map(s => (
+                  <span key={s.key} className={`ml-2 px-1.5 py-0.5 rounded-full border text-[9px] font-medium ${
+                    s.days !== null && s.days > s.threshold ? "bg-red-500/10 text-red-400 border-red-500/30" :
+                    s.days !== null && s.days > s.threshold * 0.7 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" :
+                    "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                  }`}>
+                    {s.days !== null ? `${s.days}d nesta etapa` : "em curso"}
+                  </span>
+                ))}
+              </div>
             </div>
           );
-          })()}
+        })()}
+
+        <div className="p-4 lg:p-6 space-y-5">
+          {/* SLA detail card (shown in the main content area) */}
+          {slaStages.length > 0 && (
+            <div className="bg-card border border-border/30 rounded-lg p-3">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Duração por Etapa</p>
+              <div className="flex flex-wrap gap-1.5">
+                {slaStages.map(s => {
+                  const overdue = s.days !== null && s.days > s.threshold;
+                  const color = s.days === null ? "bg-muted/40 text-muted-foreground border-border/20" :
+                    overdue ? "bg-red-500/10 text-red-400 border-red-500/30" :
+                    s.days > s.threshold * 0.7 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" :
+                    "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+                  return (
+                    <div key={s.key} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium ${color}`}>
+                      {overdue && <AlertTriangle className="w-3 h-3 shrink-0" />}
+                      <span>{s.label}</span>
+                      <span className="font-mono font-bold">
+                        {s.days !== null ? `${s.days}d` : s.isCurrent ? "…" : "—"}
+                      </span>
+                      {s.isCurrent && <span className="text-[9px] opacity-70">em curso</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {campaign.status === "briefing" && (
             <div className="bg-card border border-sky-500/30 rounded-lg p-5 space-y-3">
@@ -2656,19 +2664,21 @@ export default function CampaignDetail() {
                     <ParamRow label="Uso Médio/Dia" value={`${campaign.usagePerDay}x`} />
                     <ParamRow label="Dias por Mês" value={`${campaign.daysPerMonth}`} />
                     <ParamRow label="Restaurantes Ativos" value={`${campaign.activeRestaurants}`} />
-                    <ParamRow label="Tipo de Precificação" value={campaign.pricingType === "variable" ? "Markup (%)" : "Preço Fixo (R$)"} />
+                    <ParamRow label="Tipo de Precificação" value={campaign.pricingType === "variable" ? "Markup (%)" : "Preço Fixo (R$)"} tooltip="Define como o preço de venda é calculado sobre o custo base de produção" />
                     <ParamRow label={campaign.pricingType === "variable" ? "Markup" : "Preço Fixo"}
                       value={campaign.pricingType === "variable" ? `${Number(campaign.markupPercent)}%` : formatCurrency(Number(campaign.fixedPrice))}
+                      tooltip={campaign.pricingType === "variable" ? "Percentual aplicado sobre o custo bruto por restaurante para definir o preço de venda" : "Valor fixo adicionado ao custo bruto por restaurante"}
                     />
-                    <ParamRow label="Tipo Comissão Rest." value={campaign.commissionType === "variable" ? "Variável (%)" : "Fixo (R$/un)"} />
+                    <ParamRow label="Tipo Comissão Rest." value={campaign.commissionType === "variable" ? "Variável (%)" : "Fixo (R$/un)"} tooltip="Forma de cálculo da comissão paga aos restaurantes por coaster" />
                     <ParamRow label={campaign.commissionType === "variable" ? "Comissão Rest." : "Comissão Fixa"}
                       value={campaign.commissionType === "variable" ? `${Number(campaign.restaurantCommission)}%` : `R$ ${Number(campaign.fixedCommission).toFixed(4)}/un`}
+                      tooltip={campaign.commissionType === "variable" ? "Percentual do preço de venda pago como comissão ao restaurante" : "Valor fixo em R$ por coaster pago ao restaurante"}
                     />
-                    <ParamRow label="Comissão Vendedor" value={`${Number(campaign.sellerCommission)}%`} />
-                    <ParamRow label="Alíquota Impostos" value={`${Number(campaign.taxRate)}%`} />
-                    <ParamRow label="Lote Produção" value={`${campaign.batchSize.toLocaleString("pt-BR")} un`} />
-                    <ParamRow label="Custo Lote" value={formatCurrency(Number(campaign.batchCost))} />
-                    <ParamRow label="Custo Frete (mensal)" value={formatCurrency(Number((campaign as any).freightCost || 0))} />
+                    <ParamRow label="Comissão Vendedor" value={`${Number(campaign.sellerCommission)}%`} tooltip="Percentual da receita bruta destinado à comissão do vendedor responsável" />
+                    <ParamRow label="Alíquota Impostos" value={`${Number(campaign.taxRate)}%`} tooltip="Carga tributária total (NF) aplicada sobre a receita bruta da campanha" />
+                    <ParamRow label="Lote Produção" value={`${campaign.batchSize.toLocaleString("pt-BR")} un`} tooltip="Quantidade de coasters produzidos por lote de impressão" />
+                    <ParamRow label="Custo Lote" value={formatCurrency(Number(campaign.batchCost))} tooltip="Custo total de produção do lote (impressão + material). Dividido pelo tamanho do lote = custo unitário." />
+                    <ParamRow label="Custo Frete (mensal)" value={formatCurrency(Number((campaign as any).freightCost || 0))} tooltip="Custo mensal de logística e distribuição dos coasters para os restaurantes" />
                   </div>
                 ) : paramsForm && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
@@ -3607,10 +3617,19 @@ function ContractCard({ label, value, sub, accent }: { label: string; value: str
   );
 }
 
-function ParamRow({ label, value }: { label: string; value: string }) {
+function ParamRow({ label, value, tooltip }: { label: string; value: string; tooltip?: string }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+        {label}
+        {tooltip && (
+          <span title={tooltip} className="cursor-help text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="inline w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+            </svg>
+          </span>
+        )}
+      </p>
       <p className="text-sm font-medium mt-0.5">{value}</p>
     </div>
   );

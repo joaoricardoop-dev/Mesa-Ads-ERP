@@ -140,7 +140,7 @@ export default function Clients() {
 
   const utils = trpc.useUtils();
   const { data: clientStats } = trpc.advertiser.stats.useQuery();
-  const { data: pagedResult, isLoading } = trpc.advertiser.list.useQuery({
+  const { data: pagedResult, isLoading } = trpc.advertiser.listEnriched.useQuery({
     page,
     pageSize: PAGE_SIZE,
     search: search.trim() || undefined,
@@ -152,7 +152,7 @@ export default function Clients() {
 
   const createMutation = trpc.advertiser.create.useMutation({
     onSuccess: () => {
-      utils.advertiser.list.invalidate();
+      utils.advertiser.listEnriched.invalidate();
       utils.advertiser.stats.invalidate();
       setIsDialogOpen(false);
       setForm(emptyForm);
@@ -163,7 +163,7 @@ export default function Clients() {
 
   const updateMutation = trpc.advertiser.update.useMutation({
     onSuccess: () => {
-      utils.advertiser.list.invalidate();
+      utils.advertiser.listEnriched.invalidate();
       utils.advertiser.stats.invalidate();
       setIsDialogOpen(false);
       setEditingId(null);
@@ -175,7 +175,7 @@ export default function Clients() {
 
   const deleteMutation = trpc.advertiser.delete.useMutation({
     onSuccess: () => {
-      utils.advertiser.list.invalidate();
+      utils.advertiser.listEnriched.invalidate();
       utils.advertiser.stats.invalidate();
       setDeleteId(null);
       toast.success("Cliente removido!");
@@ -202,7 +202,7 @@ export default function Clients() {
     }
   };
 
-  const handleEdit = (c: (typeof pagedItems)[0]) => {
+  const handleEdit = (c: any) => {
     setEditingId(c.id);
     setFormErrors({});
     setForm({
@@ -241,7 +241,7 @@ export default function Clients() {
     }
   };
 
-  const pagedItems = pagedResult?.items ?? [];
+  const pagedItems: any[] = pagedResult?.items ?? [];
   const pagedTotal = pagedResult?.total ?? 0;
   const pagedTotalPages = pagedResult?.totalPages ?? 0;
 
@@ -326,6 +326,8 @@ export default function Clients() {
               <SortHeader label="CLIENTE" col="name" />
               <SortHeader label="LOCALIZAÇÃO" col="neighborhood" className="hidden md:table-cell" />
               <SortHeader label="CONTATO" col="contactPhone" className="hidden lg:table-cell" />
+              <TableHead className="hidden xl:table-cell text-xs text-muted-foreground font-medium">ÚLT. CAMPANHA</TableHead>
+              <TableHead className="hidden xl:table-cell text-xs text-muted-foreground font-medium text-right">FATURAMENTO</TableHead>
               <SortHeader label="STATUS" col="status" className="text-center" />
               <TableHead className="text-xs text-muted-foreground font-medium text-right">
                 AÇÕES
@@ -335,13 +337,13 @@ export default function Clients() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             ) : sorted.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {search
                     ? "Nenhum cliente encontrado"
                     : "Nenhum cliente cadastrado. Clique em \"Novo Cliente\" para começar."}
@@ -386,6 +388,16 @@ export default function Clients() {
                         <Phone className="w-3 h-3" />
                         {c.contactPhone || "—"}
                       </div>
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell text-muted-foreground text-sm">
+                      {(c as any).lastCampaignDate
+                        ? new Date((c as any).lastCampaignDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "2-digit" })
+                        : <span className="text-muted-foreground/50">—</span>}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell text-right text-sm font-mono">
+                      {(c as any).totalRevenue && parseFloat((c as any).totalRevenue) > 0
+                        ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(parseFloat((c as any).totalRevenue))
+                        : <span className="text-muted-foreground/50">—</span>}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge

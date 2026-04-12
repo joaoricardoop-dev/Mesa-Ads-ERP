@@ -157,6 +157,9 @@ export const campaigns = pgTable("campaigns", {
   aprovacaoEnteredAt: timestamp("aprovacaoEnteredAt"),
   producaoEnteredAt: timestamp("producaoEnteredAt"),
   distribuicaoEnteredAt: timestamp("distribuicaoEnteredAt"),
+  assignedTo: varchar("assignedTo", { length: 255 }),
+  assignedToName: varchar("assignedToName", { length: 255 }),
+  assignedToAvatar: varchar("assignedToAvatar", { length: 500 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [

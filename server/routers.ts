@@ -1069,6 +1069,63 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(({ input }) => getClient(input.id)),
 
+    listEnriched: protectedProcedure
+      .input(z.object({
+        page: z.number().int().min(1).optional(),
+        pageSize: z.number().int().min(1).max(200).optional(),
+        search: z.string().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return { items: [], total: 0, page: 1, pageSize: 25, totalPages: 0 };
+        const { clients: clientsTable, campaigns: campaignsTable, invoices } = await import("../drizzle/schema");
+        const { eq, ilike, or, count, desc, max, sql: sqlExpr } = await import("drizzle-orm");
+        const page = input?.page ?? 1;
+        const pageSize = input?.pageSize ?? 25;
+        const offset = (page - 1) * pageSize;
+        const search = input?.search?.trim();
+        const whereConditions = search
+          ? or(
+              ilike(clientsTable.name, `%${search}%`),
+              ilike(clientsTable.company, `%${search}%`),
+              ilike(clientsTable.razaoSocial, `%${search}%`),
+            )
+          : undefined;
+        const [totalResult, items] = await Promise.all([
+          db.select({ value: count() }).from(clientsTable).where(whereConditions),
+          db.select().from(clientsTable).where(whereConditions).orderBy(desc(clientsTable.createdAt)).limit(pageSize).offset(offset),
+        ]);
+        const total = totalResult[0]?.value ?? 0;
+        if (items.length === 0) return { items: [], total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+        const clientIds = items.map((c) => c.id);
+        const { inArray } = await import("drizzle-orm");
+        const [lastCampaigns, totalRevenue] = await Promise.all([
+          db.select({
+            clientId: campaignsTable.clientId,
+            lastCampaignName: sqlExpr<string>`(SELECT name FROM campaigns WHERE "clientId" = campaigns."clientId" ORDER BY "createdAt" DESC LIMIT 1)`,
+            lastCampaignDate: sqlExpr<string>`MAX(campaigns."createdAt")`,
+          }).from(campaignsTable).where(inArray(campaignsTable.clientId, clientIds)).groupBy(campaignsTable.clientId),
+          db.select({
+            clientId: invoices.clientId,
+            total: sqlExpr<string>`COALESCE(SUM(${invoices.amount}::numeric), 0)`,
+          }).from(invoices).where(inArray(invoices.clientId, clientIds)).groupBy(invoices.clientId),
+        ]);
+        const lastCampaignMap = new Map(lastCampaigns.map((r) => [r.clientId, r.lastCampaignDate]));
+        const revenueMap = new Map(totalRevenue.map((r) => [r.clientId, r.total]));
+        return {
+          items: items.map((c) => ({
+            ...c,
+            lastCampaignDate: lastCampaignMap.get(c.id) ?? null,
+            totalRevenue: revenueMap.get(c.id) ?? "0",
+          })),
+          total,
+          page,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize),
+        };
+      }),
+
     create: protectedProcedure
       .input(
         z.object({
@@ -1370,6 +1427,7 @@ export const appRouter = router({
         filterAtrasadas: z.boolean().optional(),
         filterBonificada: z.boolean().optional(),
         filterRiscoSla: z.boolean().optional(),
+        filterAssignedTo: z.string().optional(),
       }).optional())
       .query(({ input }) => listCampaigns(input ?? undefined)),
 
@@ -1418,6 +1476,9 @@ export const appRouter = router({
           batchCost: z.string().default("1200.00"),
           budgetId: z.number().nullable().optional(),
           isBonificada: z.boolean().optional(),
+          assignedTo: z.string().nullable().optional(),
+          assignedToName: z.string().nullable().optional(),
+          assignedToAvatar: z.string().nullable().optional(),
         })
       )
       .mutation(({ input }) => createCampaign(input)),
@@ -1450,6 +1511,9 @@ export const appRouter = router({
           freightCost: z.string().optional(),
           budgetId: z.number().nullable().optional(),
           isBonificada: z.boolean().optional(),
+          assignedTo: z.string().nullable().optional(),
+          assignedToName: z.string().nullable().optional(),
+          assignedToAvatar: z.string().nullable().optional(),
         })
       )
       .mutation(async ({ input }) => {

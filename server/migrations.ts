@@ -106,6 +106,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_workflow_template_to_products",
     sql: `DO $$ BEGIN CREATE TYPE "workflow_template" AS ENUM ('fisico', 'eletronico_cliente_envia', 'ativacao_evento'); EXCEPTION WHEN duplicate_object THEN NULL; END $$; ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "workflowTemplate" "workflow_template";`,
   },
+  {
+    name: "add_assigned_to_campaigns",
+    sql: `ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "assignedTo" varchar(255); ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "assignedToName" varchar(255); ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "assignedToAvatar" varchar(500);`,
+  },
 ];
 
 export async function runMigrations() {

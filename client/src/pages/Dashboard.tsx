@@ -17,8 +17,11 @@ import {
   TrendingUp,
   Building2,
   Calendar,
+  X,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -45,26 +48,6 @@ function getPreProdDays(c: { status: string; briefingEnteredAt?: any; producaoEn
     ));
   }
   return null;
-}
-
-function calcMonthlyRevenue(c: {
-  coastersPerRestaurant: number; activeRestaurants: number; pricingType: string;
-  markupPercent: string; fixedPrice: string; commissionType: string;
-  restaurantCommission: string; fixedCommission: string; sellerCommission: string;
-  taxRate: string; batchSize: number; batchCost: string;
-}): number {
-  const unitCost = Number(c.batchCost) / c.batchSize;
-  const prodCost = c.coastersPerRestaurant * unitCost;
-  const restFixed = c.commissionType === "fixed" ? Number(c.fixedCommission) * c.coastersPerRestaurant : 0;
-  const custoPD = prodCost + restFixed;
-  const restVar = c.commissionType === "variable" ? Number(c.restaurantCommission) / 100 : 0;
-  const totalVarRate = Number(c.sellerCommission) / 100 + Number(c.taxRate) / 100 + restVar;
-  const denom = 1 - totalVarRate;
-  const custoBruto = denom > 0 ? custoPD / denom : custoPD;
-  const price = c.pricingType === "fixed"
-    ? custoBruto + Number(c.fixedPrice)
-    : custoBruto * (1 + Number(c.markupPercent) / 100);
-  return price * c.activeRestaurants;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -128,12 +111,63 @@ const ACTION_LABELS: Record<string, string> = {
   inativa:                "Campanha encerrada",
 };
 
+// ─── Pipeline Modal ───────────────────────────────────────────────────────────
+
+function PipelineModal({
+  stage,
+  campaigns,
+  onClose,
+}: {
+  stage: typeof PIPELINE_STAGES[0] | null;
+  campaigns: any[];
+  onClose: () => void;
+}) {
+  const [, navigate] = useLocation();
+  if (!stage) return null;
+  const items = campaigns.filter((c) => c.status === stage.key);
+  return (
+    <Dialog open={!!stage} onOpenChange={() => onClose()}>
+      <DialogContent className="sm:max-w-lg bg-card border-border/30 max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-sm">
+            <span className={`w-2.5 h-2.5 rounded-full ${stage.color}`} />
+            Campanhas em {stage.label} ({items.length})
+          </DialogTitle>
+        </DialogHeader>
+        {items.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma campanha nesta etapa</p>
+        ) : (
+          <div className="space-y-1.5 py-2">
+            {items.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => { onClose(); navigate(`/campanhas/${c.id}`); }}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-background hover:bg-muted/60 transition-colors text-left group"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{c.name}</p>
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                    <Building2 className="w-2.5 h-2.5" />{c.clientName || "—"}
+                  </p>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+              </button>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const { data: campaignData, isLoading } = trpc.campaign.list.useQuery(undefined, { staleTime: 30000 });
   const campaigns = campaignData?.items ?? [];
+
+  const [pipelineModal, setPipelineModal] = useState<typeof PIPELINE_STAGES[0] | null>(null);
 
   const kpis = useMemo(() => {
     const ativas      = campaigns.filter((c) => c.status !== "archived").length;
@@ -203,6 +237,20 @@ export default function Dashboard() {
     { staleTime: 15000 }
   );
 
+  // Navigate to campaigns list with a specific filter via URL params
+  function goToCampaigns(filter: string) {
+    navigate(`/campanhas?filter=${filter}`);
+  }
+
+  const kpiCards = [
+    { label: "Ativas", value: kpis.ativas, sub: "não arquivadas", icon: Package, color: "", filter: "all" },
+    { label: "Pré-prod", value: kpis.preProducao, sub: "briefing → aprovação", icon: Layers, color: kpis.preProducao > 0 ? "text-violet-400" : "", filter: "pre-producao" },
+    { label: "Produção", value: kpis.producao, sub: "produção + distribuição", icon: Printer, color: kpis.producao > 0 ? "text-amber-400" : "", filter: "producao" },
+    { label: "Veiculação", value: kpis.veiculacao, sub: "campanhas ao vivo", icon: Radio, color: kpis.veiculacao > 0 ? "text-emerald-400" : "", filter: "veiculacao" },
+    { label: "Atrasadas", value: kpis.atrasadas, sub: "prazo de fim vencido", icon: AlertTriangle, color: kpis.atrasadas > 0 ? "text-red-400" : "", filter: "atrasadas" },
+    { label: "Risco SLA", value: kpis.riscoSla, sub: "pré-prod ≥ 3 dias", icon: Timer, color: kpis.riscoSla > 0 ? "text-amber-400" : "", filter: "risco-sla" },
+  ];
+
   return (
     <PageContainer title="Dashboard" description="Gestão de campanhas · Mesa Ads">
 
@@ -213,22 +261,21 @@ export default function Dashboard() {
           <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Visão Geral de Campanhas</span>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {[
-            { label: "Ativas", value: kpis.ativas, sub: "não arquivadas", icon: Package, color: "" },
-            { label: "Pré-prod", value: kpis.preProducao, sub: "briefing → aprovação", icon: Layers, color: kpis.preProducao > 0 ? "text-violet-400" : "" },
-            { label: "Produção", value: kpis.producao, sub: "produção + distribuição", icon: Printer, color: kpis.producao > 0 ? "text-amber-400" : "" },
-            { label: "Veiculação", value: kpis.veiculacao, sub: "campanhas ao vivo", icon: Radio, color: kpis.veiculacao > 0 ? "text-emerald-400" : "" },
-            { label: "Atrasadas", value: kpis.atrasadas, sub: "prazo de fim vencido", icon: AlertTriangle, color: kpis.atrasadas > 0 ? "text-red-400" : "" },
-            { label: "Risco SLA", value: kpis.riscoSla, sub: "pré-prod ≥ 3 dias", icon: Timer, color: kpis.riscoSla > 0 ? "text-amber-400" : "" },
-          ].map(({ label, value, sub, icon: Icon, color }) => (
-            <div key={label} className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1">
+          {kpiCards.map(({ label, value, sub, icon: Icon, color, filter }) => (
+            <button
+              key={label}
+              onClick={() => goToCampaigns(filter)}
+              className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1 hover:border-border/70 hover:shadow-sm transition-all text-left group"
+              title={`Ver campanhas: ${label}`}
+            >
               <div className={`flex items-center gap-1.5 ${color || "text-muted-foreground"}`}>
                 <Icon className="w-3 h-3" />
                 <span className="text-[10px] uppercase tracking-wide">{label}</span>
+                <ChevronRight className="w-2.5 h-2.5 ml-auto opacity-0 group-hover:opacity-60 transition-opacity" />
               </div>
               <p className={`text-2xl font-bold leading-none ${color || ""}`}>{isLoading ? "—" : value}</p>
               <p className="text-[9px] text-muted-foreground/60">{sub}</p>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -270,7 +317,7 @@ export default function Dashboard() {
           <Activity className="w-3.5 h-3.5 text-muted-foreground" />
           <div>
             <p className="text-sm font-semibold">Pipeline de Campanhas</p>
-            <p className="text-[10px] text-muted-foreground">Volume por etapa do funil</p>
+            <p className="text-[10px] text-muted-foreground">Clique numa barra para ver as campanhas da etapa</p>
           </div>
         </div>
         <div className="flex items-end gap-2 h-24">
@@ -279,12 +326,20 @@ export default function Dashboard() {
             const barH = Math.max(6, (count / maxPipeline) * 72);
             const pct = ((count / Math.max(campaigns.filter(c=>c.status!=="archived").length, 1)) * 100).toFixed(0);
             return (
-              <div key={stage.key} className="flex-1 flex flex-col items-center gap-1">
+              <button
+                key={stage.key}
+                className="flex-1 flex flex-col items-center gap-1 group cursor-pointer"
+                onClick={() => count > 0 && setPipelineModal(stage)}
+                title={count > 0 ? `Ver ${count} campanha(s) em ${stage.label}` : ""}
+              >
                 <span className="text-xs font-mono font-bold tabular-nums">{isLoading ? "—" : count}</span>
-                <div className={`w-full rounded-t ${stage.color} opacity-70 transition-all duration-500`} style={{ height: `${barH}px` }} />
-                <span className="text-[9px] text-muted-foreground text-center leading-tight">{stage.label}</span>
+                <div
+                  className={`w-full rounded-t ${stage.color} transition-all duration-500 ${count > 0 ? "opacity-70 group-hover:opacity-100 group-hover:scale-x-105" : "opacity-30"}`}
+                  style={{ height: `${barH}px` }}
+                />
+                <span className="text-[9px] text-muted-foreground text-center leading-tight group-hover:text-foreground transition-colors">{stage.label}</span>
                 {!isLoading && count > 0 && <span className="text-[9px] text-muted-foreground/50">{pct}%</span>}
-              </div>
+              </button>
             );
           })}
         </div>
@@ -435,6 +490,13 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Pipeline Modal */}
+      <PipelineModal
+        stage={pipelineModal}
+        campaigns={campaigns}
+        onClose={() => setPipelineModal(null)}
+      />
 
     </PageContainer>
   );

@@ -202,9 +202,9 @@ export async function getClientStats() {
 
 // ─── Campaigns ──────────────────────────────────────────────────────────────
 
-export async function listCampaigns(input?: { page?: number; pageSize?: number; search?: string; status?: string; filterAtrasadas?: boolean; filterBonificada?: boolean; filterRiscoSla?: boolean }) {
+export async function listCampaigns(input?: { page?: number; pageSize?: number; search?: string; status?: string; filterAtrasadas?: boolean; filterBonificada?: boolean; filterRiscoSla?: boolean; filterAssignedTo?: string }) {
   if (input?.page !== undefined) {
-    return listCampaignsPaged({ page: input.page, pageSize: input.pageSize ?? 25, search: input.search, status: input.status, filterAtrasadas: input.filterAtrasadas, filterBonificada: input.filterBonificada, filterRiscoSla: input.filterRiscoSla });
+    return listCampaignsPaged({ page: input.page, pageSize: input.pageSize ?? 25, search: input.search, status: input.status, filterAtrasadas: input.filterAtrasadas, filterBonificada: input.filterBonificada, filterRiscoSla: input.filterRiscoSla, filterAssignedTo: input.filterAssignedTo });
   }
   return listCampaignsPaged({ page: 1, pageSize: 10000 });
 }
@@ -217,10 +217,11 @@ export async function listCampaignsPaged(input: {
   filterAtrasadas?: boolean;
   filterBonificada?: boolean;
   filterRiscoSla?: boolean;
+  filterAssignedTo?: string;
 }) {
   const db = await getDb();
   if (!db) return { items: [], total: 0, page: input.page, pageSize: input.pageSize, totalPages: 0 };
-  const { page, pageSize, search, status, filterAtrasadas, filterBonificada, filterRiscoSla } = input;
+  const { page, pageSize, search, status, filterAtrasadas, filterBonificada, filterRiscoSla, filterAssignedTo } = input;
   const offset = (page - 1) * pageSize;
   const now = new Date();
   const SLA_WARN_DAYS = 3;
@@ -246,6 +247,9 @@ export async function listCampaignsPaged(input: {
   if (filterRiscoSla) {
     const slaDate = new Date(now.getTime() - SLA_WARN_DAYS * 86_400_000);
     conditions.push(sql`${campaigns.status} IN ('briefing','design','aprovacao') AND ${campaigns.briefingEnteredAt} IS NOT NULL AND ${campaigns.briefingEnteredAt} <= ${slaDate.toISOString()}`);
+  }
+  if (filterAssignedTo) {
+    conditions.push(sql`${campaigns.assignedTo} = ${filterAssignedTo}`);
   }
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -296,6 +300,9 @@ export async function listCampaignsPaged(input: {
     quotationTotalValue: quotations.totalValue,
     quotationCoasterVolume: quotations.coasterVolume,
     quotationUnitPrice: quotations.unitPrice,
+    assignedTo: campaigns.assignedTo,
+    assignedToName: campaigns.assignedToName,
+    assignedToAvatar: campaigns.assignedToAvatar,
     osAnuncianteTotalValue: sql<string | null>`(
       SELECT so."totalValue"::text
       FROM service_orders so

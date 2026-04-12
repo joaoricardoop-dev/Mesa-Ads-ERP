@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useSearch } from "wouter";
 import {
   Dialog,
   DialogContent,
@@ -249,6 +250,10 @@ function calcCampaignPricing(c: {
 }
 
 export default function Campaigns() {
+  const searchString = useSearch();
+  const urlParams = new URLSearchParams(searchString);
+  const urlFilter = urlParams.get("filter") ?? "";
+
   const [view, setView] = useState<"list" | "kanban">("list");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isRestaurantsDialogOpen, setIsRestaurantsDialogOpen] = useState(false);
@@ -257,10 +262,15 @@ export default function Campaigns() {
   const [formErrors, setFormErrors] = useState<CampaignErrors>({});
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterAtrasadas, setFilterAtrasadas] = useState(false);
-  const [filterRiscoSla, setFilterRiscoSla] = useState(false);
+  const [filterStatus, setFilterStatus] = useState(() => {
+    if (urlFilter === "veiculacao") return "veiculacao";
+    if (urlFilter === "producao") return "producao";
+    return "all";
+  });
+  const [filterAtrasadas, setFilterAtrasadas] = useState(() => urlFilter === "atrasadas");
+  const [filterRiscoSla, setFilterRiscoSla] = useState(() => urlFilter === "risco-sla");
   const [filterBonificada, setFilterBonificada] = useState(false);
+  const [filterAssignedTo, setFilterAssignedTo] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "client" | "startDate" | "endDate" | "status" | "restaurants">("endDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
@@ -273,6 +283,9 @@ export default function Campaigns() {
 
   const utils = trpc.useUtils();
   const { data: kpiStats } = trpc.campaign.kpiStats.useQuery();
+  // "pre-producao" URL filter means filter by status group, handled client-side
+  const urlPreProducao = urlFilter === "pre-producao";
+
   const { data: pagedResult, isLoading } = trpc.campaign.list.useQuery({
     page,
     pageSize: PAGE_SIZE,
@@ -281,6 +294,7 @@ export default function Campaigns() {
     filterAtrasadas: filterAtrasadas || undefined,
     filterBonificada: filterBonificada || undefined,
     filterRiscoSla: filterRiscoSla || undefined,
+    filterAssignedTo: filterAssignedTo || undefined,
   });
   const { data: clientsListData } = trpc.advertiser.list.useQuery();
   const clientsList = clientsListData?.items ?? [];
@@ -526,7 +540,12 @@ export default function Campaigns() {
   const pagedTotalPages = pagedResult?.totalPages ?? 0;
 
   const filtered = useMemo(() => {
-    return [...pagedItems].sort((a, b) => {
+    let items = [...pagedItems];
+    // Apply pre-producao client-side filter when coming from dashboard
+    if (urlPreProducao) {
+      items = items.filter((c) => ["briefing", "design", "aprovacao"].includes(c.status));
+    }
+    return items.sort((a, b) => {
       let va: string | number = "", vb: string | number = "";
       if (sortBy === "name") { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
       else if (sortBy === "client") { va = (a.clientName || "").toLowerCase(); vb = (b.clientName || "").toLowerCase(); }
@@ -538,7 +557,7 @@ export default function Campaigns() {
       if (va > vb) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-  }, [pagedItems, sortBy, sortDir]);
+  }, [pagedItems, sortBy, sortDir, urlPreProducao]);
 
   function effectivePricing(c: (typeof pagedItems)[0]) {
     const qVolume = (c as any).quotationCoasterVolume ? parseInt((c as any).quotationCoasterVolume) : null;
@@ -705,6 +724,17 @@ export default function Campaigns() {
           <button onClick={() => setFilterBonificada((v) => !v)} className={`flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs border transition-colors ${filterBonificada ? "bg-amber-500/20 border-amber-500/40 text-amber-400" : "bg-card border-border/30 text-muted-foreground hover:text-foreground"}`}>
             <Gift className="w-3 h-3" /> Bonificadas
           </button>
+          {/* AssignedTo filter */}
+          {filterAssignedTo && (
+            <button
+              onClick={() => setFilterAssignedTo("")}
+              className="flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs border bg-primary/10 border-primary/30 text-primary"
+            >
+              <Users className="w-3 h-3" />
+              Responsável ativo
+              <span className="ml-0.5 text-[9px] text-muted-foreground">✕</span>
+            </button>
+          )}
           {pagedTotal > 0 && (
             <span className="text-xs text-muted-foreground ml-1">
               {pagedTotal} resultado{pagedTotal !== 1 ? "s" : ""}
@@ -811,6 +841,23 @@ export default function Campaigns() {
                           {!preProdActive ? <CheckCircle2 className="w-2.5 h-2.5 shrink-0" /> : preProdIsCrit ? <AlertTriangle className="w-2.5 h-2.5 shrink-0" /> : <Timer className="w-2.5 h-2.5 shrink-0" />}
                           Pré-produção: {preProdDays}d
                         </span>
+                      )}
+                      {/* Linha 4: responsável */}
+                      {(c as any).assignedToName && (
+                        <button
+                          className="inline-flex items-center justify-end gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors w-full mt-0.5"
+                          title={`Responsável: ${(c as any).assignedToName}`}
+                          onClick={(e) => { e.stopPropagation(); setFilterAssignedTo((prev) => prev === (c as any).assignedTo ? "" : (c as any).assignedTo); }}
+                        >
+                          {(c as any).assignedToAvatar ? (
+                            <img src={(c as any).assignedToAvatar} alt={(c as any).assignedToName} className="w-4 h-4 rounded-full object-cover" />
+                          ) : (
+                            <span className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[8px] font-bold">
+                              {(c as any).assignedToName?.charAt(0) ?? "?"}
+                            </span>
+                          )}
+                          <span className="truncate max-w-[90px]">{(c as any).assignedToName}</span>
+                        </button>
                       )}
                     </div>
                   </div>
