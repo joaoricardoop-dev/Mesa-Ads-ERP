@@ -54,7 +54,6 @@ import {
 } from "lucide-react";
 import { generateReportPdf } from "@/lib/generate-report-pdf";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
-import { generateMediaKitPdf } from "@/lib/generate-mediakit-pdf";
 import { CampaignBuilder } from "@/components/CampaignBuilder";
 import {
   SEMANAS_OPTIONS,
@@ -1090,16 +1089,19 @@ export default function AnunciantePortal() {
                   Montar Minha Campanha
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                disabled={!mediaKitData}
-                onClick={() => mediaKitData && generateMediaKitPdf(mediaKitData)}
-              >
-                <Download className="w-3.5 h-3.5" />
-                Media Kit
-              </Button>
+              {mediaKitData?.pdfUrl && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  asChild
+                >
+                  <a href={mediaKitData.pdfUrl} target="_blank" rel="noopener noreferrer">
+                    <Download className="w-3.5 h-3.5" />
+                    Media Kit
+                  </a>
+                </Button>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-5 sm:gap-7 flex-wrap">

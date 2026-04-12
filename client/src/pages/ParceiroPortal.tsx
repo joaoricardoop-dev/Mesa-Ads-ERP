@@ -24,7 +24,6 @@ import {
   Download,
 } from "lucide-react";
 import { CampaignBuilder } from "@/components/CampaignBuilder";
-import { generateMediaKitPdf } from "@/lib/generate-mediakit-pdf";
 
 const QUOTATION_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   rascunho: { label: "Rascunho", color: "bg-gray-500/10 text-gray-400 border-gray-500/30" },
@@ -153,14 +152,13 @@ export default function ParceiroPortal() {
               <ShoppingCart className="w-4 h-4" /> Montar Campanha para Cliente
             </Button>
           )}
-          <Button
-            variant="outline"
-            className="gap-2"
-            disabled={!mediaKitData}
-            onClick={() => mediaKitData && generateMediaKitPdf(mediaKitData)}
-          >
-            <Download className="w-4 h-4" /> Media Kit
-          </Button>
+          {mediaKitData?.pdfUrl && (
+            <Button variant="outline" className="gap-2" asChild>
+              <a href={mediaKitData.pdfUrl} target="_blank" rel="noopener noreferrer">
+                <Download className="w-4 h-4" /> Media Kit
+              </a>
+            </Button>
+          )}
           <Link href="/leads">
             <Button className="gap-2">
               <Plus className="w-4 h-4" /> Indicar Lead

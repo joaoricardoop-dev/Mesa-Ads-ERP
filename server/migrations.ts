@@ -94,6 +94,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "create_media_kit_settings",
     sql: `CREATE TABLE IF NOT EXISTS "media_kit_settings" ("id" serial PRIMARY KEY, "tagline" varchar(200), "intro" text, "contactName" varchar(100), "contactEmail" varchar(100), "contactPhone" varchar(50), "website" varchar(200), "footerText" text, "updatedAt" timestamp DEFAULT now() NOT NULL); INSERT INTO "media_kit_settings" ("id", "updatedAt") VALUES (1, now()) ON CONFLICT DO NOTHING;`,
   },
+  {
+    name: "add_pdf_url_to_media_kit_settings",
+    sql: `ALTER TABLE "media_kit_settings" ADD COLUMN IF NOT EXISTS "pdfUrl" text;`,
+  },
 ];
 
 export async function runMigrations() {
