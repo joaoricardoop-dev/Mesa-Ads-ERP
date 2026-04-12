@@ -1,5 +1,6 @@
 import { useState, Fragment } from "react";
 import { useLocation } from "wouter";
+import { z } from "zod";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,6 +94,13 @@ const emptyForm: ClientForm = {
   status: "active",
 };
 
+const clientSchema = z.object({
+  name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  contactEmail: z.string().email("E-mail inválido").or(z.literal("")).optional(),
+});
+
+type ClientErrors = Partial<Record<keyof z.infer<typeof clientSchema>, string>>;
+
 const SEGMENTS = [
   "Alimentação",
   "Bebidas",
@@ -121,6 +129,7 @@ export default function Clients() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ClientForm>(emptyForm);
+  const [formErrors, setFormErrors] = useState<ClientErrors>({});
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -161,10 +170,17 @@ export default function Clients() {
   });
 
   const handleSubmit = () => {
-    if (!form.name.trim()) {
-      toast.error("Nome é obrigatório");
+    const result = clientSchema.safeParse({ name: form.name, contactEmail: form.contactEmail || "" });
+    if (!result.success) {
+      const errors: ClientErrors = {};
+      result.error.errors.forEach((e) => {
+        const field = e.path[0] as keyof ClientErrors;
+        if (!errors[field]) errors[field] = e.message;
+      });
+      setFormErrors(errors);
       return;
     }
+    setFormErrors({});
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...form });
     } else {
@@ -174,6 +190,7 @@ export default function Clients() {
 
   const handleEdit = (c: (typeof clientsList)[0]) => {
     setEditingId(c.id);
+    setFormErrors({});
     setForm({
       name: c.name,
       company: c.company || "",
@@ -197,6 +214,7 @@ export default function Clients() {
   const handleNew = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setFormErrors({});
     setIsDialogOpen(true);
   };
 
@@ -516,10 +534,11 @@ export default function Clients() {
                 <Label>Nome / Marca *</Label>
                 <Input
                   value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  onChange={(e) => { setForm({ ...form, name: e.target.value }); if (formErrors.name) setFormErrors({ ...formErrors, name: undefined }); }}
                   placeholder="Nome do cliente"
-                  className="bg-background border-border/30"
+                  className={`bg-background border-border/30 ${formErrors.name ? "border-destructive" : ""}`}
                 />
+                {formErrors.name && <p className="text-xs text-destructive">{formErrors.name}</p>}
               </div>
               <div className="grid gap-2">
                 <Label>Nome Fantasia</Label>
@@ -631,10 +650,11 @@ export default function Clients() {
                 <Input
                   type="email"
                   value={form.contactEmail}
-                  onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+                  onChange={(e) => { setForm({ ...form, contactEmail: e.target.value }); if (formErrors.contactEmail) setFormErrors({ ...formErrors, contactEmail: undefined }); }}
                   placeholder="email@empresa.com"
-                  className="bg-background border-border/30"
+                  className={`bg-background border-border/30 ${formErrors.contactEmail ? "border-destructive" : ""}`}
                 />
+                {formErrors.contactEmail && <p className="text-xs text-destructive">{formErrors.contactEmail}</p>}
               </div>
             </div>
             <div className="grid gap-2">

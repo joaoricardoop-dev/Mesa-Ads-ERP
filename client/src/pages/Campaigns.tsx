@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-
+import { z } from "zod";
 import { trpc } from "@/lib/trpc";
 import PageContainer from "@/components/PageContainer";
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,13 @@ interface CampaignForm {
   batchCost: number;
   isBonificada: boolean;
 }
+
+const campaignSchema = z.object({
+  name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
+  clientId: z.number({ required_error: "Selecione um cliente" }).int().positive("Selecione um cliente"),
+});
+
+type CampaignErrors = Partial<Record<keyof z.infer<typeof campaignSchema> | "batches", string>>;
 
 const emptyForm: CampaignForm = {
   clientId: null,
@@ -234,6 +241,7 @@ export default function Campaigns() {
   const [isRestaurantsDialogOpen, setIsRestaurantsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<CampaignForm>(emptyForm);
+  const [formErrors, setFormErrors] = useState<CampaignErrors>({});
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -318,9 +326,22 @@ export default function Campaigns() {
   }, [selectedBatches.length]);
 
   const handleSubmit = () => {
-    if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
-    if (!form.clientId) { toast.error("Selecione um cliente"); return; }
-    if (selectedBatchIds.length === 0) { toast.error("Selecione pelo menos um batch"); return; }
+    const result = campaignSchema.safeParse({ name: form.name, clientId: form.clientId ?? undefined });
+    const errors: CampaignErrors = {};
+    if (!result.success) {
+      result.error.errors.forEach((e) => {
+        const field = e.path[0] as keyof CampaignErrors;
+        if (!errors[field]) errors[field] = e.message;
+      });
+    }
+    if (selectedBatchIds.length === 0) {
+      errors.batches = "Selecione pelo menos um batch";
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
 
     const payload = {
       clientId: form.clientId!,
@@ -358,6 +379,7 @@ export default function Campaigns() {
 
   const handleEdit = (c: (typeof campaignsList)[0]) => {
     setEditingId(c.id);
+    setFormErrors({});
     setForm({
       clientId: c.clientId,
       name: c.name,
@@ -780,13 +802,14 @@ export default function Campaigns() {
                 <div className="grid gap-3">
                   <div className="grid gap-1.5">
                     <Label className="text-xs">Nome da Campanha *</Label>
-                    <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Campanha Verão 2026" className="bg-background border-border/30 h-9 text-sm" />
+                    <Input value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); if (formErrors.name) setFormErrors({ ...formErrors, name: undefined }); }} placeholder="Ex: Campanha Verão 2026" className={`bg-background border-border/30 h-9 text-sm ${formErrors.name ? "border-destructive" : ""}`} />
+                    {formErrors.name && <p className="text-xs text-destructive">{formErrors.name}</p>}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
                       <Label className="text-xs">Cliente *</Label>
-                      <Select value={form.clientId ? String(form.clientId) : "none"} onValueChange={(v) => setForm({ ...form, clientId: v === "none" ? null : parseInt(v) })}>
-                        <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <Select value={form.clientId ? String(form.clientId) : "none"} onValueChange={(v) => { setForm({ ...form, clientId: v === "none" ? null : parseInt(v) }); if (formErrors.clientId) setFormErrors({ ...formErrors, clientId: undefined }); }}>
+                        <SelectTrigger className={`bg-background border-border/30 h-9 text-sm ${formErrors.clientId ? "border-destructive" : ""}`}><SelectValue placeholder="Selecione" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Selecione um cliente</SelectItem>
                           {clientsList.filter((cl) => cl.status === "active").map((cl) => (
@@ -794,6 +817,7 @@ export default function Campaigns() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {formErrors.clientId && <p className="text-xs text-destructive">{formErrors.clientId}</p>}
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs">Status</Label>
@@ -830,7 +854,7 @@ export default function Campaigns() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs">Batches (Período) *</Label>
+                      <Label className={`text-xs ${formErrors.batches ? "text-destructive" : ""}`}>Batches (Período) *</Label>
                       <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setBatchYear(batchYear - 1)}>&lt;</Button>
                         <span className="text-xs font-mono font-semibold">{batchYear}</span>
@@ -872,6 +896,7 @@ export default function Campaigns() {
                         Duração: {selectedBatchIds.length} ciclo(s) de 4 semanas
                       </div>
                     )}
+                    {formErrors.batches && <p className="text-xs text-destructive">{formErrors.batches}</p>}
                   </div>
                 </div>
               </div>

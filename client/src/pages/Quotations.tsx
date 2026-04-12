@@ -1,4 +1,5 @@
 import { useState, Fragment, useCallback } from "react";
+import { z } from "zod";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
@@ -170,6 +171,14 @@ interface QuotationForm {
   editBatchIds: number[];
 }
 
+const quotationSchema = z.object({
+  clientId: z.number({ required_error: "Selecione um cliente" }).int().positive("Selecione um cliente"),
+  productId: z.number({ required_error: "Selecione um produto" }).int().positive("Selecione um produto"),
+  coasterVolume: z.number().positive("Volume deve ser maior que zero"),
+});
+
+type QuotationErrors = Partial<Record<keyof z.infer<typeof quotationSchema>, string>>;
+
 const emptyForm: QuotationForm = {
   clientId: "",
   coasterVolume: 10000,
@@ -208,6 +217,7 @@ export default function Quotations() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<QuotationForm>(emptyForm);
+  const [formErrors, setFormErrors] = useState<QuotationErrors>({});
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -328,18 +338,21 @@ export default function Quotations() {
   });
 
   const handleSubmit = () => {
-    if (!form.clientId) {
-      toast.error("Selecione um cliente");
+    const result = quotationSchema.safeParse({
+      clientId: form.clientId === "" ? undefined : Number(form.clientId),
+      productId: form.productId === "" ? undefined : Number(form.productId),
+      coasterVolume: form.coasterVolume,
+    });
+    if (!result.success) {
+      const errors: QuotationErrors = {};
+      result.error.errors.forEach((e) => {
+        const field = e.path[0] as keyof QuotationErrors;
+        if (!errors[field]) errors[field] = e.message;
+      });
+      setFormErrors(errors);
       return;
     }
-    if (form.coasterVolume < 0) {
-      toast.error("Volume inválido");
-      return;
-    }
-    if (!form.productId) {
-      toast.error("Selecione um produto");
-      return;
-    }
+    setFormErrors({});
 
     const payload = {
       clientId: form.clientId as number,
@@ -371,6 +384,7 @@ export default function Quotations() {
 
   const handleEdit = (q: (typeof quotationsList)[0]) => {
     setEditingId(q.id);
+    setFormErrors({});
     const existingPeriodStart = (q as any).periodStart || "";
     const existingCycles = q.cycles || 1;
     let preselectedBatchIds: number[] = [];
@@ -820,9 +834,9 @@ export default function Quotations() {
               <Label>Cliente *</Label>
               <Select
                 value={form.clientId ? String(form.clientId) : ""}
-                onValueChange={(v) => setForm({ ...form, clientId: Number(v) })}
+                onValueChange={(v) => { setForm({ ...form, clientId: Number(v) }); if (formErrors.clientId) setFormErrors({ ...formErrors, clientId: undefined }); }}
               >
-                <SelectTrigger className="bg-background border-border/30">
+                <SelectTrigger className={`bg-background border-border/30 ${formErrors.clientId ? "border-destructive" : ""}`}>
                   <SelectValue placeholder="Selecione um cliente" />
                 </SelectTrigger>
                 <SelectContent>
@@ -833,15 +847,16 @@ export default function Quotations() {
                   ))}
                 </SelectContent>
               </Select>
+              {formErrors.clientId && <p className="text-xs text-destructive">{formErrors.clientId}</p>}
             </div>
 
             <div className="grid gap-2">
               <Label>Produto *</Label>
               <Select
                 value={form.productId ? String(form.productId) : ""}
-                onValueChange={(v) => setForm({ ...form, productId: Number(v) })}
+                onValueChange={(v) => { setForm({ ...form, productId: Number(v) }); if (formErrors.productId) setFormErrors({ ...formErrors, productId: undefined }); }}
               >
-                <SelectTrigger className="bg-background border-border/30">
+                <SelectTrigger className={`bg-background border-border/30 ${formErrors.productId ? "border-destructive" : ""}`}>
                   <SelectValue placeholder="Selecione um produto" />
                 </SelectTrigger>
                 <SelectContent>
@@ -852,6 +867,7 @@ export default function Quotations() {
                   ))}
                 </SelectContent>
               </Select>
+              {formErrors.productId && <p className="text-xs text-destructive">{formErrors.productId}</p>}
             </div>
 
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Detalhes</p>
@@ -872,10 +888,11 @@ export default function Quotations() {
                 <Input
                   type="number"
                   value={form.coasterVolume}
-                  onChange={(e) => setForm({ ...form, coasterVolume: Number(e.target.value) })}
+                  onChange={(e) => { setForm({ ...form, coasterVolume: Number(e.target.value) }); if (formErrors.coasterVolume) setFormErrors({ ...formErrors, coasterVolume: undefined }); }}
                   min={1}
-                  className="bg-background border-border/30"
+                  className={`bg-background border-border/30 ${formErrors.coasterVolume ? "border-destructive" : ""}`}
                 />
+                {formErrors.coasterVolume && <p className="text-xs text-destructive">{formErrors.coasterVolume}</p>}
               </div>
               <div className="grid gap-2">
                 <Label>Ciclos</Label>
