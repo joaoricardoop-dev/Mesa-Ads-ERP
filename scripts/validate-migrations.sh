@@ -23,8 +23,8 @@ for sql_file in drizzle/[0-9]*.sql; do
     continue
   fi
 
-  # Extrair nomes de tabelas de CREATE TABLE (saída bruta do Drizzle, sem IF NOT EXISTS)
-  tables=$(grep -oP 'CREATE TABLE "?\K[^"\s(]+' "$sql_file" 2>/dev/null | tr -d '"' || true)
+  # Extrair nomes de tabelas de CREATE TABLE e CREATE TABLE IF NOT EXISTS
+  tables=$(grep -oP 'CREATE TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"?\K[^"\s(]+' "$sql_file" 2>/dev/null | tr -d '"' || true)
 
   for table in $tables; do
     if grep -q "\"$table\"" "$MIGRATIONS_FILE"; then
