@@ -421,6 +421,7 @@ export const quotations = pgTable("quotations", {
   customPartnerCommission: decimal("customPartnerCommission", { precision: 5, scale: 2 }),
   customSellerCommission: decimal("customSellerCommission", { precision: 5, scale: 2 }),
   agencyCommissionPercent: decimal("agencyCommissionPercent", { precision: 5, scale: 2 }),
+  source: varchar("source", { length: 50 }).default("internal"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [

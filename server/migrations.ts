@@ -78,6 +78,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_campaign_id_and_client_id_to_crm_notifications",
     sql: `ALTER TABLE "crm_notifications" ADD COLUMN IF NOT EXISTS "campaignId" integer REFERENCES "campaigns"("id") ON DELETE CASCADE; ALTER TABLE "crm_notifications" ADD COLUMN IF NOT EXISTS "clientId" integer REFERENCES "clients"("id") ON DELETE CASCADE; CREATE INDEX IF NOT EXISTS "idx_crm_notifications_campaign_id" ON "crm_notifications" ("campaignId"); CREATE INDEX IF NOT EXISTS "idx_crm_notifications_client_id" ON "crm_notifications" ("clientId");`,
   },
+  {
+    name: "add_source_to_quotations",
+    sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "source" varchar(50) DEFAULT 'internal';`,
+  },
 ];
 
 export async function runMigrations() {

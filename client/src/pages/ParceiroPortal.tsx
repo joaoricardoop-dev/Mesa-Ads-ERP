@@ -1,19 +1,28 @@
+import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format";
 import type { LucideIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DollarSign,
   Users,
   FileText,
   TrendingUp,
-  Clock,
   CheckCircle2,
   Handshake,
   Plus,
+  ShoppingCart,
+  ChevronRight,
 } from "lucide-react";
+import { CampaignBuilder } from "@/components/CampaignBuilder";
 
 const QUOTATION_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   rascunho: { label: "Rascunho", color: "bg-gray-500/10 text-gray-400 border-gray-500/30" },
@@ -75,9 +84,29 @@ export default function ParceiroPortal() {
   const { data: dashboard, isLoading: loadingDash } = trpc.parceiroPortal.getDashboard.useQuery({ adminPartnerId });
   const { data: leads = [], isLoading: loadingLeads } = trpc.parceiroPortal.getLeads.useQuery({ adminPartnerId });
   const { data: quotations = [], isLoading: loadingQuotations } = trpc.parceiroPortal.getQuotations.useQuery({ adminPartnerId });
+  const { data: myClients = [] } = trpc.parceiroPortal.getMyClients.useQuery({ adminPartnerId });
+  const { data: builderProducts = [] } = trpc.parceiroPortal.getPriceTableForBuilder.useQuery({ adminPartnerId });
+
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [clientSelectorOpen, setClientSelectorOpen] = useState(false);
 
   const recentLeads = leads.slice(0, 5);
   const recentQuotations = quotations.slice(0, 5);
+
+  const selectedClient = myClients.find((c: any) => c.id === selectedClientId);
+
+  function openBuilder() {
+    if (myClients.length === 0) return;
+    if (myClients.length === 1) {
+      setSelectedClientId(myClients[0].id);
+      setBuilderOpen(true);
+    } else {
+      setClientSelectorOpen(true);
+    }
+  }
+
+  const hasPartner = true;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -115,11 +144,18 @@ export default function ParceiroPortal() {
             </div>
           )}
         </div>
-        <Link href="/leads">
-          <Button className="gap-2 shrink-0">
-            <Plus className="w-4 h-4" /> Indicar Lead
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          {myClients.length > 0 && builderProducts.length > 0 && (
+            <Button variant="outline" className="gap-2" onClick={openBuilder}>
+              <ShoppingCart className="w-4 h-4" /> Montar Campanha para Cliente
+            </Button>
+          )}
+          <Link href="/leads">
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" /> Indicar Lead
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {loadingDash ? (
@@ -270,6 +306,61 @@ export default function ParceiroPortal() {
           </div>
         </div>
       )}
+
+      <Dialog open={clientSelectorOpen} onOpenChange={setClientSelectorOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Selecione o Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-muted-foreground mb-3">Para qual cliente deseja montar a campanha?</p>
+            {myClients.map((client: any) => (
+              <button
+                key={client.id}
+                onClick={() => {
+                  setSelectedClientId(client.id);
+                  setClientSelectorOpen(false);
+                  setBuilderOpen(true);
+                }}
+                className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-border/30 hover:border-primary/40 hover:bg-accent/30 transition-all text-left"
+              >
+                <div>
+                  <p className="font-medium text-sm">{client.company || client.name}</p>
+                  {client.company && client.name !== client.company && (
+                    <p className="text-xs text-muted-foreground">{client.name}</p>
+                  )}
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={builderOpen} onOpenChange={setBuilderOpen}>
+        <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-0 shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5 text-primary" />
+              Montar Campanha para Cliente
+              {selectedClient && (
+                <span className="font-normal text-muted-foreground text-sm">
+                  — {selectedClient.company || selectedClient.name}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedClientId && (
+            <CampaignBuilder
+              clientId={selectedClientId}
+              hasPartner={hasPartner}
+              isPartner={true}
+              products={builderProducts}
+              onClose={() => setBuilderOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

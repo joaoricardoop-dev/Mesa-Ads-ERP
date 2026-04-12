@@ -1,7 +1,7 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, invoices } from "../drizzle/schema";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices } from "../drizzle/schema";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -1000,6 +1000,203 @@ export const quotationRouter = router({
         .set({ updatedAt: new Date() })
         .where(eq(quotations.id, existing[0].quotationId));
       return { success: true };
+    }),
+
+  createFromBuilder: protectedProcedure
+    .input(z.object({
+      clientId: z.number(),
+      source: z.enum(["self_service_anunciante", "self_service_parceiro"]),
+      campaignName: z.string().min(1),
+      startDate: z.string().optional(),
+      briefing: z.string().optional(),
+      items: z.array(z.object({
+        productId: z.number(),
+        productName: z.string(),
+        volume: z.number().int().min(1),
+        weeks: z.number().int().min(1),
+      })).min(1),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDatabase();
+      const userRole = ctx.user.role || "user";
+
+      const [client] = await db.select({
+        name: clients.name,
+        company: clients.company,
+        partnerId: clients.partnerId,
+      })
+        .from(clients)
+        .where(eq(clients.id, input.clientId))
+        .limit(1);
+      if (!client) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado" });
+
+      const isPartnerFlow = userRole === "parceiro";
+
+      if (userRole === "anunciante") {
+        if (ctx.user.clientId !== input.clientId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para criar cotações para este cliente." });
+        }
+        if (input.source !== "self_service_anunciante") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Source inválida para anunciante." });
+        }
+      } else if (userRole === "parceiro") {
+        const userPartnerId = ctx.user.partnerId;
+        if (!userPartnerId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a um parceiro." });
+        }
+        if (client.partnerId !== userPartnerId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Este cliente não está vinculado ao seu parceiro." });
+        }
+        if (input.source !== "self_service_parceiro") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Source inválida para parceiro." });
+        }
+      } else if (!["admin", "comercial", "manager"].includes(userRole)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para usar o campaign builder." });
+      }
+
+      const productIds = input.items.map(i => i.productId);
+      const productRows = await db.select({
+        id: products.id,
+        name: products.name,
+        irpj: products.irpj,
+        comRestaurante: products.comRestaurante,
+        comComercial: products.comComercial,
+        pricingMode: products.pricingMode,
+        isActive: products.isActive,
+        visibleToPartners: products.visibleToPartners,
+        visibleToAdvertisers: products.visibleToAdvertisers,
+      })
+        .from(products)
+        .where(and(inArray(products.id, productIds), eq(products.isActive, true)));
+
+      const productMap = new Map(productRows.map(p => [p.id, p]));
+
+      for (const item of input.items) {
+        const prod = productMap.get(item.productId);
+        if (!prod) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Produto ${item.productId} não encontrado ou inativo.` });
+        }
+        const visibleFlag = isPartnerFlow ? prod.visibleToPartners : prod.visibleToAdvertisers;
+        if (!visibleFlag && !["admin", "comercial", "manager"].includes(userRole)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: `Produto "${prod.name}" não está disponível para este perfil.` });
+        }
+      }
+
+      const pricingTiersRows = await db.select()
+        .from(productPricingTiers)
+        .where(inArray(productPricingTiers.productId, productIds));
+
+      const discountTiersRows = await db.select()
+        .from(productDiscountPriceTiers)
+        .where(inArray(productDiscountPriceTiers.productId, productIds));
+
+      const BV_AGENCIA = 0.20;
+      const DESCONTOS_PRAZO: Record<number, number> = { 4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11 };
+      const hasPartner = !!client.partnerId || isPartnerFlow;
+
+      function computeUnitPrice(prod: { irpj: string | null; comRestaurante: string | null; comComercial: string | null; pricingMode: string | null }, tier: typeof pricingTiersRows[0], volume: number, withBv: boolean): number {
+        const irpj = parseFloat(prod.irpj ?? "6") / 100;
+        const comRestaurante = parseFloat(prod.comRestaurante ?? "15") / 100;
+        const comComercial = parseFloat(prod.comComercial ?? "10") / 100;
+        const comParceiro = withBv ? BV_AGENCIA : 0;
+        const custoUnitario = parseFloat(tier.custoUnitario);
+        const frete = parseFloat(tier.frete);
+        const margem = parseFloat(tier.margem) / 100;
+        const artes = tier.artes ?? 1;
+        const precoBase = parseFloat(tier.precoBase ?? "0");
+
+        if (prod.pricingMode === "price_based") {
+          if (precoBase <= 0) return 0;
+          const den = 1 - comParceiro - irpj;
+          const total = den > 0 ? precoBase / den : precoBase;
+          return volume > 0 ? total / volume : 0;
+        }
+        const denominadorBase = 1 - margem - irpj - comRestaurante - comComercial;
+        const custoTotal = custoUnitario * artes * volume + frete;
+        const precoCalc = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
+        const den = 1 - comParceiro - irpj;
+        const precoTotal = den > 0 ? precoCalc / den : precoCalc;
+        return volume > 0 ? precoTotal / volume : 0;
+      }
+
+      function applyDiscountTier(price: number, dTiers: typeof discountTiersRows): number {
+        if (!dTiers || dTiers.length === 0) return price;
+        const t = dTiers.find(d => price >= parseFloat(d.priceMin) && price <= parseFloat(d.priceMax));
+        if (!t) return price;
+        return price * (1 - parseFloat(t.discountPercent) / 100);
+      }
+
+      const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; unitPrice: number; totalPrice: number }> = [];
+
+      for (const item of input.items) {
+        const prod = productMap.get(item.productId)!;
+        const tiers = pricingTiersRows
+          .filter(t => t.productId === item.productId)
+          .sort((a, b) => a.volumeMin - b.volumeMin);
+
+        const tier = tiers.find(t => item.volume >= t.volumeMin && (t.volumeMax == null || item.volume <= t.volumeMax))
+          || tiers[tiers.length - 1];
+
+        if (!tier) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Sem tabela de preço configurada para o produto "${prod.name}".` });
+        }
+
+        let unitPrice = computeUnitPrice(prod, tier, item.volume, hasPartner);
+        const dTiersForProduct = discountTiersRows.filter(d => d.productId === item.productId);
+        const baseTotal = unitPrice * item.volume;
+        const discountedTotal = applyDiscountTier(baseTotal, dTiersForProduct);
+        const prazoDiscount = (DESCONTOS_PRAZO[item.weeks] ?? 0) / 100;
+        const finalTotal = discountedTotal * (1 - prazoDiscount);
+        const finalUnitPrice = item.volume > 0 ? finalTotal / item.volume : 0;
+
+        computedItems.push({ productId: item.productId, productName: prod.name, volume: item.volume, weeks: item.weeks, unitPrice: finalUnitPrice, totalPrice: finalTotal });
+      }
+
+      const entityName = client.company || client.name || "Cliente";
+      const totalVolume = computedItems.reduce((sum, i) => sum + i.volume, 0);
+      const totalValue = computedItems.reduce((sum, i) => sum + i.totalPrice, 0);
+
+      const quotationNumber = await generateQuotationNumber(db);
+      const quotationName = input.campaignName || generateQuotationName(entityName, totalVolume);
+
+      const insertValues: any = {
+        quotationNumber,
+        quotationName,
+        clientId: input.clientId,
+        partnerId: client.partnerId ?? null,
+        coasterVolume: totalVolume,
+        totalValue: totalValue.toFixed(2),
+        status: "rascunho",
+        notes: input.briefing || null,
+        periodStart: input.startDate || null,
+        source: input.source,
+        isBonificada: false,
+        hasPartnerDiscount: hasPartner,
+        createdBy: "self_service",
+      };
+
+      const [created] = await db.insert(quotations).values(insertValues).returning();
+
+      for (const item of computedItems) {
+        await db.insert(quotationItems).values({
+          quotationId: created.id,
+          productId: item.productId,
+          quantity: item.volume,
+          quantityPerLocation: item.volume,
+          unitPrice: item.unitPrice.toFixed(4),
+          totalPrice: item.totalPrice.toFixed(2),
+          notes: `${item.productName} — ${item.volume.toLocaleString("pt-BR")} un. × ${item.weeks} semanas`,
+        });
+      }
+
+      await createCrmNotification(db, {
+        eventType: "quotation_created",
+        leadId: null,
+        partnerId: client.partnerId ?? null,
+        message: `Nova cotação self-service ${quotationNumber} criada por ${entityName} (${input.source})`,
+      });
+
+      return created;
     }),
 
 });
