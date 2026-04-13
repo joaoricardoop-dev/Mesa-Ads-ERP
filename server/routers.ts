@@ -1832,7 +1832,7 @@ export const appRouter = router({
                 const paymentDueDate = new Date(new Date(input.veiculacaoEndDate).getTime() + 15 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
                 for (const rest of restaurantList) {
                   const share = totalCoasters > 0 ? (rest.coastersCount || 0) / totalCoasters : 1 / restaurantList.length;
-                  const base = netValue > 0 ? netValue : parseFloat(String(campaign.batchCost || "0"));
+                  const base = totalValue > 0 ? netValue : parseFloat(String(campaign.batchCost || "0"));
                   const amount = (base * commissionRate * share).toFixed(2);
                   await addRestaurantPayment({
                     restaurantId: rest.restaurantId,
@@ -2065,7 +2065,7 @@ export const appRouter = router({
 
                 for (const rest of restaurantList) {
                   const share = totalCoasters > 0 ? (rest.coastersCount || 0) / totalCoasters : 1 / restaurantList.length;
-                  const base = netValue > 0 ? netValue : parseFloat(String(campaign.batchCost || "0"));
+                  const base = totalValue > 0 ? netValue : parseFloat(String(campaign.batchCost || "0"));
                   const amount = (base * commissionRate * share).toFixed(2);
 
                   await addRestaurantPayment({
