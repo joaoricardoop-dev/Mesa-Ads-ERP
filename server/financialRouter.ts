@@ -549,6 +549,35 @@ export const financialRouter = router({
       return created;
     }),
 
+  updateInvoice: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      amount: z.string().optional(),
+      dueDate: z.string().optional(),
+      issueDate: z.string().optional(),
+      paymentMethod: z.string().optional(),
+      notes: z.string().optional(),
+      billingType: z.enum(["bruto", "liquido"]).optional(),
+      withheldTax: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      const { id, ...fields } = input;
+      const updateData: Record<string, unknown> = { updatedAt: new Date() };
+      if (fields.amount !== undefined) updateData.amount = fields.amount;
+      if (fields.dueDate !== undefined) updateData.dueDate = fields.dueDate;
+      if (fields.issueDate !== undefined) updateData.issueDate = fields.issueDate;
+      if (fields.paymentMethod !== undefined) updateData.paymentMethod = fields.paymentMethod;
+      if (fields.notes !== undefined) updateData.notes = fields.notes;
+      if (fields.billingType !== undefined) updateData.billingType = fields.billingType;
+      if (fields.withheldTax !== undefined) {
+        updateData.withheldTax = fields.withheldTax && parseFloat(fields.withheldTax) > 0 ? fields.withheldTax : null;
+      }
+      const [updated] = await db.update(invoices).set(updateData).where(eq(invoices.id, id)).returning();
+      return updated;
+    }),
+
   markInvoicePaid: protectedProcedure
     .input(z.object({
       id: z.number(),

@@ -376,7 +376,7 @@ export default function Invoicing() {
               </thead>
               <tbody>
                 {invoiceList.map((inv) => {
-                  const withheld = inv.withheldTax ? parseFloat(inv.withheldTax as string) : 0;
+                  const withheld = inv.withheldTax ? parseFloat(inv.withheldTax) : 0;
                   const netReceived = parseFloat(inv.amount) - withheld;
                   return (
                     <tr
@@ -409,13 +409,13 @@ export default function Invoicing() {
                           >
                             {STATUS_LABELS[inv.status] || inv.status}
                           </span>
-                          {(inv as any).billingType && (
+                          {inv.billingType && (
                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${
-                              (inv as any).billingType === "liquido"
+                              inv.billingType === "liquido"
                                 ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
                                 : "bg-sky-500/10 text-sky-400 border-sky-500/20"
                             }`}>
-                              {(inv as any).billingType === "liquido" ? "Líquido" : "Bruto"}
+                              {inv.billingType === "liquido" ? "Líquido" : "Bruto"}
                             </span>
                           )}
                         </div>
