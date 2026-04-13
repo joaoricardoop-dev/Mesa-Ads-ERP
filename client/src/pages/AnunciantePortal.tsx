@@ -1142,7 +1142,7 @@ export default function AnunciantePortal() {
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{profile.company || profile.name}</h1>
             <p className="text-sm text-muted-foreground mt-1">Olá, {user?.firstName || profile.name}</p>
             <div className="mt-3 flex items-center gap-2 flex-wrap">
-              {priceTableData && priceTableData.products.length > 0 && (
+              {priceTableData && (
                 <Button
                   onClick={() => setBuilderOpen(true)}
                   className="gap-2 bg-primary hover:bg-primary/90"

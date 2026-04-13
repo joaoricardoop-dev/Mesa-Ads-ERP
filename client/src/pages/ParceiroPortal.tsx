@@ -235,7 +235,7 @@ export default function ParceiroPortal() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-          {myClients.length > 0 && builderProducts.length > 0 && (
+          {myClients.length > 0 && (
             <Button variant="outline" className="gap-2" onClick={openBuilder}>
               <ShoppingCart className="w-4 h-4" /> Montar Campanha para Cliente
             </Button>

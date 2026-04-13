@@ -314,9 +314,16 @@ function StepProdutos({ products, cart, hasPartner, onAdd, onRemove }: {
       )}
 
       {products.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
-          <Package className="w-10 h-10 opacity-20" />
-          <p className="text-sm">Nenhum produto disponível</p>
+        <div className="flex flex-col items-center gap-4 py-16 text-center px-6">
+          <div className="w-16 h-16 rounded-full bg-muted/50 border border-border/40 flex items-center justify-center">
+            <Package className="w-8 h-8 text-muted-foreground opacity-40" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm mb-1">Nenhum produto disponível no momento</p>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Ainda não há produtos configurados para o seu perfil. Entre em contato com nossa equipe comercial para saber mais.
+            </p>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
