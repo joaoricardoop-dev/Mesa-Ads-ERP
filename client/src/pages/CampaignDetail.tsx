@@ -3113,27 +3113,11 @@ export default function CampaignDetail() {
                     </div>
 
                     <div className="space-y-1.5 text-xs">
-                      <div className="flex justify-between py-1.5 px-3 rounded bg-muted/10">
-                        <span className="font-semibold">Valor Bruto do Serviço</span>
-                        <span className="font-mono font-semibold text-blue-400">{formatCurrency(baseGross)}</span>
-                      </div>
-                      <div className="flex justify-between py-1 px-3 pl-6 text-muted-foreground">
-                        <span>(-) Imposto ({taxRate}%)</span>
-                        <span className="font-mono text-red-400">({formatCurrency(taxDed)})</span>
-                      </div>
-                      <div className="flex justify-between py-1 px-3 pl-6 text-muted-foreground">
-                        <span>(-) Restaurante ({restRate}%)</span>
-                        <span className="font-mono text-red-400">({formatCurrency(restDed)})</span>
-                      </div>
-                      <div className="flex justify-between py-1 px-3 pl-6 text-muted-foreground">
-                        <span>(-) Produção</span>
-                        <span className="font-mono text-red-400">({formatCurrency(prodCost)})</span>
-                      </div>
-                      <div className="flex justify-between py-1.5 px-3 rounded bg-blue-500/5 border-t border-border/10">
+                      <div className="flex justify-between py-1.5 px-3 rounded bg-blue-500/5">
                         <span className="font-semibold text-blue-400">Base de Cálculo</span>
                         <span className="font-mono font-semibold">{formatCurrency(commBase)}</span>
                       </div>
-                      <div className="flex justify-between py-1 px-3 pl-6 text-muted-foreground">
+                      <div className="flex justify-between py-1.5 px-3 text-muted-foreground">
                         <span>Comissão ({partnerPct}% sobre base)</span>
                         <span className="font-mono font-semibold">{formatCurrency(commValue)}</span>
                       </div>
