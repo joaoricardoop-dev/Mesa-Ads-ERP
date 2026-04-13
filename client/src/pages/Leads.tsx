@@ -1338,6 +1338,13 @@ export default function Leads() {
                           </div>
                         )}
 
+                        {lead.partnerName && (
+                          <div className="flex items-center gap-1 mt-1.5">
+                            <Handshake className="w-2.5 h-2.5 text-muted-foreground shrink-0" />
+                            <span className="text-[9px] text-muted-foreground truncate">{lead.partnerName}</span>
+                          </div>
+                        )}
+
                         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                           {(lead.assignedToFirstName || lead.createdByFirstName) && (
                             <div className="flex items-center gap-1" title={`Responsável: ${lead.assignedToFirstName || lead.createdByFirstName} ${lead.assignedToLastName || lead.createdByLastName || ""}`}>
