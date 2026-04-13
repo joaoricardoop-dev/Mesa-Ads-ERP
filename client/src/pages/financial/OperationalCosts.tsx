@@ -119,6 +119,33 @@ export default function OperationalCosts() {
         </div>
       </div>
 
+      {!isLoading && costs && costs.length > 0 && (
+        <div className="rounded-xl border border-border/30 bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Receipt className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold">Resumo Geral — {totals.campaignCount} campanhas</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase">Produção Total</p>
+              <p className="font-mono font-bold">{formatCurrency(totals.totalProduction)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase">Frete Total</p>
+              <p className="font-mono font-bold">{formatCurrency(totals.totalFreight)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase">Impostos Total</p>
+              <p className="font-mono font-bold text-orange-400">{formatCurrency(totals.totalTax)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase">Comissões Total</p>
+              <p className="font-mono font-bold text-purple-400">{formatCurrency(totals.totalRestComm + totals.totalPartnerComm)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex items-center justify-center h-40">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -133,9 +160,11 @@ export default function OperationalCosts() {
             const isExpanded = expandedId === c.campaignId;
             const isEditing = editingId === c.campaignId;
             const statusCfg = STATUS_CONFIG[c.status] || { label: c.status, color: "bg-gray-500/10 text-gray-400 border-gray-500/30" };
+            const isBonificada = c.revenue === 0;
+            const displayCosts = isBonificada ? c.productionTotal + c.freightTotal + c.restaurantCost : c.totalCosts;
 
             return (
-              <div key={c.campaignId} className="rounded-xl border border-border/30 bg-card overflow-hidden">
+              <div key={c.campaignId} className={`rounded-xl border bg-card overflow-hidden ${isBonificada ? "border-amber-500/20" : "border-border/30"}`}>
                 <div
                   className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/5 transition-colors"
                   onClick={() => setExpandedId(isExpanded ? null : c.campaignId)}
@@ -145,32 +174,45 @@ export default function OperationalCosts() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold truncate">{c.campaignName}</span>
                         <Badge variant="outline" className={`text-[9px] ${statusCfg.color}`}>{statusCfg.label}</Badge>
+                        {isBonificada && <Badge variant="outline" className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/30">Bonificada</Badge>}
                       </div>
                       <span className="text-[11px] text-muted-foreground">{c.contractDuration} meses · {c.coastersTotal.toLocaleString("pt-BR")} bolachas · {c.activeRestaurants} rest.</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    {c.revenue > 0 && (
+                    {!isBonificada && c.revenue > 0 && (
                       <div className="text-right hidden sm:block">
                         <p className="text-[10px] text-muted-foreground">Receita</p>
                         <p className="text-xs font-mono font-semibold text-emerald-400">{formatCurrency(c.revenue)}</p>
                       </div>
                     )}
                     <div className="text-right hidden sm:block">
-                      <p className="text-[10px] text-muted-foreground">Custo Total</p>
-                      <p className="text-xs font-mono font-semibold text-red-400">{formatCurrency(c.totalCosts)}</p>
+                      <p className="text-[10px] text-muted-foreground">{isBonificada ? "Custo (bonificação)" : "Custo Total"}</p>
+                      <p className="text-xs font-mono font-semibold text-red-400">{formatCurrency(displayCosts)}</p>
                     </div>
-                    <div className="text-right hidden sm:block">
-                      <p className="text-[10px] text-muted-foreground">Margem</p>
-                      <p className={`text-xs font-mono font-bold ${c.marginPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmtPct(c.marginPct)}</p>
-                    </div>
+                    {!isBonificada && (
+                      <div className="text-right hidden sm:block">
+                        <p className="text-[10px] text-muted-foreground">Margem</p>
+                        <p className={`text-xs font-mono font-bold ${c.marginPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmtPct(c.marginPct)}</p>
+                      </div>
+                    )}
                     {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                   </div>
                 </div>
 
                 {isExpanded && (
                   <div className="border-t border-border/20 p-4 space-y-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {isBonificada && (
+                      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 flex items-start gap-2">
+                        <DollarSign className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-xs font-semibold text-amber-400">Campanha Bonificada</p>
+                          <p className="text-[11px] text-muted-foreground">Esta campanha não possui receita — os custos são absorvidos como bonificação.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={`grid gap-3 ${isBonificada ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}>
                       <div className="rounded-lg border p-3">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Produção</p>
                         <p className="text-sm font-bold font-mono">{formatCurrency(c.productionTotal)}</p>
@@ -181,17 +223,21 @@ export default function OperationalCosts() {
                         <p className="text-sm font-bold font-mono">{formatCurrency(c.freightTotal)}</p>
                         <p className="text-[10px] text-muted-foreground">{formatCurrency(c.freightPerMonth)}/mês × {c.contractDuration}</p>
                       </div>
-                      <div className="rounded-lg border p-3">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Impostos ({fmtPct(c.taxRate)})</p>
-                        <p className="text-sm font-bold font-mono text-orange-400">{formatCurrency(c.taxAmount)}</p>
-                      </div>
-                      <div className="rounded-lg border p-3">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Com. Restaurante ({fmtPct(c.restRate)})</p>
-                        <p className="text-sm font-bold font-mono text-amber-400">{formatCurrency(c.restAmount)}</p>
-                      </div>
+                      {!isBonificada && (
+                        <>
+                          <div className="rounded-lg border p-3">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Impostos ({fmtPct(c.taxRate)})</p>
+                            <p className="text-sm font-bold font-mono text-orange-400">{formatCurrency(c.taxAmount)}</p>
+                          </div>
+                          <div className="rounded-lg border p-3">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Com. Restaurante ({fmtPct(c.restRate)})</p>
+                            <p className="text-sm font-bold font-mono text-amber-400">{formatCurrency(c.restAmount)}</p>
+                          </div>
+                        </>
+                      )}
                     </div>
 
-                    {(c.partnerName || c.restaurantCost > 0) && (
+                    {!isBonificada && (c.partnerName || c.restaurantCost > 0) && (
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {c.partnerName && (
                           <div className="rounded-lg border p-3">
@@ -219,7 +265,7 @@ export default function OperationalCosts() {
                         </tr>
                       </thead>
                       <tbody>
-                        {c.revenue > 0 && (
+                        {!isBonificada && c.revenue > 0 && (
                           <tr className="border-b border-border/10">
                             <td className="py-2 text-emerald-400 font-semibold">Receita Bruta</td>
                             <td className="py-2 text-right px-3 font-mono text-emerald-400">{formatCurrency(c.revenue / c.contractDuration)}</td>
@@ -227,7 +273,7 @@ export default function OperationalCosts() {
                           </tr>
                         )}
                         <tr className="border-b border-border/10">
-                          <td className="py-2 pl-3 text-red-400/80">(-) Produção Gráfica</td>
+                          <td className="py-2 pl-3 text-red-400/80">{isBonificada ? "Produção Gráfica" : "(-) Produção Gráfica"}</td>
                           <td className="py-2 text-right px-3 font-mono text-red-400/80">
                             {isEditing ? (
                               <Input type="number" step="0.01" className="w-24 ml-auto text-right h-7 text-xs" value={editProduction} onChange={(e) => setEditProduction(e.target.value)} />
@@ -236,7 +282,7 @@ export default function OperationalCosts() {
                           <td className="py-2 text-right px-3 font-mono text-red-400/80">{formatCurrency(c.productionTotal)}</td>
                         </tr>
                         <tr className="border-b border-border/10">
-                          <td className="py-2 pl-3 text-red-400/80">(-) Frete</td>
+                          <td className="py-2 pl-3 text-red-400/80">{isBonificada ? "Frete" : "(-) Frete"}</td>
                           <td className="py-2 text-right px-3 font-mono text-red-400/80">
                             {isEditing ? (
                               <Input type="number" step="0.01" className="w-24 ml-auto text-right h-7 text-xs" value={editFreight} onChange={(e) => setEditFreight(e.target.value)} />
@@ -244,21 +290,21 @@ export default function OperationalCosts() {
                           </td>
                           <td className="py-2 text-right px-3 font-mono text-red-400/80">{formatCurrency(c.freightTotal)}</td>
                         </tr>
-                        {c.taxAmount > 0 && (
+                        {!isBonificada && c.taxAmount > 0 && (
                           <tr className="border-b border-border/10">
                             <td className="py-2 pl-3 text-orange-400/80">(-) Impostos ({fmtPct(c.taxRate)})</td>
                             <td className="py-2 text-right px-3 font-mono text-orange-400/80">{formatCurrency(c.taxAmount / c.contractDuration)}</td>
                             <td className="py-2 text-right px-3 font-mono text-orange-400/80">{formatCurrency(c.taxAmount)}</td>
                           </tr>
                         )}
-                        {c.restAmount > 0 && (
+                        {!isBonificada && c.restAmount > 0 && (
                           <tr className="border-b border-border/10">
                             <td className="py-2 pl-3 text-amber-400/80">(-) Com. Restaurante ({fmtPct(c.restRate)})</td>
                             <td className="py-2 text-right px-3 font-mono text-amber-400/80">{formatCurrency(c.restAmount / c.contractDuration)}</td>
                             <td className="py-2 text-right px-3 font-mono text-amber-400/80">{formatCurrency(c.restAmount)}</td>
                           </tr>
                         )}
-                        {c.partnerCommission > 0 && (
+                        {!isBonificada && c.partnerCommission > 0 && (
                           <tr className="border-b border-border/10">
                             <td className="py-2 pl-3 text-purple-400/80">(-) Com. Parceiro ({fmtPct(c.partnerPct)})</td>
                             <td className="py-2 text-right px-3 font-mono text-purple-400/80">{formatCurrency(c.partnerCommission / c.contractDuration)}</td>
@@ -267,17 +313,17 @@ export default function OperationalCosts() {
                         )}
                         {c.restaurantCost > 0 && (
                           <tr className="border-b border-border/10">
-                            <td className="py-2 pl-3 text-cyan-400/80">(-) Remuneração Rest.</td>
+                            <td className="py-2 pl-3 text-cyan-400/80">{isBonificada ? "Remuneração Rest." : "(-) Remuneração Rest."}</td>
                             <td className="py-2 text-right px-3 font-mono text-cyan-400/80">—</td>
                             <td className="py-2 text-right px-3 font-mono text-cyan-400/80">{formatCurrency(c.restaurantCost)}</td>
                           </tr>
                         )}
-                        <tr className="border-t-2 border-border/30 bg-muted/5">
-                          <td className="py-2.5 font-bold">Total Custos</td>
-                          <td className="py-2.5 text-right px-3 font-mono font-bold text-red-400">{formatCurrency(c.totalCosts / c.contractDuration)}</td>
-                          <td className="py-2.5 text-right px-3 font-mono font-bold text-red-400">{formatCurrency(c.totalCosts)}</td>
+                        <tr className={`border-t-2 border-border/30 ${isBonificada ? "bg-amber-500/5" : "bg-muted/5"}`}>
+                          <td className={`py-2.5 font-bold ${isBonificada ? "text-amber-400" : ""}`}>{isBonificada ? "Total Bonificação" : "Total Custos"}</td>
+                          <td className={`py-2.5 text-right px-3 font-mono font-bold ${isBonificada ? "text-amber-400" : "text-red-400"}`}>{formatCurrency(displayCosts / c.contractDuration)}</td>
+                          <td className={`py-2.5 text-right px-3 font-mono font-bold ${isBonificada ? "text-amber-400" : "text-red-400"}`}>{formatCurrency(displayCosts)}</td>
                         </tr>
-                        {c.revenue > 0 && (
+                        {!isBonificada && c.revenue > 0 && (
                           <tr className={`${c.margin >= 0 ? "bg-emerald-500/5" : "bg-red-500/5"}`}>
                             <td className={`py-2.5 font-bold ${c.margin >= 0 ? "text-emerald-400" : "text-red-400"}`}>= Lucro ({fmtPct(c.marginPct)})</td>
                             <td className={`py-2.5 text-right px-3 font-mono font-bold ${c.margin >= 0 ? "text-emerald-400" : "text-red-400"}`}>{formatCurrency(c.margin / c.contractDuration)}</td>
@@ -305,30 +351,6 @@ export default function OperationalCosts() {
             );
           })}
 
-          <div className="rounded-xl border border-border/30 bg-card p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Receipt className="w-4 h-4 text-primary" />
-              <span className="text-sm font-semibold">Resumo Geral — {totals.campaignCount} campanhas</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase">Produção Total</p>
-                <p className="font-mono font-bold">{formatCurrency(totals.totalProduction)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase">Frete Total</p>
-                <p className="font-mono font-bold">{formatCurrency(totals.totalFreight)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase">Impostos Total</p>
-                <p className="font-mono font-bold text-orange-400">{formatCurrency(totals.totalTax)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase">Comissões Total</p>
-                <p className="font-mono font-bold text-purple-400">{formatCurrency(totals.totalRestComm + totals.totalPartnerComm)}</p>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </PageContainer>
