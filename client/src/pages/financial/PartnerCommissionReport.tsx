@@ -8,6 +8,7 @@ import {
   FileText, Download, Users, ChevronRight, Building2,
   AlertCircle, Printer,
 } from "lucide-react";
+import { LOGO_WHITE_BASE64 } from "@/lib/pdf-assets";
 
 function fmtPct(v: number): string {
   return `${v.toFixed(1)}%`;
@@ -33,44 +34,140 @@ export default function PartnerCommissionReport() {
   );
 
   const handlePrint = () => {
-    if (!reportRef.current) return;
+    if (!report) return;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
+    const r = report;
+    const today = new Date().toLocaleDateString("pt-BR");
+
     printWindow.document.write(`
       <html>
       <head>
-        <title>Relatório de Comissão - ${report?.partnerName || ""}</title>
+        <title>Relatório de Comissão - ${r.partnerName || ""}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1a1a1a; font-size: 13px; }
-          .header { display: flex; justify-content: space-between; margin-bottom: 36px; }
-          .header-left h1 { font-size: 22px; font-weight: 700; color: #111; }
-          .header-left p { font-size: 12px; color: #666; margin-top: 3px; }
-          .summary-box { border: 1px solid #ccc; border-radius: 6px; padding: 0; overflow: hidden; min-width: 260px; }
-          .summary-row { display: flex; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid #eee; }
-          .summary-row:last-child { border-bottom: none; background: #f0fdf4; font-weight: 700; }
-          .summary-row .label { color: #555; }
-          .summary-row .value { font-family: monospace; }
-          .neg { color: #dc2626; }
-          .pos { color: #16a34a; }
-          table { width: 100%; border-collapse: collapse; margin-top: 28px; }
-          th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #ddd; font-size: 11px; text-transform: uppercase; color: #888; letter-spacing: 0.5px; }
-          td { padding: 8px 12px; border-bottom: 1px solid #eee; }
-          .section-header { background: #f3f4f6; font-weight: 700; font-size: 11px; text-transform: uppercase; color: #555; letter-spacing: 0.5px; }
-          .highlight { background: #f0fdf4; font-weight: 700; }
-          .highlight-green { background: #dcfce7; font-weight: 700; }
-          .text-right { text-align: right; }
-          .text-center { text-align: center; }
-          .indent { padding-left: 28px; }
-          .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; }
-          .footer p { font-size: 11px; color: #888; }
-          .mono { font-family: monospace; }
-          @media print { body { padding: 20px; } }
+          body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1a1a1a; font-size: 13px; }
+
+          .top-bar { background: #111; padding: 24px 48px; display: flex; align-items: center; justify-content: space-between; }
+          .top-bar img { height: 28px; }
+          .top-bar .doc-type { color: #fff; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.6; }
+          .green-line { height: 3px; background: #22c55e; }
+
+          .content { padding: 48px; }
+
+          .info-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+          .info-left h1 { font-size: 20px; font-weight: 700; color: #111; margin-bottom: 6px; }
+          .info-left p { font-size: 12px; color: #777; line-height: 1.7; }
+          .info-right { text-align: right; }
+          .info-right .label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+          .info-right .value { font-size: 24px; font-weight: 800; color: #16a34a; font-family: 'SF Mono', monospace; }
+
+          table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+          thead th { text-align: left; padding: 10px 16px; border-bottom: 2px solid #e5e7eb; font-size: 10px; text-transform: uppercase; color: #999; letter-spacing: 1px; font-weight: 600; }
+          thead th:last-child { text-align: right; }
+          tbody td { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+          tbody td:last-child { text-align: right; font-family: 'SF Mono', monospace; font-size: 12px; }
+
+          .row-deduction td { color: #dc2626; padding-left: 32px; }
+          .row-subtotal { background: #f9fafb; }
+          .row-subtotal td { font-weight: 600; font-size: 12px; }
+          .row-base { background: #eff6ff; }
+          .row-base td { font-weight: 700; color: #2563eb; }
+          .row-commission td { color: #7c3aed; padding-left: 32px; }
+          .row-total { background: #f0fdf4; border-top: 2px solid #22c55e; }
+          .row-total td { font-weight: 800; color: #16a34a; font-size: 14px; padding: 16px; }
+
+          .footer { border-top: 1px solid #e5e7eb; padding: 24px 48px; }
+          .footer p { font-size: 11px; color: #999; line-height: 1.6; }
+          .footer strong { color: #555; }
+
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .top-bar { -webkit-print-color-adjust: exact; }
+          }
         </style>
       </head>
-      <body>${reportRef.current.innerHTML}
+      <body>
+        <div class="top-bar">
+          <img src="${LOGO_WHITE_BASE64}" alt="mesa.ads" />
+          <span class="doc-type">Relatório de Comissão</span>
+        </div>
+        <div class="green-line"></div>
+
+        <div class="content">
+          <div class="info-row">
+            <div class="info-left">
+              <h1>Repasse ao Parceiro</h1>
+              <p>
+                Parceiro: <strong style="color:#111">${r.partnerName}</strong><br/>
+                Campanha: <strong style="color:#111">${r.campaignName}</strong><br/>
+                Cliente: <strong style="color:#111">${r.clientName}</strong><br/>
+                Duração do contrato: <strong style="color:#111">${r.contractDuration} meses</strong><br/>
+                Data de emissão: <strong style="color:#111">${today}</strong>
+              </p>
+            </div>
+            <div class="info-right">
+              <div class="label">Total a Repassar</div>
+              <div class="value">${formatCurrency(r.totalToPartner)}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Descrição</th>
+                <th>Valor (R$)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight:700; color:#16a34a">Receita Bruta (${r.contractDuration}m)</td>
+                <td style="font-weight:700; color:#16a34a">${formatCurrency(r.grossValue)}</td>
+              </tr>
+              <tr class="row-deduction">
+                <td>(-) Impostos (${fmtPct(r.taxRate)} da receita)</td>
+                <td>${formatCurrency(r.taxDeduction)}</td>
+              </tr>
+              <tr class="row-subtotal">
+                <td>= Base após Impostos</td>
+                <td>${formatCurrency(r.afterTax)}</td>
+              </tr>
+              <tr class="row-deduction">
+                <td>(-) Comissão Restaurante (${fmtPct(r.restaurantRate)} da base pós-impostos)</td>
+                <td>${formatCurrency(r.restaurantDeduction)}</td>
+              </tr>
+              <tr class="row-subtotal">
+                <td>= Base após Comissões</td>
+                <td>${formatCurrency(r.afterRestaurant)}</td>
+              </tr>
+              <tr class="row-deduction">
+                <td>(-) Custo Produção (${r.contractDuration}m)</td>
+                <td>${formatCurrency(r.productionCost)}</td>
+              </tr>
+              ${r.freightCost > 0 ? `
+              <tr class="row-deduction">
+                <td>(-) Custo Frete (${r.contractDuration}m)</td>
+                <td>${formatCurrency(r.freightCost)}</td>
+              </tr>` : ""}
+              <tr class="row-base">
+                <td>= Base Comissão Parceiro</td>
+                <td>${formatCurrency(r.commissionBase)}</td>
+              </tr>
+              <tr class="row-commission">
+                <td>Comissão ${r.partnerName} (${fmtPct(r.partnerCommissionPercent)} da base)</td>
+                <td style="color:#7c3aed; font-weight:600">${formatCurrency(r.commissionValue)}</td>
+              </tr>
+              <tr class="row-total">
+                <td>TOTAL A REPASSAR AO PARCEIRO</td>
+                <td>${formatCurrency(r.totalToPartner)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <div class="footer">
           <p><strong>Observações:</strong> O pagamento deverá ser realizado em até <strong>5 (cinco) dias úteis</strong> a partir da data de emissão deste relatório.</p>
+          <p style="margin-top:8px">Documento gerado automaticamente por <strong>mesa.ads</strong> em ${today}.</p>
         </div>
       </body>
       </html>
