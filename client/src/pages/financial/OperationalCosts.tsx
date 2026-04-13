@@ -160,7 +160,7 @@ export default function OperationalCosts() {
             const isExpanded = expandedId === c.campaignId;
             const isEditing = editingId === c.campaignId;
             const statusCfg = STATUS_CONFIG[c.status] || { label: c.status, color: "bg-gray-500/10 text-gray-400 border-gray-500/30" };
-            const isBonificada = c.revenue === 0;
+            const isBonificada = c.isBonificada;
             const displayCosts = isBonificada ? c.productionTotal + c.freightTotal + c.restaurantCost : c.totalCosts;
 
             return (

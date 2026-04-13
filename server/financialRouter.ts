@@ -755,28 +755,32 @@ export const financialRouter = router({
 
         const restaurantCost = rpMap[c.id] || 0;
 
-        const revenue = soMap[c.id]
+        const isBonificada = !!(c as any).isBonificada;
+        const revenue = isBonificada ? 0 : (
+          soMap[c.id]
           || (c.quotationId ? quotMap[c.quotationId] || 0 : 0)
-          || 0;
+          || 0
+        );
 
         const taxRate = parseFloat(c.taxRate || "0");
-        const taxAmount = revenue * (taxRate / 100);
+        const taxAmount = isBonificada ? 0 : revenue * (taxRate / 100);
 
         const restRate = parseFloat(c.restaurantCommission || "0");
-        const restAmount = (revenue - taxAmount) * (restRate / 100);
+        const restAmount = isBonificada ? 0 : (revenue - taxAmount) * (restRate / 100);
 
         const pId = c.quotationId ? null : (c as any).partnerId || clientPartnerMap[c.clientId] || null;
         const resolvedPartnerId = pId;
         const partnerInfo = resolvedPartnerId ? partnerMap[resolvedPartnerId] : null;
         const partnerPct = partnerInfo?.pct || 0;
-        const commBase = (revenue - taxAmount) - restAmount - productionTotal - freightTotal;
-        const partnerCommission = commBase > 0 ? commBase * (partnerPct / 100) : 0;
+        const commBase = isBonificada ? 0 : (revenue - taxAmount) - restAmount - productionTotal - freightTotal;
+        const partnerCommission = isBonificada ? 0 : (commBase > 0 ? commBase * (partnerPct / 100) : 0);
 
-        const totalCosts = productionTotal + freightTotal + restaurantCost + taxAmount + restAmount + partnerCommission;
+        const totalCosts = productionTotal + freightTotal + restaurantCost + (isBonificada ? 0 : taxAmount + restAmount + partnerCommission);
 
         return {
           campaignId: c.id,
           campaignName: c.name,
+          isBonificada,
           status: c.status,
           startDate: c.startDate,
           contractDuration: dur,

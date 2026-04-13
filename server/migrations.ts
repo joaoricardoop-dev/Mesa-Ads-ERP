@@ -126,6 +126,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_partner_id_to_campaigns",
     sql: `ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "partnerId" integer REFERENCES "partners"("id") ON DELETE SET NULL; CREATE INDEX IF NOT EXISTS "idx_campaigns_partner_id" ON "campaigns" ("partnerId");`,
   },
+  {
+    name: "add_is_bonificada_to_campaigns",
+    sql: `ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "isBonificada" boolean DEFAULT false NOT NULL;`,
+  },
 ];
 
 export async function runMigrations() {
