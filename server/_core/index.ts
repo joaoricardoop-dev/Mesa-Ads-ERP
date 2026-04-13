@@ -11,6 +11,7 @@ import { clerkWebhookHandler } from "../clerkWebhook";
 import { setupRestaurantOnboardingRoutes } from "../restaurantOnboardingRouter";
 import { setupPublicSigningRoutes } from "../publicSigningRouter";
 import { setupPublicLogoUploadRoutes, setupAuthenticatedLogoUploadRoutes } from "../logoUploadRouter";
+import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 import { runMigrations } from "../migrations";
 import { exchangeCode } from "../melhorEnvioService";
 
@@ -49,6 +50,7 @@ async function startServer() {
   setupRestaurantOnboardingRoutes(app);
   setupPublicSigningRoutes(app);
   setupPublicLogoUploadRoutes(app);
+  registerObjectStorageRoutes(app);
 
   app.get("/api/melhor-envio/callback", async (req, res) => {
     const { code, error, error_description } = req.query as Record<string, string>;
