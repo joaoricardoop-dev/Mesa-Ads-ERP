@@ -413,7 +413,6 @@ export default function CampaignDetail() {
   const { data: proofsList = [] } = trpc.campaign.getProofs.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignBatchList = [] } = trpc.batch.getCampaignBatches.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignInvoices = [] } = trpc.financial.listInvoices.useQuery({ campaignId }, { enabled: campaignId > 0 });
-  const { data: campaignPayments = [] } = trpc.financial.listPayments.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignSoList = [] } = trpc.serviceOrder.list.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignReportsList = [], refetch: refetchReports } = trpc.campaignReport.list.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignPayables = [], refetch: refetchPayables } = trpc.financial.listAccountsPayable.useQuery({ campaignId }, { enabled: campaignId > 0 });
@@ -2514,63 +2513,29 @@ export default function CampaignDetail() {
                 </div>
               )}
 
-              {/* ── Faturas & Pagamentos ── */}
-              {(campaignInvoices.length > 0 || campaignPayments.length > 0) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {campaignInvoices.length > 0 && (
-                    <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
-                      <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                        <Receipt className="w-3 h-3" /> Faturas do Anunciante
-                      </h3>
-                      <div className="space-y-1">
-                        {campaignInvoices.map((inv: any) => {
-                          const statusColor = inv.status === "paga" ? "text-emerald-400" : inv.status === "vencida" ? "text-red-400" : "text-amber-400";
-                          const statusLabel: Record<string, string> = { emitida: "Emitida", paga: "Paga", vencida: "Vencida", cancelada: "Cancelada" };
-                          return (
-                            <div key={inv.id} className="flex items-center justify-between text-xs py-1.5 border-b border-border/10 last:border-0">
-                              <div>
-                                <span className="font-mono font-medium">{formatCurrency(Number(inv.amount))}</span>
-                                {inv.dueDate && (
-                                  <span className="text-muted-foreground ml-1.5">vence {new Date(inv.dueDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
-                                )}
-                              </div>
-                              <span className={`text-[10px] font-semibold ${statusColor}`}>{statusLabel[inv.status] || inv.status}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  {campaignPayments.length > 0 && (
-                    <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
-                      <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                        <HandCoins className="w-3 h-3" /> Pagamentos aos Locais
-                      </h3>
-                      <div className="space-y-1">
-                        {campaignPayments.slice(0, 6).map((pay: any) => {
-                          const statusColor = pay.status === "paid" ? "text-emerald-400" : pay.status === "overdue" ? "text-red-400" : "text-amber-400";
-                          const statusLabel: Record<string, string> = { pending: "Pendente", paid: "Pago", overdue: "Vencido" };
-                          return (
-                            <div key={pay.id} className="flex items-center justify-between text-xs py-1.5 border-b border-border/10 last:border-0">
-                              <div>
-                                <span className="font-medium truncate max-w-[140px] block">{pay.restaurantName || `Rest. #${pay.restaurantId}`}</span>
-                                {pay.paymentDate && (
-                                  <span className="text-muted-foreground text-[10px]">{new Date(pay.paymentDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <span className="font-mono">{formatCurrency(Number(pay.amount))}</span>
-                                <span className={`block text-[10px] font-semibold ${statusColor}`}>{statusLabel[pay.status] || pay.status}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        {campaignPayments.length > 6 && (
-                          <p className="text-[10px] text-muted-foreground text-center pt-1">+ {campaignPayments.length - 6} outros pagamentos</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
+              {/* ── Faturas ── */}
+              {campaignInvoices.length > 0 && (
+                <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <Receipt className="w-3 h-3" /> Faturas do Anunciante
+                  </h3>
+                  <div className="space-y-1">
+                    {campaignInvoices.map((inv: any) => {
+                      const statusColor = inv.status === "paga" ? "text-emerald-400" : inv.status === "vencida" ? "text-red-400" : "text-amber-400";
+                      const statusLabel: Record<string, string> = { emitida: "Emitida", paga: "Paga", vencida: "Vencida", cancelada: "Cancelada" };
+                      return (
+                        <div key={inv.id} className="flex items-center justify-between text-xs py-1.5 border-b border-border/10 last:border-0">
+                          <div>
+                            <span className="font-mono font-medium">{formatCurrency(Number(inv.amount))}</span>
+                            {inv.dueDate && (
+                              <span className="text-muted-foreground ml-1.5">vence {new Date(inv.dueDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                            )}
+                          </div>
+                          <span className={`text-[10px] font-semibold ${statusColor}`}>{statusLabel[inv.status] || inv.status}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -3211,57 +3176,6 @@ export default function CampaignDetail() {
                         ))}
                       </div>
                     )}
-                  </div>
-                );
-              })()}
-
-              {/* ── PAGAMENTOS RESTAURANTES ── */}
-              {!campaign.isBonificada && campaignPayments.length > 0 && (() => {
-                const totalPago = campaignPayments.filter(p => p.status === "paid").reduce((s, p) => s + parseFloat(p.amount), 0);
-                const totalPendente = campaignPayments.filter(p => p.status === "pending").reduce((s, p) => s + parseFloat(p.amount), 0);
-                return (
-                  <div className="bg-card border border-border/30 rounded-lg p-5 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <HandCoins className="w-4 h-4 text-muted-foreground" />
-                        <h3 className="text-sm font-semibold">Pagamentos a Locais</h3>
-                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{campaignPayments.length}</span>
-                      </div>
-                      <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/financeiro/pagamentos")}>
-                        Ver todos <ExternalLink className="w-3 h-3" />
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="text-center p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                        <p className="text-xs text-muted-foreground">Pago</p>
-                        <p className="font-mono font-semibold text-sm text-emerald-400">{formatCurrency(totalPago)}</p>
-                      </div>
-                      <div className="text-center p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
-                        <p className="text-xs text-muted-foreground">Pendente</p>
-                        <p className="font-mono font-semibold text-sm text-orange-400">{formatCurrency(totalPendente)}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      {campaignPayments.slice(0, 5).map((pay) => (
-                        <div key={pay.id} className="flex items-center justify-between p-2.5 rounded-lg border border-border/10 bg-muted/3">
-                          <div>
-                            <p className="text-sm font-medium">{pay.restaurantName}</p>
-                            <p className="text-[11px] text-muted-foreground">{pay.dueDate ? pay.dueDate.split("-").reverse().join("/") : "—"}</p>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <p className="font-mono text-sm">{formatCurrency(parseFloat(pay.amount))}</p>
-                            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${pay.status === "paid" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-orange-500/20 text-orange-400 border-orange-500/30"}`}>
-                              {pay.status === "paid" ? "Pago" : "Pendente"}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                      {campaignPayments.length > 5 && (
-                        <button className="w-full text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 pt-1" onClick={() => navigate("/financeiro/pagamentos")}>
-                          +{campaignPayments.length - 5} pagamentos <ChevronRight className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
                   </div>
                 );
               })()}
