@@ -1142,16 +1142,14 @@ export default function AnunciantePortal() {
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{profile.company || profile.name}</h1>
             <p className="text-sm text-muted-foreground mt-1">Olá, {user?.firstName || profile.name}</p>
             <div className="mt-3 flex items-center gap-2 flex-wrap">
-              {priceTableData && (
-                <Button
-                  onClick={() => setBuilderOpen(true)}
-                  className="gap-2 bg-primary hover:bg-primary/90"
-                  size="sm"
-                >
-                  <ShoppingCart className="w-3.5 h-3.5" />
-                  Montar Minha Campanha
-                </Button>
-              )}
+              <Button
+                onClick={() => setBuilderOpen(true)}
+                className="gap-2 bg-primary hover:bg-primary/90"
+                size="sm"
+              >
+                <ShoppingCart className="w-3.5 h-3.5" />
+                Montar Minha Campanha
+              </Button>
               {mediaKitData?.pdfUrl && (
                 <Button
                   variant="outline"
@@ -1313,8 +1311,8 @@ export default function AnunciantePortal() {
             {(pendingOS.length > 0 || pendingInvoices.length > 0 || pendingQuotations.length > 0) && (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <Bell className="w-4 h-4 text-amber-400" />
-                  <p className="text-sm font-semibold text-amber-300">Ações pendentes</p>
+                  <Bell className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Ações pendentes</p>
                 </div>
                 <div className="space-y-2">
                   {pendingOS.map((os) => (
@@ -1325,17 +1323,17 @@ export default function AnunciantePortal() {
                       className="w-full text-left flex items-center gap-3 p-3 rounded-lg bg-amber-500/8 hover:bg-amber-500/15 transition-colors border border-amber-500/15"
                     >
                       <div className="p-1.5 rounded-lg bg-amber-500/15 shrink-0">
-                        <FileSignature className="w-3.5 h-3.5 text-amber-400" />
+                        <FileSignature className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-amber-200 truncate">
+                        <p className="text-sm font-medium text-foreground truncate">
                           OS {os.orderNumber} aguarda sua assinatura
                         </p>
-                        <p className="text-xs text-amber-400/70 mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           Próximo passo: assinar o contrato para liberar a campanha
                         </p>
                       </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-amber-400/50 shrink-0" />
+                      <ChevronRight className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400/50 shrink-0" />
                     </button>
                   ))}
                   {pendingInvoices.slice(0, 2).map((inv: any) => (
@@ -1346,20 +1344,20 @@ export default function AnunciantePortal() {
                       className="w-full text-left flex items-center gap-3 p-3 rounded-lg bg-amber-500/8 hover:bg-amber-500/15 transition-colors border border-amber-500/15"
                     >
                       <div className="p-1.5 rounded-lg bg-amber-500/15 shrink-0">
-                        <Receipt className="w-3.5 h-3.5 text-amber-400" />
+                        <Receipt className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-amber-200 truncate">
+                        <p className="text-sm font-medium text-foreground truncate">
                           Fatura {inv.invoiceNumber} {inv.status === "vencida" ? "vencida" : "pendente"}
                           {inv.amount ? ` — ${fmt(inv.amount)}` : ""}
                         </p>
-                        <p className="text-xs text-amber-400/70 mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {inv.status === "vencida"
                             ? "Vencida em " + fmtDate(inv.dueDate) + " — regularize o pagamento"
                             : "Vence em " + fmtDate(inv.dueDate) + " — efetue o pagamento"}
                         </p>
                       </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-amber-400/50 shrink-0" />
+                      <ChevronRight className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400/50 shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -1984,7 +1982,7 @@ export default function AnunciantePortal() {
               Montar Minha Campanha
             </DialogTitle>
           </DialogHeader>
-          {profile && priceTableData && (
+          {priceTableData ? (
             <CampaignBuilder
               clientId={profile.id}
               hasPartner={priceTableData.hasPartner}
@@ -1995,6 +1993,12 @@ export default function AnunciantePortal() {
                 utils.portal.myQuotations.invalidate();
               }}
             />
+          ) : (
+            <div className="flex flex-col items-center justify-center flex-1 p-8 text-center gap-3">
+              <ShoppingCart className="w-10 h-10 text-muted-foreground/40" />
+              <p className="text-sm font-medium text-muted-foreground">Tabela de preços não configurada</p>
+              <p className="text-xs text-muted-foreground/70">Entre em contato com nossa equipe para configurar sua tabela de preços e começar a montar campanhas.</p>
+            </div>
           )}
         </DialogContent>
       </Dialog>
