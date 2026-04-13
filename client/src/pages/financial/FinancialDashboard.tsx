@@ -146,11 +146,11 @@ export default function FinancialDashboard() {
       {activeTab === "Executivo" && (
         <div className="space-y-8">
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            <div className="lg:col-span-2 rounded-2xl border border-border/20 bg-gradient-to-br from-violet-500/10 via-card to-card p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-violet-500/10 via-card to-card p-6">
               <div className="flex items-center gap-2 mb-1">
                 <Receipt className="w-4 h-4 text-violet-400" />
-                <span className="text-xs text-muted-foreground font-medium">Faturado este mês</span>
+                <span className="text-xs text-muted-foreground font-medium">Faturado</span>
               </div>
               <div className="flex items-end gap-3 mb-1">
                 <span className="text-3xl font-bold tracking-tight">{formatCurrency(invoicedThisMonth)}</span>
@@ -159,21 +159,21 @@ export default function FinancialDashboard() {
               <p className="text-xs text-muted-foreground/60">vs mês anterior: {formatCurrency(prevMonthData?.invoiced || 0)}</p>
             </div>
 
-            <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-emerald-500/10 via-card to-card p-6">
+            <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-red-500/10 via-card to-card p-6">
               <div className="flex items-center gap-2 mb-1">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs text-muted-foreground font-medium">Recebido</span>
+                <TrendingDown className="w-4 h-4 text-red-400" />
+                <span className="text-xs text-muted-foreground font-medium">Custos</span>
               </div>
-              <span className="text-2xl font-bold tracking-tight">{formatCurrency(revenue)}</span>
-              <div className="mt-1"><GrowthIndicator value={growth?.received} /></div>
+              <span className="text-3xl font-bold tracking-tight">{formatCurrency(currMonth?.directCosts || 0)}</span>
+              <p className="text-xs text-muted-foreground/60 mt-1">produção + frete + locais</p>
             </div>
 
-            <div className={`rounded-2xl border border-border/20 p-6 ${grossMarginOk ? "bg-gradient-to-br from-blue-500/10 via-card to-card" : "bg-gradient-to-br from-amber-500/10 via-card to-card"}`}>
+            <div className={`rounded-2xl border border-border/20 p-6 ${grossMarginOk ? "bg-gradient-to-br from-emerald-500/10 via-card to-card" : "bg-gradient-to-br from-amber-500/10 via-card to-card"}`}>
               <div className="flex items-center gap-2 mb-1">
-                <Percent className="w-4 h-4" style={{ color: grossMarginOk ? "rgb(96 165 250)" : "rgb(251 191 36)" }} />
-                <span className="text-xs text-muted-foreground font-medium">Margem Bruta</span>
+                <Percent className="w-4 h-4" style={{ color: grossMarginOk ? "rgb(52 211 153)" : "rgb(251 191 36)" }} />
+                <span className="text-xs text-muted-foreground font-medium">Margem</span>
               </div>
-              <span className="text-2xl font-bold tracking-tight">{fmtPct(currMonth?.grossMargin)}</span>
+              <span className="text-3xl font-bold tracking-tight">{fmtPct(currMonth?.grossMargin)}</span>
               <p className="text-xs text-muted-foreground/60 mt-1">Lucro: {formatCurrency(currMonth?.grossProfit || 0)}</p>
             </div>
           </div>
@@ -182,7 +182,7 @@ export default function FinancialDashboard() {
             {[
               { label: "A Receber", value: formatCurrency(receivables), sub: `${data?.receivablesCount || 0} faturas`, icon: Clock, accent: "amber", path: "/financeiro/faturamento" },
               { label: "Inadimplente", value: formatCurrency(overdue), sub: `${data?.overdueCount || 0} vencidas`, icon: AlertTriangle, accent: overdue > 0 ? "red" : "zinc", path: "/financeiro/faturamento" },
-              { label: "Pagar Locais", value: formatCurrency(pendingRp), sub: `${data?.pendingRestaurantCount || 0} pendentes`, icon: HandCoins, accent: pendingRp > 0 ? "orange" : "zinc", path: "/financeiro/pagamentos" },
+              { label: "Contas a Pagar", value: formatCurrency(pendingRp), sub: `${data?.pendingRestaurantCount || 0} pendentes`, icon: HandCoins, accent: pendingRp > 0 ? "orange" : "zinc", path: "/financeiro/contas-pagar" },
               { label: "Campanhas Ativas", value: String(activeCampaigns), sub: "em execução", icon: Target, accent: "blue", path: "/campanhas" },
             ].map(item => {
               const accentColors: Record<string, string> = {
