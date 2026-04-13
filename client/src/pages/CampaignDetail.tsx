@@ -2318,6 +2318,40 @@ export default function CampaignDetail() {
                 </div>
               </div>
 
+              {/* ── Ordens de Serviço ── */}
+              {campaignSoList.length > 0 && (
+                <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <FileText className="w-3 h-3" /> Ordens de Serviço
+                  </h3>
+                  <div className="divide-y divide-border/10">
+                    {(campaignSoList as any[]).map((so: any) => {
+                      const typeLabel: Record<string, string> = { anunciante: "Anunciante", producao: "Produção", distribuicao: "Distribuição" };
+                      const statusLabel: Record<string, string> = { rascunho: "Rascunho", enviada: "Enviada", assinada: "Assinada", cancelada: "Cancelada" };
+                      const statusColor: Record<string, string> = {
+                        rascunho: "bg-muted text-muted-foreground",
+                        enviada: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+                        assinada: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+                        cancelada: "bg-red-500/20 text-red-400 border-red-500/30",
+                      };
+                      return (
+                        <div key={so.id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0 gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm font-bold text-primary">{so.orderNumber}</span>
+                            <span className="text-[10px] text-muted-foreground border border-border/30 rounded px-1.5 py-0.5">
+                              {typeLabel[so.type] ?? so.type}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className={`text-[10px] ${statusColor[so.status] ?? "bg-muted text-muted-foreground"}`}>
+                            {statusLabel[so.status] ?? so.status}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* ── Produção & Rastreamento ── */}
               {(prodSo || distSo || prodTrackings.length > 0 || distTrackings.length > 0 || (campaign as any).artPdfUrl || (campaign as any).artImageUrls) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
