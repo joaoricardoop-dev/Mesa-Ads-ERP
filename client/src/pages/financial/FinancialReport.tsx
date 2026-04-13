@@ -63,13 +63,13 @@ function exportCsv(startDate: string, endDate: string, data: FinancialReportData
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  pending:   "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  paid:      "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  overdue:   "bg-red-500/20 text-red-400 border-red-500/30",
-  cancelled: "bg-muted text-muted-foreground",
+  emitida:   "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  paga:      "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  vencida:   "bg-red-500/20 text-red-400 border-red-500/30",
+  cancelada: "bg-muted text-muted-foreground",
 };
 const STATUS_LABEL: Record<string, string> = {
-  pending: "Pendente", paid: "Pago", overdue: "Vencida", cancelled: "Cancelada",
+  emitida: "Emitida", paga: "Paga", vencida: "Vencida", cancelada: "Cancelada",
 };
 
 // ─── Drill-down Modal ─────────────────────────────────────────────────────────

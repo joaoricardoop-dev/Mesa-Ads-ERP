@@ -369,9 +369,9 @@ export const financialRouter = router({
     const prevDirectCosts = prevRpCosts;
     const prevGrossProfit = prevInvoicedVal - prevDirectCosts;
 
-    const growthInvoiced = prevInvoicedVal > 0 ? (currInvoicedVal - prevInvoicedVal) / prevInvoicedVal : null;
-    const growthReceived = prevReceivedVal > 0 ? (currReceivedVal - prevReceivedVal) / prevReceivedVal : null;
-    const growthProfit = prevGrossProfit > 0 ? (currGrossProfit - prevGrossProfit) / prevGrossProfit : null;
+    const growthInvoiced = (prevInvoicedVal > 0 && currInvoicedVal > 0) ? (currInvoicedVal - prevInvoicedVal) / prevInvoicedVal : null;
+    const growthReceived = (prevReceivedVal > 0 && currReceivedVal > 0) ? (currReceivedVal - prevReceivedVal) / prevReceivedVal : null;
+    const growthProfit = (prevGrossProfit > 0 && currGrossProfit > 0) ? (currGrossProfit - prevGrossProfit) / prevGrossProfit : null;
 
     const avgTicket = paidInvoiceCount > 0 ? ytdReceivedVal / paidInvoiceCount : 0;
     const avgRevenuePerClient = activeClientsCount > 0 ? ytdReceivedVal / activeClientsCount : 0;
