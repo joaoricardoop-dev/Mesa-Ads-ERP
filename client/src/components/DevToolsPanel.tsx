@@ -21,9 +21,10 @@ interface DevToolsPanelProps {
 
 export default function DevToolsPanel({ currentRole, overrideRole, overrideClientId, onSetOverride, onSetClientId }: DevToolsPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { data: clientsList = [] } = trpc.advertiser.list.useQuery(undefined, {
+  const { data: clientsData } = trpc.advertiser.list.useQuery(undefined, {
     enabled: isOpen && overrideRole === "anunciante",
   });
+  const clientsList = Array.isArray(clientsData) ? clientsData : (clientsData as any)?.items ?? [];
 
   if (import.meta.env.PROD) return null;
 
