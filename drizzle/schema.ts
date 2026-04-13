@@ -158,6 +158,7 @@ export const campaigns = pgTable("campaigns", {
   aprovacaoEnteredAt: timestamp("aprovacaoEnteredAt"),
   producaoEnteredAt: timestamp("producaoEnteredAt"),
   distribuicaoEnteredAt: timestamp("distribuicaoEnteredAt"),
+  partnerId: integer("partnerId").references(() => partners.id, { onDelete: "set null" }),
   assignedTo: varchar("assignedTo", { length: 255 }),
   assignedToName: varchar("assignedToName", { length: 255 }),
   assignedToAvatar: varchar("assignedToAvatar", { length: 500 }),
@@ -169,6 +170,7 @@ export const campaigns = pgTable("campaigns", {
   index("idx_campaigns_quotation_id").on(t.quotationId),
   index("idx_campaigns_budget_id").on(t.budgetId),
   index("idx_campaigns_dates").on(t.startDate, t.endDate),
+  index("idx_campaigns_partner_id").on(t.partnerId),
 ]);
 
 export type Campaign = typeof campaigns.$inferSelect;

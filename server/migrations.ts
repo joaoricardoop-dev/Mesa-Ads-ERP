@@ -122,6 +122,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_billing_type_and_withheld_tax_to_invoices",
     sql: `DO $$ BEGIN CREATE TYPE billing_mode AS ENUM ('bruto', 'liquido'); EXCEPTION WHEN duplicate_object THEN NULL; END $$; ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "billingType" billing_mode NOT NULL DEFAULT 'bruto'; ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "withheldTax" numeric(12, 2);`,
   },
+  {
+    name: "add_partner_id_to_campaigns",
+    sql: `ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "partnerId" integer REFERENCES "partners"("id") ON DELETE SET NULL; CREATE INDEX IF NOT EXISTS "idx_campaigns_partner_id" ON "campaigns" ("partnerId");`,
+  },
 ];
 
 export async function runMigrations() {

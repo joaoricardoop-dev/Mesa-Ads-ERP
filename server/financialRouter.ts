@@ -965,6 +965,16 @@ export const financialRouter = router({
         }
       }
 
+      if (!partnerId && campaign.partnerId) {
+        const [partner] = await db.select().from(partners).where(eq(partners.id, campaign.partnerId)).limit(1);
+        if (partner) {
+          partnerId = partner.id;
+          partnerName = partner.name;
+          partnerCommissionPercent = parseFloat(partner.commissionPercent);
+          partnerBillingMode = partner.billingMode;
+        }
+      }
+
       if (!partnerId && client?.partnerId) {
         const [partner] = await db.select().from(partners).where(eq(partners.id, client.partnerId)).limit(1);
         if (partner) {
@@ -1070,6 +1080,19 @@ export const financialRouter = router({
         .innerJoin(partners, eq(clients.partnerId, partners.id))
         .where(inArray(clients.partnerId, partnerIds));
 
+      const directRows = await db.select({
+        campaignId: campaigns.id,
+        campaignName: campaigns.name,
+        clientName: clients.name,
+        partnerId: campaigns.partnerId,
+        partnerName: partners.name,
+        status: campaigns.status,
+      })
+        .from(campaigns)
+        .innerJoin(clients, eq(campaigns.clientId, clients.id))
+        .innerJoin(partners, eq(campaigns.partnerId, partners.id))
+        .where(inArray(campaigns.partnerId, partnerIds));
+
       const seen = new Set<number>();
       const result: { campaignId: number; campaignName: string; clientName: string; partnerId: number; partnerName: string; status: string; totalValue: number }[] = [];
 
@@ -1088,6 +1111,20 @@ export const financialRouter = router({
         }
       }
       for (const r of clientRows) {
+        if (!seen.has(r.campaignId) && r.partnerId) {
+          seen.add(r.campaignId);
+          result.push({
+            campaignId: r.campaignId,
+            campaignName: r.campaignName,
+            clientName: r.clientName,
+            partnerId: r.partnerId,
+            partnerName: r.partnerName!,
+            status: r.status,
+            totalValue: 0,
+          });
+        }
+      }
+      for (const r of directRows) {
         if (!seen.has(r.campaignId) && r.partnerId) {
           seen.add(r.campaignId);
           result.push({

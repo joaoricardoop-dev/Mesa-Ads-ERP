@@ -370,7 +370,7 @@ export async function getCampaign(id: number) {
     .where(eq(campaigns.id, id))
     .limit(1);
   if (!result[0]) return undefined;
-  return {
+  const out: Record<string, any> = {
     ...result[0].campaign,
     productName: result[0].productName,
     productTipo: result[0].productTipo,
@@ -388,6 +388,17 @@ export async function getCampaign(id: number) {
     partnerCommissionPercent: result[0].partnerCommissionPercent,
     partnerBillingMode: result[0].partnerBillingMode,
   };
+
+  if (!out.partnerName && result[0].campaign.partnerId) {
+    const [directPartner] = await db.select().from(partners).where(eq(partners.id, result[0].campaign.partnerId)).limit(1);
+    if (directPartner) {
+      out.partnerName = directPartner.name;
+      out.partnerCommissionPercent = directPartner.commissionPercent;
+      out.partnerBillingMode = directPartner.billingMode;
+    }
+  }
+
+  return out;
 }
 
 export async function createCampaign(data: Omit<InsertCampaign, "id" | "createdAt" | "updatedAt">) {

@@ -583,6 +583,8 @@ export default function CampaignDetail() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const { data: allPartners } = trpc.partner.list.useQuery({ status: "active" });
+
   const addHistoryMutation = trpc.campaign.addHistory.useMutation({
     onSuccess: () => utils.campaign.getHistory.invalidate(),
   });
@@ -2067,6 +2069,40 @@ export default function CampaignDetail() {
                         icon={<Package className="w-3 h-3" />}
                       />
                     )}
+                    {/* Parceiro vinculado */}
+                    <div className="space-y-0.5">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                        <Users className="w-3 h-3" /> Parceiro
+                      </p>
+                      {(() => {
+                        const currentPartnerName = (campaign as any).partnerName;
+                        const quotPartner = (campaign as any).quotationPartnerId;
+                        if (quotPartner && currentPartnerName) {
+                          return (
+                            <p className="text-xs font-medium flex items-center gap-1.5">
+                              {currentPartnerName}
+                              <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">via cotação</span>
+                            </p>
+                          );
+                        }
+                        return (
+                          <select
+                            className="w-full text-xs bg-background border border-border/50 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                            value={campaign.partnerId ?? ""}
+                            onChange={(e) => {
+                              const val = e.target.value ? Number(e.target.value) : null;
+                              updateMutation.mutate({ id: campaign.id, partnerId: val });
+                              toast.success(val ? "Parceiro vinculado à campanha" : "Parceiro removido da campanha");
+                            }}
+                          >
+                            <option value="">Nenhum parceiro</option>
+                            {allPartners?.map((p: any) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
 
