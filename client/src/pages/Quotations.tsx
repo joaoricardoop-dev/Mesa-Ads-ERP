@@ -115,6 +115,7 @@ function OSActionButton({ quotationId, quotationNumber, clientName, clientCompan
             generateOSPdf({
               orderNumber: os.orderNumber,
               quotationNumber,
+              type: os.type,
               clientName,
               clientCompany,
               coasterVolume,
@@ -1436,6 +1437,7 @@ export default function Quotations() {
                 generateOSPdf({
                   orderNumber: `OS-${signOsDialogId}`,
                   quotationNumber: q?.quotationNumber || "",
+                  type: "anunciante",
                   clientName: q?.clientName || "Anunciante",
                   clientCompany: q?.clientCompany || undefined,
                   coasterVolume: q?.coasterVolume || 0,

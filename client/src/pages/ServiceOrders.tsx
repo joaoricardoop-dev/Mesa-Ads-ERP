@@ -456,6 +456,15 @@ export default function ServiceOrders() {
           <DialogHeader>
             <DialogTitle>{editingId ? "Editar OS" : "Nova Ordem de Serviço"}</DialogTitle>
           </DialogHeader>
+          {editingId && (() => {
+            const editingOrder = ordersList.find(o => o.id === editingId);
+            return editingOrder?.orderNumber ? (
+              <div className="flex items-center gap-2 px-1 -mt-1 mb-1">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Número OS</span>
+                <span className="font-mono text-base font-bold text-primary">{editingOrder.orderNumber}</span>
+              </div>
+            ) : null;
+          })()}
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">

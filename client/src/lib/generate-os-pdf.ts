@@ -1,9 +1,16 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+const TYPE_SUBTITLE: Record<string, string> = {
+  anunciante:  "ORDEM DE SERVIÇO — ANUNCIANTE",
+  producao:    "ORDEM DE SERVIÇO — PRODUÇÃO",
+  distribuicao:"ORDEM DE SERVIÇO — DISTRIBUIÇÃO",
+};
+
 interface OSPDFData {
   orderNumber: string;
   quotationNumber: string;
+  type?: string;
   clientName: string;
   clientCompany?: string;
   coasterVolume: number;
@@ -22,6 +29,8 @@ export function generateOSPdf(data: OSPDFData) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
+  const subtitle = (data.type && TYPE_SUBTITLE[data.type]) || TYPE_SUBTITLE.anunciante;
+
   doc.setFillColor(13, 13, 13);
   doc.rect(0, 0, pageWidth, 40, "F");
 
@@ -33,7 +42,7 @@ export function generateOSPdf(data: OSPDFData) {
   doc.text("Ads", 44, 22);
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(10);
-  doc.text("ORDEM DE SERVIÇO — ANUNCIANTE", 20, 32);
+  doc.text(subtitle, 20, 32);
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(12);

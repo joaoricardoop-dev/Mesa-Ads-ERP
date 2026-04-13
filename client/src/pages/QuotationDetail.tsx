@@ -744,6 +744,7 @@ export default function QuotationDetail() {
                           generateOSPdf({
                             orderNumber: os.orderNumber,
                             quotationNumber: quotation.quotationNumber,
+                            type: os.type,
                             clientName: quotation.clientName || "Anunciante",
                             clientCompany: quotation.clientCompany || undefined,
                             coasterVolume: quotation.coasterVolume,
