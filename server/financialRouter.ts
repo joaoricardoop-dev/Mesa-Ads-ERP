@@ -10,6 +10,7 @@ import {
   activeRestaurants,
   quotations,
   partners,
+  serviceOrders,
 } from "../drizzle/schema";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -947,12 +948,19 @@ export const financialRouter = router({
       let partnerCommissionPercent = 0;
       let partnerBillingMode = "bruto";
 
+      let quotCoasterVolume: number | null = null;
+
       if (campaign.quotationId) {
         const [quot] = await db.select({
           partnerId: quotations.partnerId,
           agencyCommissionPercent: quotations.agencyCommissionPercent,
           totalValue: quotations.totalValue,
+          coasterVolume: quotations.coasterVolume,
         }).from(quotations).where(eq(quotations.id, campaign.quotationId)).limit(1);
+
+        if (quot?.coasterVolume) {
+          quotCoasterVolume = parseInt(String(quot.coasterVolume));
+        }
 
         if (quot?.partnerId) {
           partnerId = quot.partnerId;
@@ -985,16 +993,54 @@ export const financialRouter = router({
         }
       }
 
-      const invoiceRows = await db.select().from(invoices)
-        .where(and(eq(invoices.campaignId, campaign.id), eq(invoices.status, "paga")));
-      const grossValue = invoiceRows.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
+      const [osAnunciante] = await db.select({ totalValue: serviceOrders.totalValue })
+        .from(serviceOrders)
+        .where(and(
+          eq(serviceOrders.campaignId, campaign.id),
+          eq(serviceOrders.type, "anunciante"),
+          eq(serviceOrders.status, "assinada"),
+        ))
+        .limit(1);
+      const osValue = osAnunciante?.totalValue ? parseFloat(osAnunciante.totalValue) : 0;
 
-      const emittedRows = await db.select().from(invoices)
-        .where(and(eq(invoices.campaignId, campaign.id), eq(invoices.status, "emitida")));
-      const emittedValue = emittedRows.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
+      let quotTotalValue = 0;
+      if (campaign.quotationId) {
+        const [q] = await db.select({ totalValue: quotations.totalValue })
+          .from(quotations).where(eq(quotations.id, campaign.quotationId)).limit(1);
+        if (q?.totalValue) quotTotalValue = parseFloat(q.totalValue);
+      }
 
-      const totalInvoiced = grossValue + emittedValue;
-      const baseGross = totalInvoiced > 0 ? totalInvoiced : parseFloat(String(campaign.batchCost || "0")) * campaign.contractDuration;
+      const contractRevenueTruth = osValue > 0 ? osValue : (quotTotalValue > 0 ? quotTotalValue : 0);
+
+      let baseGross: number;
+      if (contractRevenueTruth > 0) {
+        baseGross = contractRevenueTruth;
+      } else {
+        const n = campaign.activeRestaurants || 1;
+        let coastersPerRest = campaign.coastersPerRestaurant;
+        if (quotCoasterVolume && quotCoasterVolume > 0 && n > 0) {
+          coastersPerRest = Math.round(quotCoasterVolume / n);
+        }
+        const unitCost = parseFloat(String(campaign.batchCost || "0")) / campaign.batchSize;
+        const productionCostPerRest = coastersPerRest * unitCost;
+        const freightPerRest = n > 0 ? parseFloat(String((campaign as any).freightCost || "0")) / n : 0;
+        const restCommFixed = campaign.commissionType === "fixed" ? Number(campaign.fixedCommission || 0) * coastersPerRest : 0;
+        const custoPD = productionCostPerRest + restCommFixed + freightPerRest;
+        const restVarRate = campaign.commissionType === "variable" ? parseFloat(String(campaign.restaurantCommission || "0")) / 100 : 0;
+        const sellerRate = parseFloat(String(campaign.sellerCommission || "0")) / 100;
+        const taxRateCalc = parseFloat(String(campaign.taxRate || "0")) / 100;
+        const totalVarRate = sellerRate + taxRateCalc + restVarRate;
+        const denominator = 1 - totalVarRate;
+        const custoBruto = denominator > 0 ? custoPD / denominator : custoPD;
+        let sellingPricePerRest: number;
+        if (campaign.pricingType === "fixed") {
+          sellingPricePerRest = custoBruto + Number(campaign.fixedPrice || 0);
+        } else {
+          sellingPricePerRest = custoBruto * (1 + parseFloat(String(campaign.markupPercent || "0")) / 100);
+        }
+        const monthlyRevenue = sellingPricePerRest * n;
+        baseGross = monthlyRevenue * campaign.contractDuration;
+      }
 
       const taxRate = parseFloat(String(campaign.taxRate || "0"));
       const taxDeduction = baseGross * (taxRate / 100);
