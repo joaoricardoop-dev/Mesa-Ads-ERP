@@ -501,6 +501,8 @@ export const financialRouter = router({
       installmentNumber: z.number().int().optional(),
       installmentTotal: z.number().int().optional(),
       notes: z.string().optional(),
+      billingType: z.enum(["bruto", "liquido"]).optional(),
+      withheldTax: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
@@ -536,6 +538,8 @@ export const financialRouter = router({
         clientId: campaign[0].clientId,
         invoiceNumber,
         amount: input.amount,
+        billingType: input.billingType ?? "bruto",
+        withheldTax: input.withheldTax && parseFloat(input.withheldTax) > 0 ? input.withheldTax : undefined,
         issueDate,
         dueDate: input.dueDate,
         paymentMethod: input.paymentMethod,

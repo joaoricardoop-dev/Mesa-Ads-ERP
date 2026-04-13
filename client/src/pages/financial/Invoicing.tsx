@@ -58,6 +58,8 @@ export default function Invoicing() {
   const [newPaymentMethod, setNewPaymentMethod] = useState("");
   const [newInstallmentNumber, setNewInstallmentNumber] = useState("");
   const [newNotes, setNewNotes] = useState("");
+  const [newBillingType, setNewBillingType] = useState<"bruto" | "liquido">("bruto");
+  const [newWithheldTax, setNewWithheldTax] = useState("");
 
   const utils = trpc.useUtils();
   const { data: invoiceList, isLoading } = trpc.financial.listInvoices.useQuery(
@@ -73,6 +75,8 @@ export default function Invoicing() {
     setNewPaymentMethod("");
     setNewInstallmentNumber("");
     setNewNotes("");
+    setNewBillingType("bruto");
+    setNewWithheldTax("");
   }
 
   const createMutation = trpc.financial.createInvoice.useMutation({
@@ -119,6 +123,8 @@ export default function Invoicing() {
       installmentNumber: newInstallmentNumber ? parseInt(newInstallmentNumber) : undefined,
       installmentTotal: selectedCamp?.cycles && selectedCamp.cycles > 1 ? selectedCamp.cycles : undefined,
       notes: newNotes || undefined,
+      billingType: newBillingType,
+      withheldTax: newWithheldTax || undefined,
     });
   };
 
@@ -186,6 +192,40 @@ export default function Invoicing() {
 
               <Separator />
 
+              {/* Tipo de Faturamento */}
+              <div>
+                <Label>Tipo de Faturamento</Label>
+                <div className="flex gap-2 mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setNewBillingType("bruto")}
+                    className={`flex-1 py-2 rounded-md border text-sm font-medium transition-colors ${
+                      newBillingType === "bruto"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border/50 text-muted-foreground hover:border-border"
+                    }`}
+                  >
+                    Bruto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewBillingType("liquido")}
+                    className={`flex-1 py-2 rounded-md border text-sm font-medium transition-colors ${
+                      newBillingType === "liquido"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border/50 text-muted-foreground hover:border-border"
+                    }`}
+                  >
+                    Líquido
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {newBillingType === "bruto"
+                    ? "Bruto: cliente paga o valor total; impostos são responsabilidade da empresa."
+                    : "Líquido: cliente retém impostos na fonte e paga o valor líquido."}
+                </p>
+              </div>
+
               {/* Datas lado a lado */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -234,6 +274,23 @@ export default function Invoicing() {
                     onChange={(e) => setNewInstallmentNumber(e.target.value)}
                   />
                 </div>
+              </div>
+
+              {/* Retenção na fonte */}
+              <div>
+                <Label>Retenção na fonte (R$) <span className="text-muted-foreground text-xs font-normal">— opcional</span></Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0,00"
+                  value={newWithheldTax}
+                  onChange={(e) => setNewWithheldTax(e.target.value)}
+                />
+                {newWithheldTax && parseFloat(newWithheldTax) > 0 && newAmount && parseFloat(newAmount) > 0 && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Valor líquido recebido: {formatCurrency(parseFloat(newAmount) - parseFloat(newWithheldTax))}
+                  </p>
+                )}
               </div>
 
               {/* Forma de pagamento */}
@@ -318,65 +375,87 @@ export default function Invoicing() {
                 </tr>
               </thead>
               <tbody>
-                {invoiceList.map((inv) => (
-                  <tr
-                    key={inv.id}
-                    className={`border-b border-border/10 hover:bg-muted/5 transition-colors ${
-                      inv.status === "vencida" ? "bg-red-500/5" : ""
-                    }`}
-                  >
-                    <td className="px-4 py-3 font-mono text-xs">{inv.invoiceNumber}</td>
-                    <td className="px-4 py-3">{inv.clientName}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{inv.campaignName}</td>
-                    <td className="px-4 py-3 text-right font-medium">
-                      {formatCurrency(parseFloat(inv.amount))}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatDate(inv.issueDate)}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatDate(inv.dueDate)}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
-                          STATUS_STYLES[inv.status] || ""
-                        }`}
-                      >
-                        {STATUS_LABELS[inv.status] || inv.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {inv.status === "emitida" && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-emerald-500"
-                              onClick={() => {
-                                setPayDialogId(inv.id);
-                                setPayDate(new Date().toISOString().split("T")[0]);
-                              }}
-                              title="Marcar como paga"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive"
-                              onClick={() => {
-                                if (confirm("Cancelar esta fatura?")) {
-                                  cancelMutation.mutate({ id: inv.id });
-                                }
-                              }}
-                              title="Cancelar fatura"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {invoiceList.map((inv) => {
+                  const withheld = inv.withheldTax ? parseFloat(inv.withheldTax as string) : 0;
+                  const netReceived = parseFloat(inv.amount) - withheld;
+                  return (
+                    <tr
+                      key={inv.id}
+                      className={`border-b border-border/10 hover:bg-muted/5 transition-colors ${
+                        inv.status === "vencida" ? "bg-red-500/5" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3 font-mono text-xs">{inv.invoiceNumber}</td>
+                      <td className="px-4 py-3">{inv.clientName}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{inv.campaignName}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div>
+                          <span className="font-medium">{formatCurrency(parseFloat(inv.amount))}</span>
+                          {withheld > 0 && (
+                            <p className="text-[11px] text-muted-foreground">
+                              líq. {formatCurrency(netReceived)}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{formatDate(inv.issueDate)}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{formatDate(inv.dueDate)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                              STATUS_STYLES[inv.status] || ""
+                            }`}
+                          >
+                            {STATUS_LABELS[inv.status] || inv.status}
+                          </span>
+                          {(inv as any).billingType && (
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                              (inv as any).billingType === "liquido"
+                                ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                                : "bg-sky-500/10 text-sky-400 border-sky-500/20"
+                            }`}>
+                              {(inv as any).billingType === "liquido" ? "Líquido" : "Bruto"}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {inv.status === "emitida" && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-emerald-500"
+                                onClick={() => {
+                                  setPayDialogId(inv.id);
+                                  setPayDate(new Date().toISOString().split("T")[0]);
+                                }}
+                                title="Marcar como paga"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive"
+                                onClick={() => {
+                                  if (confirm("Cancelar esta fatura?")) {
+                                    cancelMutation.mutate({ id: inv.id });
+                                  }
+                                }}
+                                title="Cancelar fatura"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

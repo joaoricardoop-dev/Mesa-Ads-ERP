@@ -1824,15 +1824,16 @@ export const appRouter = router({
                   const qRows = await db.select({ totalValue: quotations.totalValue }).from(quotations).where(eq(quotations.id, campaign.quotationId)).limit(1);
                   totalValue = parseFloat(qRows[0]?.totalValue || "0");
                 }
+                const taxRateDecimal = parseFloat(String(campaign.taxRate || "0")) / 100;
+                const netValue = totalValue * (1 - taxRateDecimal);
                 const commissionRate = parseFloat(String(campaign.restaurantCommission || "20")) / 100;
                 const totalCoasters = restaurantList.reduce((sum: number, r: any) => sum + (r.coastersCount || 0), 0);
                 const referenceMonth = input.veiculacaoStartDate.slice(0, 7);
                 const paymentDueDate = new Date(new Date(input.veiculacaoEndDate).getTime() + 15 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
                 for (const rest of restaurantList) {
                   const share = totalCoasters > 0 ? (rest.coastersCount || 0) / totalCoasters : 1 / restaurantList.length;
-                  const amount = totalValue > 0
-                    ? (totalValue * commissionRate * share).toFixed(2)
-                    : (parseFloat(String(campaign.batchCost || "0")) * commissionRate * share).toFixed(2);
+                  const base = netValue > 0 ? netValue : parseFloat(String(campaign.batchCost || "0"));
+                  const amount = (base * commissionRate * share).toFixed(2);
                   await addRestaurantPayment({
                     restaurantId: rest.restaurantId,
                     campaignId: campaign.id,
@@ -2055,6 +2056,8 @@ export const appRouter = router({
                   totalValue = parseFloat(qRows[0]?.totalValue || "0");
                 }
 
+                const taxRateDecimal = parseFloat(String(campaign.taxRate || "0")) / 100;
+                const netValue = totalValue * (1 - taxRateDecimal);
                 const commissionRate = parseFloat(String(campaign.restaurantCommission || "20")) / 100;
                 const totalCoasters = restaurantList.reduce((sum: number, r: any) => sum + (r.coastersCount || 0), 0);
                 const referenceMonth = input.veiculacaoStartDate.slice(0, 7);
@@ -2062,9 +2065,8 @@ export const appRouter = router({
 
                 for (const rest of restaurantList) {
                   const share = totalCoasters > 0 ? (rest.coastersCount || 0) / totalCoasters : 1 / restaurantList.length;
-                  const amount = totalValue > 0
-                    ? (totalValue * commissionRate * share).toFixed(2)
-                    : (parseFloat(String(campaign.batchCost || "0")) * commissionRate * share).toFixed(2);
+                  const base = netValue > 0 ? netValue : parseFloat(String(campaign.batchCost || "0"));
+                  const amount = (base * commissionRate * share).toFixed(2);
 
                   await addRestaurantPayment({
                     restaurantId: rest.restaurantId,

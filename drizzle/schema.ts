@@ -20,6 +20,7 @@ export const statusEnum = pgEnum("status", ["active", "inactive"]);
 export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa", "briefing", "design", "aprovacao", "distribuicao"]);
 export const budgetStatusEnum = pgEnum("budget_status", ["active", "expired", "rejected"]);
 export const invoiceStatusEnum = pgEnum("invoice_status", ["emitida", "paga", "vencida", "cancelada"]);
+export const billingModeEnum = pgEnum("billing_mode", ["bruto", "liquido"]);
 export const quotationStatusEnum = pgEnum("quotation_status", ["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]);
 export const leadTypeEnum = pgEnum("lead_type", ["anunciante", "restaurante"]);
 export const serviceOrderTypeEnum = pgEnum("service_order_type", ["anunciante", "producao", "distribuicao"]);
@@ -351,6 +352,8 @@ export const invoices = pgTable("invoices", {
   clientId: integer("clientId").notNull().references(() => clients.id, { onDelete: "cascade" }),
   invoiceNumber: varchar("invoiceNumber", { length: 20 }).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  billingType: billingModeEnum("billingType").default("bruto").notNull(),
+  withheldTax: decimal("withheldTax", { precision: 12, scale: 2 }),
   issueDate: date("issueDate").notNull(),
   dueDate: date("dueDate").notNull(),
   paymentDate: date("paymentDate"),
@@ -442,7 +445,6 @@ export type InsertQuotation = typeof quotations.$inferInsert;
 // ─── Partners (parceiros comerciais/agências) ────────────────────────────────
 
 export const partnerTypeEnum = pgEnum("partner_type", ["agencia", "indicador", "consultor"]);
-export const billingModeEnum = pgEnum("billing_mode", ["bruto", "liquido"]);
 
 export const partners = pgTable("partners", {
   id: serial("id").primaryKey(),
