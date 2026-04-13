@@ -1084,9 +1084,22 @@ export const financialRouter = router({
         commissionBase,
         commissionValue,
         totalToPartner: commissionValue,
-        invoicesPaid: invoiceRows.length,
-        invoicesEmitted: emittedRows.length,
         contractDuration: campaign.contractDuration,
+        startDate: campaign.startDate,
+        monthlyInstallments: (() => {
+          const months: { month: string; revenue: number; commission: number }[] = [];
+          const dur = campaign.contractDuration;
+          const monthlyRevenue = baseGross / dur;
+          const monthlyComm = commissionValue / dur;
+          const start = new Date(campaign.startDate + "T00:00:00");
+          for (let i = 0; i < dur; i++) {
+            const d = new Date(start);
+            d.setMonth(d.getMonth() + i);
+            const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+            months.push({ month: label, revenue: monthlyRevenue, commission: monthlyComm });
+          }
+          return months;
+        })(),
       };
     }),
 

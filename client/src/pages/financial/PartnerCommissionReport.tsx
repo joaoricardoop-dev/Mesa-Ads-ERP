@@ -325,6 +325,39 @@ export default function PartnerCommissionReport() {
               </table>
             </div>
 
+            {report.monthlyInstallments && report.monthlyInstallments.length > 1 && (
+              <div className="rounded-2xl border border-border/20 bg-card p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <FileText className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold">Cronograma de Pagamento</span>
+                  <span className="text-[10px] text-muted-foreground ml-1">({report.monthlyInstallments.length} parcelas)</span>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border/30">
+                      <th className="text-left py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Mês</th>
+                      <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-3">Receita</th>
+                      <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-3">Comissão ({fmtPct(report.partnerCommissionPercent)})</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.monthlyInstallments.map((inst: { month: string; revenue: number; commission: number }, idx: number) => (
+                      <tr key={idx} className="border-b border-border/10">
+                        <td className="py-2 capitalize">{inst.month}</td>
+                        <td className="py-2 text-right px-3 font-mono text-muted-foreground">{formatCurrency(inst.revenue)}</td>
+                        <td className="py-2 text-right px-3 font-mono font-semibold text-purple-400">{formatCurrency(inst.commission)}</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 border-emerald-500/30 bg-emerald-500/5">
+                      <td className="py-2.5 font-bold text-emerald-400">Total</td>
+                      <td className="py-2.5 text-right px-3 font-mono font-bold text-emerald-400">{formatCurrency(report.grossValue)}</td>
+                      <td className="py-2.5 text-right px-3 font-mono font-bold text-emerald-400">{formatCurrency(report.totalToPartner)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 p-4">
               <p className="text-[11px] text-muted-foreground/70">
                 <strong className="text-amber-400">Observações:</strong> O pagamento deverá ser realizado em até <strong>5 (cinco) dias úteis</strong> a partir da data de emissão deste relatório.
