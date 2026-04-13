@@ -111,6 +111,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     sql: `ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "defaultPessoasPorMesa" numeric(4, 2) DEFAULT 3.00 NOT NULL; ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "loopDurationSeconds" integer DEFAULT 30 NOT NULL; ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "frequenciaAparicoes" numeric(4, 2) DEFAULT 1.00 NOT NULL;`,
   },
   {
+    name: "add_camelcase_impression_columns_to_products",
+    sql: `ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "impressionFormulaType" varchar(50) DEFAULT 'por_coaster' NOT NULL; UPDATE "products" SET "impressionFormulaType" = "impression_formula_type"::text WHERE "impression_formula_type" IS NOT NULL; ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "attentionFactor" numeric(4, 2) DEFAULT 1.00 NOT NULL; UPDATE "products" SET "attentionFactor" = "attention_factor" WHERE "attention_factor" IS NOT NULL; ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "frequencyParam" numeric(8, 2) DEFAULT 1.00; UPDATE "products" SET "frequencyParam" = "frequency_param" WHERE "frequency_param" IS NOT NULL; ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "distributionType" distribution_type DEFAULT 'rede'; UPDATE "products" SET "distributionType" = "distribution_type" WHERE "distribution_type" IS NOT NULL;`,
+  },
+  {
     name: "add_assigned_to_campaigns",
     sql: `ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "assignedTo" varchar(255); ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "assignedToName" varchar(255); ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "assignedToAvatar" varchar(500);`,
   },
