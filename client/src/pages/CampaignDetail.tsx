@@ -416,6 +416,13 @@ export default function CampaignDetail() {
   const { data: campaignPayments = [] } = trpc.financial.listPayments.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignSoList = [] } = trpc.serviceOrder.list.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignReportsList = [], refetch: refetchReports } = trpc.campaignReport.list.useQuery({ campaignId }, { enabled: campaignId > 0 });
+  const { data: campaignPayables = [], refetch: refetchPayables } = trpc.financial.listAccountsPayable.useQuery({ campaignId }, { enabled: campaignId > 0 });
+  const generatePayablesMutation = trpc.financial.generateCampaignPayables.useMutation({
+    onSuccess: (data) => { refetchPayables(); toast.success(`${data.generated} lançamentos gerados`); },
+  });
+  const markPayablePaidMutation = trpc.financial.markAccountPayablePaid.useMutation({
+    onSuccess: () => { refetchPayables(); toast.success("Pagamento registrado"); },
+  });
 
   const distSo = campaignSoList.find((s: any) => s.type === "distribuicao");
   const prodSo = campaignSoList.find((s: any) => s.type === "producao");
@@ -2881,6 +2888,91 @@ export default function CampaignDetail() {
                   </div>
                 )}
               </div>
+
+              {/* ── CONTAS A PAGAR ── */}
+              {(() => {
+                const apList = campaignPayables;
+                const pendingCount = apList.filter((a: any) => a.status === "pendente").length;
+                const totalPending = apList.filter((a: any) => a.status === "pendente").reduce((s: number, a: any) => s + Number(a.amount), 0);
+
+                return (
+                  <div className="bg-card border border-border/30 rounded-lg p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contas a Pagar</h3>
+                        {pendingCount > 0 && (
+                          <Badge variant="outline" className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/30">{pendingCount} pendente{pendingCount > 1 ? "s" : ""}</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {apList.length === 0 && (
+                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={generatePayablesMutation.isPending}
+                            onClick={() => generatePayablesMutation.mutate({ campaignId })}>
+                            {generatePayablesMutation.isPending ? "Gerando..." : "Gerar Lançamentos"}
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => navigate("/financeiro/contas-pagar")}>
+                          Ver Todos
+                        </Button>
+                      </div>
+                    </div>
+                    {apList.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-border/30">
+                              <th className="text-left py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Tipo</th>
+                              <th className="text-left py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Descrição</th>
+                              <th className="text-left py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Fornecedor</th>
+                              <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Valor</th>
+                              <th className="text-center py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Vencimento</th>
+                              <th className="text-center py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Status</th>
+                              <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {apList.map((ap: any) => {
+                              const typeLabels: Record<string, string> = { producao: "Produção", frete: "Frete", comissao: "Comissão", outro: "Outro" };
+                              const typeColors: Record<string, string> = { producao: "text-emerald-400", frete: "text-blue-400", comissao: "text-purple-400", outro: "text-gray-400" };
+                              return (
+                                <tr key={ap.id} className="border-b border-border/10">
+                                  <td className={`py-2 font-medium ${typeColors[ap.type] || "text-gray-400"}`}>{typeLabels[ap.type] || ap.type}</td>
+                                  <td className="py-2 text-muted-foreground">{ap.description}</td>
+                                  <td className="py-2 text-muted-foreground">{ap.supplierName || "—"}</td>
+                                  <td className="py-2 text-right font-mono">{formatCurrency(Number(ap.amount))}</td>
+                                  <td className="py-2 text-center text-muted-foreground">{ap.dueDate ? new Date(ap.dueDate + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</td>
+                                  <td className="py-2 text-center">
+                                    <Badge variant="outline" className={`text-[9px] ${ap.status === "pago" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-amber-500/10 text-amber-400 border-amber-500/30"}`}>
+                                      {ap.status === "pago" ? "Pago" : "Pendente"}
+                                    </Badge>
+                                  </td>
+                                  <td className="py-2 text-right">
+                                    {ap.status === "pendente" && (
+                                      <Button size="sm" variant="ghost" className="h-6 text-[10px] text-emerald-400"
+                                        onClick={() => markPayablePaidMutation.mutate({ id: ap.id, paymentDate: new Date().toISOString().split("T")[0] })}>
+                                        Pagar
+                                      </Button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t border-border/30">
+                              <td colSpan={2} className="py-2 font-semibold text-muted-foreground">Total Pendente</td>
+                              <td className="py-2 text-right font-mono font-bold text-amber-400">{formatCurrency(totalPending)}</td>
+                              <td colSpan={3}></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center py-4">Nenhum lançamento. Clique em "Gerar Lançamentos" para criar automaticamente.</p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* ── DRE SIMPLIFICADA ── */}
               {(() => {

@@ -1082,4 +1082,31 @@ export const mediaKitSettings = pgTable("media_kit_settings", {
 
 export type MediaKitSettings = typeof mediaKitSettings.$inferSelect;
 
+// ─── Accounts Payable (Contas a Pagar) ──────────────────────────────────────
+
+export const accountsPayable = pgTable("accounts_payable", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  invoiceId: integer("invoiceId").references(() => invoices.id, { onDelete: "set null" }),
+  supplierId: integer("supplierId").references(() => suppliers.id, { onDelete: "set null" }),
+  type: varchar("type", { length: 30 }).notNull(),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  dueDate: date("dueDate"),
+  paymentDate: date("paymentDate"),
+  status: varchar("status", { length: 20 }).notNull().default("pendente"),
+  recipientType: varchar("recipientType", { length: 30 }),
+  notes: text("notes"),
+  proofUrl: text("proofUrl"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_accounts_payable_campaign_id").on(t.campaignId),
+  index("idx_accounts_payable_status").on(t.status),
+  index("idx_accounts_payable_type").on(t.type),
+]);
+
+export type AccountPayable = typeof accountsPayable.$inferSelect;
+export type InsertAccountPayable = typeof accountsPayable.$inferInsert;
+
 export * from "../shared/models/auth";

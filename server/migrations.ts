@@ -130,6 +130,46 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_is_bonificada_to_campaigns",
     sql: `ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "isBonificada" boolean DEFAULT false NOT NULL;`,
   },
+  {
+    name: "create_accounts_payable_table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS "accounts_payable" (
+        "id" SERIAL PRIMARY KEY,
+        "campaignId" INTEGER NOT NULL REFERENCES "campaigns"("id") ON DELETE CASCADE,
+        "invoiceId" INTEGER REFERENCES "invoices"("id") ON DELETE SET NULL,
+        "type" VARCHAR(30) NOT NULL,
+        "description" TEXT NOT NULL,
+        "amount" NUMERIC(12,2) NOT NULL,
+        "dueDate" DATE,
+        "paymentDate" DATE,
+        "status" VARCHAR(20) NOT NULL DEFAULT 'pendente',
+        "recipientName" VARCHAR(255),
+        "recipientType" VARCHAR(30),
+        "notes" TEXT,
+        "proofUrl" TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL,
+        "updatedAt" TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_accounts_payable_campaign_id" ON "accounts_payable" ("campaignId");
+      CREATE INDEX IF NOT EXISTS "idx_accounts_payable_status" ON "accounts_payable" ("status");
+      CREATE INDEX IF NOT EXISTS "idx_accounts_payable_type" ON "accounts_payable" ("type");
+    `,
+  },
+  {
+    name: "add_supplier_id_to_accounts_payable",
+    sql: `ALTER TABLE "accounts_payable" ADD COLUMN IF NOT EXISTS "supplierId" INTEGER REFERENCES "suppliers"("id") ON DELETE SET NULL;`,
+  },
+  {
+    name: "enforce_campaign_id_not_null_accounts_payable",
+    sql: `
+      DELETE FROM "accounts_payable" WHERE "campaignId" IS NULL;
+      ALTER TABLE "accounts_payable" ALTER COLUMN "campaignId" SET NOT NULL;
+    `,
+  },
+  {
+    name: "drop_recipient_name_from_accounts_payable",
+    sql: `ALTER TABLE "accounts_payable" DROP COLUMN IF EXISTS "recipientName";`,
+  },
 ];
 
 export async function runMigrations() {

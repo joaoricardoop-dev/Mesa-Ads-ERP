@@ -25,6 +25,7 @@ The application utilizes a sidebar-based layout built with `shadcn/ui`, offering
 - **Client Management**: Detailed internal view for advertisers (`/clientes/:id`) covering campaigns, quotations, finances, CRM contacts, account hierarchy (parent-child), and service orders. Leads are auto-classified as "upsell" or "new" based on existing client matching.
 - **Pricing Engine**: Cost-based pricing with markup, supporting multiple products with volume-based pricing tiers, dynamic unit labels, and product-specific commission/tax rates. Features a multi-product budget creator and simulator.
 - **Digital Signature**: Public signing flow for quotations and service orders, updating status, creating campaigns, and generating branded PDF contracts with audit-ready content hashing.
+- **Contas a Pagar (Accounts Payable)**: Full CRUD system for managing campaign-related payables (produção, frete, comissão, outro). Campaign is required (NOT NULL FK). Recipients are registered suppliers (FK to `suppliers` table) via dropdown selector, not free text. Auto-generates production/freight entries per campaign month; auto-generates commission entry when invoice is paid.
 - **Bonificação**: Campaigns and quotations can be marked as `isBonificada`, excluding them from financial KPIs and aggregations.
 - **Campaign Batches**: Divides the year into 13 four-week cycles, used for all campaign/quotation/OS period definitions, with event-aware labels.
 - **System Version Tag**: Displays build-time version and environment (`dev`/`prod`) in the UI.

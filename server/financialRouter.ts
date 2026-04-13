@@ -11,6 +11,8 @@ import {
   quotations,
   partners,
   serviceOrders,
+  accountsPayable,
+  suppliers,
 } from "../drizzle/schema";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -594,6 +596,38 @@ export const financialRouter = router({
         .set({ status: "paga", paymentDate: input.paymentDate, paymentMethod: input.paymentMethod, updatedAt: new Date() })
         .where(eq(invoices.id, input.id))
         .returning();
+
+      if (updated && updated.campaignId) {
+        try {
+          const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, updated.campaignId));
+          if (campaign && !(campaign as any).isBonificada) {
+            const existing = await db.select({ id: accountsPayable.id })
+              .from(accountsPayable)
+              .where(and(
+                eq(accountsPayable.campaignId, updated.campaignId),
+                eq(accountsPayable.invoiceId, input.id),
+                eq(accountsPayable.type, "comissao"),
+              ));
+            if (existing.length === 0) {
+              const invoiceAmt = Number(updated.amount);
+              const restCommRate = Number(campaign.restaurantCommission || 0);
+              const commAmount = invoiceAmt * (restCommRate / 100);
+              if (commAmount > 0) {
+                await db.insert(accountsPayable).values({
+                  campaignId: updated.campaignId,
+                  invoiceId: input.id,
+                  type: "comissao",
+                  description: `Comissão Restaurante (${restCommRate}%) - NF ${updated.invoiceNumber || updated.id}`,
+                  amount: commAmount.toFixed(2),
+                  recipientType: "restaurante",
+                  status: "pendente",
+                });
+              }
+            }
+          }
+        } catch (err) { console.warn("[markInvoicePaid] Auto-generate commission payable failed:", err); }
+      }
+
       return updated;
     }),
 
@@ -1294,4 +1328,201 @@ export const financialRouter = router({
     const rows = await db.select({ id: partners.id, name: partners.name, commissionPercent: partners.commissionPercent }).from(partners).where(eq(partners.status, "active"));
     return rows;
   }),
+
+  listAccountsPayable: protectedProcedure
+    .input(z.object({
+      campaignId: z.number().optional(),
+      status: z.string().optional(),
+      type: z.string().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      const conditions = [];
+      if (input?.campaignId) conditions.push(eq(accountsPayable.campaignId, input.campaignId));
+      if (input?.status) conditions.push(eq(accountsPayable.status, input.status));
+      if (input?.type) conditions.push(eq(accountsPayable.type, input.type));
+      const rows = await db
+        .select({
+          ap: accountsPayable,
+          campaignName: campaigns.name,
+          supplierName: suppliers.name,
+        })
+        .from(accountsPayable)
+        .leftJoin(campaigns, eq(accountsPayable.campaignId, campaigns.id))
+        .leftJoin(suppliers, eq(accountsPayable.supplierId, suppliers.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(accountsPayable.createdAt));
+      return rows.map(r => ({ ...r.ap, campaignName: r.campaignName, supplierName: r.supplierName }));
+    }),
+
+  createAccountPayable: protectedProcedure
+    .input(z.object({
+      campaignId: z.number(),
+      invoiceId: z.number().optional(),
+      supplierId: z.number().optional(),
+      type: z.string(),
+      description: z.string(),
+      amount: z.string(),
+      dueDate: z.string().optional(),
+      recipientType: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      const [row] = await db.insert(accountsPayable).values({
+        campaignId: input.campaignId,
+        invoiceId: input.invoiceId ?? null,
+        supplierId: input.supplierId ?? null,
+        type: input.type,
+        description: input.description,
+        amount: input.amount,
+        dueDate: input.dueDate ?? null,
+        recipientType: input.recipientType ?? null,
+        notes: input.notes ?? null,
+        status: "pendente",
+      }).returning();
+      return row;
+    }),
+
+  updateAccountPayable: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      dueDate: z.string().optional(),
+      amount: z.string().optional(),
+      supplierId: z.number().nullable().optional(),
+      notes: z.string().optional(),
+      status: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      const { id, ...fields } = input;
+      const updateData: Record<string, unknown> = { updatedAt: new Date() };
+      if (fields.dueDate !== undefined) updateData.dueDate = fields.dueDate;
+      if (fields.amount !== undefined) updateData.amount = fields.amount;
+      if (fields.supplierId !== undefined) updateData.supplierId = fields.supplierId;
+      if (fields.notes !== undefined) updateData.notes = fields.notes;
+      if (fields.status !== undefined) updateData.status = fields.status;
+      const [updated] = await db.update(accountsPayable).set(updateData).where(eq(accountsPayable.id, id)).returning();
+      return updated;
+    }),
+
+  markAccountPayablePaid: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      paymentDate: z.string(),
+      proofUrl: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      const [updated] = await db
+        .update(accountsPayable)
+        .set({ status: "pago", paymentDate: input.paymentDate, proofUrl: input.proofUrl ?? null, updatedAt: new Date() })
+        .where(eq(accountsPayable.id, input.id))
+        .returning();
+      return updated;
+    }),
+
+  deleteAccountPayable: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      await db.delete(accountsPayable).where(eq(accountsPayable.id, input.id));
+      return { ok: true };
+    }),
+
+  generateCampaignPayables: protectedProcedure
+    .input(z.object({ campaignId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
+
+      const existing = await db.select({ id: accountsPayable.id, type: accountsPayable.type })
+        .from(accountsPayable)
+        .where(eq(accountsPayable.campaignId, input.campaignId));
+      const hasProduction = existing.some(e => e.type === "producao");
+      const hasFreight = existing.some(e => e.type === "frete");
+
+      const toInsert: any[] = [];
+      const prodCost = Number(campaign.batchCost);
+      const freightCost = Number((campaign as any).freightCost || 0);
+      const dur = campaign.contractDuration;
+
+      if (!hasProduction && prodCost > 0) {
+        for (let m = 0; m < dur; m++) {
+          toInsert.push({
+            campaignId: input.campaignId,
+            type: "producao",
+            description: `Produção Gráfica - Mês ${m + 1}/${dur}`,
+            amount: prodCost.toFixed(2),
+            recipientType: "fornecedor",
+            status: "pendente",
+          });
+        }
+      }
+
+      if (!hasFreight && freightCost > 0) {
+        for (let m = 0; m < dur; m++) {
+          toInsert.push({
+            campaignId: input.campaignId,
+            type: "frete",
+            description: `Frete/Logística - Mês ${m + 1}/${dur}`,
+            amount: freightCost.toFixed(2),
+            recipientType: "transportadora",
+            status: "pendente",
+          });
+        }
+      }
+
+      if (toInsert.length > 0) {
+        await db.insert(accountsPayable).values(toInsert);
+      }
+      return { generated: toInsert.length };
+    }),
+
+  generateCommissionPayable: protectedProcedure
+    .input(z.object({
+      campaignId: z.number(),
+      invoiceId: z.number(),
+      invoiceAmount: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const existing = await db.select({ id: accountsPayable.id })
+        .from(accountsPayable)
+        .where(and(
+          eq(accountsPayable.campaignId, input.campaignId),
+          eq(accountsPayable.invoiceId, input.invoiceId),
+          eq(accountsPayable.type, "comissao"),
+        ));
+      if (existing.length > 0) return { generated: 0 };
+
+      const invoiceAmt = Number(input.invoiceAmount);
+      const restCommRate = Number(campaign.restaurantCommission || 0);
+      const commAmount = invoiceAmt * (restCommRate / 100);
+
+      if (commAmount > 0) {
+        await db.insert(accountsPayable).values({
+          campaignId: input.campaignId,
+          invoiceId: input.invoiceId,
+          type: "comissao",
+          description: `Comissão Restaurante (${restCommRate}%)`,
+          amount: commAmount.toFixed(2),
+          recipientType: "restaurante",
+          status: "pendente",
+        });
+        return { generated: 1 };
+      }
+      return { generated: 0 };
+    }),
 });

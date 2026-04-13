@@ -1481,7 +1481,47 @@ export const appRouter = router({
           assignedToAvatar: z.string().nullable().optional(),
         })
       )
-      .mutation(({ input }) => createCampaign(input)),
+      .mutation(async ({ input }) => {
+        const campaign = await createCampaign(input);
+        if (campaign) {
+          try {
+            const { accountsPayable } = await import("../drizzle/schema");
+            const db = await (await import("./db")).getDb();
+            if (db) {
+              const toInsert: any[] = [];
+              const prodCost = Number(input.batchCost || "1200.00");
+              const freightCost = Number((input as any).freightCost || 0);
+              const dur = input.contractDuration || 6;
+              if (prodCost > 0) {
+                for (let m = 0; m < dur; m++) {
+                  toInsert.push({
+                    campaignId: campaign.id,
+                    type: "producao",
+                    description: `Produção Gráfica - Mês ${m + 1}/${dur}`,
+                    amount: prodCost.toFixed(2),
+                    recipientType: "fornecedor",
+                    status: "pendente",
+                  });
+                }
+              }
+              if (freightCost > 0) {
+                for (let m = 0; m < dur; m++) {
+                  toInsert.push({
+                    campaignId: campaign.id,
+                    type: "frete",
+                    description: `Frete/Logística - Mês ${m + 1}/${dur}`,
+                    amount: freightCost.toFixed(2),
+                    recipientType: "transportadora",
+                    status: "pendente",
+                  });
+                }
+              }
+              if (toInsert.length > 0) await db.insert(accountsPayable).values(toInsert);
+            }
+          } catch (err) { console.warn("[campaign.create] Auto-generate payables failed:", err); }
+        }
+        return campaign;
+      }),
 
     update: protectedProcedure
       .input(
