@@ -2832,28 +2832,70 @@ export default function CampaignDetail() {
               {/* ── DRE SIMPLIFICADA ── */}
               {(() => {
                 const dur = campaign.contractDuration;
-                const receita = p.monthlyRevenue;
-                const receitaTotal = p.contractRevenue;
+                const isBonif = !!(campaign as any).isBonificada;
+                const receita = isBonif ? 0 : p.monthlyRevenue;
+                const receitaTotal = isBonif ? 0 : p.contractRevenue;
                 const taxRate = Number(campaign.taxRate);
                 const restCommRate = campaign.commissionType === "variable" ? Number(campaign.restaurantCommission) : 0;
                 const partnerPct = Number((campaign as any).partnerCommissionPercent || 0);
                 const pName = (campaign as any).partnerName as string | null;
 
-                const impostos = receita * (taxRate / 100);
+                const impostos = isBonif ? 0 : receita * (taxRate / 100);
                 const baseAposImpostos = receita - impostos;
 
-                const commRest = baseAposImpostos * (restCommRate / 100);
+                const commRest = isBonif ? 0 : baseAposImpostos * (restCommRate / 100);
                 const baseAposComRest = baseAposImpostos - commRest;
 
                 const prodCost = Number(campaign.batchCost);
                 const freteCost = Number((campaign as any).freightCost || 0);
                 const baseAposCustos = baseAposComRest - prodCost - freteCost;
 
-                const commParceiro = pName && partnerPct > 0 ? baseAposCustos * (partnerPct / 100) : 0;
-                const lucro = baseAposCustos - commParceiro;
+                const commParceiro = isBonif ? 0 : (pName && partnerPct > 0 ? baseAposCustos * (partnerPct / 100) : 0);
+                const lucro = isBonif ? -(prodCost + freteCost) : baseAposCustos - commParceiro;
                 const margem = receita > 0 ? (lucro / receita) * 100 : 0;
 
                 const m = (v: number) => v * dur;
+
+                if (isBonif) {
+                  return (
+                    <div className="bg-card border border-amber-500/20 rounded-lg p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 px-2 py-1 rounded">Campanha Bonificada</span>
+                        <span className="text-[11px] text-muted-foreground">Sem receita — apenas custos operacionais</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border/30">
+                              <th className="text-left py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold"></th>
+                              <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-3">Mensal</th>
+                              <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-3">Total ({dur}m)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b border-border/10">
+                              <td className="py-2 text-red-400/80">Custo Produção <span className="text-[10px]">({campaign.batchSize} un × R$ {p.unitCost.toFixed(2)})</span></td>
+                              <td className="py-2 text-right px-3 font-mono text-red-400/80">{formatCurrency(prodCost)}</td>
+                              <td className="py-2 text-right px-3 font-mono text-red-400/80">{formatCurrency(m(prodCost))}</td>
+                            </tr>
+                            {freteCost > 0 && (
+                              <tr className="border-b border-border/10">
+                                <td className="py-2 text-red-400/80">Custo Frete</td>
+                                <td className="py-2 text-right px-3 font-mono text-red-400/80">{formatCurrency(freteCost)}</td>
+                                <td className="py-2 text-right px-3 font-mono text-red-400/80">{formatCurrency(m(freteCost))}</td>
+                              </tr>
+                            )}
+                            <tr className="border-t-2 border-amber-500/30 bg-amber-500/5">
+                              <td className="py-2.5 font-bold text-amber-400">Total Bonificação</td>
+                              <td className="py-2.5 text-right px-3 font-mono font-bold text-amber-400">{formatCurrency(prodCost + freteCost)}</td>
+                              <td className="py-2.5 text-right px-3 font-mono font-bold text-amber-400">{formatCurrency(m(prodCost + freteCost))}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
               <div className="bg-card border border-border/30 rounded-lg p-5">
