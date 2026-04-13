@@ -163,6 +163,33 @@ export default function PartnerCommissionReport() {
               </tr>
             </tbody>
           </table>
+          ${r.monthlyInstallments && r.monthlyInstallments.length > 1 ? `
+          <div style="margin-bottom: 40px;">
+            <h2 style="font-size: 14px; font-weight: 700; color: #111; margin-bottom: 16px;">Cronograma de Pagamento <span style="font-size: 11px; color: #999; font-weight: 400;">(${r.monthlyInstallments.length} parcelas)</span></h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Mês</th>
+                  <th style="text-align: right;">Receita (R$)</th>
+                  <th style="text-align: right;">Comissão (R$)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${r.monthlyInstallments.map((inst: { month: string; revenue: number; commission: number }, idx: number) => `
+                <tr>
+                  <td style="text-transform: capitalize;">${inst.month}</td>
+                  <td style="text-align: right; font-family: 'SF Mono', monospace; font-size: 12px; color: #555;">${formatCurrency(inst.revenue)}</td>
+                  <td style="text-align: right; font-family: 'SF Mono', monospace; font-size: 12px; color: #7c3aed; font-weight: 600;">${formatCurrency(inst.commission)}</td>
+                </tr>`).join("")}
+                <tr class="row-total">
+                  <td>Total</td>
+                  <td style="text-align: right;">${formatCurrency(r.grossValue)}</td>
+                  <td style="text-align: right;">${formatCurrency(r.totalToPartner)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          ` : ""}
         </div>
 
         <div class="footer">
