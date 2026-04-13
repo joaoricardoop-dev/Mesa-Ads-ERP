@@ -1000,9 +1000,41 @@ export default function CampaignDetail() {
     p = pBase;
   }
 
+  if ((campaign as any).isBonificada) {
+    const prodTotal = p.totalProductionCost;
+    const freightTotal = p.totalFreight;
+    const costOnly = prodTotal + freightTotal;
+    p = {
+      ...p,
+      sellingPricePerRest: 0,
+      restCommPerRest: 0,
+      sellerCommPerRest: 0,
+      taxPerRest: 0,
+      profitPerRest: 0,
+      totalCostsPerRest: p.productionCostPerRest + p.freightPerRest,
+      totalRestComm: 0,
+      totalSellerComm: 0,
+      totalTax: 0,
+      totalCosts: costOnly,
+      monthlyRevenue: 0,
+      monthlyProfit: -(costOnly),
+      contractRevenue: 0,
+      contractProfit: -(costOnly * campaign.contractDuration),
+      contractCosts: costOnly * campaign.contractDuration,
+      grossMargin: 0,
+      roi: 0,
+      cpi: 0,
+    };
+  }
+
   const client = clientsList.find((cl) => cl.id === campaign.clientId);
 
-  const costBreakdownData = [
+  const isBonif = !!(campaign as any).isBonificada;
+
+  const costBreakdownData = isBonif ? [
+    { name: "Produção", value: p.totalProductionCost, color: "#22c55e" },
+    { name: "Frete", value: p.totalFreight, color: "#f59e0b" },
+  ].filter(d => d.value > 0) : [
     { name: "Produção", value: p.totalProductionCost, color: "#22c55e" },
     { name: "Com. Local", value: p.totalRestComm, color: "#3b82f6" },
     { name: "Com. Vendedor", value: p.totalSellerComm, color: "#f59e0b" },
@@ -1010,7 +1042,10 @@ export default function CampaignDetail() {
     { name: "Lucro", value: Math.max(0, p.monthlyProfit), color: "#8b5cf6" },
   ];
 
-  const perRestBarData = [
+  const perRestBarData = isBonif ? [
+    { name: "Produção", custo: p.productionCostPerRest },
+    { name: "Frete", custo: p.freightPerRest },
+  ].filter(d => d.custo > 0) : [
     { name: "Produção", custo: p.productionCostPerRest },
     { name: "Com. Rest.", custo: p.restCommPerRest },
     { name: "Com. Vend.", custo: p.sellerCommPerRest },
@@ -2540,12 +2575,21 @@ export default function CampaignDetail() {
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <KPIBig label="Receita Mensal" value={formatCurrency(p.monthlyRevenue)} icon={<Banknote className="w-5 h-5" />} />
-                <KPIBig label="Lucro Mensal" value={formatCurrency(p.monthlyProfit)} icon={<TrendingUp className="w-5 h-5" />} accent />
-                <KPIBig label="Margem Real" value={`${p.grossMargin.toFixed(1)}%`} icon={<ShieldCheck className="w-5 h-5" />}
-                  accent={p.grossMargin >= 20} warn={p.grossMargin < 15}
-                />
-                <KPIBig label="ROI Mensal" value={`${p.roi.toFixed(1)}%`} icon={<Target className="w-5 h-5" />} accent={p.roi > 0} />
+                {isBonif ? (
+                  <>
+                    <KPIBig label="Custo Mensal" value={formatCurrency(p.totalCosts)} icon={<Banknote className="w-5 h-5" />} warn />
+                    <KPIBig label="Custo Total" value={formatCurrency(p.contractCosts)} icon={<TrendingUp className="w-5 h-5" />} warn />
+                  </>
+                ) : (
+                  <>
+                    <KPIBig label="Receita Mensal" value={formatCurrency(p.monthlyRevenue)} icon={<Banknote className="w-5 h-5" />} />
+                    <KPIBig label="Lucro Mensal" value={formatCurrency(p.monthlyProfit)} icon={<TrendingUp className="w-5 h-5" />} accent />
+                    <KPIBig label="Margem Real" value={`${p.grossMargin.toFixed(1)}%`} icon={<ShieldCheck className="w-5 h-5" />}
+                      accent={p.grossMargin >= 20} warn={p.grossMargin < 15}
+                    />
+                    <KPIBig label="ROI Mensal" value={`${p.roi.toFixed(1)}%`} icon={<Target className="w-5 h-5" />} accent={p.roi > 0} />
+                  </>
+                )}
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -2612,7 +2656,7 @@ export default function CampaignDetail() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="bg-card border border-border/30 rounded-lg p-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Composição do Preço (Mensal Total)</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">{isBonif ? "Custos Bonificação (Mensal)" : "Composição do Preço (Mensal Total)"}</h3>
                   <div className="h-52">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -2654,10 +2698,19 @@ export default function CampaignDetail() {
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <ContractCard label="Contrato Total" value={formatCurrency(p.contractRevenue)} sub={batchCount > 0 ? `${batchCount} batch${batchCount > 1 ? "es" : ""} (${batchWeeks} semanas)` : `${campaign.contractDuration} meses`} />
-                <ContractCard label="Custos do Contrato" value={formatCurrency(p.contractCosts)} />
-                <ContractCard label="Lucro do Contrato" value={formatCurrency(p.contractProfit)} accent />
-                <ContractCard label="Coasters Total Contrato" value={(expectedTotalCoasters * campaign.contractDuration).toLocaleString("pt-BR")} sub="unidades" />
+                {isBonif ? (
+                  <>
+                    <ContractCard label="Custo Total Bonificação" value={formatCurrency(p.contractCosts)} sub={batchCount > 0 ? `${batchCount} batch${batchCount > 1 ? "es" : ""} (${batchWeeks} semanas)` : `${campaign.contractDuration} meses`} />
+                    <ContractCard label="Coasters Total Contrato" value={(expectedTotalCoasters * campaign.contractDuration).toLocaleString("pt-BR")} sub="unidades" />
+                  </>
+                ) : (
+                  <>
+                    <ContractCard label="Contrato Total" value={formatCurrency(p.contractRevenue)} sub={batchCount > 0 ? `${batchCount} batch${batchCount > 1 ? "es" : ""} (${batchWeeks} semanas)` : `${campaign.contractDuration} meses`} />
+                    <ContractCard label="Custos do Contrato" value={formatCurrency(p.contractCosts)} />
+                    <ContractCard label="Lucro do Contrato" value={formatCurrency(p.contractProfit)} accent />
+                    <ContractCard label="Coasters Total Contrato" value={(expectedTotalCoasters * campaign.contractDuration).toLocaleString("pt-BR")} sub="unidades" />
+                  </>
+                )}
               </div>
             </TabsContent>
 
