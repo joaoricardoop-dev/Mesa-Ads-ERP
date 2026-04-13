@@ -42,7 +42,12 @@ import {
   UserPlus,
   Send,
   Eye,
+  Printer,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
 } from "lucide-react";
+import { LOGO_WHITE_BASE64 } from "@/lib/pdf-assets";
 
 interface PartnerLead {
   id: number;
@@ -122,6 +127,297 @@ function KpiCard({ icon: Icon, label, value, color }: { icon: LucideIcon; label:
           <p className="text-lg font-bold">{value}</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function fmtPct(v: number): string {
+  return `${(v ?? 0).toFixed(1).replace(".", ",")}%`;
+}
+
+function PartnerCommissionsTab({ partnerId, partnerName }: { partnerId: number; partnerName: string }) {
+  const [expandedCampaign, setExpandedCampaign] = useState<number | null>(null);
+
+  const { data: campaignsList = [], isLoading: loadingCampaigns } = trpc.financial.listPartnerCampaigns.useQuery(
+    { partnerId },
+    { enabled: partnerId > 0 }
+  );
+
+  const { data: report, isLoading: loadingReport } = trpc.financial.partnerCommissionReport.useQuery(
+    { campaignId: expandedCampaign!, partnerId },
+    { enabled: !!expandedCampaign }
+  );
+
+  const handlePrintReport = () => {
+    if (!report) return;
+    const r = report;
+    const today = new Date().toLocaleDateString("pt-BR");
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+      <head>
+        <title>Relatório de Comissão - ${r.partnerName || ""}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1a1a1a; font-size: 13px; }
+          .top-bar { background: #111; padding: 24px 48px; display: flex; align-items: center; justify-content: space-between; }
+          .top-bar img { height: 28px; }
+          .top-bar .doc-type { color: #fff; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.6; }
+          .green-line { height: 3px; background: #22c55e; }
+          .content { padding: 48px; }
+          .info-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+          .info-left h1 { font-size: 20px; font-weight: 700; color: #111; margin-bottom: 6px; }
+          .info-left p { font-size: 12px; color: #777; line-height: 1.7; }
+          .info-right { text-align: right; }
+          .info-right .label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+          .info-right .value { font-size: 24px; font-weight: 800; color: #16a34a; font-family: 'SF Mono', monospace; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+          thead th { text-align: left; padding: 10px 16px; border-bottom: 2px solid #e5e7eb; font-size: 10px; text-transform: uppercase; color: #999; letter-spacing: 1px; font-weight: 600; }
+          thead th:last-child { text-align: right; }
+          tbody td { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+          tbody td:last-child { text-align: right; font-family: 'SF Mono', monospace; font-size: 12px; }
+          .row-deduction td { color: #dc2626; padding-left: 32px; }
+          .row-subtotal { background: #f9fafb; }
+          .row-subtotal td { font-weight: 600; font-size: 12px; }
+          .row-base { background: #eff6ff; }
+          .row-base td { font-weight: 700; color: #2563eb; }
+          .row-commission td { color: #7c3aed; padding-left: 32px; }
+          .row-total { background: #f0fdf4; border-top: 2px solid #22c55e; }
+          .row-total td { font-weight: 800; color: #16a34a; font-size: 14px; padding: 16px; }
+          .footer { border-top: 1px solid #e5e7eb; padding: 24px 48px; }
+          .footer p { font-size: 11px; color: #999; line-height: 1.6; }
+          .footer strong { color: #555; }
+          @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .top-bar { -webkit-print-color-adjust: exact; } }
+        </style>
+      </head>
+      <body>
+        <div class="top-bar">
+          <img src="${LOGO_WHITE_BASE64}" alt="mesa.ads" />
+          <span class="doc-type">Relatório de Comissão</span>
+        </div>
+        <div class="green-line"></div>
+        <div class="content">
+          <div class="info-row">
+            <div class="info-left">
+              <h1>Repasse ao Parceiro</h1>
+              <p>
+                Parceiro: <strong style="color:#111">${r.partnerName}</strong><br/>
+                Campanha: <strong style="color:#111">${r.campaignName}</strong><br/>
+                Cliente: <strong style="color:#111">${r.clientName}</strong><br/>
+                Duração do contrato: <strong style="color:#111">${r.contractDuration} meses</strong><br/>
+                Data de emissão: <strong style="color:#111">${today}</strong>
+              </p>
+            </div>
+            <div class="info-right">
+              <div class="label">Total a Repassar</div>
+              <div class="value">${formatCurrency(r.totalToPartner)}</div>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Descrição</th><th>Valor (R$)</th></tr></thead>
+            <tbody>
+              <tr><td style="font-weight:700; color:#16a34a">Receita Bruta (${r.contractDuration}m)</td><td style="font-weight:700; color:#16a34a">${formatCurrency(r.grossValue)}</td></tr>
+              <tr class="row-deduction"><td>(-) Impostos (${fmtPct(r.taxRate)} da receita)</td><td>${formatCurrency(r.taxDeduction)}</td></tr>
+              <tr class="row-subtotal"><td>= Base após Impostos</td><td>${formatCurrency(r.afterTax)}</td></tr>
+              <tr class="row-deduction"><td>(-) Comissão Restaurante (${fmtPct(r.restaurantRate)} da base pós-impostos)</td><td>${formatCurrency(r.restaurantDeduction)}</td></tr>
+              <tr class="row-subtotal"><td>= Base após Comissões</td><td>${formatCurrency(r.afterRestaurant)}</td></tr>
+              <tr class="row-deduction"><td>(-) Custo Produção (${r.contractDuration}m)</td><td>${formatCurrency(r.productionCost)}</td></tr>
+              ${r.freightCost > 0 ? `<tr class="row-deduction"><td>(-) Custo Frete (${r.contractDuration}m)</td><td>${formatCurrency(r.freightCost)}</td></tr>` : ""}
+              <tr class="row-base"><td>= Base Comissão Parceiro</td><td>${formatCurrency(r.commissionBase)}</td></tr>
+              <tr class="row-commission"><td>Comissão ${r.partnerName} (${fmtPct(r.partnerCommissionPercent)} da base)</td><td style="color:#7c3aed; font-weight:600">${formatCurrency(r.commissionValue)}</td></tr>
+              <tr class="row-total"><td>TOTAL A REPASSAR AO PARCEIRO</td><td>${formatCurrency(r.totalToPartner)}</td></tr>
+            </tbody>
+          </table>
+          ${r.monthlyInstallments && r.monthlyInstallments.length > 1 ? `
+          <div style="margin-bottom: 40px;">
+            <h2 style="font-size: 14px; font-weight: 700; color: #111; margin-bottom: 16px;">Cronograma de Pagamento <span style="font-size: 11px; color: #999; font-weight: 400;">(${r.monthlyInstallments.length} parcelas)</span></h2>
+            <table>
+              <thead><tr><th>Mês</th><th style="text-align:right;">Receita (R$)</th><th style="text-align:right;">Comissão (R$)</th></tr></thead>
+              <tbody>
+                ${r.monthlyInstallments.map((inst: { month: string; revenue: number; commission: number }) => `
+                <tr>
+                  <td style="text-transform:capitalize;">${inst.month}</td>
+                  <td style="text-align:right; font-family:'SF Mono',monospace; font-size:12px; color:#555;">${formatCurrency(inst.revenue)}</td>
+                  <td style="text-align:right; font-family:'SF Mono',monospace; font-size:12px; color:#7c3aed; font-weight:600;">${formatCurrency(inst.commission)}</td>
+                </tr>`).join("")}
+                <tr class="row-total"><td>Total</td><td style="text-align:right;">${formatCurrency(r.grossValue)}</td><td style="text-align:right;">${formatCurrency(r.totalToPartner)}</td></tr>
+              </tbody>
+            </table>
+          </div>` : ""}
+        </div>
+        <div class="footer">
+          <p><strong>Observações:</strong> O pagamento deverá ser realizado em até <strong>5 (cinco) dias úteis</strong> a partir da data de emissão deste relatório.</p>
+          <p style="margin-top:8px">Documento gerado automaticamente por <strong>mesa.ads</strong> em ${today}.</p>
+        </div>
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  if (loadingCampaigns) {
+    return <div className="text-center py-8 text-sm text-muted-foreground">Carregando campanhas...</div>;
+  }
+
+  if (campaignsList.length === 0) {
+    return (
+      <div className="rounded-xl border bg-card p-8 text-center">
+        <DollarSign className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground">Nenhuma campanha vinculada a este parceiro.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {campaignsList.map((c) => {
+        const isExpanded = expandedCampaign === c.campaignId;
+        return (
+          <div key={c.campaignId} className="rounded-xl border bg-card overflow-hidden">
+            <button
+              onClick={() => setExpandedCampaign(isExpanded ? null : c.campaignId)}
+              className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  <DollarSign className="w-4 h-4 text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{c.campaignName}</p>
+                  <p className="text-xs text-muted-foreground">{c.clientName}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {c.totalValue > 0 && (
+                  <span className="text-xs font-mono text-muted-foreground">{formatCurrency(c.totalValue)}</span>
+                )}
+                <Badge variant="outline" className="text-[10px]">{c.status}</Badge>
+                {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+              </div>
+            </button>
+
+            {isExpanded && (
+              <div className="border-t border-border/20 p-5 space-y-4">
+                {loadingReport ? (
+                  <div className="text-center py-6 text-sm text-muted-foreground">Calculando comissão...</div>
+                ) : report ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-primary" /> DRE — Comissão
+                      </h4>
+                      <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handlePrintReport}>
+                        <Printer className="w-3.5 h-3.5" /> PDF
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-lg border p-3 text-center">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Receita Bruta</p>
+                        <p className="text-sm font-bold font-mono text-emerald-400 mt-1">{formatCurrency(report.grossValue)}</p>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Base Comissão</p>
+                        <p className="text-sm font-bold font-mono text-blue-400 mt-1">{formatCurrency(report.commissionBase)}</p>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center bg-emerald-500/5">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total a Repassar</p>
+                        <p className="text-sm font-bold font-mono text-emerald-400 mt-1">{formatCurrency(report.totalToPartner)}</p>
+                      </div>
+                    </div>
+
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border/30">
+                          <th className="text-left py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Descrição</th>
+                          <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-3">Valor (R$)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b border-border/10">
+                          <td className="py-2 text-emerald-400 font-semibold">Receita Bruta ({report.contractDuration}m)</td>
+                          <td className="py-2 text-right px-3 font-mono font-semibold text-emerald-400">{formatCurrency(report.grossValue)}</td>
+                        </tr>
+                        <tr className="border-b border-border/10">
+                          <td className="py-2 pl-4 text-red-400/80">(-) Impostos ({fmtPct(report.taxRate)})</td>
+                          <td className="py-2 text-right px-3 font-mono text-red-400/80">{formatCurrency(report.taxDeduction)}</td>
+                        </tr>
+                        <tr className="border-b border-border/10 bg-white/[0.02]">
+                          <td className="py-2 font-medium">= Base após Impostos</td>
+                          <td className="py-2 text-right px-3 font-mono font-medium">{formatCurrency(report.afterTax)}</td>
+                        </tr>
+                        <tr className="border-b border-border/10">
+                          <td className="py-2 pl-4 text-red-400/80">(-) Com. Restaurante ({fmtPct(report.restaurantRate)})</td>
+                          <td className="py-2 text-right px-3 font-mono text-red-400/80">{formatCurrency(report.restaurantDeduction)}</td>
+                        </tr>
+                        <tr className="border-b border-border/10 bg-white/[0.02]">
+                          <td className="py-2 font-medium">= Base após Comissões</td>
+                          <td className="py-2 text-right px-3 font-mono font-medium">{formatCurrency(report.afterRestaurant)}</td>
+                        </tr>
+                        <tr className="border-b border-border/10">
+                          <td className="py-2 pl-4 text-red-400/80">(-) Produção ({report.contractDuration}m)</td>
+                          <td className="py-2 text-right px-3 font-mono text-red-400/80">{formatCurrency(report.productionCost)}</td>
+                        </tr>
+                        {report.freightCost > 0 && (
+                          <tr className="border-b border-border/10">
+                            <td className="py-2 pl-4 text-red-400/80">(-) Frete ({report.contractDuration}m)</td>
+                            <td className="py-2 text-right px-3 font-mono text-red-400/80">{formatCurrency(report.freightCost)}</td>
+                          </tr>
+                        )}
+                        <tr className="border-b border-border/10 bg-blue-500/5">
+                          <td className="py-2 font-bold text-blue-400">= Base Comissão Parceiro</td>
+                          <td className="py-2 text-right px-3 font-mono font-bold text-blue-400">{formatCurrency(report.commissionBase)}</td>
+                        </tr>
+                        <tr className="border-b border-border/10">
+                          <td className="py-2 pl-4 text-purple-400/80">Comissão ({fmtPct(report.partnerCommissionPercent)})</td>
+                          <td className="py-2 text-right px-3 font-mono font-semibold text-purple-400">{formatCurrency(report.commissionValue)}</td>
+                        </tr>
+                        <tr className="bg-emerald-500/10 border-t-2 border-emerald-500/30">
+                          <td className="py-2.5 font-bold text-emerald-400">TOTAL A REPASSAR</td>
+                          <td className="py-2.5 text-right px-3 font-mono font-bold text-emerald-400">{formatCurrency(report.totalToPartner)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    {report.monthlyInstallments && report.monthlyInstallments.length > 1 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                          <Calendar className="w-4 h-4 text-primary" /> Cronograma de Pagamento
+                          <span className="text-[10px] text-muted-foreground font-normal">({report.monthlyInstallments.length} parcelas)</span>
+                        </h4>
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border/30">
+                              <th className="text-left py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Mês</th>
+                              <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-3">Receita</th>
+                              <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-3">Comissão</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {report.monthlyInstallments.map((inst: { month: string; revenue: number; commission: number }, idx: number) => (
+                              <tr key={idx} className="border-b border-border/10">
+                                <td className="py-2 capitalize">{inst.month}</td>
+                                <td className="py-2 text-right px-3 font-mono text-muted-foreground">{formatCurrency(inst.revenue)}</td>
+                                <td className="py-2 text-right px-3 font-mono font-semibold text-purple-400">{formatCurrency(inst.commission)}</td>
+                              </tr>
+                            ))}
+                            <tr className="border-t-2 border-emerald-500/30 bg-emerald-500/5">
+                              <td className="py-2.5 font-bold text-emerald-400">Total</td>
+                              <td className="py-2.5 text-right px-3 font-mono font-bold text-emerald-400">{formatCurrency(report.grossValue)}</td>
+                              <td className="py-2.5 text-right px-3 font-mono font-bold text-emerald-400">{formatCurrency(report.totalToPartner)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                ) : null}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -296,6 +592,7 @@ export default function PartnerDetail() {
           <TabsTrigger value="painel" className="text-xs">Painel</TabsTrigger>
           <TabsTrigger value="leads" className="text-xs">Leads ({partnerLeads.length})</TabsTrigger>
           <TabsTrigger value="cotacoes" className="text-xs">Cotações ({partnerQuotations.length})</TabsTrigger>
+          <TabsTrigger value="comissoes" className="text-xs">Comissões</TabsTrigger>
           {isAdmin && <TabsTrigger value="usuarios" className="text-xs">Usuários ({partnerUsers.length})</TabsTrigger>}
           <TabsTrigger value="info" className="text-xs">Informações</TabsTrigger>
         </TabsList>
@@ -483,6 +780,10 @@ export default function PartnerDetail() {
             )}
           </div>
         </TabsContent>}
+
+        <TabsContent value="comissoes" className="mt-4">
+          <PartnerCommissionsTab partnerId={partnerId} partnerName={partner.name} />
+        </TabsContent>
 
         <TabsContent value="info" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
