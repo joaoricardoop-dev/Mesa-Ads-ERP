@@ -165,7 +165,10 @@ export default function ParceiroPortal() {
   const selectedClient = myClients.find((c: any) => c.id === selectedClientId);
 
   function openBuilder() {
-    if (myClients.length === 0) return;
+    if (myClients.length === 0) {
+      setClientSelectorOpen(true);
+      return;
+    }
     if (myClients.length === 1) {
       setSelectedClientId(myClients[0].id);
       setBuilderOpen(true);
@@ -235,11 +238,9 @@ export default function ParceiroPortal() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-          {myClients.length > 0 && (
-            <Button variant="outline" className="gap-2" onClick={openBuilder}>
-              <ShoppingCart className="w-4 h-4" /> Montar Campanha para Cliente
-            </Button>
-          )}
+          <Button variant="outline" className="gap-2" onClick={openBuilder}>
+            <ShoppingCart className="w-4 h-4" /> Montar Campanha para Cliente
+          </Button>
           {mediaKitData?.pdfUrl && (
             <Button variant="outline" className="gap-2" asChild>
               <a href={mediaKitData.pdfUrl} target="_blank" rel="noopener noreferrer">
@@ -256,20 +257,20 @@ export default function ParceiroPortal() {
       </div>
 
       {!loadingDash && dashboard && (
-        <div className="rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-950/30 via-card to-card overflow-hidden">
-          <div className="px-5 py-4 flex items-center gap-3 border-b border-amber-500/15">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 overflow-hidden">
+          <div className="px-5 py-4 flex items-center gap-3 border-b border-amber-500/20">
             <div className="p-2 rounded-lg bg-amber-500/15">
-              <DollarSign className="w-4 h-4 text-amber-400" />
+              <DollarSign className="w-4 h-4 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-amber-300">BV Estimado do Mês</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-foreground">BV Estimado do Mês</p>
               <p className="text-xs text-muted-foreground capitalize">{currentMonth}</p>
             </div>
           </div>
           <div className="px-5 py-4 flex items-center gap-6 flex-wrap">
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Estimativa {now.toLocaleString("pt-BR", { month: "short" })}</p>
-              <p className="text-3xl font-black text-amber-400 font-mono tabular-nums">{formatCurrency(bvEstimadoMes)}</p>
+              <p className="text-3xl font-black text-amber-600 dark:text-amber-400 font-mono tabular-nums">{formatCurrency(bvEstimadoMes)}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 {thisMonthWon.length} negócio{thisMonthWon.length !== 1 ? "s" : ""} fechado{thisMonthWon.length !== 1 ? "s" : ""} · {commissionPercent}% de {formatCurrency(thisMonthRevenue)}
               </p>
@@ -291,7 +292,7 @@ export default function ParceiroPortal() {
                   <CalendarDays className="w-3 h-3 inline mr-1" />
                   Total acumulado
                 </p>
-                <p className="text-lg font-bold font-mono">{formatCurrency(dashboard?.commissionEstimated ?? 0)}</p>
+                <p className="text-lg font-bold font-mono text-muted-foreground">{formatCurrency(dashboard?.commissionEstimated ?? 0)}</p>
                 <p className="text-[10px] text-muted-foreground">{dashboard?.wonDeals ?? 0} negócios no total</p>
               </div>
             </div>
@@ -457,7 +458,17 @@ export default function ParceiroPortal() {
             <DialogTitle>Selecione o Cliente</DialogTitle>
           </DialogHeader>
           <div className="space-y-2 py-2">
-            <p className="text-sm text-muted-foreground mb-3">Para qual cliente deseja montar a campanha?</p>
+            {myClients.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-6 text-center">
+                <Users className="w-10 h-10 text-muted-foreground/40" />
+                <div>
+                  <p className="font-medium text-sm">Nenhum cliente cadastrado</p>
+                  <p className="text-xs text-muted-foreground mt-1">Cadastre um cliente antes de montar uma campanha.</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground mb-3">Para qual cliente deseja montar a campanha?</p>
+            )}
             {myClients.map((client: any) => (
               <button
                 key={client.id}
