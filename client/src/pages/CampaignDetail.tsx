@@ -2831,22 +2831,29 @@ export default function CampaignDetail() {
 
               {/* ── DRE SIMPLIFICADA ── */}
               {(() => {
-                const batchCostTotal = Number(campaign.batchCost);
-                const freightTotal = Number((campaign as any).freightCost || 0);
-                const prodMensal = batchCostTotal;
-                const prodContrato = batchCostTotal * campaign.contractDuration;
-                const freteContrato = freightTotal * campaign.contractDuration;
-                const restCommRate = campaign.commissionType === "variable" ? Number(campaign.restaurantCommission) : 0;
-                const sellerRate = Number(campaign.sellerCommission);
+                const dur = campaign.contractDuration;
+                const receita = p.monthlyRevenue;
+                const receitaTotal = p.contractRevenue;
                 const taxRate = Number(campaign.taxRate);
-                const commRestMensal = p.monthlyRevenue * (restCommRate / 100);
-                const commVendMensal = p.monthlyRevenue * (sellerRate / 100);
-                const impostosMensal = p.monthlyRevenue * (taxRate / 100);
-                const custosMensal = prodMensal + freightTotal + commRestMensal + commVendMensal + impostosMensal;
-                const custosContrato = custosMensal * campaign.contractDuration;
-                const lucroMensal = p.monthlyRevenue - custosMensal;
-                const lucroContrato = p.contractRevenue - custosContrato;
-                const margem = p.monthlyRevenue > 0 ? (lucroMensal / p.monthlyRevenue) * 100 : 0;
+                const restCommRate = campaign.commissionType === "variable" ? Number(campaign.restaurantCommission) : 0;
+                const partnerPct = Number((campaign as any).partnerCommissionPercent || 0);
+                const pName = (campaign as any).partnerName as string | null;
+
+                const impostos = receita * (taxRate / 100);
+                const baseAposImpostos = receita - impostos;
+
+                const commRest = baseAposImpostos * (restCommRate / 100);
+                const baseAposComRest = baseAposImpostos - commRest;
+
+                const prodCost = Number(campaign.batchCost);
+                const freteCost = Number((campaign as any).freightCost || 0);
+                const baseAposCustos = baseAposComRest - prodCost - freteCost;
+
+                const commParceiro = pName && partnerPct > 0 ? baseAposCustos * (partnerPct / 100) : 0;
+                const lucro = baseAposCustos - commParceiro;
+                const margem = receita > 0 ? (lucro / receita) * 100 : 0;
+
+                const m = (v: number) => v * dur;
 
                 return (
               <div className="bg-card border border-border/30 rounded-lg p-5">
@@ -2856,54 +2863,70 @@ export default function CampaignDetail() {
                       <tr className="border-b border-border/30">
                         <th className="text-left py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold"></th>
                         <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-3">Mensal</th>
-                        <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-3">Total ({campaign.contractDuration}m)</th>
+                        <th className="text-right py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-3">Total ({dur}m)</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-b border-emerald-500/10">
-                        <td className="py-2 font-semibold text-emerald-400">Receita</td>
-                        <td className="py-2 text-right px-3 font-semibold text-emerald-400">{formatCurrency(p.monthlyRevenue)}</td>
-                        <td className="py-2 text-right px-3 font-semibold text-emerald-400">{formatCurrency(p.contractRevenue)}</td>
+                      <tr>
+                        <td className="py-2 font-semibold text-emerald-400">Receita Bruta</td>
+                        <td className="py-2 text-right px-3 font-semibold text-emerald-400">{formatCurrency(receita)}</td>
+                        <td className="py-2 text-right px-3 font-semibold text-emerald-400">{formatCurrency(receitaTotal)}</td>
                       </tr>
 
-                      <tr>
-                        <td className="py-1.5 text-muted-foreground pl-3">Custo Produção <span className="text-[10px]">({campaign.batchSize} un × R$ {p.unitCost.toFixed(2)})</span></td>
-                        <td className="py-1.5 text-right px-3">{formatCurrency(prodMensal)}</td>
-                        <td className="py-1.5 text-right px-3">{formatCurrency(prodContrato)}</td>
+                      <tr className="border-t border-border/10">
+                        <td className="py-1.5 text-red-400/80 pl-4">(-) Impostos <span className="text-[10px]">({taxRate}%)</span></td>
+                        <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(impostos)}</td>
+                        <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(m(impostos))}</td>
                       </tr>
-                      {freightTotal > 0 && (
+                      <tr className="bg-muted/20">
+                        <td className="py-1.5 font-medium pl-2 text-xs">= Base após Impostos</td>
+                        <td className="py-1.5 text-right px-3 font-medium text-xs">{formatCurrency(baseAposImpostos)}</td>
+                        <td className="py-1.5 text-right px-3 font-medium text-xs">{formatCurrency(m(baseAposImpostos))}</td>
+                      </tr>
+
+                      <tr className="border-t border-border/10">
+                        <td className="py-1.5 text-red-400/80 pl-4">(-) Comissão Restaurante <span className="text-[10px]">({restCommRate}%)</span></td>
+                        <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(commRest)}</td>
+                        <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(m(commRest))}</td>
+                      </tr>
+                      <tr className="bg-muted/20">
+                        <td className="py-1.5 font-medium pl-2 text-xs">= Base após Comissões</td>
+                        <td className="py-1.5 text-right px-3 font-medium text-xs">{formatCurrency(baseAposComRest)}</td>
+                        <td className="py-1.5 text-right px-3 font-medium text-xs">{formatCurrency(m(baseAposComRest))}</td>
+                      </tr>
+
+                      <tr className="border-t border-border/10">
+                        <td className="py-1.5 text-red-400/80 pl-4">(-) Custo Produção <span className="text-[10px]">({campaign.batchSize} un × R$ {p.unitCost.toFixed(2)})</span></td>
+                        <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(prodCost)}</td>
+                        <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(m(prodCost))}</td>
+                      </tr>
+                      {freteCost > 0 && (
                         <tr>
-                          <td className="py-1.5 text-muted-foreground pl-3">Custo Frete</td>
-                          <td className="py-1.5 text-right px-3">{formatCurrency(freightTotal)}</td>
-                          <td className="py-1.5 text-right px-3">{formatCurrency(freteContrato)}</td>
+                          <td className="py-1.5 text-red-400/80 pl-4">(-) Custo Frete</td>
+                          <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(freteCost)}</td>
+                          <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(m(freteCost))}</td>
                         </tr>
                       )}
-                      <tr>
-                        <td className="py-1.5 text-muted-foreground pl-3">Comissão Restaurante <span className="text-[10px]">({campaign.commissionType === "variable" ? `${restCommRate}%` : `fixa`})</span></td>
-                        <td className="py-1.5 text-right px-3">{formatCurrency(commRestMensal)}</td>
-                        <td className="py-1.5 text-right px-3">{formatCurrency(commRestMensal * campaign.contractDuration)}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1.5 text-muted-foreground pl-3">Comissão Vendedor <span className="text-[10px]">({sellerRate}%)</span></td>
-                        <td className="py-1.5 text-right px-3">{formatCurrency(commVendMensal)}</td>
-                        <td className="py-1.5 text-right px-3">{formatCurrency(commVendMensal * campaign.contractDuration)}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1.5 text-muted-foreground pl-3">Impostos <span className="text-[10px]">({taxRate}%)</span></td>
-                        <td className="py-1.5 text-right px-3">{formatCurrency(impostosMensal)}</td>
-                        <td className="py-1.5 text-right px-3">{formatCurrency(impostosMensal * campaign.contractDuration)}</td>
+                      <tr className="bg-muted/20">
+                        <td className="py-1.5 font-medium pl-2 text-xs">= Base{pName ? " Comissão Parceiro" : ""}</td>
+                        <td className="py-1.5 text-right px-3 font-medium text-xs">{formatCurrency(baseAposCustos)}</td>
+                        <td className="py-1.5 text-right px-3 font-medium text-xs">{formatCurrency(m(baseAposCustos))}</td>
                       </tr>
 
-                      <tr className="border-t border-border/30 font-semibold">
-                        <td className="py-2">Total Custos</td>
-                        <td className="py-2 text-right px-3">{formatCurrency(custosMensal)}</td>
-                        <td className="py-2 text-right px-3">{formatCurrency(custosContrato)}</td>
-                      </tr>
+                      {pName && partnerPct > 0 && (
+                        <>
+                          <tr className="border-t border-border/10">
+                            <td className="py-1.5 text-purple-400/80 pl-4">(-) Comissão {pName} <span className="text-[10px]">({partnerPct}%)</span></td>
+                            <td className="py-1.5 text-right px-3 text-purple-400/80">{formatCurrency(commParceiro)}</td>
+                            <td className="py-1.5 text-right px-3 text-purple-400/80">{formatCurrency(m(commParceiro))}</td>
+                          </tr>
+                        </>
+                      )}
 
-                      <tr className="border-t border-border/30">
-                        <td className="py-2 font-semibold text-emerald-400">Lucro</td>
-                        <td className="py-2 text-right px-3 font-semibold text-emerald-400">{formatCurrency(lucroMensal)}</td>
-                        <td className="py-2 text-right px-3 font-semibold text-emerald-400">{formatCurrency(lucroContrato)}</td>
+                      <tr className="border-t-2 border-emerald-500/30">
+                        <td className="py-2.5 font-bold text-emerald-400">Lucro Líquido</td>
+                        <td className="py-2.5 text-right px-3 font-bold text-emerald-400">{formatCurrency(lucro)}</td>
+                        <td className="py-2.5 text-right px-3 font-bold text-emerald-400">{formatCurrency(m(lucro))}</td>
                       </tr>
                       <tr>
                         <td className="py-1.5 text-muted-foreground">Margem</td>
@@ -2914,17 +2937,6 @@ export default function CampaignDetail() {
                     </tbody>
                   </table>
                 </div>
-
-                {campaign.activeRestaurants > 1 && (
-                  <div className="mt-4 pt-3 border-t border-border/20">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Por Restaurante (mensal)</p>
-                    <div className="grid grid-cols-3 gap-3 text-xs">
-                      <div><span className="text-muted-foreground">Receita</span> <span className="font-medium ml-1">{formatCurrency(p.sellingPricePerRest)}</span></div>
-                      <div><span className="text-muted-foreground">Custos</span> <span className="font-medium ml-1">{formatCurrency(p.totalCostsPerRest)}</span></div>
-                      <div><span className="text-muted-foreground">Lucro</span> <span className="font-medium ml-1">{formatCurrency(p.profitPerRest)}</span></div>
-                    </div>
-                  </div>
-                )}
               </div>
                 );
               })()}
