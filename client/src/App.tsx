@@ -37,6 +37,7 @@ import Invoicing from "./pages/financial/Invoicing";
 import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
 import OperationalCosts from "./pages/financial/OperationalCosts";
 import FinancialReport from "./pages/financial/FinancialReport";
+import PartnerCommissionReport from "./pages/financial/PartnerCommissionReport";
 import PriceTable from "./pages/PriceTable";
 import AnunciantePortal from "./pages/AnunciantePortal";
 import RestaurantePortal from "./pages/RestaurantePortal";
@@ -116,6 +117,7 @@ function Router() {
       <Route path="/financeiro/pagamentos" component={RestaurantPaymentsPage} />
       <Route path="/financeiro/custos" component={OperationalCosts} />
       <Route path="/financeiro/relatorios" component={FinancialReport} />
+      <Route path="/financeiro/comissao-parceiros" component={PartnerCommissionReport} />
       <Route path="/campanhas/:id" component={CampaignDetail} />
       <Route path="/campanhas" component={Campaigns} />
       <Route path="/ordens-servico" component={ServiceOrders} />

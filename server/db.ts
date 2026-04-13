@@ -18,6 +18,7 @@ import {
   budgetItems,
   products,
   quotations,
+  partners,
   serviceOrders,
   type InsertRestaurant,
   type InsertClient,
@@ -348,6 +349,10 @@ export async function getCampaign(id: number) {
       quotationTotalValue: quotations.totalValue,
       quotationCoasterVolume: quotations.coasterVolume,
       quotationUnitPrice: quotations.unitPrice,
+      quotationPartnerId: quotations.partnerId,
+      partnerName: partners.name,
+      partnerCommissionPercent: partners.commissionPercent,
+      partnerBillingMode: partners.billingMode,
       osAnuncianteTotalValue: sql<string | null>`(
         SELECT so."totalValue"::text
         FROM service_orders so
@@ -361,6 +366,7 @@ export async function getCampaign(id: number) {
     .from(campaigns)
     .leftJoin(products, eq(campaigns.productId, products.id))
     .leftJoin(quotations, eq(campaigns.quotationId, quotations.id))
+    .leftJoin(partners, eq(quotations.partnerId, partners.id))
     .where(eq(campaigns.id, id))
     .limit(1);
   if (!result[0]) return undefined;
@@ -378,6 +384,9 @@ export async function getCampaign(id: number) {
     quotationCoasterVolume: result[0].quotationCoasterVolume,
     quotationUnitPrice: result[0].quotationUnitPrice,
     osAnuncianteTotalValue: result[0].osAnuncianteTotalValue,
+    partnerName: result[0].partnerName,
+    partnerCommissionPercent: result[0].partnerCommissionPercent,
+    partnerBillingMode: result[0].partnerBillingMode,
   };
 }
 

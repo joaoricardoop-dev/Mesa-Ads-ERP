@@ -9,6 +9,7 @@ import {
   restaurantPayments,
   activeRestaurants,
   quotations,
+  partners,
 } from "../drizzle/schema";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -928,5 +929,186 @@ export const financialRouter = router({
         cycles,
       };
     });
+  }),
+
+  partnerCommissionReport: protectedProcedure
+    .input(z.object({ campaignId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+
+      const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId)).limit(1);
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
+
+      const [client] = await db.select().from(clients).where(eq(clients.id, campaign.clientId)).limit(1);
+
+      let partnerId: number | null = null;
+      let partnerName: string | null = null;
+      let partnerCommissionPercent = 0;
+      let partnerBillingMode = "bruto";
+
+      if (campaign.quotationId) {
+        const [quot] = await db.select({
+          partnerId: quotations.partnerId,
+          agencyCommissionPercent: quotations.agencyCommissionPercent,
+          totalValue: quotations.totalValue,
+        }).from(quotations).where(eq(quotations.id, campaign.quotationId)).limit(1);
+
+        if (quot?.partnerId) {
+          partnerId = quot.partnerId;
+          const [partner] = await db.select().from(partners).where(eq(partners.id, quot.partnerId)).limit(1);
+          if (partner) {
+            partnerName = partner.name;
+            partnerCommissionPercent = parseFloat(partner.commissionPercent);
+            partnerBillingMode = partner.billingMode;
+          }
+        }
+      }
+
+      if (!partnerId && client?.partnerId) {
+        const [partner] = await db.select().from(partners).where(eq(partners.id, client.partnerId)).limit(1);
+        if (partner) {
+          partnerId = partner.id;
+          partnerName = partner.name;
+          partnerCommissionPercent = parseFloat(partner.commissionPercent);
+          partnerBillingMode = partner.billingMode;
+        }
+      }
+
+      const invoiceRows = await db.select().from(invoices)
+        .where(and(eq(invoices.campaignId, campaign.id), eq(invoices.status, "paga")));
+      const grossValue = invoiceRows.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
+
+      const emittedRows = await db.select().from(invoices)
+        .where(and(eq(invoices.campaignId, campaign.id), eq(invoices.status, "emitida")));
+      const emittedValue = emittedRows.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
+
+      const totalInvoiced = grossValue + emittedValue;
+      const baseGross = totalInvoiced > 0 ? totalInvoiced : parseFloat(String(campaign.batchCost || "0")) * campaign.contractDuration;
+
+      const taxRate = parseFloat(String(campaign.taxRate || "0"));
+      const taxDeduction = baseGross * (taxRate / 100);
+
+      const afterTax = baseGross - taxDeduction;
+
+      const restaurantRate = parseFloat(String(campaign.restaurantCommission || "0"));
+      const restaurantDeduction = afterTax * (restaurantRate / 100);
+
+      const costRows = await db.select().from(operationalCosts)
+        .where(eq(operationalCosts.campaignId, campaign.id)).limit(1);
+      const productionCost = costRows.length > 0 ? parseFloat(costRows[0].productionCost) : 0;
+
+      const totalDeductions = taxDeduction + restaurantDeduction + productionCost;
+      const commissionBase = baseGross - totalDeductions;
+
+      const commissionValue = commissionBase * (partnerCommissionPercent / 100);
+
+      return {
+        campaignId: campaign.id,
+        campaignName: campaign.name,
+        clientName: client?.name || "—",
+        partnerId,
+        partnerName,
+        partnerCommissionPercent,
+        partnerBillingMode,
+        grossValue: baseGross,
+        taxRate,
+        taxDeduction,
+        restaurantRate,
+        restaurantDeduction,
+        productionCost,
+        totalDeductions,
+        commissionBase,
+        commissionValue,
+        totalToPartner: commissionValue,
+        invoicesPaid: invoiceRows.length,
+        invoicesEmitted: emittedRows.length,
+      };
+    }),
+
+  listPartnerCampaigns: protectedProcedure
+    .input(z.object({ partnerId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+
+      let partnerIds: number[] = [];
+      if (input.partnerId) {
+        partnerIds = [input.partnerId];
+      } else {
+        const allPartners = await db.select({ id: partners.id }).from(partners);
+        partnerIds = allPartners.map(p => p.id);
+      }
+
+      if (partnerIds.length === 0) return [];
+
+      const quotRows = await db.select({
+        campaignId: campaigns.id,
+        campaignName: campaigns.name,
+        clientName: clients.name,
+        partnerId: quotations.partnerId,
+        partnerName: partners.name,
+        status: campaigns.status,
+        totalValue: quotations.totalValue,
+      })
+        .from(campaigns)
+        .innerJoin(quotations, eq(campaigns.quotationId, quotations.id))
+        .innerJoin(partners, eq(quotations.partnerId, partners.id))
+        .innerJoin(clients, eq(campaigns.clientId, clients.id))
+        .where(inArray(quotations.partnerId, partnerIds));
+
+      const clientRows = await db.select({
+        campaignId: campaigns.id,
+        campaignName: campaigns.name,
+        clientName: clients.name,
+        partnerId: clients.partnerId,
+        partnerName: partners.name,
+        status: campaigns.status,
+      })
+        .from(campaigns)
+        .innerJoin(clients, eq(campaigns.clientId, clients.id))
+        .innerJoin(partners, eq(clients.partnerId, partners.id))
+        .where(inArray(clients.partnerId, partnerIds));
+
+      const seen = new Set<number>();
+      const result: { campaignId: number; campaignName: string; clientName: string; partnerId: number; partnerName: string; status: string; totalValue: number }[] = [];
+
+      for (const r of quotRows) {
+        if (!seen.has(r.campaignId)) {
+          seen.add(r.campaignId);
+          result.push({
+            campaignId: r.campaignId,
+            campaignName: r.campaignName,
+            clientName: r.clientName,
+            partnerId: r.partnerId!,
+            partnerName: r.partnerName!,
+            status: r.status,
+            totalValue: parseFloat(r.totalValue || "0"),
+          });
+        }
+      }
+      for (const r of clientRows) {
+        if (!seen.has(r.campaignId) && r.partnerId) {
+          seen.add(r.campaignId);
+          result.push({
+            campaignId: r.campaignId,
+            campaignName: r.campaignName,
+            clientName: r.clientName,
+            partnerId: r.partnerId,
+            partnerName: r.partnerName!,
+            status: r.status,
+            totalValue: 0,
+          });
+        }
+      }
+
+      return result;
+    }),
+
+  listAllPartners: protectedProcedure.query(async ({ ctx }) => {
+    requireFinancialAccess(ctx.user.role);
+    const db = await getDatabase();
+    const rows = await db.select({ id: partners.id, name: partners.name, commissionPercent: partners.commissionPercent }).from(partners).where(eq(partners.status, "active"));
+    return rows;
   }),
 });

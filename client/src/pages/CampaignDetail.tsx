@@ -75,6 +75,7 @@ import {
   Trash2,
   Download,
   X,
+  Users,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -2965,6 +2966,73 @@ export default function CampaignDetail() {
                           +{campaignPayments.length - 5} pagamentos <ChevronRight className="w-3 h-3" />
                         </button>
                       )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ── COMISSÃO DO PARCEIRO ── */}
+              {!campaign.isBonificada && (() => {
+                const pName = (campaign as any).partnerName;
+                if (!pName) return null;
+                const partnerPct = Number((campaign as any).partnerCommissionPercent || 10);
+
+                const totalFaturado = campaignInvoices
+                  .filter(i => i.status !== "cancelada")
+                  .reduce((s, i) => s + parseFloat(i.amount), 0);
+                const baseGross = totalFaturado > 0 ? totalFaturado : Number(campaign.batchCost) * campaign.contractDuration;
+                const taxRate = Number(campaign.taxRate || 0);
+                const taxDed = baseGross * (taxRate / 100);
+                const afterTax = baseGross - taxDed;
+                const restRate = Number(campaign.restaurantCommission || 0);
+                const restDed = afterTax * (restRate / 100);
+                const prodCost = Number(campaign.productionCost || 0);
+                const totalDed = taxDed + restDed + prodCost;
+                const commBase = baseGross - totalDed;
+                const commValue = commBase * (partnerPct / 100);
+
+                return (
+                  <div className="bg-card border border-border/30 rounded-lg p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        <h3 className="text-sm font-semibold">Comissão do Parceiro</h3>
+                        <Badge variant="outline" className="text-[10px] border-purple-500/40 text-purple-400">{pName}</Badge>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/financeiro/comissao-parceiros")}>
+                        Relatório completo <ExternalLink className="w-3 h-3" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between py-1.5 px-3 rounded bg-muted/10">
+                        <span className="font-semibold">Valor Bruto do Serviço</span>
+                        <span className="font-mono font-semibold text-blue-400">{formatCurrency(baseGross)}</span>
+                      </div>
+                      <div className="flex justify-between py-1 px-3 pl-6 text-muted-foreground">
+                        <span>(-) Imposto ({taxRate}%)</span>
+                        <span className="font-mono text-red-400">({formatCurrency(taxDed)})</span>
+                      </div>
+                      <div className="flex justify-between py-1 px-3 pl-6 text-muted-foreground">
+                        <span>(-) Restaurante ({restRate}%)</span>
+                        <span className="font-mono text-red-400">({formatCurrency(restDed)})</span>
+                      </div>
+                      <div className="flex justify-between py-1 px-3 pl-6 text-muted-foreground">
+                        <span>(-) Produção</span>
+                        <span className="font-mono text-red-400">({formatCurrency(prodCost)})</span>
+                      </div>
+                      <div className="flex justify-between py-1.5 px-3 rounded bg-blue-500/5 border-t border-border/10">
+                        <span className="font-semibold text-blue-400">Base de Cálculo</span>
+                        <span className="font-mono font-semibold">{formatCurrency(commBase)}</span>
+                      </div>
+                      <div className="flex justify-between py-1 px-3 pl-6 text-muted-foreground">
+                        <span>Comissão ({partnerPct}% sobre base)</span>
+                        <span className="font-mono font-semibold">{formatCurrency(commValue)}</span>
+                      </div>
+                      <div className="flex justify-between py-2 px-3 rounded bg-emerald-500/10 border-t border-emerald-500/20">
+                        <span className="font-bold text-emerald-400">TOTAL A REPASSAR</span>
+                        <span className="font-mono font-bold text-emerald-400">{formatCurrency(commValue)}</span>
+                      </div>
                     </div>
                   </div>
                 );
