@@ -1004,13 +1004,15 @@ export const financialRouter = router({
       const restaurantRate = parseFloat(String(campaign.restaurantCommission || "0"));
       const restaurantDeduction = afterTax * (restaurantRate / 100);
 
-      const costRows = await db.select().from(operationalCosts)
-        .where(eq(operationalCosts.campaignId, campaign.id)).limit(1);
-      const productionCost = costRows.length > 0 ? parseFloat(costRows[0].productionCost) : 0;
+      const productionCost = parseFloat(String(campaign.batchCost || "0")) * campaign.contractDuration;
+      const freightCost = parseFloat(String((campaign as any).freightCost || "0")) * campaign.contractDuration;
 
-      const totalDeductions = taxDeduction + restaurantDeduction + productionCost;
-      const commissionBase = baseGross - totalDeductions;
+      const afterRestaurant = afterTax - restaurantDeduction;
+      const afterProduction = afterRestaurant - productionCost;
+      const afterFreight = afterProduction - freightCost;
+      const commissionBase = afterFreight;
 
+      const totalDeductions = taxDeduction + restaurantDeduction + productionCost + freightCost;
       const commissionValue = commissionBase * (partnerCommissionPercent / 100);
 
       return {
@@ -1024,15 +1026,21 @@ export const financialRouter = router({
         grossValue: baseGross,
         taxRate,
         taxDeduction,
+        afterTax,
         restaurantRate,
         restaurantDeduction,
+        afterRestaurant,
         productionCost,
+        freightCost,
+        afterProduction,
+        afterFreight,
         totalDeductions,
         commissionBase,
         commissionValue,
         totalToPartner: commissionValue,
         invoicesPaid: invoiceRows.length,
         invoicesEmitted: emittedRows.length,
+        contractDuration: campaign.contractDuration,
       };
     }),
 

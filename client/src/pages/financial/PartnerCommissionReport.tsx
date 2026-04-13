@@ -155,19 +155,17 @@ export default function PartnerCommissionReport() {
                   <h1 style={{ fontSize: "20px", fontWeight: 700 }}>Relatório de Comissão</h1>
                   <p style={{ fontSize: "12px", color: "#999", marginTop: "4px" }}>{fmtDateBR(new Date())}</p>
                   <p style={{ fontSize: "12px", color: "#999" }}>Repasse ao Parceiro — {report.partnerName}</p>
+                  <p style={{ fontSize: "12px", color: "#999" }}>Duração do contrato: {report.contractDuration} meses</p>
                 </div>
                 <div style={{ border: "1px solid hsl(var(--border))", borderRadius: "8px", overflow: "hidden", minWidth: "260px" }}>
-                  {[
-                    { label: "Valor Bruto (R$)", value: formatCurrency(report.grossValue), cls: "" },
-                    { label: "Deduções (R$)", value: `(${formatCurrency(report.totalDeductions)})`, cls: "text-red-400" },
-                    { label: "Base da Comissão (R$)", value: formatCurrency(report.commissionBase), cls: "" },
-                    { label: "Total a Repassar (R$)", value: formatCurrency(report.totalToPartner), cls: "font-bold text-emerald-400" },
-                  ].map(r => (
-                    <div key={r.label} className={`flex justify-between px-4 py-2 border-b border-border/10 last:border-0 last:bg-emerald-500/5 ${r.cls}`}>
-                      <span className="text-xs text-muted-foreground">{r.label}</span>
-                      <span className={`text-xs font-mono font-semibold ${r.cls}`}>{r.value}</span>
-                    </div>
-                  ))}
+                  <div className="flex justify-between px-4 py-2 border-b border-border/10">
+                    <span className="text-xs text-muted-foreground">Base Comissão (R$)</span>
+                    <span className="text-xs font-mono font-semibold">{formatCurrency(report.commissionBase)}</span>
+                  </div>
+                  <div className="flex justify-between px-4 py-2 bg-emerald-500/5">
+                    <span className="text-xs text-muted-foreground">Total a Repassar (R$)</span>
+                    <span className="text-xs font-mono font-bold text-emerald-400">{formatCurrency(report.totalToPartner)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -175,77 +173,59 @@ export default function PartnerCommissionReport() {
                 <thead>
                   <tr style={{ borderBottom: "2px solid hsl(var(--border))" }}>
                     <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Descrição</th>
-                    <th className="text-center py-2 px-3 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Base de Cálculo</th>
                     <th className="text-right py-2 px-3 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Valor (R$)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-b border-border/10">
-                    <td className="py-2.5 px-3 text-sm font-semibold">Valor Bruto do Serviço</td>
-                    <td className="py-2.5 px-3 text-sm text-center text-muted-foreground">—</td>
-                    <td className="py-2.5 px-3 text-sm text-right font-mono font-semibold text-blue-400">{formatCurrency(report.grossValue)}</td>
+                  <tr>
+                    <td className="py-2.5 px-3 text-sm font-semibold text-emerald-400">Receita Bruta ({report.contractDuration}m)</td>
+                    <td className="py-2.5 px-3 text-sm text-right font-mono font-semibold text-emerald-400">{formatCurrency(report.grossValue)}</td>
                   </tr>
 
+                  <tr className="border-t border-border/10">
+                    <td className="py-2 px-3 pl-6 text-sm text-red-400/80">(-) Impostos ({fmtPct(report.taxRate)} da receita)</td>
+                    <td className="py-2 px-3 text-sm text-right font-mono text-red-400/80">{formatCurrency(report.taxDeduction)}</td>
+                  </tr>
                   <tr className="bg-muted/20">
-                    <td colSpan={3} className="py-1.5 px-3 text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Deduções</td>
-                  </tr>
-                  <tr className="border-b border-border/5">
-                    <td className="py-2 px-3 pl-6 text-sm text-muted-foreground">Imposto ({fmtPct(report.taxRate)} sobre valor bruto)</td>
-                    <td className="py-2 px-3 text-sm text-center font-mono text-muted-foreground">{formatCurrency(report.grossValue)}</td>
-                    <td className="py-2 px-3 text-sm text-right font-mono text-red-400">({formatCurrency(report.taxDeduction)})</td>
-                  </tr>
-                  <tr className="border-b border-border/5">
-                    <td className="py-2 px-3 pl-6 text-sm text-muted-foreground">Restaurante ({fmtPct(report.restaurantRate)} − imposto)</td>
-                    <td className="py-2 px-3 text-sm text-center font-mono text-muted-foreground">{formatCurrency(report.grossValue - report.taxDeduction)}</td>
-                    <td className="py-2 px-3 text-sm text-right font-mono text-red-400">({formatCurrency(report.restaurantDeduction)})</td>
-                  </tr>
-                  <tr className="border-b border-border/10">
-                    <td className="py-2 px-3 pl-6 text-sm text-muted-foreground">Produção (valor fixo)</td>
-                    <td className="py-2 px-3 text-sm text-center text-muted-foreground">Fixo</td>
-                    <td className="py-2 px-3 text-sm text-right font-mono text-red-400">({formatCurrency(report.productionCost)})</td>
+                    <td className="py-1.5 px-3 text-xs font-medium">= Base após Impostos</td>
+                    <td className="py-1.5 px-3 text-xs text-right font-mono font-medium">{formatCurrency(report.afterTax)}</td>
                   </tr>
 
-                  <tr className="border-t border-border/20 bg-blue-500/5">
-                    <td className="py-2.5 px-3 text-sm font-bold text-blue-400">Base de Cálculo da Comissão</td>
-                    <td className="py-2.5 px-3 text-sm text-center text-muted-foreground">—</td>
-                    <td className="py-2.5 px-3 text-sm text-right font-mono font-bold">{formatCurrency(report.commissionBase)}</td>
+                  <tr className="border-t border-border/10">
+                    <td className="py-2 px-3 pl-6 text-sm text-red-400/80">(-) Comissão Restaurante ({fmtPct(report.restaurantRate)} da base pós-impostos)</td>
+                    <td className="py-2 px-3 text-sm text-right font-mono text-red-400/80">{formatCurrency(report.restaurantDeduction)}</td>
                   </tr>
-
                   <tr className="bg-muted/20">
-                    <td colSpan={3} className="py-1.5 px-3 text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Comissão do Parceiro</td>
+                    <td className="py-1.5 px-3 text-xs font-medium">= Base após Comissões</td>
+                    <td className="py-1.5 px-3 text-xs text-right font-mono font-medium">{formatCurrency(report.afterRestaurant)}</td>
                   </tr>
-                  <tr className="border-b border-border/10">
-                    <td className="py-2 px-3 pl-6 text-sm text-muted-foreground">Comissão do Parceiro ({fmtPct(report.partnerCommissionPercent)} sobre base)</td>
-                    <td className="py-2 px-3 text-sm text-center font-mono text-muted-foreground">{formatCurrency(report.commissionBase)}</td>
-                    <td className="py-2 px-3 text-sm text-right font-mono font-semibold">{formatCurrency(report.commissionValue)}</td>
+
+                  <tr className="border-t border-border/10">
+                    <td className="py-2 px-3 pl-6 text-sm text-red-400/80">(-) Custo Produção ({report.contractDuration}m)</td>
+                    <td className="py-2 px-3 text-sm text-right font-mono text-red-400/80">{formatCurrency(report.productionCost)}</td>
+                  </tr>
+                  {report.freightCost > 0 && (
+                    <tr>
+                      <td className="py-2 px-3 pl-6 text-sm text-red-400/80">(-) Custo Frete ({report.contractDuration}m)</td>
+                      <td className="py-2 px-3 text-sm text-right font-mono text-red-400/80">{formatCurrency(report.freightCost)}</td>
+                    </tr>
+                  )}
+                  <tr className="bg-blue-500/5 border-t border-border/20">
+                    <td className="py-2.5 px-3 text-sm font-bold text-blue-400">= Base Comissão Parceiro</td>
+                    <td className="py-2.5 px-3 text-sm text-right font-mono font-bold text-blue-400">{formatCurrency(report.commissionBase)}</td>
+                  </tr>
+
+                  <tr className="border-t border-border/10">
+                    <td className="py-2 px-3 pl-6 text-sm text-purple-400/80">Comissão {report.partnerName} ({fmtPct(report.partnerCommissionPercent)} da base)</td>
+                    <td className="py-2 px-3 text-sm text-right font-mono font-semibold text-purple-400">{formatCurrency(report.commissionValue)}</td>
                   </tr>
 
                   <tr className="bg-emerald-500/10 border-t-2 border-emerald-500/30">
                     <td className="py-3 px-3 text-sm font-bold text-emerald-400">TOTAL A REPASSAR AO PARCEIRO</td>
-                    <td className="py-3 px-3"></td>
                     <td className="py-3 px-3 text-right font-mono text-lg font-bold text-emerald-400">{formatCurrency(report.totalToPartner)}</td>
                   </tr>
                 </tbody>
               </table>
-
-              <div className="mt-8 pt-6 border-t border-border/10">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-bold">Totais do período</p>
-                    <p className="text-[11px] text-muted-foreground">{fmtDateBR(new Date())}</p>
-                  </div>
-                  <div className="flex gap-10">
-                    <div className="text-center">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Base da comissão (R$)</p>
-                      <p className="text-base font-bold font-mono mt-1">{formatCurrency(report.commissionBase)}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total a repassar (R$)</p>
-                      <p className="text-base font-bold font-mono mt-1 text-emerald-400">{formatCurrency(report.totalToPartner)}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 p-4">
