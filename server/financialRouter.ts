@@ -710,19 +710,94 @@ export const financialRouter = router({
         if (r.campaignId) rpMap[r.campaignId] = parseFloat(r.total);
       }
 
+      const soRows = await db
+        .select({
+          campaignId: serviceOrders.campaignId,
+          totalValue: serviceOrders.totalValue,
+        })
+        .from(serviceOrders)
+        .where(
+          and(
+            eq(serviceOrders.type, "anunciante"),
+            eq(serviceOrders.status, "assinada"),
+          )
+        );
+      const soMap: Record<number, number> = {};
+      for (const s of soRows) {
+        if (s.campaignId) soMap[s.campaignId] = parseFloat(s.totalValue || "0");
+      }
+
+      const quotRows2 = await db
+        .select({ id: quotations.id, totalValue: quotations.totalValue })
+        .from(quotations);
+      const quotMap: Record<number, number> = {};
+      for (const q of quotRows2) quotMap[q.id] = parseFloat(q.totalValue || "0");
+
+      const partnerRows = await db.select({ id: partners.id, name: partners.name, commissionPercent: partners.commissionPercent }).from(partners);
+      const partnerMap: Record<number, { name: string; pct: number }> = {};
+      for (const p of partnerRows) partnerMap[p.id] = { name: p.name, pct: parseFloat(p.commissionPercent || "0") };
+
+      const clientRows = await db.select({ id: clients.id, partnerId: clients.partnerId }).from(clients);
+      const clientPartnerMap: Record<number, number | null> = {};
+      for (const cl of clientRows) clientPartnerMap[cl.id] = cl.partnerId;
+
       return campaignRows.map((c) => {
         const cost = costMap[c.id];
-        const production = parseFloat(cost?.productionCost || c.productionCost || "0");
-        const freight = parseFloat(cost?.freightCost || c.freightCost || "0");
+        const dur = c.contractDuration;
+        const batchCost = parseFloat(c.batchCost || "0");
+        const productionPerMonth = parseFloat(cost?.productionCost || "0") > 0
+          ? parseFloat(cost.productionCost) / dur
+          : batchCost;
+        const productionTotal = productionPerMonth * dur;
+
+        const freightPerMonth = parseFloat(c.freightCost || "0");
+        const freightTotal = freightPerMonth * dur;
+
         const restaurantCost = rpMap[c.id] || 0;
+
+        const revenue = soMap[c.id]
+          || (c.quotationId ? quotMap[c.quotationId] || 0 : 0)
+          || 0;
+
+        const taxRate = parseFloat(c.taxRate || "0");
+        const taxAmount = revenue * (taxRate / 100);
+
+        const restRate = parseFloat(c.restaurantCommission || "0");
+        const restAmount = (revenue - taxAmount) * (restRate / 100);
+
+        const pId = c.quotationId ? null : (c as any).partnerId || clientPartnerMap[c.clientId] || null;
+        const resolvedPartnerId = pId;
+        const partnerInfo = resolvedPartnerId ? partnerMap[resolvedPartnerId] : null;
+        const partnerPct = partnerInfo?.pct || 0;
+        const commBase = (revenue - taxAmount) - restAmount - productionTotal - freightTotal;
+        const partnerCommission = commBase > 0 ? commBase * (partnerPct / 100) : 0;
+
+        const totalCosts = productionTotal + freightTotal + restaurantCost + taxAmount + restAmount + partnerCommission;
+
         return {
           campaignId: c.id,
           campaignName: c.name,
-          production,
-          freight,
-          restaurantCost,
-          total: production + freight + restaurantCost,
+          status: c.status,
+          startDate: c.startDate,
+          contractDuration: dur,
           coastersTotal: c.coastersPerRestaurant * c.activeRestaurants,
+          activeRestaurants: c.activeRestaurants,
+          revenue,
+          taxRate,
+          taxAmount,
+          restRate,
+          restAmount,
+          productionPerMonth,
+          productionTotal,
+          freightPerMonth,
+          freightTotal,
+          restaurantCost,
+          partnerName: partnerInfo?.name || null,
+          partnerPct,
+          partnerCommission,
+          totalCosts,
+          margin: revenue > 0 ? revenue - totalCosts : 0,
+          marginPct: revenue > 0 ? ((revenue - totalCosts) / revenue) * 100 : 0,
         };
       });
     }),
