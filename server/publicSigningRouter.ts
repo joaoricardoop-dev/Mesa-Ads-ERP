@@ -1,7 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import { getDb } from "./db";
-import { quotations, clients, leads, serviceOrders, quotationRestaurants, activeRestaurants, campaigns, campaignHistory, campaignRestaurants, campaignBatches, campaignBatchAssignments, invoices } from "../drizzle/schema";
+import { quotations, clients, leads, serviceOrders, quotationRestaurants, activeRestaurants, campaigns, campaignHistory, campaignRestaurants, campaignBatches, campaignBatchAssignments, invoices, quotationItems, products } from "../drizzle/schema";
 import { eq, inArray, asc, sql } from "drizzle-orm";
 
 async function getDatabase() {
@@ -75,6 +75,18 @@ export function setupPublicSigningRoutes(app: express.Express) {
         .leftJoin(activeRestaurants, eq(quotationRestaurants.restaurantId, activeRestaurants.id))
         .where(eq(quotationRestaurants.quotationId, quotation[0].id));
 
+      const items = await db
+        .select({
+          productName: products.name,
+          quantity: quotationItems.quantity,
+          unitPrice: quotationItems.unitPrice,
+          totalPrice: quotationItems.totalPrice,
+          unitLabelPlural: products.unitLabelPlural,
+        })
+        .from(quotationItems)
+        .leftJoin(products, eq(quotationItems.productId, products.id))
+        .where(eq(quotationItems.quotationId, quotation[0].id));
+
       let batchInfo: any[] = [];
       if (os[0].batchSelectionJson) {
         const batchIds = JSON.parse(os[0].batchSelectionJson) as number[];
@@ -105,6 +117,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
         },
         restaurants,
         batches: batchInfo,
+        items,
       });
     } catch (err: any) {
       console.error("Error fetching public quotation:", err);

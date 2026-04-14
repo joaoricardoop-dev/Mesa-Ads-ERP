@@ -3,11 +3,20 @@ import { useParams } from "wouter";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
 import { Loader2, CheckCircle2, AlertCircle, FileDown } from "lucide-react";
 
+interface QuotationItem {
+  productName: string | null;
+  quantity: number;
+  unitPrice: string | null;
+  totalPrice: string | null;
+  unitLabelPlural: string | null;
+}
+
 interface QuotationData {
   quotation: any;
   serviceOrder: any;
   restaurants: any[];
   batches: any[];
+  items: QuotationItem[];
 }
 
 interface SignResult {
@@ -271,26 +280,70 @@ export default function QuotationSign() {
                   <span className="text-white font-medium text-right max-w-[60%]">{q.description}</span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-[hsl(0,0%,50%)]">Volume</span>
-                <span className="text-white font-medium">
-                  {(q?.coasterVolume || q?.volume || 0).toLocaleString("pt-BR")} bolachas
-                </span>
-              </div>
             </div>
           </div>
 
           <div className="border-t border-[hsl(0,0%,14%)]" />
 
-          <div>
-            <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-3">Financeiro</h3>
-            <div className="flex justify-between text-sm">
-              <span className="text-[hsl(0,0%,50%)]">Valor Total</span>
-              <span className="text-white font-bold text-lg">
-                {formatCurrency(q?.totalValue || q?.value || 0)}
-              </span>
+          {data.items && data.items.length > 0 ? (
+            <>
+              <div>
+                <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-3">Produtos do Orçamento</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-[hsl(0,0%,40%)] text-xs border-b border-[hsl(0,0%,14%)]">
+                        <th className="text-left pb-2 font-medium">Produto</th>
+                        <th className="text-right pb-2 font-medium">Volume</th>
+                        <th className="text-right pb-2 font-medium">Preço/un.</th>
+                        <th className="text-right pb-2 font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.items.map((item, i) => (
+                        <tr key={i} className="border-b border-[hsl(0,0%,10%)]">
+                          <td className="py-2 text-white font-medium pr-3">{item.productName || "-"}</td>
+                          <td className="py-2 text-white text-right whitespace-nowrap">
+                            {item.quantity.toLocaleString("pt-BR")} {item.unitLabelPlural || "unidades"}
+                          </td>
+                          <td className="py-2 text-[hsl(0,0%,60%)] text-right whitespace-nowrap">
+                            {item.unitPrice ? formatCurrency(parseFloat(item.unitPrice)) : "-"}
+                          </td>
+                          <td className="py-2 text-white text-right whitespace-nowrap">
+                            {item.totalPrice ? formatCurrency(parseFloat(item.totalPrice)) : "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="text-xs text-[hsl(0,0%,45%)]">
+                        <td className="pt-2" colSpan={1}>
+                          {data.items.length} {data.items.length === 1 ? "produto" : "produtos"}
+                        </td>
+                        <td className="pt-2 text-right">
+                          {data.items.reduce((s, it) => s + it.quantity, 0).toLocaleString("pt-BR")} quantidade total
+                        </td>
+                        <td />
+                        <td className="pt-2 text-right text-white font-bold text-base">
+                          {formatCurrency(parseFloat(q?.totalValue || q?.value || "0"))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div>
+              <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-3">Financeiro</h3>
+              <div className="flex justify-between text-sm">
+                <span className="text-[hsl(0,0%,50%)]">Valor Total</span>
+                <span className="text-white font-bold text-lg">
+                  {formatCurrency(parseFloat(q?.totalValue || q?.value || "0"))}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="border-t border-[hsl(0,0%,14%)]" />
 
