@@ -95,11 +95,11 @@ async function autoCreateInvoice(db: any, campaign: { id: number; clientId: numb
 async function generateOSNumber(db: any) {
   const year = new Date().getFullYear();
   const pattern = `OS-ANT-${year}-%`;
-  const countResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
+  const maxResult = await db
+    .select({ maxSeq: sql<string>`MAX(CAST(SPLIT_PART("orderNumber", '-', 4) AS INTEGER))` })
     .from(serviceOrders)
     .where(sql`${serviceOrders.orderNumber} LIKE ${pattern}`);
-  const seqNum = Number(countResult[0]?.count || 0) + 1;
+  const seqNum = Number(maxResult[0]?.maxSeq || 0) + 1;
   return `OS-ANT-${year}-${String(seqNum).padStart(4, "0")}`;
 }
 

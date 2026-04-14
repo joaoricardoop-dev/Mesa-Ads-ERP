@@ -1715,11 +1715,11 @@ export const appRouter = router({
           const { sql: sqlFn, eq: eqFn } = await import("drizzle-orm");
           const year = new Date().getFullYear();
           const pattern = `OS-PROD-${year}-%`;
-          const countResult = await db
-            .select({ count: sqlFn<number>`COUNT(*)` })
+          const maxResult = await db
+            .select({ maxSeq: sqlFn<string>`MAX(CAST(SPLIT_PART("orderNumber", '-', 4) AS INTEGER))` })
             .from(soTable)
             .where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
-          const seqNum = Number(countResult[0]?.count || 0) + 1;
+          const seqNum = Number(maxResult[0]?.maxSeq || 0) + 1;
           const orderNumber = `OS-PROD-${year}-${String(seqNum).padStart(4, "0")}`;
           await db.insert(soTable).values({
             orderNumber,
@@ -1784,11 +1784,11 @@ export const appRouter = router({
           const { sql: sqlFn, eq: eqFn } = await import("drizzle-orm");
           const year = new Date().getFullYear();
           const pattern = `OS-DIST-${year}-%`;
-          const countResult = await db
-            .select({ count: sqlFn<number>`COUNT(*)` })
+          const maxResult = await db
+            .select({ maxSeq: sqlFn<string>`MAX(CAST(SPLIT_PART("orderNumber", '-', 4) AS INTEGER))` })
             .from(soTable)
             .where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
-          const seqNum = Number(countResult[0]?.count || 0) + 1;
+          const seqNum = Number(maxResult[0]?.maxSeq || 0) + 1;
           const orderNumber = `OS-DIST-${year}-${String(seqNum).padStart(4, "0")}`;
           const restaurants = await db.select().from(crTable).where(eqFn(crTable.campaignId, input.id));
           await db.insert(soTable).values({
@@ -1934,8 +1934,8 @@ export const appRouter = router({
           if (existing.length === 0) {
             const year = new Date().getFullYear();
             const pattern = `OS-PROD-${year}-%`;
-            const countResult = await db.select({ count: sqlFn<number>`COUNT(*)` }).from(soTable).where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
-            const seqNum = Number(countResult[0]?.count || 0) + 1;
+            const maxResult = await db.select({ maxSeq: sqlFn<string>`MAX(CAST(SPLIT_PART("orderNumber", '-', 4) AS INTEGER))` }).from(soTable).where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
+            const seqNum = Number(maxResult[0]?.maxSeq || 0) + 1;
             const orderNumber = `OS-PROD-${year}-${String(seqNum).padStart(4, "0")}`;
             await db.insert(soTable).values({
               orderNumber,
@@ -1984,8 +1984,8 @@ export const appRouter = router({
         if (existing.length > 0) return { id: existing[0].id, alreadyExisted: true };
         const year = new Date().getFullYear();
         const pattern = `OS-PROD-${year}-%`;
-        const countResult = await db.select({ count: sqlFn<number>`COUNT(*)` }).from(soTable).where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
-        const seqNum = Number(countResult[0]?.count || 0) + 1;
+        const maxResult = await db.select({ maxSeq: sqlFn<string>`MAX(CAST(SPLIT_PART("orderNumber", '-', 4) AS INTEGER))` }).from(soTable).where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
+        const seqNum = Number(maxResult[0]?.maxSeq || 0) + 1;
         const orderNumber = `OS-PROD-${year}-${String(seqNum).padStart(4, "0")}`;
         const [created] = await db.insert(soTable).values({
           orderNumber,
@@ -2022,11 +2022,11 @@ export const appRouter = router({
           if (existing.length === 0) {
             const year = new Date().getFullYear();
             const pattern = `OS-PROD-${year}-%`;
-            const countResult = await db
-              .select({ count: sqlFn<number>`COUNT(*)` })
+            const maxResult = await db
+              .select({ maxSeq: sqlFn<string>`MAX(CAST(SPLIT_PART("orderNumber", '-', 4) AS INTEGER))` })
               .from(soTable)
               .where(sqlFn`${soTable.orderNumber} LIKE ${pattern}`);
-            const seqNum = Number(countResult[0]?.count || 0) + 1;
+            const seqNum = Number(maxResult[0]?.maxSeq || 0) + 1;
             const orderNumber = `OS-PROD-${year}-${String(seqNum).padStart(4, "0")}`;
             await db.insert(soTable).values({
               orderNumber,
