@@ -225,6 +225,8 @@ export default function ParceiroTabelaPrecos() {
   const [bvPercent, setBvPercent] = useState<number | null>(null);
   const displayBv = bvPercent ?? 20;
 
+  const [refProductId, setRefProductId] = useState<number | null>(null);
+
   const handleToggleBillingMode = () => {
     const newMode = billingMode === "bruto" ? "liquido" : "bruto";
     updateBillingModeMutation.mutate({ billingMode: newMode });
@@ -283,7 +285,10 @@ export default function ParceiroTabelaPrecos() {
               Com 20%: preço público de tabela. Reduza para oferecer um preço menor ao seu cliente — a diferença sai da sua comissão.
             </p>
             {(() => {
-              const refProduct = products[0];
+              const productsWithTiers = products.filter((p: any) => (p.tiers ?? []).length > 0);
+              if (productsWithTiers.length === 0) return null;
+              const effectiveId = refProductId ?? productsWithTiers[0]?.id ?? null;
+              const refProduct = productsWithTiers.find((p: any) => p.id === effectiveId) ?? productsWithTiers[0];
               const refTiers = refProduct?.tiers ?? [];
               const refTier = refTiers.length > 0 ? [...refTiers].sort((a: any, b: any) => a.volumeMin - b.volumeMin)[0] : null;
               if (!refProduct || !refTier) return null;
@@ -308,6 +313,20 @@ export default function ParceiroTabelaPrecos() {
               const comissaoEstimada = precoComBv - precoSemBv;
               return (
                 <div className="mb-3">
+                  {productsWithTiers.length > 1 && (
+                    <div className="mb-2">
+                      <label className="text-[10px] text-muted-foreground mr-1.5">Produto de referência:</label>
+                      <select
+                        value={refProduct.id}
+                        onChange={(e) => setRefProductId(Number(e.target.value))}
+                        className="text-xs bg-muted/40 border border-border/50 rounded px-2 py-0.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        {productsWithTiers.map((p: any) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="flex gap-6 text-sm">
                     <div>
                       <p className="text-muted-foreground text-xs">Preço para o cliente</p>
