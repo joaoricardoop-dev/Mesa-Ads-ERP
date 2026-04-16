@@ -227,16 +227,14 @@ export default function ParceiroTabelaPrecos() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
-  const [localCommission, setLocalCommission] = useState<number | null>(null);
-  const commissionPercent = localCommission ?? (data?.commissionPercent ?? 10);
-  const hasUnsaved = localCommission !== null && localCommission !== data?.commissionPercent;
   const billingMode: "bruto" | "liquido" = data?.billingMode ?? "bruto";
 
-  const [bvPercent, setBvPercent] = useState(20);
+  const [bvPercent, setBvPercent] = useState<number | null>(null);
+  const displayBv = bvPercent ?? (data?.commissionPercent ?? 20);
+  const hasUnsavedBv = bvPercent !== null && bvPercent !== data?.commissionPercent;
 
-  const handleSaveCommission = () => {
-    if (localCommission === null) return;
-    updateCommissionMutation.mutate({ commissionPercent: localCommission });
+  const handleSaveBv = () => {
+    updateCommissionMutation.mutate({ commissionPercent: displayBv });
   };
 
   const handleToggleBillingMode = () => {
@@ -278,7 +276,7 @@ export default function ParceiroTabelaPrecos() {
                 variant="outline"
                 className="text-emerald-400 border-emerald-500/30 bg-emerald-500/10 font-mono text-xs"
               >
-                {bvPercent}%
+                {displayBv}%
               </Badge>
             </div>
             <div className="flex items-center gap-4 mb-2">
@@ -287,16 +285,64 @@ export default function ParceiroTabelaPrecos() {
                 min={0}
                 max={20}
                 step={0.5}
-                defaultValue={[20]}
-                value={[bvPercent]}
+                value={[displayBv]}
                 onValueChange={([v]) => setBvPercent(v)}
                 className="flex-1"
               />
               <span className="text-xs text-muted-foreground w-8">20%</span>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mb-3">
               Com 20%: preço público de tabela. Reduza para oferecer um preço menor ao seu cliente — a diferença sai da sua comissão.
             </p>
+            {(() => {
+              const refProduct = products[0];
+              const refTiers = refProduct?.tiers ?? [];
+              const refTier = refTiers.length > 0 ? [...refTiers].sort((a: any, b: any) => a.volumeMin - b.volumeMin)[0] : null;
+              if (!refProduct || !refTier) return null;
+              const refIrpj = parseFloat(refProduct.irpj ?? "6") / 100;
+              const refComRest = parseFloat(refProduct.comRestaurante ?? "15") / 100;
+              const refComCom = parseFloat(refProduct.comComercial ?? "10") / 100;
+              const refVol = refTier.volumeMin;
+              const calcParams = {
+                custoUnitario: parseFloat(refTier.custoUnitario),
+                frete: parseFloat(refTier.frete),
+                margem: parseFloat(refTier.margem) / 100,
+                artes: refTier.artes ?? 1,
+                volume: refVol,
+                irpj: refIrpj,
+                comRestaurante: refComRest,
+                comComercialProduto: refComCom,
+                pricingMode: refProduct.pricingMode ?? "cost_based",
+                precoBaseTier: parseFloat(refTier.precoBase ?? "0"),
+              };
+              const precoComBv = calcUnitPrice({ ...calcParams, comParceiro: displayBv / 100 });
+              const precoSemBv = calcUnitPrice({ ...calcParams, comParceiro: 0 });
+              const comissaoEstimada = precoComBv - precoSemBv;
+              return (
+                <div className="flex gap-6 text-sm mb-3">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Preço para o cliente</p>
+                    <p className="font-bold font-mono">{fmtBRL4(precoComBv)}</p>
+                    <p className="text-[10px] text-muted-foreground">/un · 4 sem. · {refVol.toLocaleString("pt-BR")} {refProduct.unitLabelPlural}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Sua comissão estimada</p>
+                    <p className="font-bold font-mono text-emerald-400">{fmtBRL4(comissaoEstimada)}</p>
+                    <p className="text-[10px] text-muted-foreground">/un · 4 sem.</p>
+                  </div>
+                </div>
+              );
+            })()}
+            {hasUnsavedBv && (
+              <button
+                onClick={handleSaveBv}
+                disabled={updateCommissionMutation.isPending}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors"
+              >
+                <Save className="w-3 h-3" />
+                Salvar comissão ({displayBv}%)
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -355,7 +401,7 @@ export default function ParceiroTabelaPrecos() {
             <ProductTable
               key={product.id}
               product={product}
-              bvPercent={bvPercent}
+              bvPercent={displayBv}
               billingMode={billingMode}
             />
           ))}
