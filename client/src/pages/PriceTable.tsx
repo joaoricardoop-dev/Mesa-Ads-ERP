@@ -66,6 +66,8 @@ const DEFAULT_PAGAMENTO = {
 
 const SEMANAS = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52];
 
+const BV_PADRAO = 0.20; // BV sempre embutido no preço público
+
 const inputCls = "bg-background border-border/30 h-7 text-xs font-mono px-2 w-20 text-right";
 
 export default function PriceTable() {
@@ -225,9 +227,11 @@ export default function PriceTable() {
     const custoProducao = dados.custoGPC * dados.artes * volume;
     const custoTotal4sem = custoProducao + dados.frete;
 
-    const precoTotalBase4sem = denominador > 0
+    const precoNetBase4sem = denominador > 0
       ? custoTotal4sem / denominador
       : 0;
+    const bvDen = 1 - BV_PADRAO - irpj;
+    const precoTotalBase4sem = bvDen > 0 ? precoNetBase4sem / bvDen : precoNetBase4sem;
     const precoUnit4sem = volume > 0 ? precoTotalBase4sem / volume : 0;
 
     const smallestVolume = volumes.length > 0 ? volumes[0] : 1000;
@@ -236,7 +240,8 @@ export default function PriceTable() {
       if (!d) return precoUnit4sem;
       const ct = d.custoGPC * d.artes * smallestVolume + d.frete;
       const den = 1 - d.margem - irpj - comRest - comCom;
-      return den > 0 ? (ct / den) / smallestVolume : 0;
+      const netUnit = den > 0 ? (ct / den) / smallestVolume : 0;
+      return bvDen > 0 ? netUnit / bvDen : netUnit;
     })();
     const descontoQuantidade = precoUnitSmallest > 0 && volume > smallestVolume ? 1 - (precoUnit4sem / precoUnitSmallest) : 0;
 
@@ -270,13 +275,15 @@ export default function PriceTable() {
     const lucroPorUnidade = volume > 0 ? lucroBruto / volume : 0;
     const custoPorUnidade = volume > 0 ? custoTotal4sem / volume : 0;
 
+    const precoUnit4semNet = volume > 0 ? precoNetBase4sem / volume : 0;
     const decomposicaoUnit = [
       { label: "Custo GPC", valor: dados.custoGPC, perc: precoUnit4sem > 0 ? dados.custoGPC / precoUnit4sem : 0 },
       { label: "Frete/un.", valor: volume > 0 ? dados.frete / volume : 0, perc: precoUnit4sem > 0 ? (dados.frete / volume) / precoUnit4sem : 0 },
-      { label: "IRPJ", valor: precoUnit4sem * irpj, perc: irpj },
-      { label: "Com. Local", valor: precoUnit4sem * comRest, perc: comRest },
-      { label: "Com. Comercial", valor: precoUnit4sem * comCom, perc: comCom },
-      { label: "Margem / Lucro", valor: precoUnit4sem * dados.margem, perc: margemLiquida > 0 ? margemLiquida : dados.margem },
+      { label: "IRPJ", valor: precoUnit4semNet * irpj, perc: precoUnit4sem > 0 ? (precoUnit4semNet * irpj) / precoUnit4sem : 0 },
+      { label: "Com. Local", valor: precoUnit4semNet * comRest, perc: precoUnit4sem > 0 ? (precoUnit4semNet * comRest) / precoUnit4sem : 0 },
+      { label: "Com. Comercial", valor: precoUnit4semNet * comCom, perc: precoUnit4sem > 0 ? (precoUnit4semNet * comCom) / precoUnit4sem : 0 },
+      { label: "BV (Agência / Mesa Ads)", valor: precoUnit4sem - precoUnit4semNet, perc: precoUnit4sem > 0 ? (precoUnit4sem - precoUnit4semNet) / precoUnit4sem : 0 },
+      { label: "Margem / Lucro", valor: precoUnit4semNet * dados.margem, perc: precoUnit4sem > 0 ? (precoUnit4semNet * dados.margem) / precoUnit4sem : 0 },
     ];
 
     const tabela = SEMANAS.map((s) => {
@@ -677,11 +684,14 @@ export default function PriceTable() {
                 const irpj = premissas.irpj / 100;
                 const comRest = premissas.comissaoRestaurante / 100;
                 const comCom = premissas.comissaoComercial / 100;
+                const bvD = 1 - BV_PADRAO - irpj;
+                const precoPublico4sem = bvD > 0 ? precoBase4sem / bvD : precoBase4sem;
                 const receitaLiquidaGPC = precoBase4sem * (1 - irpj - comRest - comCom);
                 return (
                   <Section title="Receita Líquida GPC" icon={TrendingUp}>
                     <div className="space-y-2">
-                      <EconRow label="Preço Base (4sem)" value={formatCurrency(precoBase4sem)} bold />
+                      <EconRow label="Preço Público (4sem, c/ BV 20%)" value={formatCurrency(precoPublico4sem)} bold />
+                      <EconRow label="Preço Base s/ BV (4sem)" value={formatCurrency(precoBase4sem)} />
                       <EconRow label="IRPJ" value={`${premissas.irpj}% = ${formatCurrency(precoBase4sem * irpj)}`} />
                       <EconRow label="Com. Restaurante" value={`${premissas.comissaoRestaurante}% = ${formatCurrency(precoBase4sem * comRest)}`} />
                       <EconRow label="Com. Comercial" value={`${premissas.comissaoComercial}% = ${formatCurrency(precoBase4sem * comCom)}`} />
@@ -700,9 +710,11 @@ export default function PriceTable() {
                 const irpj = premissas.irpj / 100;
                 const comRest = premissas.comissaoRestaurante / 100;
                 const comCom = premissas.comissaoComercial / 100;
+                const bvD = 1 - BV_PADRAO - irpj;
+                const precoPublico4sem = bvD > 0 ? precoBase4sem / bvD : precoBase4sem;
                 const receitaLiquidaGPC4sem = precoBase4sem * (1 - irpj - comRest - comCom);
                 const nPeriodos = semanas / 4;
-                const precoSemDescDuracao = precoBase4sem * nPeriodos;
+                const precoSemDescDuracao = precoPublico4sem * nPeriodos;
                 // Faixa discount applied on gross bruto amount (before prazo)
                 const faixaTierDuracao = discountPriceTiers.find(t => precoSemDescDuracao >= t.priceMin && precoSemDescDuracao <= t.priceMax);
                 const descFaixaDuracao = faixaTierDuracao ? faixaTierDuracao.discountPercent / 100 : 0;
@@ -716,7 +728,7 @@ export default function PriceTable() {
 
                 const tabelaDuracao = SEMANAS.map((s) => {
                   const mult = s / 4;
-                  const pSemDesc = precoBase4sem * mult;
+                  const pSemDesc = precoPublico4sem * mult;
                   const faixaTier = discountPriceTiers.find(t => pSemDesc >= t.priceMin && pSemDesc <= t.priceMax);
                   const descFaixa = faixaTier ? faixaTier.discountPercent / 100 : 0;
                   const pPosFaixa = pSemDesc * (1 - descFaixa);
@@ -732,7 +744,7 @@ export default function PriceTable() {
                   <>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <KpiCard label="Preço Total" value={formatCurrency(precoFinal)} sub={`${semanas} sem • ${pagLabel}${descontoParceiro ? " • parceiro" : ""}`} variant="primary" icon={DollarSign} />
-                      <KpiCard label="Preço Base (4sem)" value={formatCurrency(precoBase4sem)} sub="por período sem desconto" icon={TrendingUp} />
+                      <KpiCard label="Preço Público (4sem, c/ BV)" value={formatCurrency(precoPublico4sem)} sub="por período sem desconto" icon={TrendingUp} />
                       <KpiCard label="Receita Mensal" value={formatCurrency(receitaMensal)} sub={`${semanas} sem = ${nPeriodos} ${nPeriodos === 1 ? "mês" : "meses"}`} icon={CalendarDays} />
                       <KpiCard label="Desconto Total" value={formatCurrency(descontoTotalValor)} sub={`${semanas} sem economizados`} icon={PieChart} />
                     </div>
