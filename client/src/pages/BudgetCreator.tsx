@@ -1189,7 +1189,7 @@ export default function BudgetCreator() {
   const clearAll = useCallback(() => {
     setClientId(null); setLeadId(null); setIsBonificada(false);
     setDescontoParceiro(false); setPartnerId(null); setDescontoManual(0);
-    setAgencyCommissionPercent(""); setFormaPagamento("boleto"); setNotes(""); setItems([]);
+    setAgencyCommissionPercent("20"); setFormaPagamento("boleto"); setNotes(""); setItems([]);
   }, []);
 
   const itemCalcs = useMemo(() => {

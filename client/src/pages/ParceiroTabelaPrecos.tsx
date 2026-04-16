@@ -420,7 +420,7 @@ export default function ParceiroTabelaPrecos() {
           <p><span className="text-muted-foreground">Custo total</span> = Custo GPC × Artes × Volume + Frete</p>
           <p><span className="text-muted-foreground">Denominador base</span> = 1 − Margem − IRPJ − Com. Local − Com. Interna</p>
           <p><span className="text-muted-foreground">Preço base (4 sem.)</span> = Custo total ÷ Denominador base</p>
-          <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Preço base ÷ (1 − <span className="text-emerald-400">BV ({bvPercent}%)</span> − IRPJ)</p>
+          <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Preço base ÷ (1 − <span className="text-emerald-400">BV ({displayBv}%)</span> − IRPJ)</p>
           <p><span className="text-muted-foreground">Preço unitário</span> = Preço total ÷ Volume</p>
         </div>
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-muted-foreground">
@@ -438,7 +438,7 @@ export default function ParceiroTabelaPrecos() {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-            <span>BV de agência: <strong>{bvPercent}%</strong> (gross-up no preço público)</span>
+            <span>BV de agência: <strong>{displayBv}%</strong> (gross-up no preço público)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
