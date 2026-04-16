@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Package, Users, Tag, Megaphone, ImageIcon, X, Upload, MapPin } from "lucide-react";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { SEMANAS_OPTIONS } from "@/hooks/useBudgetCalculator";
+import { cn } from "@/lib/utils";
 
 type TipoProduct = "impressos" | "eletronicos" | "telas";
 type ImpressionFormulaType = "por_coaster" | "por_tela" | "por_visitante" | "por_evento" | "manual";
@@ -113,6 +114,9 @@ interface ProductListItem {
   impressionFormulaType?: string | null;
   attentionFactor?: string | null;
   frequencyParam?: string | null;
+  defaultPessoasPorMesa?: string | null;
+  loopDurationSeconds?: number | null;
+  frequenciaAparicoes?: string | null;
   distributionType?: string | null;
 }
 
@@ -136,6 +140,9 @@ interface ProductForm {
   impressionFormulaType: ImpressionFormulaType;
   attentionFactor: string;
   frequencyParam: string;
+  defaultPessoasPorMesa: string;
+  loopDurationSeconds: string;
+  frequenciaAparicoes: string;
   distributionType: DistributionType;
   locationIds: number[];
 }
@@ -160,6 +167,9 @@ const emptyProduct: ProductForm = {
   impressionFormulaType: "por_coaster",
   attentionFactor: "1.00",
   frequencyParam: "1.00",
+  defaultPessoasPorMesa: "3.00",
+  loopDurationSeconds: "30",
+  frequenciaAparicoes: "1.00",
   distributionType: "rede",
   locationIds: [],
 };
@@ -244,6 +254,9 @@ export default function Products() {
       impressionFormulaType: (p.impressionFormulaType as ImpressionFormulaType) || "por_coaster",
       attentionFactor: p.attentionFactor || "1.00",
       frequencyParam: p.frequencyParam || "1.00",
+      defaultPessoasPorMesa: p.defaultPessoasPorMesa || "3.00",
+      loopDurationSeconds: p.loopDurationSeconds != null ? String(p.loopDurationSeconds) : "30",
+      frequenciaAparicoes: p.frequenciaAparicoes || "1.00",
       distributionType: (p.distributionType as DistributionType) || "rede",
       locationIds,
     });
@@ -271,6 +284,9 @@ export default function Products() {
       impressionFormulaType: form.impressionFormulaType,
       attentionFactor: form.attentionFactor,
       frequencyParam: form.frequencyParam,
+      defaultPessoasPorMesa: form.defaultPessoasPorMesa,
+      loopDurationSeconds: parseInt(form.loopDurationSeconds) || 30,
+      frequenciaAparicoes: form.frequenciaAparicoes,
       distributionType: form.distributionType,
       locationIds: form.distributionType === "local_especifico" ? form.locationIds : [],
     };
@@ -559,42 +575,135 @@ export default function Products() {
               </div>
             </div>
             <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
-              <h3 className="text-sm font-semibold text-foreground">Fórmula de Impressões</h3>
-              <div>
-                <Label>Tipo de Fórmula</Label>
-                <Select value={form.impressionFormulaType} onValueChange={v => setForm({ ...form, impressionFormulaType: v as ImpressionFormulaType })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.entries(impressionFormulaLabels) as [ImpressionFormulaType, string][]).map(([val, label]) => (
-                      <SelectItem key={val} value={val}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <h3 className="text-sm font-semibold text-foreground">Cálculo de Impressões</h3>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: "por_coaster", label: "Por Coaster", desc: "Impressões por unidade física distribuída nos locais" },
+                  { value: "por_tela", label: "Por Tela", desc: "Impressões por tempo de exibição em tela digital" },
+                  { value: "manual", label: "Simples", desc: "Contagem direta sem fórmula automática" },
+                ] as const).map(({ value, label, desc }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setForm({ ...form, impressionFormulaType: value as ImpressionFormulaType })}
+                    className={cn(
+                      "text-left rounded-md border p-2 text-xs transition-colors",
+                      form.impressionFormulaType === value
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-background text-muted-foreground hover:border-muted-foreground"
+                    )}
+                  >
+                    <div className="font-semibold">{label}</div>
+                    <div className="opacity-70 mt-0.5 leading-tight">{desc}</div>
+                  </button>
+                ))}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Fator de Atenção</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.attentionFactor}
-                    onChange={e => setForm({ ...form, attentionFactor: e.target.value })}
-                    placeholder="1.00"
-                  />
-                </div>
-                <div>
-                  <Label>Frequência / Loop</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.frequencyParam}
-                    onChange={e => setForm({ ...form, frequencyParam: e.target.value })}
-                    placeholder="1.00"
-                  />
-                </div>
-              </div>
+
+              {form.impressionFormulaType === "por_coaster" && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Pessoas por Mesa</Label>
+                      <p className="text-xs text-muted-foreground mb-1">Padrão quando o local não tem dados de assentos</p>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={form.defaultPessoasPorMesa}
+                        onChange={e => setForm({ ...form, defaultPessoasPorMesa: e.target.value })}
+                        placeholder="3.00"
+                      />
+                    </div>
+                    <div>
+                      <Label>Multiplicador</Label>
+                      <p className="text-xs text-muted-foreground mb-1">Ajuste de atenção (1 = sem ajuste)</p>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.attentionFactor}
+                        onChange={e => setForm({ ...form, attentionFactor: e.target.value })}
+                        placeholder="1.00"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground bg-muted rounded px-2 py-1.5">
+                    Fórmula: <code className="font-mono">qtd × usos × pessoas/mesa × multiplicador</code>
+                  </p>
+                </>
+              )}
+
+              {form.impressionFormulaType === "por_tela" && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Duração do Loop</Label>
+                      <p className="text-xs text-muted-foreground mb-1">Segundos para um ciclo completo na tela</p>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={form.loopDurationSeconds}
+                          onChange={e => setForm({ ...form, loopDurationSeconds: e.target.value })}
+                          placeholder="30"
+                          className="pr-8"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">s</span>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Aparições por Visita</Label>
+                      <p className="text-xs text-muted-foreground mb-1">Fallback quando o local não tem permanência média</p>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={form.frequenciaAparicoes}
+                        onChange={e => setForm({ ...form, frequenciaAparicoes: e.target.value })}
+                        placeholder="1.00"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Multiplicador</Label>
+                    <p className="text-xs text-muted-foreground mb-1">Ajuste de atenção (1 = sem ajuste)</p>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="max-w-[160px]"
+                      value={form.attentionFactor}
+                      onChange={e => setForm({ ...form, attentionFactor: e.target.value })}
+                      placeholder="1.00"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground bg-muted rounded px-2 py-1.5">
+                    Fórmula: <code className="font-mono">clientes/dia × aparições/visita × multiplicador × dias/mês</code>
+                  </p>
+                </>
+              )}
+
+              {form.impressionFormulaType !== "por_coaster" && form.impressionFormulaType !== "por_tela" && (
+                <>
+                  <div>
+                    <Label>Multiplicador</Label>
+                    <p className="text-xs text-muted-foreground mb-1">Ajuste sobre a contagem base (1 = sem ajuste)</p>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="max-w-[160px]"
+                      value={form.attentionFactor}
+                      onChange={e => setForm({ ...form, attentionFactor: e.target.value })}
+                      placeholder="1.00"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground bg-muted rounded px-2 py-1.5">
+                    Fórmula: <code className="font-mono">qtd × usos</code>
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="space-y-3">
