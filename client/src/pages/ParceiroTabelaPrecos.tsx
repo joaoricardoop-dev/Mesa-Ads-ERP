@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Info, Package, Percent, Save, ChevronDown, ChevronRight, Receipt } from "lucide-react";
+import { Info, Package, Percent, ChevronDown, ChevronRight, Receipt } from "lucide-react";
 
 const SEMANAS_OPTIONS = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52];
 
@@ -212,13 +212,6 @@ function ProductTable({ product, bvPercent, billingMode }: ProductTableProps) {
 export default function ParceiroTabelaPrecos() {
   const adminPartnerId = (window as any).__IMPERSONATION__?.partnerId as number | undefined;
   const { data, isLoading, refetch } = trpc.parceiroPortal.getPriceTable.useQuery({ adminPartnerId });
-  const updateCommissionMutation = trpc.parceiroPortal.updateCommission.useMutation({
-    onSuccess: (res) => {
-      toast.success(`Comissão atualizada para ${res.commissionPercent}%`);
-      refetch();
-    },
-    onError: (err) => toast.error(`Erro: ${err.message}`),
-  });
   const updateBillingModeMutation = trpc.parceiroPortal.updateBillingMode.useMutation({
     onSuccess: (res) => {
       toast.success(`Modo de faturamento atualizado para ${res.billingMode === "bruto" ? "Bruto" : "Líquido"}`);
@@ -230,12 +223,7 @@ export default function ParceiroTabelaPrecos() {
   const billingMode: "bruto" | "liquido" = data?.billingMode ?? "bruto";
 
   const [bvPercent, setBvPercent] = useState<number | null>(null);
-  const displayBv = bvPercent ?? (data?.commissionPercent ?? 20);
-  const hasUnsavedBv = bvPercent !== null && bvPercent !== data?.commissionPercent;
-
-  const handleSaveBv = () => {
-    updateCommissionMutation.mutate({ commissionPercent: displayBv });
-  };
+  const displayBv = bvPercent ?? 20;
 
   const handleToggleBillingMode = () => {
     const newMode = billingMode === "bruto" ? "liquido" : "bruto";
@@ -333,16 +321,6 @@ export default function ParceiroTabelaPrecos() {
                 </div>
               );
             })()}
-            {hasUnsavedBv && (
-              <button
-                onClick={handleSaveBv}
-                disabled={updateCommissionMutation.isPending}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors"
-              >
-                <Save className="w-3 h-3" />
-                Salvar comissão ({displayBv}%)
-              </button>
-            )}
           </div>
         </div>
       </div>

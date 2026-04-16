@@ -336,24 +336,6 @@ export const parceiroPortalRouter = router({
       };
     }),
 
-  updateCommission: parceiroProcedure
-    .input(z.object({
-      commissionPercent: z.number().min(0).max(20),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const partnerId = ctx.user.partnerId;
-      if (!partnerId) throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a nenhum parceiro." });
-
-      const db = await getDatabase();
-      const [updated] = await db
-        .update(partners)
-        .set({ commissionPercent: input.commissionPercent.toFixed(2), updatedAt: new Date() })
-        .where(eq(partners.id, partnerId))
-        .returning();
-      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Parceiro não encontrado." });
-      return { commissionPercent: Number(updated.commissionPercent) };
-    }),
-
   updateBillingMode: parceiroProcedure
     .input(z.object({
       billingMode: z.enum(["bruto", "liquido"]),
