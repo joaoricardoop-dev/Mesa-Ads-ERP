@@ -307,17 +307,22 @@ export default function ParceiroTabelaPrecos() {
               const precoSemBv = calcUnitPrice({ ...calcParams, comParceiro: 0 });
               const comissaoEstimada = precoComBv - precoSemBv;
               return (
-                <div className="flex gap-6 text-sm mb-3">
-                  <div>
-                    <p className="text-muted-foreground text-xs">Preço para o cliente</p>
-                    <p className="font-bold font-mono">{fmtBRL4(precoComBv)}</p>
-                    <p className="text-[10px] text-muted-foreground">/un · 4 sem. · {refVol.toLocaleString("pt-BR")} {refProduct.unitLabelPlural}</p>
+                <div className="mb-3">
+                  <div className="flex gap-6 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Preço para o cliente</p>
+                      <p className="font-bold font-mono">{fmtBRL4(precoComBv)}</p>
+                      <p className="text-[10px] text-muted-foreground">/un</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Sua comissão estimada</p>
+                      <p className="font-bold font-mono text-emerald-400">{fmtBRL4(comissaoEstimada)}</p>
+                      <p className="text-[10px] text-muted-foreground">/un</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">Sua comissão estimada</p>
-                    <p className="font-bold font-mono text-emerald-400">{fmtBRL4(comissaoEstimada)}</p>
-                    <p className="text-[10px] text-muted-foreground">/un · 4 sem.</p>
-                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    (referência: menor volume de {refProduct.name} — {refVol.toLocaleString("pt-BR")} {refProduct.unitLabelPlural})
+                  </p>
                 </div>
               );
             })()}
