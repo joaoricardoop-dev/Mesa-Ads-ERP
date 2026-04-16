@@ -1,0 +1,245 @@
+Prompt — Unificação de Preços: BV Sempre Embutido na Tabela Pública
+## Feature: Preço Público Unificado com BV Sempre Embutido
+### Contexto e Objetivo
+Hoje o sistema tem dois preços distintos:
+- Preço líquido (`comParceiro = 0`): exibido para anunciantes sem agência
+- Preço com gross-up (`comParceiro = BV_PADRAO_AGENCIA`): exibido para anunciantes com agência
+Isso cria inconsistência de mercado: o cliente que comprou via agência pagou mais
+que o que comprou direto, expondo a agência.
+A mudança é: o preço público passa a ser SEMPRE o preço com BV embutido (20%).
+O que muda é quem recebe o BV:
+- Com agência vinculada → BV pago à agência
+- Sem agência → BV fica como margem extra da Mesa Ads
+O cliente final SEMPRE vê o mesmo preço, independente do canal.
+### Antes de qualquer edição, leia estes arquivos na íntegra:
+1. client/src/lib/campaign-builder-utils.ts
+2. client/src/hooks/useBudgetCalculator.ts
+3. client/src/pages/AnunciantePortal.tsx
+4. client/src/components/CampaignBuilder.tsx
+5. client/src/pages/BudgetCreator.tsx
+6. client/src/pages/ParceiroTabelaPrecos.tsx
+7. server/quotationRouter.ts
+8. server/parceiroPortalRouter.ts
+9. client/src/lib/generate-proposal-pdf.ts
+10. client/src/pages/ClientDetail.tsx
+---
+### 1. campaign-builder-utils.ts
+Localizar TODAS as ocorrências de:
+```ts
+const comParceiro = hasPartner ? BV_PADRAO_AGENCIA : 0;
+
+Substituir por:
+```ts
+const comParceiro = BV_PADRAO_AGENCIA;
+
+A função `calcUnitPriceAdv` sempre calcula com BV embutido. A variável
+`hasPartner` deixa de afetar o preço (continua para outros fins como labels
+e relatórios).
+---
+### 2. AnunciantePortal.tsx
+Localizar TODAS as ocorrências de:
+```ts
+const comParceiro = hasPartner ? BV_PADRAO_AGENCIA : 0;
+
+Existem múltiplas instâncias (linhas ~87, ~261, ~375 e outras).
+Substituir todas por:
+```ts
+const comParceiro = BV_PADRAO_AGENCIA;
+
+Localizar e remover o badge condicional "Inclui comissão de agência (+20% BV)".
+Hoje aparecia apenas para clientes com parceiro. Como todos os preços incluem
+BV, o badge perde sentido — remover completamente.
+Não alterar a prop `hasPartner` — ainda usada para outros elementos de UI
+(nome da agência, etc.), apenas não deve mais afetar cálculo de preço.
+---
+### 3. CampaignBuilder.tsx
+Localizar (linha ~71):
+```ts
+const comParceiro = hasPartner ? BV_PADRAO_AGENCIA : 0;
+
+Substituir por:
+```ts
+const comParceiro = BV_PADRAO_AGENCIA;
+
+Localizar e atualizar o badge informativo (linha ~312):
+```tsx
+// Antes:
+"Preços com comissão de agência incluída (+20% BV)"
+
+// Depois (sem condicionar a hasPartner):
+"Preços de tabela pública Mesa Ads"
+
+---
+### 4. quotationRouter.ts
+Localizar a função `computeUnitPrice` (linha ~1097) com o parâmetro `withBv`:
+```ts
+function computeUnitPrice(..., withBv: boolean): number {
+const comParceiro = withBv ? BV_AGENCIA : 0;
+
+Substituir por:
+```ts
+function computeUnitPrice(...): number {
+const comParceiro = BV_AGENCIA; // sempre embutido no preço público
+
+Localizar todas as chamadas `computeUnitPrice(..., hasPartner)` e remover
+o argumento `hasPartner`:
+```ts
+// Antes:
+computeUnitPrice(..., hasPartner)
+
+// Depois:
+computeUnitPrice(...)
+
+A variável `hasPartner` continua sendo calculada e salva na cotação
+(para comissão e relatório), mas não afeta o preço unitário.
+---
+### 5. parceiroPortalRouter.ts
+Localizar (linha ~420):
+```ts
+const comParceiro = Number(partner.commissionPercent) / 100;
+const billingMode = (partner.billingMode ?? "bruto") as "bruto" | "liquido";
+
+O gross-up hoje é condicional a `billingMode === "bruto"`. Na nova lógica,
+o preço público usa sempre BV_PADRAO_AGENCIA = 0.20, independente do
+billingMode do parceiro.
+Substituir o cálculo de preço por:
+```ts
+const BV_PADRAO = 0.20; // preço público sempre com este BV
+const comParceiro = BV_PADRAO;
+
+if (pricingMode === "price_based") {
+const grossUpDen = 1 - comParceiro - irpj;
+const precoTotal = grossUpDen > 0 ? precoBaseTier / grossUpDen : precoBaseTier;
+} else {
+const grossUpDen = 1 - comParceiro - irpj;
+const precoTotal = grossUpDen > 0 ? precoBase / grossUpDen : precoBase;
+}
+
+Manter o campo `billingMode` — ainda determina como o parceiro fatura
+seu cliente (bruto = uma linha, líquido = base + comissão separada),
+mas não muda o preço final que o cliente paga.
+Salvar na cotação:
+```ts
+agencyCommissionPercent: partner.commissionPercent,
+
+---
+### 6. ParceiroTabelaPrecos.tsx
+Esta página tem um slider de comissão do parceiro. Manter o slider,
+mas com o seguinte comportamento:
+- Valor padrão: 20% (preço público de tabela completo)
+- Direção: apenas para baixo (0% a 20%) — a agência pode abrir mão
+  de parte do BV para oferecer preço menor ao cliente
+- Nunca acima de 20%
+```ts
+const [bvPercent, setBvPercent] = useState(20); // default: tabela pública
+const comParceiro = bvPercent / 100;
+
+O preço no `calcUnitPrice` usa `comParceiro` vindo do slider:
+```ts
+// Manter a lógica de cálculo usando o valor do slider,
+// mas limitar o max a 20 no componente Slider
+
+Atualizar o Slider na UI:
+```tsx
+<Label>Sua comissão de agência</Label>
+<Slider
+min={0}
+max={20}
+step={0.5}
+defaultValue={[20]}
+onValueChange={([v]) => setBvPercent(v)}
+/>
+
+<p className="text-xs text-muted-foreground"> Com 20%: preço público de tabela. Reduza para oferecer um preço menor ao seu cliente — a diferença sai da sua comissão. </p> ```
+Abaixo do slider, mostrar dois valores lado a lado:
+
+<div className="flex gap-6 text-sm"> <div> <p className="text-muted-foreground">Preço para o cliente</p> <p className="font-bold">{fmtBRL(precoComBv)}</p> </div> <div> <p className="text-muted-foreground">Sua comissão estimada</p> <p className="font-bold text-emerald-400">{fmtBRL(comissaoEstimada)}</p> </div> </div> ```
+Onde comissaoEstimada = precoComBv - precoSemBv (diferença entre
+o preço com o BV escolhido e o preço sem BV).
+
+7. BudgetCreator.tsx
+Esta é a ferramenta interna. A lógica muda de "gross-up adicional quando
+tem agência" para "gross-up sempre embutido, campo indica quem recebe".
+
+Localizar (linha ~1045):
+
+const [agencyCommissionPercent, setAgencyCommissionPercent] = useState("");
+
+Substituir por:
+```ts
+const [agencyCommissionPercent, setAgencyCommissionPercent] = useState("20");
+
+Atualizar o label do campo na UI:
+```tsx
+// Antes:
+<Label>BV da Agência (%)</Label>
+
+<p>Aplicar gross-up de agência sobre o total</p>
+// Depois:
+<Label>Comissão de Agência — BV (%)</Label>
+
+<p className="text-xs text-muted-foreground"> O preço público já inclui este BV. Quando há agência parceira, este valor é repassado a ela. Quando não há agência, fica como margem adicional Mesa Ads. </p> ```
+Atualizar o breakdown de totais para indicar o destino do BV:
+
+{totals.agencyBVVal > 0 && (
+
+<div className="flex justify-between text-sm"> <span className="text-muted-foreground"> BV embutido ({(globalParams.agencyBVPercent ?? 0).toFixed(1)}%) {hasPartner ? " → pago à agência" : " → margem Mesa Ads"} </span> <span className="font-mono">{fmtBRL(totals.agencyBVVal)}</span> </div> )} ```
+8. generate-proposal-pdf.ts
+Localizar (linha ~368):
+
+const bvScaleFactor = (data.agencyCommissionPercent ?? 0) > 0 && rawItemsTotal > 0
+? totalFinalWithBv / rawItemsTotal
+: 1;
+
+Substituir por:
+```ts
+// BV sempre embutido no preço público
+const bvScaleFactor = rawItemsTotal > 0 ? totalFinalWithBv / rawItemsTotal : 1;
+
+No PDF gerado, o preço exibido é sempre o preço público (com BV).
+Não exibir o valor do BV como linha separada no PDF do cliente —
+é detalhe interno.
+---
+### 9. ClientDetail.tsx
+Localizar o toggle de "Exibir preço com agência" / `showAgencyPricing`
+(linhas ~591–608) e remover completamente da UI.
+Todos os clientes veem o mesmo preço público agora. O campo
+`showAgencyPricing` pode ser mantido no banco (não rodar migration),
+mas a UI não deve mais expô-lo.
+Não alterar o campo `partnerId` — continua determinando se há agência
+vinculada para fins de comissão e relatório.
+---
+### Verificação de consistência após as mudanças
+Testar os seguintes cenários:
+Cenário 1 — Anunciante COM agência:
+- Portal do anunciante mostra preço com BV embutido ✓
+- Cotação gerada: preço com BV, agencyCommissionPercent = 20, partnerId preenchido ✓
+- PDF: preço público (com BV) ✓
+- Financeiro interno: receita = preço público, custo de agência = BV pago ✓
+Cenário 2 — Anunciante SEM agência:
+- Portal do anunciante mostra o MESMO preço (com BV embutido) ✓
+- Cotação: preço com BV, agencyCommissionPercent = 20, partnerId = null ✓
+- PDF: mesmo preço público ✓
+- Financeiro interno: receita = preço público, custo de agência = 0,
+  margem extra = BV ✓
+Cenário 3 — Orçamento interno (BudgetCreator):
+- Preço exibido: com BV (default 20%) ✓
+- Se agência: agencyBVVal aparece como "→ pago à agência" ✓
+- Se sem agência: agencyBVVal aparece como "→ margem Mesa Ads" ✓
+Cenário 4 — Portal do parceiro (tabela de preços):
+- Slider default = 20%, preço = tabela pública completa ✓
+- Parceiro reduz slider para 15%: preço cai, comissão estimada cai ✓
+- Slider nunca ultrapassa 20% ✓
+---
+### O que NÃO muda
+- A constante BV_PADRAO_AGENCIA = 0.20 — mantida onde está
+- O campo partnerId em clientes e cotações
+- O campo agencyCommissionPercent nas cotações
+- A fórmula de gross-up: total / (1 - bv - irpj) — mantida
+- Campanhas isBonificada — continuam zeradas
+- Comissões de vendedor e restaurante/local — não afetadas
+- O billingMode do parceiro — continua para formato de fatura
+### Notas finais
+- Não renomear variáveis, funções ou tabelas de banco
+- Após as mudanças: tsc --noEmit para verificar TypeScript
+- Não alterar lógica de campanhas bonificadas
