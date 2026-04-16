@@ -86,7 +86,7 @@ function ProductPriceSheet({ product, hasPartner, open, onClose }: {
   const irpj = parseFloat(product.irpj ?? "6") / 100;
   const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
   const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-  const comParceiro = hasPartner ? BV_PADRAO_AGENCIA : 0;
+  const comParceiro = BV_PADRAO_AGENCIA;
 
   const volumes = useMemo(
     () => tiers.map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
@@ -138,17 +138,6 @@ function ProductPriceSheet({ product, hasPartner, open, onClose }: {
 
         <div className="py-5 space-y-5">
           <div className="flex items-center gap-2 flex-wrap">
-            {hasPartner ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
-                <Tag className="w-3.5 h-3.5" />
-                Inclui comissão de agência (+{(BV_PADRAO_AGENCIA * 100).toFixed(0)}% BV)
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
-                <Tag className="w-3.5 h-3.5" />
-                Preço direto — sem comissão de agência
-              </div>
-            )}
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Info className="w-3 h-3" />
               Estimativa: {USOS_POR_PORTA_COPO} usos por porta-copo
@@ -260,7 +249,7 @@ function ShoppingProductCard({
   const irpj = parseFloat(product.irpj ?? "6") / 100;
   const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
   const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-  const comParceiro = hasPartner ? BV_PADRAO_AGENCIA : 0;
+  const comParceiro = BV_PADRAO_AGENCIA;
 
   const tiers = product.tiers ?? [];
   const discountTiers = product.discountTiers ?? [];
@@ -374,7 +363,7 @@ function AdvertiserProductTable({ product, hasPartner }: { product: any; hasPart
   const irpj = parseFloat(product.irpj ?? "6") / 100;
   const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
   const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-  const comParceiro = hasPartner ? BV_PADRAO_AGENCIA : 0;
+  const comParceiro = BV_PADRAO_AGENCIA;
 
   const volumes = useMemo(
     () => tiers.map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
@@ -1799,17 +1788,6 @@ export default function AnunciantePortal() {
               <span className="text-foreground/80">Tabela de Preços</span>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              {priceTableData?.hasPartner ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
-                  <Tag className="w-3.5 h-3.5" />
-                  Inclui comissão de agência (+{(BV_PADRAO_AGENCIA * 100).toFixed(0)}% BV)
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
-                  <Tag className="w-3.5 h-3.5" />
-                  Preço direto — sem comissão de agência
-                </div>
-              )}
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Info className="w-3 h-3" />
                 Estimativa: 3 usos/dia × 26 dias/mês por porta-copos

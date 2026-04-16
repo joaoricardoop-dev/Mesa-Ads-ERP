@@ -884,11 +884,12 @@ interface BudgetSummaryPanelProps {
   items: BudgetItemState[];
   globalParams: GlobalBudgetParams;
   clientName: string;
+  hasPartner: boolean;
   onGerarCotacao: () => void;
   isGenerating: boolean;
 }
 
-function BudgetSummaryPanel({ items, globalParams, clientName, onGerarCotacao, isGenerating }: BudgetSummaryPanelProps) {
+function BudgetSummaryPanel({ items, globalParams, clientName, hasPartner, onGerarCotacao, isGenerating }: BudgetSummaryPanelProps) {
   const itemCalcs = useMemo(() => {
     return items
       .filter((item) => item.productId !== null)
@@ -993,7 +994,10 @@ function BudgetSummaryPanel({ items, globalParams, clientName, onGerarCotacao, i
                 )}
                 {totals.agencyBVVal > 0 && (
                   <div className="flex justify-between text-amber-600 dark:text-amber-400">
-                    <span>BV Agência (+{(globalParams.agencyBVPercent ?? 0).toFixed(1)}%)</span>
+                    <span>
+                      BV embutido ({(globalParams.agencyBVPercent ?? 0).toFixed(1)}%)
+                      {hasPartner ? " → pago à agência" : " → margem Mesa Ads"}
+                    </span>
                     <span className="font-mono">+{fmtBRL(totals.agencyBVVal)}</span>
                   </div>
                 )}
@@ -1042,7 +1046,7 @@ export default function BudgetCreator() {
   const [descontoParceiro, setDescontoParceiro] = useState(false);
   const [partnerId, setPartnerId] = useState<number | null>(null);
   const [descontoManual, setDescontoManual] = useState(0);
-  const [agencyCommissionPercent, setAgencyCommissionPercent] = useState("");
+  const [agencyCommissionPercent, setAgencyCommissionPercent] = useState("20");
   const [formaPagamento, setFormaPagamento] = useState<"pix" | "boleto" | "cartao">("boleto");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<BudgetItemState[]>([]);
@@ -1362,8 +1366,8 @@ export default function BudgetCreator() {
                     <Input type="number" min={0} max={20} step={0.5} value={descontoManual || ""} onChange={(e) => setDescontoManual(Math.min(20, Math.max(0, parseFloat(e.target.value) || 0)))} className="h-8 text-xs" placeholder="0" />
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">BV Agência (%)</Label>
-                    <Input type="number" min={0} max={99.9} step={0.5} value={agencyCommissionPercent} onChange={(e) => setAgencyCommissionPercent(e.target.value)} className="h-8 text-xs" placeholder="0" />
+                    <Label className="text-xs text-muted-foreground mb-1 block">Comissão de Agência — BV (%)</Label>
+                    <Input type="number" min={0} max={99.9} step={0.5} value={agencyCommissionPercent} onChange={(e) => setAgencyCommissionPercent(e.target.value)} className="h-8 text-xs" placeholder="20" />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -1446,6 +1450,7 @@ export default function BudgetCreator() {
             items={items}
             globalParams={globalParams}
             clientName={clientName}
+            hasPartner={!!partnerId}
             onGerarCotacao={handleGerarCotacao}
             isGenerating={isGenerating}
           />

@@ -582,35 +582,6 @@ export default function ClientDetail() {
                   <Label className="text-sm font-medium flex items-center gap-2">
                     <ToggleRight className="w-4 h-4 text-primary" /> Tabela de Preços no Portal
                   </Label>
-                  <p className="text-xs text-muted-foreground">Controla se o anunciante vê os preços com comissão de agência (+20% BV) no portal.</p>
-                  <div className="space-y-3 pt-1">
-                    <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
-                      <div>
-                        <p className="text-sm font-medium">Exibir preços com comissão de agência</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {portalConfig.showAgencyPricing === null
-                            ? "Automático: segue a agência vinculada acima"
-                            : portalConfig.showAgencyPricing
-                            ? "Ativo: preços com BV de agência sempre visíveis"
-                            : "Inativo: preços sem BV de agência mesmo com agência vinculada"}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={portalConfig.showAgencyPricing === true || (portalConfig.showAgencyPricing === null && !!portalConfig.partnerId)}
-                        onCheckedChange={(checked) => setPortalConfig(prev => ({ ...prev, showAgencyPricing: checked }))}
-                      />
-                    </div>
-                    {portalConfig.showAgencyPricing !== null && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-muted-foreground h-7"
-                        onClick={() => setPortalConfig(prev => ({ ...prev, showAgencyPricing: null }))}
-                      >
-                        Redefinir para automático
-                      </Button>
-                    )}
-                  </div>
                 </div>
               </div>
 

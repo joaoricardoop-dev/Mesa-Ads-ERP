@@ -1096,11 +1096,11 @@ export const quotationRouter = router({
       const DESCONTOS_PRAZO: Record<number, number> = { 4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11 };
       const hasPartner = !!client.partnerId || isPartnerFlow;
 
-      function computeUnitPrice(prod: { irpj: string | null; comRestaurante: string | null; comComercial: string | null; pricingMode: string | null }, tier: typeof pricingTiersRows[0], volume: number, withBv: boolean): number {
+      function computeUnitPrice(prod: { irpj: string | null; comRestaurante: string | null; comComercial: string | null; pricingMode: string | null }, tier: typeof pricingTiersRows[0], volume: number): number {
         const irpj = parseFloat(prod.irpj ?? "6") / 100;
         const comRestaurante = parseFloat(prod.comRestaurante ?? "15") / 100;
         const comComercial = parseFloat(prod.comComercial ?? "10") / 100;
-        const comParceiro = withBv ? BV_AGENCIA : 0;
+        const comParceiro = BV_AGENCIA; // sempre embutido no preço público
         const custoUnitario = parseFloat(tier.custoUnitario);
         const frete = parseFloat(tier.frete);
         const margem = parseFloat(tier.margem) / 100;
@@ -1143,7 +1143,7 @@ export const quotationRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: `Sem tabela de preço configurada para o produto "${prod.name}".` });
         }
 
-        let unitPrice = computeUnitPrice(prod, tier, item.volume, hasPartner);
+        let unitPrice = computeUnitPrice(prod, tier, item.volume);
         const dTiersForProduct = discountTiersRows.filter(d => d.productId === item.productId);
         const baseTotal = unitPrice * item.volume;
         const discountedTotal = applyDiscountTier(baseTotal, dTiersForProduct);

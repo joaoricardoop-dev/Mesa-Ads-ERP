@@ -30,18 +30,15 @@ function calcUnitPrice(params: {
   comRestaurante: number;
   comComercialProduto: number;
   comParceiro: number;
-  billingMode?: "bruto" | "liquido";
   pricingMode?: "cost_based" | "price_based";
   precoBaseTier?: number;
 }) {
-  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercialProduto, comParceiro, billingMode = "bruto", pricingMode = "cost_based", precoBaseTier = 0 } = params;
+  const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercialProduto, comParceiro, pricingMode = "cost_based", precoBaseTier = 0 } = params;
 
   if (pricingMode === "price_based") {
     if (precoBaseTier <= 0) return 0;
     const grossUpDen = 1 - comParceiro - irpj;
-    const precoTotal = billingMode === "bruto" && grossUpDen > 0
-      ? precoBaseTier / grossUpDen
-      : precoBaseTier;
+    const precoTotal = grossUpDen > 0 ? precoBaseTier / grossUpDen : precoBaseTier;
     return volume > 0 ? precoTotal / volume : 0;
   }
 
@@ -49,9 +46,7 @@ function calcUnitPrice(params: {
   const custoTotal = custoUnitario * artes * volume + frete;
   const precoBase = denominadorBase > 0 && custoTotal > 0 ? custoTotal / denominadorBase : 0;
   const grossUpDen = 1 - comParceiro - irpj;
-  const precoTotal = billingMode === "bruto" && grossUpDen > 0
-    ? precoBase / grossUpDen
-    : precoBase;
+  const precoTotal = grossUpDen > 0 ? precoBase / grossUpDen : precoBase;
   return volume > 0 ? precoTotal / volume : 0;
 }
 
@@ -68,7 +63,7 @@ function getPricingTierForVolume(tiers: any[], volume: number) {
 
 interface ProductTableProps {
   product: any;
-  commissionPercent: number;
+  bvPercent: number;
   billingMode: "bruto" | "liquido";
 }
 
@@ -85,7 +80,7 @@ function applyDiscountTier(price: number, discountTiers: DiscountTierEntry[]): n
   return price * (1 - parseFloat(String(tier.discountPercent)) / 100);
 }
 
-function ProductTable({ product, commissionPercent, billingMode }: ProductTableProps) {
+function ProductTable({ product, bvPercent, billingMode }: ProductTableProps) {
   const [expanded, setExpanded] = useState(true);
   const tiers = product.tiers ?? [];
   const discountTiers = product.discountTiers ?? [];
@@ -93,7 +88,7 @@ function ProductTable({ product, commissionPercent, billingMode }: ProductTableP
   const irpj = parseFloat(product.irpj ?? "6") / 100;
   const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
   const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-  const comParceiro = commissionPercent / 100;
+  const comParceiro = bvPercent / 100;
 
   const volumes = useMemo(
     () => tiers.map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
@@ -126,7 +121,6 @@ function ProductTable({ product, commissionPercent, billingMode }: ProductTableP
         comRestaurante,
         comComercialProduto,
         comParceiro,
-        billingMode,
         pricingMode,
         precoBaseTier: parseFloat(smallestTier.precoBase ?? "0"),
       })
@@ -175,7 +169,6 @@ function ProductTable({ product, commissionPercent, billingMode }: ProductTableP
                   comRestaurante,
                   comComercialProduto,
                   comParceiro,
-                  billingMode,
                   pricingMode,
                   precoBaseTier: parseFloat(tier.precoBase ?? "0"),
                 });
@@ -239,6 +232,8 @@ export default function ParceiroTabelaPrecos() {
   const hasUnsaved = localCommission !== null && localCommission !== data?.commissionPercent;
   const billingMode: "bruto" | "liquido" = data?.billingMode ?? "bruto";
 
+  const [bvPercent, setBvPercent] = useState(20);
+
   const handleSaveCommission = () => {
     if (localCommission === null) return;
     updateCommissionMutation.mutate({ commissionPercent: localCommission });
@@ -278,42 +273,30 @@ export default function ParceiroTabelaPrecos() {
           <div className="flex-1 min-w-64">
             <div className="flex items-center gap-2 mb-1">
               <Percent className="w-4 h-4 text-primary" />
-              <span className="text-sm font-semibold">Minha Comissão Comercial</span>
+              <span className="text-sm font-semibold">Sua comissão de agência</span>
               <Badge
                 variant="outline"
                 className="text-emerald-400 border-emerald-500/30 bg-emerald-500/10 font-mono text-xs"
               >
-                {commissionPercent}%
+                {bvPercent}%
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">
-              Ajuste sua comissão entre 0% e 20%. Ao salvar, os preços são recalculados e o valor é salvo no seu perfil.
-            </p>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 mb-2">
               <span className="text-xs text-muted-foreground w-8">0%</span>
               <Slider
                 min={0}
                 max={20}
                 step={0.5}
-                value={[commissionPercent]}
-                onValueChange={([v]) => setLocalCommission(v)}
+                defaultValue={[20]}
+                value={[bvPercent]}
+                onValueChange={([v]) => setBvPercent(v)}
                 className="flex-1"
               />
               <span className="text-xs text-muted-foreground w-8">20%</span>
             </div>
-          </div>
-          <div className="flex items-end gap-2 self-end">
-            {hasUnsaved && (
-              <Button
-                size="sm"
-                onClick={handleSaveCommission}
-                disabled={updateCommissionMutation.isPending}
-                className="gap-2"
-              >
-                <Save className="w-3.5 h-3.5" />
-                Salvar comissão
-              </Button>
-            )}
+            <p className="text-xs text-muted-foreground">
+              Com 20%: preço público de tabela. Reduza para oferecer um preço menor ao seu cliente — a diferença sai da sua comissão.
+            </p>
           </div>
         </div>
       </div>
@@ -372,7 +355,7 @@ export default function ParceiroTabelaPrecos() {
             <ProductTable
               key={product.id}
               product={product}
-              commissionPercent={commissionPercent}
+              bvPercent={bvPercent}
               billingMode={billingMode}
             />
           ))}
@@ -391,11 +374,7 @@ export default function ParceiroTabelaPrecos() {
           <p><span className="text-muted-foreground">Custo total</span> = Custo GPC × Artes × Volume + Frete</p>
           <p><span className="text-muted-foreground">Denominador base</span> = 1 − Margem − IRPJ − Com. Local − Com. Interna</p>
           <p><span className="text-muted-foreground">Preço base (4 sem.)</span> = Custo total ÷ Denominador base</p>
-          {billingMode === "bruto" ? (
-            <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Preço base ÷ (1 − <span className="text-emerald-400">Sua Com. ({commissionPercent}%)</span> − IRPJ)</p>
-          ) : (
-            <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Preço base <span className="text-amber-400">(sem gross-up — comissão faturada separadamente)</span></p>
-          )}
+          <p><span className="text-muted-foreground">Preço total (4 sem.)</span> = Preço base ÷ (1 − <span className="text-emerald-400">BV ({bvPercent}%)</span> − IRPJ)</p>
           <p><span className="text-muted-foreground">Preço unitário</span> = Preço total ÷ Volume</p>
         </div>
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-muted-foreground">
@@ -413,7 +392,7 @@ export default function ParceiroTabelaPrecos() {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-            <span>Sua com.: <strong>{commissionPercent}%</strong> (gross-up parceiro)</span>
+            <span>BV de agência: <strong>{bvPercent}%</strong> (gross-up no preço público)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />

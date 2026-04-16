@@ -68,7 +68,7 @@ function calcItemPrice(product: any, volume: number, weeks: number, hasPartner: 
   const irpj = parseFloat(product.irpj ?? "6") / 100;
   const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
   const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-  const comParceiro = hasPartner ? BV_PADRAO_AGENCIA : 0;
+  const comParceiro = BV_PADRAO_AGENCIA;
 
   const sortedTiers = [...tiers].sort((a: any, b: any) => b.volumeMin - a.volumeMin);
   const tier = sortedTiers.find((t: any) => volume >= t.volumeMin) ?? tiers[0];
@@ -306,12 +306,10 @@ function StepProdutos({ products, cart, hasPartner, onAdd, onRemove }: {
         <p className="text-sm text-muted-foreground">Escolha os produtos que deseja incluir na sua campanha.</p>
       </div>
 
-      {hasPartner && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
-          <Tag className="w-3.5 h-3.5 shrink-0" />
-          Preços com comissão de agência incluída (+{(BV_PADRAO_AGENCIA * 100).toFixed(0)}% BV)
-        </div>
-      )}
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-xs text-primary/80">
+        <Tag className="w-3.5 h-3.5 shrink-0" />
+        Preços de tabela pública Mesa Ads
+      </div>
 
       {products.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-16 text-center px-6">
@@ -341,7 +339,7 @@ function StepProdutos({ products, cart, hasPartner, onAdd, onRemove }: {
             const irpj = parseFloat(product.irpj ?? "6") / 100;
             const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
             const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-            const comParceiro = hasPartner ? BV_PADRAO_AGENCIA : 0;
+            const comParceiro = BV_PADRAO_AGENCIA;
             let minPrice: number | null = null;
             if (smallestTier && smallestVol != null) {
               const unitPrice = calcUnitPriceAdv({
@@ -606,12 +604,6 @@ function StepConfirmacao({ cart, campaignName, startDate, briefing, hasPartner, 
           )}
           {briefing && (
             <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3 leading-relaxed">{briefing}</p>
-          )}
-          {hasPartner && (
-            <div className="flex items-center gap-1.5 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-1.5">
-              <Tag className="w-3 h-3" />
-              Inclui comissão de agência ({(BV_PADRAO_AGENCIA * 100).toFixed(0)}% BV)
-            </div>
           )}
         </div>
       </div>

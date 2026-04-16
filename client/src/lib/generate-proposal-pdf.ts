@@ -369,9 +369,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
     const items = data.items!;
     const totalVolume = items.reduce((s, i) => s + i.volume, 0);
     const rawItemsTotal = items.reduce((s, i) => s + i.totalPrice, 0);
-    const bvScaleFactor = (data.agencyCommissionPercent ?? 0) > 0 && rawItemsTotal > 0
-      ? contractTotal / rawItemsTotal
-      : 1;
+    const bvScaleFactor = rawItemsTotal > 0 ? contractTotal / rawItemsTotal : 1;
     const hasTelasItems = items.some(i => i.spotSeconds !== null && i.spotSeconds !== undefined);
 
     if (hasTelasItems) {
