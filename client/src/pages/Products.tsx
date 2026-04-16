@@ -251,7 +251,9 @@ export default function Products() {
       entryType: (p.entryType as EntryType) || "tiers",
       workflowTemplate: (p.workflowTemplate as WorkflowTemplate) || "",
       isActive: p.isActive,
-      impressionFormulaType: (p.impressionFormulaType as ImpressionFormulaType) || "por_coaster",
+      impressionFormulaType: (["por_coaster", "por_tela", "manual"].includes(p.impressionFormulaType ?? "")
+        ? p.impressionFormulaType as ImpressionFormulaType
+        : "manual") || "por_coaster",
       attentionFactor: p.attentionFactor || "1.00",
       frequencyParam: p.frequencyParam || "1.00",
       defaultPessoasPorMesa: p.defaultPessoasPorMesa || "3.00",
