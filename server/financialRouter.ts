@@ -92,6 +92,53 @@ function buildNetInvoiceCountQuery(db: NonNullable<Awaited<ReturnType<typeof get
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GROSS = valor cheio da fatura (sem deduzir comissão restaurante nem repasse
+// VIP). Usado nas visões "Receita Total" do painel.
+// ─────────────────────────────────────────────────────────────────────────────
+function buildGrossInvoiceQuery(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
+  return db
+    .select({ total: sql<string>`COALESCE(SUM(${invoices.amount}::numeric), 0)` })
+    .from(invoices);
+}
+
+function buildGrossInvoiceCountQuery(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
+  return db
+    .select({
+      total: sql<string>`COALESCE(SUM(${invoices.amount}::numeric), 0)`,
+      count: sql<number>`COUNT(*)::int`,
+    })
+    .from(invoices);
+}
+
+// Deduções que viram CUSTO operacional (comissão restaurante + repasse sala VIP).
+// Bonificadas e ISS retido ficam de fora — bonificadas não geram repasse e ISS
+// é tributo, não custo.
+const DEDUCTION_AMOUNT_SQL = sql<string>`
+  CASE WHEN COALESCE(${campaigns.isBonificada}, false) THEN 0
+  ELSE
+    (${invoices.amount}::numeric * (COALESCE(${campaigns.restaurantCommission}, 0)::numeric / 100))
+    + (
+        CASE
+          WHEN ${products.tipo} IN ('telas', 'janelas_digitais') AND ${products.vipProviderId} IS NOT NULL
+          THEN ${invoices.amount}::numeric * (
+            COALESCE(${products.vipProviderCommissionPercent}::numeric, ${vipProviders.commissionPercent}::numeric, 0) / 100
+          )
+          ELSE 0
+        END
+      )
+  END
+`;
+
+function buildDeductionQuery(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
+  return db
+    .select({ total: sql<string>`COALESCE(SUM(${DEDUCTION_AMOUNT_SQL}), 0)` })
+    .from(invoices)
+    .leftJoin(campaigns, eq(campaigns.id, invoices.campaignId))
+    .leftJoin(products, eq(products.id, campaigns.productId))
+    .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Sincroniza accounts_payable (produção + frete) com os custos operacionais
 // da campanha. Regras:
 //   • Gera `contractDuration` parcelas por tipo (1 parcela = 1 mês).
@@ -194,17 +241,14 @@ export const financialRouter = router({
     const monthEnd = new Date(currentYear, currentMonth + 1, 0).toISOString().split("T")[0];
     const next30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    // ── Invoice totals by status (valor líquido = nossa parte) ────────────────
+    // ── Invoice totals by status (valor BRUTO = receita total) ───────────────
     const invoicesByStatus = await db
       .select({
         status: invoices.status,
         count: sql<number>`COUNT(*)::int`,
-        total: sql<string>`COALESCE(SUM(${NET_AMOUNT_SQL}), 0)`,
+        total: sql<string>`COALESCE(SUM(${invoices.amount}::numeric), 0)`,
       })
       .from(invoices)
-      .leftJoin(campaigns, eq(campaigns.id, invoices.campaignId))
-      .leftJoin(products, eq(products.id, campaigns.productId))
-      .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId))
       .groupBy(invoices.status);
 
     const invByStatus: Record<string, { count: number; total: number }> = {};
@@ -212,21 +256,30 @@ export const financialRouter = router({
       invByStatus[row.status] = { count: row.count, total: parseFloat(row.total) };
     }
 
-    // Overdue = emitida past due date (líquido)
-    const overdueResult = await buildNetInvoiceCountQuery(db)
+    // Overdue = emitida past due date (bruto)
+    const overdueResult = await buildGrossInvoiceCountQuery(db)
       .where(and(eq(invoices.status, "emitida"), lte(invoices.dueDate, today)));
 
-    // Invoiced this month (emitida + paga issued this month) - líquido
-    const invoicedThisMonthResult = await buildNetInvoiceQuery(db)
+    // Invoiced this month (emitida + paga issued this month) - bruto
+    const invoicedThisMonthResult = await buildGrossInvoiceQuery(db)
       .where(and(
         sql`${invoices.status} NOT IN ('cancelada')`,
         gte(invoices.issueDate, monthStart),
         lte(invoices.issueDate, monthEnd),
       ));
 
-    // Received this month (paga) - líquido
-    const paidThisMonthResult = await buildNetInvoiceQuery(db)
+    // Received this month (paga) - bruto
+    const paidThisMonthResult = await buildGrossInvoiceQuery(db)
       .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, monthStart), lte(invoices.paymentDate, monthEnd)));
+
+    // Deduções (comissão restaurante + repasse VIP) sobre faturas emitidas
+    // este mês — entram como custo operacional do mês.
+    const deductionsThisMonthResult = await buildDeductionQuery(db)
+      .where(and(
+        sql`${invoices.status} NOT IN ('cancelada')`,
+        gte(invoices.issueDate, monthStart),
+        lte(invoices.issueDate, monthEnd),
+      ));
 
     // ── Pending restaurant payments ─────────────────────────────────────────────
     const pendingRpResult = await db
@@ -253,16 +306,16 @@ export const financialRouter = router({
       .from(restaurantPayments)
       .where(eq(restaurantPayments.status, "paid"));
 
-    // ── Monthly chart: last 6 months, invoiced vs received (líquidos) ───────
+    // ── Monthly chart: last 6 months, invoiced vs received (BRUTOS) ─────────
     const monthlyData: { month: string; invoiced: number; received: number }[] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(currentYear, currentMonth - i, 1);
       const mStart = d.toISOString().split("T")[0];
       const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split("T")[0];
       const [inv, rcv] = await Promise.all([
-        buildNetInvoiceQuery(db)
+        buildGrossInvoiceQuery(db)
           .where(and(sql`${invoices.status} NOT IN ('cancelada')`, gte(invoices.issueDate, mStart), lte(invoices.issueDate, mEnd))),
-        buildNetInvoiceQuery(db)
+        buildGrossInvoiceQuery(db)
           .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, mStart), lte(invoices.paymentDate, mEnd))),
       ]);
       monthlyData.push({
@@ -272,21 +325,17 @@ export const financialRouter = router({
       });
     }
 
-    // ── Upcoming invoices (due in next 30 days, not yet paid) — net ─────────
+    // ── Upcoming invoices (due in next 30 days, not yet paid) — bruto ───────
     const upcomingRows = await db
       .select({
         id: invoices.id,
         invoiceNumber: invoices.invoiceNumber,
-        amount: invoices.amount, // bruto (referência)
-        netAmount: sql<string>`${NET_AMOUNT_SQL}`, // nossa parte
+        amount: invoices.amount, // bruto = receita total
         dueDate: invoices.dueDate,
         clientId: invoices.clientId,
         campaignId: invoices.campaignId,
       })
       .from(invoices)
-      .leftJoin(campaigns, eq(campaigns.id, invoices.campaignId))
-      .leftJoin(products, eq(products.id, campaigns.productId))
-      .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId))
       .where(and(
         eq(invoices.status, "emitida"),
         gte(invoices.dueDate, today),
@@ -316,17 +365,17 @@ export const financialRouter = router({
     const monthlyRevenue = monthlyData.map((m) => ({ month: m.month, revenue: m.received }));
 
     // ──────────────────────────────────────────────────────────────────────────
-    // `revenue` e `invoicedThisMonth` já estão LÍQUIDOS (net = nossa parte).
-    // Os repasses (comissão restaurante + VIP) já foram deduzidos do bruto pelo
-    // NET_AMOUNT_SQL, portanto NÃO devem entrar novamente em totalCosts.
-    // `restaurantCosts` é mantido apenas no breakdown (referência histórica).
+    // `revenue` e `invoicedThisMonth` agora são BRUTOS (receita total cheia).
+    // `totalCosts` inclui produção + frete + deduções operacionais
+    // (comissão restaurante + repasse VIP) deste mês.
     // ──────────────────────────────────────────────────────────────────────────
     const revenue = parseFloat(paidThisMonthResult[0]?.total || "0");
     const invoicedThisMonth = parseFloat(invoicedThisMonthResult[0]?.total || "0");
     const production = parseFloat(costData[0]?.totalProduction || "0");
     const freight = parseFloat(costData[0]?.totalFreight || "0");
     const restaurantCosts = parseFloat(rpPaidTotal[0]?.total || "0");
-    const totalCosts = production + freight; // comm de restaurante/VIP já deduzidos
+    const deductionsThisMonth = parseFloat(deductionsThisMonthResult[0]?.total || "0");
+    const totalCosts = production + freight + deductionsThisMonth;
     const margin = revenue - totalCosts;
 
     return {
@@ -368,20 +417,29 @@ export const financialRouter = router({
     const prevMonthStart = new Date(prevYear, prevMonth, 1).toISOString().split("T")[0];
     const prevMonthEnd = new Date(prevYear, prevMonth + 1, 0).toISOString().split("T")[0];
 
-    // ── YTD & current month revenue (líquidos = nossa parte) ────────────────
-    const [ytdInvoiced, ytdReceived, currInvoiced, currReceived, prevInvoiced, prevReceived] = await Promise.all([
-      buildNetInvoiceQuery(db)
+    // ── YTD & current month revenue (BRUTOS = receita total) ────────────────
+    const [
+      ytdInvoiced, ytdReceived, currInvoiced, currReceived, prevInvoiced, prevReceived,
+      ytdDeductions, currDeductions, prevDeductions,
+    ] = await Promise.all([
+      buildGrossInvoiceQuery(db)
         .where(and(sql`${invoices.status} NOT IN ('cancelada')`, gte(invoices.issueDate, ytdStart), lte(invoices.issueDate, today))),
-      buildNetInvoiceQuery(db)
+      buildGrossInvoiceQuery(db)
         .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, ytdStart), lte(invoices.paymentDate, today))),
-      buildNetInvoiceQuery(db)
+      buildGrossInvoiceQuery(db)
         .where(and(sql`${invoices.status} NOT IN ('cancelada')`, gte(invoices.issueDate, currMonthStart), lte(invoices.issueDate, currMonthEnd))),
-      buildNetInvoiceQuery(db)
+      buildGrossInvoiceQuery(db)
         .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, currMonthStart), lte(invoices.paymentDate, currMonthEnd))),
-      buildNetInvoiceQuery(db)
+      buildGrossInvoiceQuery(db)
         .where(and(sql`${invoices.status} NOT IN ('cancelada')`, gte(invoices.issueDate, prevMonthStart), lte(invoices.issueDate, prevMonthEnd))),
-      buildNetInvoiceQuery(db)
+      buildGrossInvoiceQuery(db)
         .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, prevMonthStart), lte(invoices.paymentDate, prevMonthEnd))),
+      buildDeductionQuery(db)
+        .where(and(sql`${invoices.status} NOT IN ('cancelada')`, gte(invoices.issueDate, ytdStart), lte(invoices.issueDate, today))),
+      buildDeductionQuery(db)
+        .where(and(sql`${invoices.status} NOT IN ('cancelada')`, gte(invoices.issueDate, currMonthStart), lte(invoices.issueDate, currMonthEnd))),
+      buildDeductionQuery(db)
+        .where(and(sql`${invoices.status} NOT IN ('cancelada')`, gte(invoices.issueDate, prevMonthStart), lte(invoices.issueDate, prevMonthEnd))),
     ]);
 
     // ── Total costs (no date on operational_costs) ──────────────────────────
@@ -407,16 +465,16 @@ export const financialRouter = router({
     const currRpCosts = parseFloat(currRpRows[0]?.total || "0");
     const prevRpCosts = parseFloat(prevRpRows[0]?.total || "0");
 
-    // ── 12-month series (invoiced/received líquidos; rpCosts mantido bruto) ─
+    // ── 12-month series (invoiced/received BRUTOS; rpCosts mantido bruto) ───
     const monthlySeries: { month: string; invoiced: number; received: number; rpCosts: number }[] = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date(currentYear, currentMonth - i, 1);
       const mStart = d.toISOString().split("T")[0];
       const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split("T")[0];
       const [inv, rcv, rp] = await Promise.all([
-        buildNetInvoiceQuery(db)
+        buildGrossInvoiceQuery(db)
           .where(and(sql`${invoices.status} NOT IN ('cancelada')`, gte(invoices.issueDate, mStart), lte(invoices.issueDate, mEnd))),
-        buildNetInvoiceQuery(db)
+        buildGrossInvoiceQuery(db)
           .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, mStart), lte(invoices.paymentDate, mEnd))),
         db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(restaurantPayments)
           .where(and(eq(restaurantPayments.status, "paid"), gte(restaurantPayments.createdAt, new Date(mStart)), lte(restaurantPayments.createdAt, new Date(mEnd + "T23:59:59")))),
@@ -464,20 +522,17 @@ export const financialRouter = router({
       .from(quotations).where(and(eq(quotations.isBonificada, true), sql`"totalValue" IS NOT NULL`));
     const bonificadas = { count: bonificadasRows[0]?.count || 0, total: parseFloat(bonificadasRows[0]?.total || "0") };
 
-    // ── Top clients by paid invoices (por valor líquido) ────────────────────
+    // ── Top clients by paid invoices (BRUTO = receita total) ────────────────
     const topClientRows = await db
       .select({
         clientId: invoices.clientId,
-        total: sql<string>`COALESCE(SUM(${NET_AMOUNT_SQL}), 0)`,
+        total: sql<string>`COALESCE(SUM(${invoices.amount}::numeric), 0)`,
         count: sql<number>`COUNT(*)::int`,
       })
       .from(invoices)
-      .leftJoin(campaigns, eq(campaigns.id, invoices.campaignId))
-      .leftJoin(products, eq(products.id, campaigns.productId))
-      .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId))
       .where(eq(invoices.status, "paga"))
       .groupBy(invoices.clientId)
-      .orderBy(desc(sql`SUM(${NET_AMOUNT_SQL})`))
+      .orderBy(desc(sql`SUM(${invoices.amount}::numeric)`))
       .limit(10);
 
     const topClientIds = uniqueIds(topClientRows.map(r => r.clientId));
@@ -505,12 +560,12 @@ export const financialRouter = router({
     const paidInvoiceCount = paidCountRow[0]?.count || 0;
 
     // ── DRE components ───────────────────────────────────────────────────────
-    // ytdInvoicedVal / ytdReceivedVal já são LÍQUIDOS (nossa parte).
-    // Comissão de restaurante e repasse VIP já deduzidos pelo NET_AMOUNT_SQL.
-    // Custos diretos agora = produção + frete (comissões não recontam aqui).
+    // ytdInvoicedVal / ytdReceivedVal são BRUTOS (receita total).
+    // Custos = produção + frete + deduções (comissão restaurante + repasse VIP).
     const ytdInvoicedVal = parseFloat(ytdInvoiced[0]?.total || "0");
     const ytdReceivedVal = parseFloat(ytdReceived[0]?.total || "0");
-    const ytdTotalCosts = totalProduction + totalFreight;
+    const ytdDeductionsVal = parseFloat(ytdDeductions[0]?.total || "0");
+    const ytdTotalCosts = totalProduction + totalFreight + ytdDeductionsVal;
     const ytdIrpj = ytdInvoicedVal * 0.06;
     const ytdGrossProfit = ytdInvoicedVal - ytdTotalCosts;
     const ytdNetProfit = ytdGrossProfit - ytdIrpj;
@@ -519,7 +574,8 @@ export const financialRouter = router({
 
     const currInvoicedVal = parseFloat(currInvoiced[0]?.total || "0");
     const currReceivedVal = parseFloat(currReceived[0]?.total || "0");
-    const currDirectCosts = 0; // comissões já deduzidas do net
+    const currDeductionsVal = parseFloat(currDeductions[0]?.total || "0");
+    const currDirectCosts = currDeductionsVal; // produção/frete não tem data
     const currGrossProfit = currInvoicedVal - currDirectCosts;
     const currIrpj = currInvoicedVal * 0.06;
     const currNetProfit = currGrossProfit - currIrpj;
@@ -527,7 +583,8 @@ export const financialRouter = router({
 
     const prevInvoicedVal = parseFloat(prevInvoiced[0]?.total || "0");
     const prevReceivedVal = parseFloat(prevReceived[0]?.total || "0");
-    const prevGrossProfit = prevInvoicedVal; // sem custos diretos aqui (já net)
+    const prevDeductionsVal = parseFloat(prevDeductions[0]?.total || "0");
+    const prevGrossProfit = prevInvoicedVal - prevDeductionsVal;
 
     const growthInvoiced = (prevInvoicedVal > 0 && currInvoicedVal > 0) ? (currInvoicedVal - prevInvoicedVal) / prevInvoicedVal : null;
     const growthReceived = (prevReceivedVal > 0 && currReceivedVal > 0) ? (currReceivedVal - prevReceivedVal) / prevReceivedVal : null;
@@ -563,6 +620,7 @@ export const financialRouter = router({
         netProfit: currNetProfit,
         grossMargin: currGrossMargin,
         directCosts: currDirectCosts,
+        deductions: currDeductionsVal,
       },
       prevMonth: {
         invoiced: prevInvoicedVal,
@@ -575,20 +633,18 @@ export const financialRouter = router({
         profit: growthProfit,
       },
       dre: {
-        // `grossRevenue` aqui já é LÍQUIDO (nossa parte), pois comissões de
-        // restaurante e repasse VIP foram deduzidos no NET_AMOUNT_SQL.
-        // O nome do campo foi mantido para compat de clientes, mas
-        // semanticamente = nossa receita líquida.
+        // `grossRevenue` = receita BRUTA total (sem deduzir comissões/repasses).
+        // Custos = produção + frete + comissão restaurante + repasse VIP YTD.
         grossRevenue: ytdInvoicedVal,
-        restaurantCommissions: allRpPaid, // referência histórica
+        restaurantCommissions: ytdDeductionsVal, // comissões + repasses YTD
         productionCosts: totalProduction,
         freightCosts: totalFreight,
-        totalDirectCosts: totalProduction + totalFreight,
-        grossProfit: ytdInvoicedVal - (totalProduction + totalFreight),
+        totalDirectCosts: totalProduction + totalFreight + ytdDeductionsVal,
+        grossProfit: ytdGrossProfit,
         irpj: ytdIrpj,
-        netProfit: ytdInvoicedVal - (totalProduction + totalFreight) - ytdIrpj,
-        grossMarginPct: ytdInvoicedVal > 0 ? (ytdInvoicedVal - (totalProduction + totalFreight)) / ytdInvoicedVal : 0,
-        netMarginPct: ytdInvoicedVal > 0 ? (ytdInvoicedVal - (totalProduction + totalFreight) - ytdIrpj) / ytdInvoicedVal : 0,
+        netProfit: ytdNetProfit,
+        grossMarginPct: ytdGrossMargin,
+        netMarginPct: ytdNetMargin,
       },
       quotations: {
         won: qWon,
