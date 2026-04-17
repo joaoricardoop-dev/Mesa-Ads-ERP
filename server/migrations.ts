@@ -550,10 +550,22 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     `,
   },
   {
+    // Troca o termo "Lote" por "Batch" no nome de todas as campanhas
+    // (ex: "UNIPAR — Lote Abr/2026" → "UNIPAR — Batch Abr/2026").
+    // Idempotente: só toca em quem ainda usa "— Lote ".
+    name: "rename_campaigns_lote_to_batch",
+    sql: `
+      UPDATE "campaigns"
+      SET "name" = REPLACE("name", ' — Lote ', ' — Batch '),
+          "updatedAt" = NOW()
+      WHERE "name" LIKE '% — Lote %';
+    `,
+  },
+  {
     name: "rename_campaigns_to_lote_format",
     sql: `
       UPDATE "campaigns" c
-      SET "name" = cli."name" || ' — Lote ' ||
+      SET "name" = cli."name" || ' — Batch ' ||
         (CASE EXTRACT(MONTH FROM c."startDate"::date)::int
           WHEN 1 THEN 'Jan' WHEN 2 THEN 'Fev' WHEN 3 THEN 'Mar' WHEN 4 THEN 'Abr'
           WHEN 5 THEN 'Mai' WHEN 6 THEN 'Jun' WHEN 7 THEN 'Jul' WHEN 8 THEN 'Ago'
@@ -562,7 +574,7 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         "updatedAt" = NOW()
       FROM "clients" cli
       WHERE cli.id = c."clientId"
-        AND c."name" !~ ' — Lote (Jan|Fev|Mar|Abr|Mai|Jun|Jul|Ago|Set|Out|Nov|Dez)/[0-9]{4}\\b';
+        AND c."name" !~ ' — (Batch|Lote) (Jan|Fev|Mar|Abr|Mai|Jun|Jul|Ago|Set|Out|Nov|Dez)/[0-9]{4}\\b';
     `,
   },
 ];

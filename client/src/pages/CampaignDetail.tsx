@@ -1325,8 +1325,11 @@ export default function CampaignDetail() {
           </div>
         </div>
 
-        {/* ── Stepper sticky (dynamic template-aware) ───────────────────── */}
+        {/* ── Stepper sticky (dynamic template-aware) ─────────────────────
+             Esconde quando o usuário está dentro de um batch específico —
+             nesse caso a BatchTimeline própria do batch é exibida abaixo. */}
         {(() => {
+          if (currentPhaseId != null) return null;
           const workflowSteps = getWorkflowSteps((campaign as any).productWorkflowTemplate);
           return workflowSteps.some(s => s.key === campaign.status) && (
             <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/20 px-4 lg:px-6 py-3">
@@ -1373,8 +1376,9 @@ export default function CampaignDetail() {
         })()}
 
         <div className="p-4 lg:p-6 space-y-5">
-          {/* SLA detail card (shown in the main content area) */}
-          {slaStages.length > 0 && (
+          {/* SLA detail card (shown in the main content area).
+               Também escondido em batch view — duração de etapa é da campanha toda. */}
+          {currentPhaseId == null && slaStages.length > 0 && (
             <div className="bg-card border border-border/30 rounded-lg p-3">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Duração por Etapa</p>
               <div className="flex flex-wrap gap-1.5">

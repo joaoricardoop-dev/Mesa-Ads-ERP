@@ -22,10 +22,10 @@ export function buildCampaignName(
 
   const mes = MESES_PT_ABBR[d.getMonth()];
   const ano = d.getFullYear();
-  return `${safeClient} — Lote ${mes}/${ano}`;
+  return `${safeClient} — Batch ${mes}/${ano}`;
 }
 
 export function isFormattedCampaignName(name: string | null | undefined): boolean {
   if (!name) return false;
-  return /— Lote (Jan|Fev|Mar|Abr|Mai|Jun|Jul|Ago|Set|Out|Nov|Dez)\/\d{4}\b/.test(name);
+  return /— (Batch|Lote) (Jan|Fev|Mar|Abr|Mai|Jun|Jul|Ago|Set|Out|Nov|Dez)\/\d{4}\b/.test(name);
 }
