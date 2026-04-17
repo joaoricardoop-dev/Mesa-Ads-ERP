@@ -61,7 +61,7 @@ export const vipProviderRouter = router({
         .from(vipProviders)
         .where(eq(vipProviders.id, input.id))
         .limit(1);
-      if (!provider) throw new TRPCError({ code: "NOT_FOUND", message: "Provedor VIP não encontrado" });
+      if (!provider) throw new TRPCError({ code: "NOT_FOUND", message: "Provedor Sala VIP não encontrado" });
       return provider;
     }),
 
@@ -108,7 +108,7 @@ export const vipProviderRouter = router({
         .set({ ...data, updatedAt: new Date() })
         .where(eq(vipProviders.id, id))
         .returning();
-      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Provedor VIP não encontrado" });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Provedor Sala VIP não encontrado" });
       return updated;
     }),
 

@@ -554,7 +554,7 @@ export default function Products() {
                     </Select>
                     {vipProvidersList.length === 0 && (
                       <p className="text-[10px] text-muted-foreground mt-1">
-                        Nenhum provedor cadastrado. Cadastre em Financeiro → Provedores VIP.
+                        Nenhum provedor cadastrado. Cadastre em Configurações → Provedores Sala VIP.
                       </p>
                     )}
                   </div>

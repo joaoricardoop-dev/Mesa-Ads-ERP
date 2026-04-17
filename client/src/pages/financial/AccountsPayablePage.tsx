@@ -33,7 +33,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: any; color: string }> =
   producao: { label: "Produção", icon: Factory, color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
   frete: { label: "Frete", icon: Truck, color: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
   comissao: { label: "Comissão", icon: HandCoins, color: "bg-purple-500/10 text-purple-400 border-purple-500/30" },
-  repasse_vip: { label: "Repasse VIP", icon: Crown, color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30" },
+  repasse_vip: { label: "Repasse Sala VIP", icon: Crown, color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30" },
   outro: { label: "Outro", icon: CircleDollarSign, color: "bg-gray-500/10 text-gray-400 border-gray-500/30" },
 };
 
@@ -165,7 +165,7 @@ export default function AccountsPayablePage() {
               <SelectItem value="producao">Produção</SelectItem>
               <SelectItem value="frete">Frete</SelectItem>
               <SelectItem value="comissao">Comissão</SelectItem>
-              <SelectItem value="repasse_vip">Repasse VIP</SelectItem>
+              <SelectItem value="repasse_vip">Repasse Sala VIP</SelectItem>
               <SelectItem value="outro">Outro</SelectItem>
             </SelectContent>
           </Select>

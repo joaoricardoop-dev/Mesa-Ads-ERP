@@ -121,6 +121,8 @@ function Router() {
       <Route path="/financeiro/relatorios" component={FinancialReport} />
       <Route path="/financeiro/comissao-parceiros" component={PartnerCommissionReport} />
       <Route path="/financeiro/contas-pagar" component={AccountsPayablePage} />
+      <Route path="/configuracoes/provedores-sala-vip" component={VipProvidersPage} />
+      {/* Rota antiga mantida como alias pra não quebrar links existentes */}
       <Route path="/financeiro/provedores-vip" component={VipProvidersPage} />
       <Route path="/campanhas/:id" component={CampaignDetail} />
       <Route path="/campanhas" component={Campaigns} />

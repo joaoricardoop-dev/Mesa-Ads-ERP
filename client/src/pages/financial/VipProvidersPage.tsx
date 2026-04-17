@@ -65,7 +65,7 @@ export default function VipProvidersPage() {
     onSuccess: () => {
       utils.vipProvider.list.invalidate();
       setDialogOpen(false);
-      toast.success("Provedor VIP criado");
+      toast.success("Provedor Sala VIP criado");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -74,7 +74,7 @@ export default function VipProvidersPage() {
     onSuccess: () => {
       utils.vipProvider.list.invalidate();
       setDialogOpen(false);
-      toast.success("Provedor VIP atualizado");
+      toast.success("Provedor Sala VIP atualizado");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -83,7 +83,7 @@ export default function VipProvidersPage() {
     onSuccess: () => {
       utils.vipProvider.list.invalidate();
       setDeleteConfirm(null);
-      toast.success("Provedor VIP excluído");
+      toast.success("Provedor Sala VIP excluído");
     },
     onError: (e) => {
       toast.error(e.message);
@@ -148,12 +148,12 @@ export default function VipProvidersPage() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={openCreateDialog}>
-              <Plus className="w-4 h-4 mr-2" /> Novo Provedor
+              <Plus className="w-4 h-4 mr-2" /> Novo Provedor Sala VIP
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>{editingId ? "Editar Provedor VIP" : "Novo Provedor VIP"}</DialogTitle>
+              <DialogTitle>{editingId ? "Editar Provedor Sala VIP" : "Novo Provedor Sala VIP"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -323,7 +323,7 @@ export default function VipProvidersPage() {
       <Dialog open={deleteConfirm !== null} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Excluir Provedor VIP?</DialogTitle>
+            <DialogTitle>Excluir Provedor Sala VIP?</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Esta ação não pode ser desfeita. Se houver produtos vinculados, a exclusão será bloqueada.
