@@ -449,6 +449,79 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     `,
   },
   {
+    // Recria campaign_items a partir de quotation_items quando a soma do
+    // totalPrice das fases está zerada — as versões anteriores do backfill
+    // copiavam c.fixedPrice (NULL/0 em quase todas as campanhas), o que
+    // resultava em receita prevista R$ 0,00 no overview.
+    // Idempotente: só toca em campanhas (com cotação válida) cujos itens
+    // ainda somam zero.
+    name: "backfill_campaign_items_from_quotation_v3",
+    sql: `
+      DO $$
+      DECLARE
+        c RECORD;
+        r_qi RECORD;
+        r_ph RECORD;
+        num_phases INT;
+      BEGIN
+        FOR c IN
+          SELECT cp.id AS campaign_id, cp."quotationId"
+          FROM campaigns cp
+          WHERE cp."quotationId" IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM quotation_items qit
+              WHERE qit."quotationId" = cp."quotationId"
+                AND COALESCE(qit."totalPrice"::numeric, 0) > 0
+            )
+            AND COALESCE((
+              SELECT SUM(COALESCE(ci."totalPrice"::numeric, 0))
+              FROM campaign_items ci
+              JOIN campaign_phases php ON php.id = ci."campaignPhaseId"
+              WHERE php."campaignId" = cp.id
+            ), 0) = 0
+        LOOP
+          SELECT COUNT(*)::int INTO num_phases
+          FROM campaign_phases WHERE "campaignId" = c.campaign_id;
+
+          IF num_phases <= 0 THEN CONTINUE; END IF;
+
+          DELETE FROM campaign_items
+          WHERE "campaignPhaseId" IN (
+            SELECT id FROM campaign_phases WHERE "campaignId" = c.campaign_id
+          );
+
+          FOR r_ph IN
+            SELECT id FROM campaign_phases
+            WHERE "campaignId" = c.campaign_id
+            ORDER BY sequence
+          LOOP
+            FOR r_qi IN
+              SELECT * FROM quotation_items
+              WHERE "quotationId" = c."quotationId"
+              ORDER BY id
+            LOOP
+              INSERT INTO campaign_items (
+                "campaignPhaseId", "productId", quantity,
+                "unitPrice", "totalPrice",
+                "productionCost", "freightCost",
+                notes, "createdAt", "updatedAt"
+              ) VALUES (
+                r_ph.id,
+                r_qi."productId",
+                COALESCE(r_qi.quantity, 1),
+                COALESCE(r_qi."unitPrice"::numeric, 0),
+                ROUND(COALESCE(r_qi."totalPrice"::numeric, 0) / num_phases, 2),
+                0, 0,
+                'Recriado a partir da cotação (rateio por fase)',
+                NOW(), NOW()
+              );
+            END LOOP;
+          END LOOP;
+        END LOOP;
+      END $$;
+    `,
+  },
+  {
     // Renomeia todas as campanhas existentes para o padrão
     // "<Cliente> — Lote <Mês>/<Ano>" (ex: "Brahma — Lote Jan/2026").
     // Idempotente: só atualiza nomes que ainda não estão no formato novo.
