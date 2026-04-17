@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
-import { Plus, Check, X, Building2 } from "lucide-react";
+import { Plus, Check, X, Building2, Eye, Pencil, Save, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -49,6 +49,19 @@ export default function Invoicing() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payDialogId, setPayDialogId] = useState<number | null>(null);
   const [payDate, setPayDate] = useState("");
+
+  // View/Edit dialog state
+  const [viewInvoiceId, setViewInvoiceId] = useState<number | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editAmount, setEditAmount] = useState("");
+  const [editIssueDate, setEditIssueDate] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editPaymentMethod, setEditPaymentMethod] = useState("");
+  const [editBillingType, setEditBillingType] = useState<"bruto" | "liquido">("bruto");
+  const [editWithheldTax, setEditWithheldTax] = useState("");
+  const [editIssRate, setEditIssRate] = useState("");
+  const [editIssRetained, setEditIssRetained] = useState(false);
+  const [editNotes, setEditNotes] = useState("");
 
   const today = new Date().toISOString().split("T")[0];
   const [newCampaignId, setNewCampaignId] = useState<string>("");
@@ -117,6 +130,48 @@ export default function Invoicing() {
       toast.success("Fatura cancelada");
     },
   });
+
+  const updateMutation = trpc.financial.updateInvoice.useMutation({
+    onSuccess: () => {
+      utils.financial.listInvoices.invalidate();
+      utils.financial.dashboard.invalidate();
+      setIsEditing(false);
+      toast.success("Fatura atualizada");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const viewedInvoice = (invoiceList || []).find((i) => i.id === viewInvoiceId) || null;
+
+  function openInvoice(inv: any) {
+    setViewInvoiceId(inv.id);
+    setIsEditing(false);
+    setEditAmount(inv.amount ?? "");
+    setEditIssueDate(inv.issueDate ?? "");
+    setEditDueDate(inv.dueDate ?? "");
+    setEditPaymentMethod(inv.paymentMethod ?? "");
+    setEditBillingType((inv.billingType as any) || "bruto");
+    setEditWithheldTax(inv.withheldTax ?? "");
+    setEditIssRate(inv.issRate && parseFloat(inv.issRate) > 0 ? inv.issRate : "");
+    setEditIssRetained(!!inv.issRetained);
+    setEditNotes(inv.notes ?? "");
+  }
+
+  function handleSaveEdit() {
+    if (!viewedInvoice) return;
+    updateMutation.mutate({
+      id: viewedInvoice.id,
+      amount: editAmount,
+      issueDate: editIssueDate,
+      dueDate: editDueDate,
+      paymentMethod: editPaymentMethod || undefined,
+      notes: editNotes,
+      billingType: editBillingType,
+      withheldTax: editWithheldTax || undefined,
+      issRate: editIssRate || "0",
+      issRetained: editIssRate && parseFloat(editIssRate) > 0 ? editIssRetained : false,
+    });
+  }
 
   const selectedCamp = (campaignsForInvoice || []).find((c) => String(c.id) === newCampaignId);
 
@@ -486,9 +541,11 @@ export default function Invoicing() {
                   return (
                     <tr
                       key={inv.id}
-                      className={`border-b border-border/10 hover:bg-muted/5 transition-colors ${
+                      onClick={() => openInvoice(inv)}
+                      className={`border-b border-border/10 hover:bg-muted/5 transition-colors cursor-pointer ${
                         inv.status === "vencida" ? "bg-red-500/5" : ""
                       }`}
+                      data-testid={`row-invoice-${inv.id}`}
                     >
                       <td className="px-4 py-3 font-mono text-xs">{inv.invoiceNumber}</td>
                       <td className="px-4 py-3">{inv.clientName}</td>
@@ -539,8 +596,18 @@ export default function Invoicing() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => openInvoice(inv)}
+                            title="Ver detalhes"
+                            data-testid={`button-view-invoice-${inv.id}`}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
                           {inv.status === "emitida" && (
                             <>
                               <Button
@@ -580,6 +647,277 @@ export default function Invoicing() {
           </div>
         </div>
       )}
+
+      <Dialog open={viewInvoiceId !== null} onOpenChange={(open) => { if (!open) { setViewInvoiceId(null); setIsEditing(false); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 flex-wrap">
+              <span className="font-mono text-sm">{viewedInvoice?.invoiceNumber}</span>
+              {viewedInvoice && (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_STYLES[viewedInvoice.status] || ""}`}>
+                  {STATUS_LABELS[viewedInvoice.status] || viewedInvoice.status}
+                </span>
+              )}
+              {viewedInvoice?.billingType && (
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                  viewedInvoice.billingType === "liquido"
+                    ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                    : "bg-sky-500/10 text-sky-400 border-sky-500/20"
+                }`}>
+                  {viewedInvoice.billingType === "liquido" ? "Líquido" : "Bruto"}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {viewedInvoice && (() => {
+            const inv: any = viewedInvoice;
+            const gross = parseFloat(inv.amount);
+            const ourShare = parseFloat(inv.netAmount ?? inv.amount);
+            const restaurantRepasse = parseFloat(inv.restaurantRepasseAmount ?? "0");
+            const vipRepasse = parseFloat(inv.vipRepasseAmount ?? "0");
+            const issAmount = parseFloat(inv.issAmount ?? "0");
+            const issRetained = !!inv.issRetained;
+            const issRate = parseFloat(inv.issRate ?? "0");
+            const issDeducted = issRetained ? issAmount : 0;
+            const withheld = parseFloat(inv.withheldTax ?? "0");
+            const isLocked = inv.status !== "emitida";
+
+            return (
+              <div className="space-y-4 pt-2">
+                {/* Cabeçalho com cliente e campanha */}
+                <div className="rounded-md border border-border/50 bg-muted/20 p-3 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">{inv.clientName}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground pl-6">{inv.campaignName}</p>
+                  {inv.phaseLabel && (
+                    <p className="text-[11px] text-primary/80 font-medium pl-6">
+                      Fase #{inv.phaseSequence} · {inv.phaseLabel}
+                    </p>
+                  )}
+                </div>
+
+                {/* Breakdown financeiro */}
+                <div className="rounded-md border border-border/30 p-3 space-y-1.5 bg-muted/5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Detalhamento</p>
+                  <div className="flex justify-between text-sm">
+                    <span>Valor bruto</span>
+                    <span className="font-mono">{formatCurrency(gross)}</span>
+                  </div>
+                  {restaurantRepasse > 0 && (
+                    <div className="flex justify-between text-sm text-amber-400/90">
+                      <span>− Comissão restaurante ({parseFloat(inv.restaurantCommissionPercent ?? "0").toFixed(2)}%)</span>
+                      <span className="font-mono">−{formatCurrency(restaurantRepasse)}</span>
+                    </div>
+                  )}
+                  {vipRepasse > 0 && (
+                    <div className="flex justify-between text-sm text-amber-400/90">
+                      <span>− Repasse VIP{inv.vipProviderName ? ` (${inv.vipProviderName})` : ""}</span>
+                      <span className="font-mono">−{formatCurrency(vipRepasse)}</span>
+                    </div>
+                  )}
+                  {issDeducted > 0 && (
+                    <div className="flex justify-between text-sm text-amber-400/90">
+                      <span>− ISS retido ({issRate.toFixed(2)}%)</span>
+                      <span className="font-mono">−{formatCurrency(issDeducted)}</span>
+                    </div>
+                  )}
+                  {withheld > 0 && (
+                    <div className="flex justify-between text-sm text-amber-400/90">
+                      <span>− Retenção na fonte</span>
+                      <span className="font-mono">−{formatCurrency(withheld)}</span>
+                    </div>
+                  )}
+                  <Separator className="my-1" />
+                  <div className="flex justify-between text-sm font-semibold">
+                    <span>Nossa parte</span>
+                    <span className="font-mono text-emerald-400">{formatCurrency(ourShare)}</span>
+                  </div>
+                  {issAmount > 0 && !issRetained && (
+                    <p className="text-[11px] text-amber-400/80 mt-1">
+                      ISS {issRate.toFixed(2)}% a recolher: {formatCurrency(issAmount)} (não afeta líquido recebido)
+                    </p>
+                  )}
+                </div>
+
+                {/* Campos editáveis ou somente leitura */}
+                {!isEditing ? (
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Emissão</p>
+                      <p>{formatDate(inv.issueDate)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Vencimento</p>
+                      <p>{formatDate(inv.dueDate)}</p>
+                    </div>
+                    {inv.paymentDate && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Data do pagamento</p>
+                        <p className="text-emerald-400">{formatDate(inv.paymentDate)}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs text-muted-foreground">Forma de pagamento</p>
+                      <p>{inv.paymentMethod || "—"}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">Observações</p>
+                      <p className="whitespace-pre-wrap text-sm">{inv.notes || "—"}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Valor (R$)</Label>
+                        <Input type="number" step="0.01" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} data-testid="input-edit-amount" />
+                      </div>
+                      <div>
+                        <Label>Forma de pagamento</Label>
+                        <Select value={editPaymentMethod || "none"} onValueChange={(v) => setEditPaymentMethod(v === "none" ? "" : v)}>
+                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">—</SelectItem>
+                            <SelectItem value="boleto">Boleto</SelectItem>
+                            <SelectItem value="pix">Pix</SelectItem>
+                            <SelectItem value="cartao">Cartão de Crédito</SelectItem>
+                            <SelectItem value="transferencia">Transferência Bancária</SelectItem>
+                            <SelectItem value="cheque">Cheque</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Data de Emissão</Label>
+                        <Input type="date" value={editIssueDate} onChange={(e) => setEditIssueDate(e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Data de Vencimento</Label>
+                        <Input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Tipo de Faturamento</Label>
+                      <div className="flex gap-2 mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditBillingType("bruto")}
+                          className={`flex-1 py-1.5 rounded-md border text-sm font-medium ${
+                            editBillingType === "bruto"
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background border-border/50 text-muted-foreground"
+                          }`}
+                        >Bruto</button>
+                        <button
+                          type="button"
+                          onClick={() => setEditBillingType("liquido")}
+                          className={`flex-1 py-1.5 rounded-md border text-sm font-medium ${
+                            editBillingType === "liquido"
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background border-border/50 text-muted-foreground"
+                          }`}
+                        >Líquido</button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Retenção na fonte (R$) <span className="text-xs text-muted-foreground font-normal">— opcional</span></Label>
+                      <Input type="number" step="0.01" placeholder="0,00" value={editWithheldTax} onChange={(e) => setEditWithheldTax(e.target.value)} />
+                    </div>
+                    <div className="border border-border rounded-md p-3 space-y-2 bg-muted/10">
+                      <Label className="text-xs font-semibold">ISS — alíquota (%)</Label>
+                      <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+                        <Input type="number" step="0.01" min="0" max="100" placeholder="Ex: 5,00" value={editIssRate} onChange={(e) => setEditIssRate(e.target.value)} />
+                        <div className="flex items-center gap-2 h-9">
+                          <input
+                            id="editIssRetained"
+                            type="checkbox"
+                            className="w-4 h-4 rounded border-border"
+                            checked={editIssRetained}
+                            onChange={(e) => setEditIssRetained(e.target.checked)}
+                            disabled={!editIssRate || parseFloat(editIssRate) === 0}
+                          />
+                          <Label htmlFor="editIssRetained" className="text-xs cursor-pointer whitespace-nowrap">Retido pelo tomador</Label>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Observações</Label>
+                      <Textarea rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="resize-none" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer com ações */}
+                <Separator />
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    {!isEditing ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditing(true)}
+                        disabled={isLocked}
+                        title={isLocked ? "Apenas faturas emitidas podem ser editadas" : ""}
+                        data-testid="button-edit-invoice"
+                      >
+                        <Pencil className="w-3.5 h-3.5 mr-1.5" /> Editar
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveEdit}
+                          disabled={updateMutation.isPending}
+                          data-testid="button-save-invoice"
+                        >
+                          <Save className="w-3.5 h-3.5 mr-1.5" />
+                          {updateMutation.isPending ? "Salvando..." : "Salvar alterações"}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => { setIsEditing(false); openInvoice(inv); }}>
+                          <XCircle className="w-3.5 h-3.5 mr-1.5" /> Cancelar
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  {!isEditing && inv.status === "emitida" && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-emerald-500 border-emerald-500/30"
+                        onClick={() => {
+                          setPayDialogId(inv.id);
+                          setPayDate(new Date().toISOString().split("T")[0]);
+                          setViewInvoiceId(null);
+                        }}
+                      >
+                        <Check className="w-3.5 h-3.5 mr-1.5" /> Marcar como paga
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive border-destructive/30"
+                        onClick={() => {
+                          if (confirm("Cancelar esta fatura?")) {
+                            cancelMutation.mutate({ id: inv.id });
+                            setViewInvoiceId(null);
+                          }
+                        }}
+                      >
+                        <X className="w-3.5 h-3.5 mr-1.5" /> Cancelar fatura
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={payDialogId !== null} onOpenChange={(open) => !open && setPayDialogId(null)}>
         <DialogContent>
