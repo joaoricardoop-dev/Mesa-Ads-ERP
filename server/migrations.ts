@@ -577,6 +577,13 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         AND c."name" !~ ' — (Batch|Lote) (Jan|Fev|Mar|Abr|Mai|Jun|Jul|Ago|Set|Out|Nov|Dez)/[0-9]{4}\\b';
     `,
   },
+  {
+    name: "add_agency_bv_to_campaigns",
+    sql: `
+      ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "hasAgencyBv" boolean DEFAULT true NOT NULL;
+      ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "agencyBvPercent" numeric(5, 2) DEFAULT '20.00' NOT NULL;
+    `,
+  },
 ];
 
 export async function runMigrations() {

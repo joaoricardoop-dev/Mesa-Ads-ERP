@@ -84,6 +84,7 @@ import CampaignConsolidation from "@/components/CampaignConsolidation";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { calcTelaImpressions, TELAS_INSERCOES } from "@/hooks/useBudgetCalculator";
 import { calcImpressionesParaLocal } from "@/lib/campaign-builder-utils";
@@ -1117,7 +1118,12 @@ export default function CampaignDetail() {
   const client = clientsList.find((cl) => cl.id === campaign.clientId);
   const isBonif = !!(campaign as any).isBonificada;
 
-  const bvMonthly = p.monthlyRevenue * BV_PADRAO;
+  const hasAgencyBv = (campaign as any).hasAgencyBv !== false;
+  const agencyBvPct = (() => {
+    const v = parseFloat((campaign as any).agencyBvPercent ?? "20");
+    return Number.isFinite(v) ? v / 100 : BV_PADRAO;
+  })();
+  const bvMonthly = hasAgencyBv ? p.monthlyRevenue * agencyBvPct : 0;
   const dreCalc = (() => {
     const liquido = p.monthlyRevenue - p.totalTax - bvMonthly - p.totalSellerComm - p.totalRestComm;
     const custos = p.totalProductionCost + p.totalFreight;
@@ -2736,15 +2742,56 @@ export default function CampaignDetail() {
                           contract={p.totalTax * (campaign.contractDuration || 1)}
                           sub warn
                         />
-                        <DRECampRow
-                          label={`(-) BV de Agência${(campaign as any).partnerId ? " → Agência Parceira" : " (sem agência)"}`}
-                          monthly={bvMonthly}
-                          pct={BV_PADRAO * 100}
-                          contract={bvMonthly * (campaign.contractDuration || 1)}
-                          sub
-                          warn={!!(campaign as any).partnerId}
-                          muted={!(campaign as any).partnerId}
-                        />
+                        <tr className="border-b border-border/10">
+                          <td className="py-1 pl-4 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={hasAgencyBv ? "text-red-400" : "text-muted-foreground/60"}>
+                                (-) BV de Agência
+                                {hasAgencyBv
+                                  ? ((campaign as any).partnerId ? " → Agência Parceira" : "")
+                                  : " (não se aplica)"}
+                              </span>
+                              <Switch
+                                checked={hasAgencyBv}
+                                onCheckedChange={(v) =>
+                                  updateMutation.mutate({ id: campaign.id, hasAgencyBv: !!v })
+                                }
+                                data-testid="switch-has-agency-bv"
+                                className="scale-75"
+                              />
+                              {hasAgencyBv && (
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={99.9}
+                                    step={0.5}
+                                    defaultValue={parseFloat((campaign as any).agencyBvPercent ?? "20")}
+                                    onBlur={(e) => {
+                                      const v = parseFloat(e.target.value);
+                                      if (!Number.isFinite(v) || v < 0 || v > 99.9) return;
+                                      const cur = parseFloat((campaign as any).agencyBvPercent ?? "20");
+                                      if (v === cur) return;
+                                      updateMutation.mutate({ id: campaign.id, agencyBvPercent: v.toFixed(2) });
+                                    }}
+                                    className="h-6 w-16 text-xs"
+                                    data-testid="input-agency-bv-percent"
+                                  />
+                                  <span className="text-xs">%</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className={`py-1 text-right text-xs tabular-nums ${hasAgencyBv ? "text-red-400" : "text-muted-foreground/60"}`}>
+                            {formatCurrency(bvMonthly)}
+                          </td>
+                          <td className={`py-1 text-right text-xs tabular-nums ${hasAgencyBv ? "text-red-400" : "text-muted-foreground/60"}`}>
+                            {hasAgencyBv ? `${(agencyBvPct * 100).toFixed(1)}%` : "—"}
+                          </td>
+                          <td className={`py-1 text-right text-xs tabular-nums ${hasAgencyBv ? "text-red-400" : "text-muted-foreground/60"}`}>
+                            {formatCurrency(bvMonthly * (campaign.contractDuration || 1))}
+                          </td>
+                        </tr>
                         <DRECampRow
                           label="(-) Comissão Interna"
                           monthly={p.totalSellerComm}

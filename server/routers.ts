@@ -1556,6 +1556,8 @@ export const appRouter = router({
           budgetId: z.number().nullable().optional(),
           isBonificada: z.boolean().optional(),
           partnerId: z.number().nullable().optional(),
+          hasAgencyBv: z.boolean().optional(),
+          agencyBvPercent: z.string().optional(),
           assignedTo: z.string().nullable().optional(),
           assignedToName: z.string().nullable().optional(),
           assignedToAvatar: z.string().nullable().optional(),

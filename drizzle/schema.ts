@@ -159,6 +159,8 @@ export const campaigns = pgTable("campaigns", {
   producaoEnteredAt: timestamp("producaoEnteredAt"),
   distribuicaoEnteredAt: timestamp("distribuicaoEnteredAt"),
   partnerId: integer("partnerId").references(() => partners.id, { onDelete: "set null" }),
+  hasAgencyBv: boolean("hasAgencyBv").default(true).notNull(),
+  agencyBvPercent: decimal("agencyBvPercent", { precision: 5, scale: 2 }).default("20.00").notNull(),
   assignedTo: varchar("assignedTo", { length: 255 }),
   assignedToName: varchar("assignedToName", { length: 255 }),
   assignedToAvatar: varchar("assignedToAvatar", { length: 500 }),

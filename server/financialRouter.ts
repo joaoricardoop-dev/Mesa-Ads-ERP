@@ -1118,9 +1118,13 @@ export const financialRouter = router({
         const pId = c.quotationId ? null : (c as any).partnerId || clientPartnerMap[c.clientId] || null;
         const resolvedPartnerId = pId;
         const partnerInfo = resolvedPartnerId ? partnerMap[resolvedPartnerId] : null;
-        const partnerPct = partnerInfo?.pct || 0;
+        const hasAgencyBv = (c as any).hasAgencyBv !== false;
+        const rawAgencyBvPct = parseFloat((c as any).agencyBvPercent ?? "");
+        const partnerPct = hasAgencyBv
+          ? (Number.isFinite(rawAgencyBvPct) ? rawAgencyBvPct : (partnerInfo?.pct || 0))
+          : 0;
         const commBase = isBonificada ? 0 : (revenue - taxAmount) - restAmount - productionTotal - freightTotal;
-        const partnerCommission = isBonificada ? 0 : (commBase > 0 ? commBase * (partnerPct / 100) : 0);
+        const partnerCommission = (isBonificada || !hasAgencyBv) ? 0 : (commBase > 0 ? commBase * (partnerPct / 100) : 0);
 
         const totalCosts = productionTotal + freightTotal + restaurantCost + (isBonificada ? 0 : taxAmount + restAmount + partnerCommission);
 
@@ -1713,7 +1717,15 @@ export const financialRouter = router({
       const commissionBase = afterFreight;
 
       const totalDeductions = taxDeduction + restaurantDeduction + productionCost + freightCost;
-      const commissionValue = commissionBase * (partnerCommissionPercent / 100);
+
+      const hasAgencyBv = (campaign as any).hasAgencyBv !== false;
+      const rawCampaignBvPct = parseFloat((campaign as any).agencyBvPercent ?? "");
+      if (!hasAgencyBv) {
+        partnerCommissionPercent = 0;
+      } else if (Number.isFinite(rawCampaignBvPct)) {
+        partnerCommissionPercent = rawCampaignBvPct;
+      }
+      const commissionValue = hasAgencyBv ? commissionBase * (partnerCommissionPercent / 100) : 0;
 
       return {
         campaignId: campaign.id,
