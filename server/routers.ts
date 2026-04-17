@@ -10,6 +10,7 @@ import { batchRouter } from "./batchRouter";
 import { productRouter } from "./productRouter";
 import { partnerRouter } from "./partnerRouter";
 import { vipProviderRouter } from "./vipProviderRouter";
+import { campaignPhaseRouter } from "./campaignPhaseRouter";
 import { parceiroPortalRouter } from "./parceiroPortalRouter";
 import { notificationRouter } from "./notificationRouter";
 import { melhorEnvioRouter } from "./melhorEnvioRouter";
@@ -88,6 +89,7 @@ export const appRouter = router({
   product: productRouter,
   partner: partnerRouter,
   vipProvider: vipProviderRouter,
+  campaignPhase: campaignPhaseRouter,
   parceiroPortal: parceiroPortalRouter,
   notification: notificationRouter,
   melhorEnvio: melhorEnvioRouter,
