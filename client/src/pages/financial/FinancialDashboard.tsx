@@ -150,13 +150,15 @@ export default function FinancialDashboard() {
             <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-violet-500/10 via-card to-card p-6">
               <div className="flex items-center gap-2 mb-1">
                 <Receipt className="w-4 h-4 text-violet-400" />
-                <span className="text-xs text-muted-foreground font-medium">Faturado</span>
+                <span className="text-xs text-muted-foreground font-medium">Faturado (nossa parte)</span>
               </div>
               <div className="flex items-end gap-3 mb-1">
                 <span className="text-3xl font-bold tracking-tight">{formatCurrency(invoicedThisMonth)}</span>
                 <GrowthIndicator value={growth?.invoiced} />
               </div>
-              <p className="text-xs text-muted-foreground/60">vs mês anterior: {formatCurrency(prevMonthData?.invoiced || 0)}</p>
+              <p className="text-xs text-muted-foreground/60">
+                já líquido de comissões e repasses · vs mês anterior: {formatCurrency(prevMonthData?.invoiced || 0)}
+              </p>
             </div>
 
             <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-red-500/10 via-card to-card p-6">
@@ -165,7 +167,7 @@ export default function FinancialDashboard() {
                 <span className="text-xs text-muted-foreground font-medium">Custos</span>
               </div>
               <span className="text-3xl font-bold tracking-tight">{formatCurrency(currMonth?.directCosts || 0)}</span>
-              <p className="text-xs text-muted-foreground/60 mt-1">produção + frete + locais</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">produção + frete</p>
             </div>
 
             <div className={`rounded-2xl border border-border/20 p-6 ${grossMarginOk ? "bg-gradient-to-br from-emerald-500/10 via-card to-card" : "bg-gradient-to-br from-amber-500/10 via-card to-card"}`}>
@@ -362,9 +364,9 @@ export default function FinancialDashboard() {
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-4">Acumulado do Ano</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                { label: "Faturamento YTD", value: formatCurrency(ytd?.invoiced || 0), sub: `${ytd?.paidInvoiceCount || 0} faturas emitidas`, icon: FileText, accent: "text-violet-400" },
-                { label: "Receita Recebida", value: formatCurrency(ytd?.received || 0), sub: "faturas pagas", icon: DollarSign, accent: "text-emerald-400" },
-                { label: "Ticket Médio", value: formatCurrency(ytd?.avgTicket || 0), sub: "por fatura paga", icon: Receipt, accent: "text-blue-400" },
+                { label: "Faturamento YTD (nossa parte)", value: formatCurrency(ytd?.invoiced || 0), sub: `${ytd?.paidInvoiceCount || 0} faturas emitidas`, icon: FileText, accent: "text-violet-400" },
+                { label: "Receita Recebida (nossa parte)", value: formatCurrency(ytd?.received || 0), sub: "faturas pagas", icon: DollarSign, accent: "text-emerald-400" },
+                { label: "Ticket Médio", value: formatCurrency(ytd?.avgTicket || 0), sub: "por fatura paga (líquido)", icon: Receipt, accent: "text-blue-400" },
                 { label: "Receita/Cliente", value: formatCurrency(ytd?.avgRevenuePerClient || 0), sub: `${ytd?.activeClientsCount || 0} clientes ativos`, icon: Users, accent: "text-purple-400" },
               ].map(item => (
                 <div key={item.label}>

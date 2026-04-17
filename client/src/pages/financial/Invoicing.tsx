@@ -367,7 +367,7 @@ export default function Invoicing() {
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Número</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Anunciante</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Campanha</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Valor</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Nossa parte</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Emissão</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Vencimento</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
@@ -376,8 +376,11 @@ export default function Invoicing() {
               </thead>
               <tbody>
                 {invoiceList.map((inv) => {
-                  const withheld = inv.withheldTax ? parseFloat(inv.withheldTax) : 0;
-                  const netReceived = parseFloat(inv.amount) - withheld;
+                  const gross = parseFloat(inv.amount);
+                  const ourShare = parseFloat((inv as any).netAmount ?? inv.amount);
+                  const restaurantRepasse = parseFloat((inv as any).restaurantRepasseAmount ?? "0");
+                  const vipRepasse = parseFloat((inv as any).vipRepasseAmount ?? "0");
+                  const totalRepasses = restaurantRepasse + vipRepasse;
                   return (
                     <tr
                       key={inv.id}
@@ -389,11 +392,15 @@ export default function Invoicing() {
                       <td className="px-4 py-3">{inv.clientName}</td>
                       <td className="px-4 py-3 text-muted-foreground">{inv.campaignName}</td>
                       <td className="px-4 py-3 text-right">
-                        <div>
-                          <span className="font-medium">{formatCurrency(parseFloat(inv.amount))}</span>
-                          {withheld > 0 && (
+                        <div
+                          title={totalRepasses > 0
+                            ? `Bruto: ${formatCurrency(gross)}\n− Comissão restaurante: ${formatCurrency(restaurantRepasse)}${vipRepasse > 0 ? `\n− Repasse VIP: ${formatCurrency(vipRepasse)}` : ""}\n= Nossa parte: ${formatCurrency(ourShare)}`
+                            : undefined}
+                        >
+                          <span className="font-semibold text-emerald-400">{formatCurrency(ourShare)}</span>
+                          {totalRepasses > 0 && (
                             <p className="text-[11px] text-muted-foreground">
-                              líq. {formatCurrency(netReceived)}
+                              bruto {formatCurrency(gross)} · repasses {formatCurrency(totalRepasses)}
                             </p>
                           )}
                         </div>
