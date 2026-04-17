@@ -372,8 +372,20 @@ function DRECampRow({
 
 export default function CampaignDetail() {
   const [, navigate] = useLocation();
-  const [match, params] = useRoute("/campanhas/:id");
-  const campaignId = match ? parseInt(params!.id) : 0;
+  const [matchPhase, phaseParams] = useRoute<{ id: string; phaseId: string }>("/campanhas/:id/fase/:phaseId");
+  const [matchLegacy, legacyParams] = useRoute<{ id: string }>("/campanhas/:id");
+  const campaignId = matchPhase
+    ? parseInt(phaseParams!.id)
+    : (matchLegacy ? parseInt(legacyParams!.id) : 0);
+  const currentPhaseId = matchPhase ? parseInt(phaseParams!.phaseId) : null;
+
+  const { data: allPhasesForHeader = [] } = trpc.campaignPhase.listByCampaign.useQuery(
+    { campaignId },
+    { enabled: campaignId > 0 },
+  );
+  const currentPhase = currentPhaseId != null
+    ? (allPhasesForHeader as any[]).find((p) => p.id === currentPhaseId) ?? null
+    : null;
 
   const [isRestaurantsDialogOpen, setIsRestaurantsDialogOpen] = useState(false);
   const [restaurantSelections, setRestaurantSelections] = useState<RestaurantSelection[]>([]);
@@ -2098,11 +2110,29 @@ export default function CampaignDetail() {
             </div>
           )}
 
-          <Tabs defaultValue="fases" className="space-y-4">
+          {currentPhase && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-xs">
+              <CalendarRange className="w-3.5 h-3.5 text-primary" />
+              <span className="text-muted-foreground">Você está vendo:</span>
+              <span className="font-semibold">
+                Fase {currentPhase.sequence} — {currentPhase.label}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto h-6 text-xs"
+                onClick={() => navigate(`/campanhas/${campaignId}`)}
+                data-testid="button-back-overview"
+              >
+                <ArrowLeft className="w-3 h-3 mr-1" /> Todas as fases
+              </Button>
+            </div>
+          )}
+
+          <Tabs defaultValue="resumo" className="space-y-4">
             <div className="overflow-x-auto -mx-1 px-1 scrollbar-hide">
               <TabsList className="bg-card border border-border/30 inline-flex w-auto min-w-full sm:w-auto">
                 <TabsTrigger value="resumo" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>
-                <TabsTrigger value="fases" className="gap-1.5 text-xs"><CalendarRange className="w-3.5 h-3.5" /> Fases</TabsTrigger>
                 <TabsTrigger value="consolidado" className="gap-1.5 text-xs"><CircleDollarSign className="w-3.5 h-3.5" /> Consolidado</TabsTrigger>
                 <TabsTrigger value="financeiro" className="gap-1.5 text-xs"><CircleDollarSign className="w-3.5 h-3.5" /> Financeiro</TabsTrigger>
                 <TabsTrigger value="restaurantes" className="gap-1.5 text-xs"><Store className="w-3.5 h-3.5" /> Distribuição</TabsTrigger>
@@ -2835,14 +2865,6 @@ export default function CampaignDetail() {
             </TabsContent>
 
             {/* ─── FASES ─── */}
-            <TabsContent value="fases" className="space-y-4">
-              <CampaignPhases
-                campaignId={campaign.id}
-                contractDuration={campaign.contractDuration}
-                startDate={campaign.startDate}
-              />
-            </TabsContent>
-
             {/* ─── CONSOLIDADO ─── */}
             <TabsContent value="consolidado" className="space-y-4">
               <CampaignConsolidation campaignId={campaign.id} />

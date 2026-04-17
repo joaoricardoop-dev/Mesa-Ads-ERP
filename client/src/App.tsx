@@ -20,6 +20,7 @@ import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import Campaigns from "./pages/Campaigns";
 import CampaignDetail from "./pages/CampaignDetail";
+import CampaignOverview from "./pages/CampaignOverview";
 import QuotationPreview from "./pages/QuotationPreview";
 import Economics from "./pages/Economics";
 import Production from "./pages/Production";
@@ -124,7 +125,8 @@ function Router() {
       <Route path="/configuracoes/provedores-sala-vip" component={VipProvidersPage} />
       {/* Rota antiga mantida como alias pra não quebrar links existentes */}
       <Route path="/financeiro/provedores-vip" component={VipProvidersPage} />
-      <Route path="/campanhas/:id" component={CampaignDetail} />
+      <Route path="/campanhas/:id/fase/:phaseId" component={CampaignDetail} />
+      <Route path="/campanhas/:id" component={CampaignOverview} />
       <Route path="/campanhas" component={Campaigns} />
       <Route path="/ordens-servico" component={ServiceOrders} />
       <Route path="/economics" component={Economics} />
