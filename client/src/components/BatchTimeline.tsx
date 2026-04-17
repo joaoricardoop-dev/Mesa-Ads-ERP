@@ -1,18 +1,18 @@
-import { Check, Circle, Clock } from "lucide-react";
+import { Check, Circle, Clock, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 type StageKey = "briefing" | "design" | "aprovacao" | "producao" | "distribuicao" | "veiculacao" | "concluida";
 
-const STAGE_DEFS: { key: StageKey; label: string }[] = [
-  { key: "briefing", label: "Briefing" },
-  { key: "design", label: "Design" },
-  { key: "aprovacao", label: "Aprovação" },
-  { key: "producao", label: "Produção" },
-  { key: "distribuicao", label: "Distribuição" },
-  { key: "veiculacao", label: "Veiculação" },
-  { key: "concluida", label: "Concluída" },
+const STAGE_DEFS: { key: StageKey; label: string; threshold: number | null }[] = [
+  { key: "briefing", label: "Briefing", threshold: 5 },
+  { key: "design", label: "Design", threshold: 5 },
+  { key: "aprovacao", label: "Aprovação", threshold: 5 },
+  { key: "producao", label: "Produção", threshold: 14 },
+  { key: "distribuicao", label: "Distribuição", threshold: 7 },
+  { key: "veiculacao", label: "Veiculação", threshold: null },
+  { key: "concluida", label: "Concluída", threshold: null },
 ];
 
 const STAGE_COL_MAP: Record<StageKey, string> = {
@@ -57,9 +57,21 @@ export function BatchTimeline({ phase, editable = true }: BatchTimelineProps) {
     return v ? new Date(v) : null;
   };
 
-  const stages = STAGE_DEFS.map((s) => ({ ...s, at: toDate(s.key) }));
-  const lastDoneIdx = stages.reduce((acc, s, i) => (s.at ? i : acc), -1);
-  const currentIdx = lastDoneIdx >= 0 && lastDoneIdx < stages.length - 1 ? lastDoneIdx + 1 : lastDoneIdx;
+  const MS_DAY = 1000 * 60 * 60 * 24;
+  const now = Date.now();
+  const stagesRaw = STAGE_DEFS.map((s) => ({ ...s, at: toDate(s.key) }));
+  const lastDoneIdx = stagesRaw.reduce((acc, s, i) => (s.at ? i : acc), -1);
+  const currentIdx = lastDoneIdx >= 0 && lastDoneIdx < stagesRaw.length - 1 ? lastDoneIdx + 1 : lastDoneIdx;
+
+  const stages = stagesRaw.map((s, i) => {
+    const next = stagesRaw[i + 1];
+    const start = s.at;
+    const end = next?.at ?? (i === currentIdx ? new Date(now) : null);
+    const days = start && end ? Math.max(0, Math.floor((end.getTime() - start.getTime()) / MS_DAY)) : null;
+    const isCurrent = i === currentIdx && !s.at;
+    const isInProgress = !!start && !next?.at && i === lastDoneIdx;
+    return { ...s, days, isCurrent, isInProgress };
+  });
 
   function handleClick(stage: StageKey, isDone: boolean) {
     if (!editable || advanceMutation.isPending) return;
@@ -88,7 +100,16 @@ export function BatchTimeline({ phase, editable = true }: BatchTimelineProps) {
       <div className="flex items-center gap-1 overflow-x-auto pb-2">
         {stages.map((s, i) => {
           const isDone = !!s.at;
-          const isCurrent = i === currentIdx && !isDone;
+          const isCurrent = s.isCurrent;
+          const overdue = s.threshold !== null && s.days !== null && s.days > s.threshold;
+          const warning = s.threshold !== null && s.days !== null && !overdue && s.days > s.threshold * 0.7;
+          const dayColor = s.days === null
+            ? "text-muted-foreground/60 border-border/30 bg-muted/20"
+            : overdue
+            ? "text-red-400 border-red-500/30 bg-red-500/10"
+            : warning
+            ? "text-yellow-400 border-yellow-500/30 bg-yellow-500/10"
+            : "text-emerald-400 border-emerald-500/30 bg-emerald-500/10";
           return (
             <div key={s.key} className="flex items-center gap-1 min-w-fit">
               <button
@@ -96,7 +117,7 @@ export function BatchTimeline({ phase, editable = true }: BatchTimelineProps) {
                 disabled={!editable || advanceMutation.isPending}
                 onClick={() => handleClick(s.key, isDone)}
                 className={cn(
-                  "flex flex-col items-center min-w-[68px]",
+                  "flex flex-col items-center min-w-[72px]",
                   editable ? "cursor-pointer hover:opacity-80" : "cursor-default"
                 )}
                 data-testid={`batch-stage-${s.key}`}
@@ -129,11 +150,24 @@ export function BatchTimeline({ phase, editable = true }: BatchTimelineProps) {
                   {s.label}
                 </div>
                 <div className="text-[9px] text-muted-foreground/70">{fmtDate(s.at)}</div>
+                {s.threshold !== null && (s.days !== null || isCurrent || s.isInProgress) && (
+                  <div
+                    className={cn(
+                      "mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[9px] font-mono font-semibold",
+                      dayColor
+                    )}
+                    title={`SLA: ${s.threshold} dias`}
+                  >
+                    {overdue && <AlertTriangle className="w-2.5 h-2.5" />}
+                    {s.days !== null ? `${s.days}d` : "…"}
+                    {s.isInProgress && s.days !== null && <span className="opacity-60">·em curso</span>}
+                  </div>
+                )}
               </button>
               {i < stages.length - 1 && (
                 <div
                   className={cn(
-                    "h-0.5 w-6 -mt-5",
+                    "h-0.5 w-6 -mt-10",
                     isDone ? "bg-emerald-500/60" : "bg-border/40"
                   )}
                 />
