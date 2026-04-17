@@ -1325,6 +1325,213 @@ export const financialRouter = router({
       };
     }),
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // FONTE ÚNICA DE VERDADE para métricas financeiras consolidadas.
+  //
+  // Todas as páginas financeiras devem buscar dados aqui para garantir
+  // consistência:
+  //   • Receita Bruta  = soma dos valores das faturas não-canceladas
+  //   • Receita Líquida ("Nossa Parte") = NET_AMOUNT_SQL (bruto - comissão
+  //     restaurante - repasse VIP - ISS retido)
+  //   • Custos = operational_costs (produção + frete)
+  //   • Resultado = Receita Líquida - Custos
+  //
+  // Filtro de data aplicado sobre invoices.issueDate. Sem filtro = tudo.
+  // ─────────────────────────────────────────────────────────────────────────────
+  getMetrics: protectedProcedure
+    .input(z.object({
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+
+      const invConditions = [sql`${invoices.status} NOT IN ('cancelada')`];
+      if (input?.startDate) invConditions.push(gte(invoices.issueDate, input.startDate));
+      if (input?.endDate) invConditions.push(lte(invoices.issueDate, input.endDate));
+
+      // Busca faturas com valor líquido (Nossa Parte) calculado via SQL
+      const invoiceRows = await db
+        .select({
+          id: invoices.id,
+          invoiceNumber: invoices.invoiceNumber,
+          campaignId: invoices.campaignId,
+          clientId: invoices.clientId,
+          amount: invoices.amount,
+          netAmount: NET_AMOUNT_SQL,
+          status: invoices.status,
+          issueDate: invoices.issueDate,
+          dueDate: invoices.dueDate,
+          paymentDate: invoices.paymentDate,
+          paymentMethod: invoices.paymentMethod,
+        })
+        .from(invoices)
+        .leftJoin(campaigns, eq(campaigns.id, invoices.campaignId))
+        .leftJoin(products, eq(products.id, campaigns.productId))
+        .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId))
+        .where(and(...invConditions))
+        .orderBy(invoices.issueDate);
+
+      // Custos operacionais por campanha (fonte: operational_costs)
+      const costRows = await db.select().from(operationalCosts);
+      const costMap: Record<number, { production: number; freight: number }> = {};
+      for (const c of costRows) {
+        costMap[c.campaignId] = {
+          production: parseFloat(c.productionCost || "0"),
+          freight: parseFloat(c.freightCost || "0"),
+        };
+      }
+
+      // Nomes de campanhas e clientes
+      const campaignIds = [...new Set(invoiceRows.map(i => i.campaignId))];
+      const clientIds = [...new Set(invoiceRows.map(i => i.clientId))];
+
+      const campaignMap: Record<number, string> = {};
+      const clientMap: Record<number, string> = {};
+
+      if (campaignIds.length > 0) {
+        const rows = await db.select({ id: campaigns.id, name: campaigns.name }).from(campaigns).where(inArray(campaigns.id, campaignIds));
+        for (const r of rows) campaignMap[r.id] = r.name;
+      }
+      if (clientIds.length > 0) {
+        const rows = await db.select({ id: clients.id, name: clients.name }).from(clients).where(inArray(clients.id, clientIds));
+        for (const r of rows) clientMap[r.id] = r.name;
+      }
+
+      // Agrega por campanha
+      type CampaignEntry = {
+        name: string;
+        grossBilling: number;
+        netBilling: number;
+        invoiceCount: number;
+        productionCosts: number;
+        freightCosts: number;
+        invList: typeof invoiceRows;
+      };
+      const byCampaignMap: Record<number, CampaignEntry> = {};
+
+      let totalGross = 0;
+      let totalNet = 0;
+
+      for (const inv of invoiceRows) {
+        const gross = parseFloat(inv.amount);
+        const net = parseFloat(inv.netAmount as string);
+        totalGross += gross;
+        totalNet += net;
+
+        if (!byCampaignMap[inv.campaignId]) {
+          const costs = costMap[inv.campaignId] || { production: 0, freight: 0 };
+          byCampaignMap[inv.campaignId] = {
+            name: campaignMap[inv.campaignId] || `Campanha #${inv.campaignId}`,
+            grossBilling: 0,
+            netBilling: 0,
+            invoiceCount: 0,
+            productionCosts: costs.production,
+            freightCosts: costs.freight,
+            invList: [],
+          };
+        }
+        byCampaignMap[inv.campaignId].grossBilling += gross;
+        byCampaignMap[inv.campaignId].netBilling += net;
+        byCampaignMap[inv.campaignId].invoiceCount++;
+        byCampaignMap[inv.campaignId].invList.push(inv);
+      }
+
+      // Custos totais somente das campanhas com faturas
+      let totalProductionCosts = 0;
+      let totalFreightCosts = 0;
+      for (const entry of Object.values(byCampaignMap)) {
+        totalProductionCosts += entry.productionCosts;
+        totalFreightCosts += entry.freightCosts;
+      }
+
+      // Agrega por cliente
+      type ClientEntry = { name: string; grossBilling: number; netBilling: number; invList: typeof invoiceRows };
+      const byClientMap: Record<number, ClientEntry> = {};
+      for (const inv of invoiceRows) {
+        if (!byClientMap[inv.clientId]) {
+          byClientMap[inv.clientId] = {
+            name: clientMap[inv.clientId] || `Cliente #${inv.clientId}`,
+            grossBilling: 0,
+            netBilling: 0,
+            invList: [],
+          };
+        }
+        byClientMap[inv.clientId].grossBilling += parseFloat(inv.amount);
+        byClientMap[inv.clientId].netBilling += parseFloat(inv.netAmount as string);
+        byClientMap[inv.clientId].invList.push(inv);
+      }
+
+      // Agrega por mês
+      const byMonthMap: Record<string, { grossBilling: number; netBilling: number }> = {};
+      for (const inv of invoiceRows) {
+        const month = inv.issueDate ? inv.issueDate.substring(0, 7) : "unknown";
+        if (!byMonthMap[month]) byMonthMap[month] = { grossBilling: 0, netBilling: 0 };
+        byMonthMap[month].grossBilling += parseFloat(inv.amount);
+        byMonthMap[month].netBilling += parseFloat(inv.netAmount as string);
+      }
+
+      const grossResult = totalNet - totalProductionCosts - totalFreightCosts;
+
+      const invMapper = (inv: typeof invoiceRows[0], campaignName: string, clientName: string) => ({
+        invoiceNumber: inv.invoiceNumber,
+        campaignName,
+        clientName,
+        grossAmount: parseFloat(inv.amount),
+        netAmount: parseFloat(inv.netAmount as string),
+        issueDate: inv.issueDate,
+        dueDate: inv.dueDate,
+        paymentDate: inv.paymentDate || null,
+        paymentMethod: inv.paymentMethod || null,
+        status: inv.status,
+      });
+
+      return {
+        summary: {
+          grossBilling: totalGross,
+          netBilling: totalNet,
+          deductions: totalGross - totalNet,
+          productionCosts: totalProductionCosts,
+          freightCosts: totalFreightCosts,
+          totalCosts: totalProductionCosts + totalFreightCosts,
+          grossResult,
+          marginPct: totalNet > 0 ? grossResult / totalNet : 0,
+        },
+        byCampaign: Object.entries(byCampaignMap).map(([id, c]) => {
+          const result = c.netBilling - c.productionCosts - c.freightCosts;
+          return {
+            campaignId: Number(id),
+            name: c.name,
+            grossBilling: c.grossBilling,
+            netBilling: c.netBilling,
+            deductions: c.grossBilling - c.netBilling,
+            invoiceCount: c.invoiceCount,
+            productionCosts: c.productionCosts,
+            freightCosts: c.freightCosts,
+            totalCosts: c.productionCosts + c.freightCosts,
+            result,
+            marginPct: c.netBilling > 0 ? result / c.netBilling : 0,
+            invoices: c.invList.map(inv => invMapper(inv, c.name, clientMap[inv.clientId] || `Cliente #${inv.clientId}`)),
+          };
+        }).sort((a, b) => b.netBilling - a.netBilling),
+        byClient: Object.entries(byClientMap).map(([, c]) => ({
+          name: c.name,
+          grossBilling: c.grossBilling,
+          netBilling: c.netBilling,
+          invoices: c.invList.map(inv => invMapper(inv, campaignMap[inv.campaignId] || `Campanha #${inv.campaignId}`, c.name)),
+        })).sort((a, b) => b.netBilling - a.netBilling),
+        byMonth: Object.entries(byMonthMap)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([month, v]) => ({ month, ...v })),
+        invoiceList: invoiceRows.map(inv => invMapper(
+          inv,
+          campaignMap[inv.campaignId] || `Campanha #${inv.campaignId}`,
+          clientMap[inv.clientId] || `Cliente #${inv.clientId}`,
+        )),
+      };
+    }),
+
   campaignsForInvoice: protectedProcedure.query(async ({ ctx }) => {
     requireFinancialAccess(ctx.user.role);
     const db = await getDatabase();

@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import {
-  Save, Calculator, BarChart3, Layers, TrendingUp, DollarSign,
-  Truck, Factory, Percent, ChevronDown, ChevronUp, Users,
-  Receipt, PiggyBank, CircleDollarSign, ExternalLink,
+  Save, Calculator, DollarSign,
+  Truck, Factory, ChevronDown, ChevronUp,
+  Receipt, PiggyBank, CircleDollarSign, ExternalLink, TrendingUp,
+  Info,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -34,6 +35,16 @@ export default function OperationalCosts() {
 
   const utils = trpc.useUtils();
   const { data: costs, isLoading } = trpc.financial.listCosts.useQuery();
+
+  // Fonte unificada: receita líquida (Nossa Parte) faturada por campanha
+  const { data: metrics } = trpc.financial.getMetrics.useQuery(undefined);
+  const invoicedMap = useMemo(() => {
+    const map: Record<number, { netBilling: number; grossBilling: number; invoiceCount: number }> = {};
+    for (const c of metrics?.byCampaign ?? []) {
+      map[c.campaignId] = { netBilling: c.netBilling, grossBilling: c.grossBilling, invoiceCount: c.invoiceCount };
+    }
+    return map;
+  }, [metrics]);
 
   const upsertMutation = trpc.financial.upsertCost.useMutation({
     onSuccess: (result: any) => {
@@ -87,13 +98,32 @@ export default function OperationalCosts() {
 
   return (
     <PageContainer title="Custos Operacionais" description="Visão completa de custos por campanha: produção, frete, impostos, comissões e margem">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+
+      {/* Banner de consistência */}
+      <div className="flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-muted-foreground">
+        <Info className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+        <span>
+          <strong className="text-foreground">Receita Contratada</strong> = valor do contrato (OS/cotação) para toda a duração.
+          {" "}<strong className="text-foreground">Faturado (Nossa Parte)</strong> = soma das faturas emitidas, já deduzidas comissões de restaurante, repasse VIP e ISS — mesma base do Dashboard.
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="rounded-xl border border-border/30 bg-card p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 rounded-lg bg-primary/10"><DollarSign className="w-3.5 h-3.5 text-primary" /></div>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Receita Total</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Contratado</span>
           </div>
-          <p className="text-lg font-bold text-emerald-400">{formatCurrency(totals.totalRevenue)}</p>
+          <p className="text-lg font-bold text-foreground">{formatCurrency(totals.totalRevenue)}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Valor total dos contratos</p>
+        </div>
+        <div className="rounded-xl border border-border/30 bg-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 rounded-lg bg-emerald-500/10"><TrendingUp className="w-3.5 h-3.5 text-emerald-500" /></div>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Faturado (Nossa Parte)</span>
+          </div>
+          <p className="text-lg font-bold text-emerald-400">{formatCurrency(metrics?.summary.netBilling ?? 0)}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">= mesmo do Dashboard</p>
         </div>
         <div className="rounded-xl border border-border/30 bg-card p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -101,13 +131,7 @@ export default function OperationalCosts() {
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Custos Totais</span>
           </div>
           <p className="text-lg font-bold text-red-400">{formatCurrency(totals.totalCosts)}</p>
-        </div>
-        <div className="rounded-xl border border-border/30 bg-card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-1.5 rounded-lg bg-emerald-500/10"><PiggyBank className="w-3.5 h-3.5 text-emerald-500" /></div>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Margem Média</span>
-          </div>
-          <p className={`text-lg font-bold ${totals.avgMargin >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fmtPct(totals.avgMargin)}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Prod + frete + impostos + coms</p>
         </div>
         <div className="rounded-xl border border-border/30 bg-card p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -122,13 +146,6 @@ export default function OperationalCosts() {
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Frete</span>
           </div>
           <p className="text-lg font-bold">{formatCurrency(totals.totalFreight)}</p>
-        </div>
-        <div className="rounded-xl border border-border/30 bg-card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-1.5 rounded-lg bg-purple-500/10"><Users className="w-3.5 h-3.5 text-purple-500" /></div>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Comissões</span>
-          </div>
-          <p className="text-lg font-bold">{formatCurrency(totals.totalRestComm + totals.totalPartnerComm)}</p>
         </div>
       </div>
 
@@ -195,10 +212,21 @@ export default function OperationalCosts() {
                   <div className="flex items-center gap-4">
                     {!isBonificada && c.revenue > 0 && (
                       <div className="text-right hidden sm:block">
-                        <p className="text-[10px] text-muted-foreground">Receita</p>
-                        <p className="text-xs font-mono font-semibold text-emerald-400">{formatCurrency(c.revenue)}</p>
+                        <p className="text-[10px] text-muted-foreground">Contratado</p>
+                        <p className="text-xs font-mono font-semibold text-foreground/70">{formatCurrency(c.revenue)}</p>
                       </div>
                     )}
+                    {!isBonificada && (() => {
+                      const inv = invoicedMap[c.campaignId];
+                      if (!inv) return null;
+                      return (
+                        <div className="text-right hidden sm:block">
+                          <p className="text-[10px] text-muted-foreground">Faturado (Nossa Parte)</p>
+                          <p className="text-xs font-mono font-semibold text-emerald-400">{formatCurrency(inv.netBilling)}</p>
+                          <p className="text-[9px] text-muted-foreground">{inv.invoiceCount} fatura{inv.invoiceCount !== 1 ? "s" : ""}</p>
+                        </div>
+                      );
+                    })()}
                     <div className="text-right hidden sm:block">
                       <p className="text-[10px] text-muted-foreground">{isBonificada ? "Custo (bonificação)" : "Custo Total"}</p>
                       <p className="text-xs font-mono font-semibold text-red-400">{formatCurrency(displayCosts)}</p>
