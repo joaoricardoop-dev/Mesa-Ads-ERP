@@ -356,6 +356,11 @@ export const invoices = pgTable("invoices", {
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   billingType: billingModeEnum("billingType").default("bruto").notNull(),
   withheldTax: decimal("withheldTax", { precision: 12, scale: 2 }),
+  // ISS (Imposto Sobre Serviços) — alíquota % e flag se é retido pelo tomador.
+  // Se issRetained=true: valor é descontado do que recebemos (nossa parte cai).
+  // Se issRetained=false: empresa recolhe depois; não afeta o líquido recebido.
+  issRate: decimal("issRate", { precision: 5, scale: 2 }).default("0.00"),
+  issRetained: boolean("issRetained").default(false).notNull(),
   issueDate: date("issueDate").notNull(),
   dueDate: date("dueDate").notNull(),
   paymentDate: date("paymentDate"),

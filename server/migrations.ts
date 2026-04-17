@@ -211,6 +211,13 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       CREATE INDEX IF NOT EXISTS "idx_accounts_payable_vip_provider_id" ON "accounts_payable" ("vipProviderId");
     `,
   },
+  {
+    name: "add_iss_fields_to_invoices",
+    sql: `
+      ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "issRate" NUMERIC(5,2) DEFAULT 0.00;
+      ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "issRetained" BOOLEAN NOT NULL DEFAULT false;
+    `,
+  },
 ];
 
 export async function runMigrations() {

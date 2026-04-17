@@ -55,6 +55,14 @@ const NET_AMOUNT_SQL = sql<string>`
           ELSE 0
         END
       )
+    - (
+        -- ISS retido pelo tomador reduz o líquido que recebemos.
+        -- ISS não retido: empresa recolhe depois; não entra aqui.
+        CASE WHEN COALESCE(${invoices.issRetained}, false)
+          THEN ${invoices.amount}::numeric * (COALESCE(${invoices.issRate}, 0)::numeric / 100)
+          ELSE 0
+        END
+      )
   END
 `;
 
@@ -79,6 +87,77 @@ function buildNetInvoiceCountQuery(db: NonNullable<Awaited<ReturnType<typeof get
     .leftJoin(campaigns, eq(campaigns.id, invoices.campaignId))
     .leftJoin(products, eq(products.id, campaigns.productId))
     .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sincroniza accounts_payable (produção + frete) com os custos operacionais
+// da campanha. Regras:
+//   • Gera `contractDuration` parcelas por tipo (1 parcela = 1 mês).
+//   • Parcelas JÁ PAGAS nunca são apagadas nem alteradas.
+//   • Parcelas PENDENTES/CANCELADAS são recriadas conforme o valor atual.
+//   • Se custo vira 0, remove as pendentes (mantém as pagas como histórico).
+//
+// Isso mantém Custos ↔ Contas a Pagar sempre em sincronia a partir da edição
+// na tela de Custos.
+// ─────────────────────────────────────────────────────────────────────────────
+async function syncCampaignCostPayables(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  campaignId: number,
+  costs: { productionCost: number; freightCost: number },
+): Promise<{ type: string; created: number; removed: number }[]> {
+  const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId));
+  if (!campaign) return [];
+
+  const duration = Math.max(1, campaign.contractDuration ?? 1);
+  const today = new Date();
+  const summary: { type: string; created: number; removed: number }[] = [];
+
+  for (const { type, totalValue, label, recipient } of [
+    { type: "producao", totalValue: costs.productionCost, label: "Produção Gráfica", recipient: "fornecedor" },
+    { type: "frete", totalValue: costs.freightCost, label: "Frete/Logística", recipient: "transportadora" },
+  ] as const) {
+    // Custo total já está "mensal" no operational_costs (padrão atual).
+    // Portanto cada parcela = totalValue (não dividimos).
+    const installmentAmount = Number(totalValue.toFixed(2));
+
+    // Remove pendentes/canceladas existentes deste tipo/campanha
+    const existing = await db
+      .select()
+      .from(accountsPayable)
+      .where(and(
+        eq(accountsPayable.campaignId, campaignId),
+        eq(accountsPayable.type, type),
+      ));
+
+    const paidCount = existing.filter((e) => e.status === "pago").length;
+    const toRemove = existing.filter((e) => e.status !== "pago");
+
+    for (const entry of toRemove) {
+      await db.delete(accountsPayable).where(eq(accountsPayable.id, entry.id));
+    }
+
+    // Quantas novas parcelas precisamos criar?
+    const remaining = Math.max(0, duration - paidCount);
+    const shouldCreate = installmentAmount > 0 ? remaining : 0;
+
+    for (let i = 0; i < shouldCreate; i++) {
+      const installmentIndex = paidCount + i + 1;
+      const dueDate = new Date(today.getFullYear(), today.getMonth() + i, today.getDate());
+      await db.insert(accountsPayable).values({
+        campaignId,
+        type,
+        description: `${label} - Mês ${installmentIndex}/${duration}`,
+        amount: installmentAmount.toFixed(2),
+        recipientType: recipient,
+        status: "pendente",
+        dueDate: dueDate.toISOString().split("T")[0],
+      });
+    }
+
+    summary.push({ type, created: shouldCreate, removed: toRemove.length });
+  }
+
+  return summary;
 }
 
 function uniqueIds(arr: (number | null | undefined)[]): number[] {
@@ -550,10 +629,15 @@ export const financialRouter = router({
           notes: invoices.notes,
           billingType: invoices.billingType,
           withheldTax: invoices.withheldTax,
+          issRate: invoices.issRate,
+          issRetained: invoices.issRetained,
           createdAt: invoices.createdAt,
           updatedAt: invoices.updatedAt,
           // Campos computados
           netAmount: sql<string>`${NET_AMOUNT_SQL}`,
+          issAmount: sql<string>`
+            ${invoices.amount}::numeric * (COALESCE(${invoices.issRate}, 0)::numeric / 100)
+          `,
           restaurantRepasseAmount: sql<string>`
             CASE WHEN COALESCE(${campaigns.isBonificada}, false) THEN 0
             ELSE ${invoices.amount}::numeric * (COALESCE(${campaigns.restaurantCommission}, 0)::numeric / 100)
@@ -613,6 +697,8 @@ export const financialRouter = router({
       notes: z.string().optional(),
       billingType: z.enum(["bruto", "liquido"]).optional(),
       withheldTax: z.string().optional(),
+      issRate: z.string().optional(),
+      issRetained: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
@@ -650,6 +736,8 @@ export const financialRouter = router({
         amount: input.amount,
         billingType: input.billingType ?? "bruto",
         withheldTax: input.withheldTax && parseFloat(input.withheldTax) > 0 ? input.withheldTax : undefined,
+        issRate: input.issRate && parseFloat(input.issRate) > 0 ? input.issRate : "0.00",
+        issRetained: input.issRetained ?? false,
         issueDate,
         dueDate: input.dueDate,
         paymentMethod: input.paymentMethod,
@@ -669,6 +757,8 @@ export const financialRouter = router({
       notes: z.string().optional(),
       billingType: z.enum(["bruto", "liquido"]).optional(),
       withheldTax: z.string().optional(),
+      issRate: z.string().optional(),
+      issRetained: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
@@ -681,6 +771,10 @@ export const financialRouter = router({
       if (fields.paymentMethod !== undefined) updateData.paymentMethod = fields.paymentMethod;
       if (fields.notes !== undefined) updateData.notes = fields.notes;
       if (fields.billingType !== undefined) updateData.billingType = fields.billingType;
+      if (fields.issRate !== undefined) {
+        updateData.issRate = fields.issRate && parseFloat(fields.issRate) > 0 ? fields.issRate : "0.00";
+      }
+      if (fields.issRetained !== undefined) updateData.issRetained = fields.issRetained;
       if (fields.withheldTax !== undefined) {
         updateData.withheldTax = fields.withheldTax && parseFloat(fields.withheldTax) > 0 ? fields.withheldTax : null;
       }
@@ -935,6 +1029,42 @@ export const financialRouter = router({
       const clientPartnerMap: Record<number, number | null> = {};
       for (const cl of clientRows) clientPartnerMap[cl.id] = cl.partnerId;
 
+      // ── Agrega contas a pagar (produção+frete) por campanha+tipo ───────────
+      // Retorna contagem total e contagem paga por (campaign,type) para mostrar
+      // status "X de Y parcelas pagas" na tela de Custos.
+      const payableAgg = await db
+        .select({
+          campaignId: accountsPayable.campaignId,
+          type: accountsPayable.type,
+          count: sql<number>`COUNT(*)::int`,
+          paidCount: sql<number>`COUNT(*) FILTER (WHERE ${accountsPayable.status} = 'pago')::int`,
+          totalAmount: sql<string>`COALESCE(SUM(${accountsPayable.amount}::numeric), 0)`,
+          paidAmount: sql<string>`COALESCE(SUM(${accountsPayable.amount}::numeric) FILTER (WHERE ${accountsPayable.status} = 'pago'), 0)`,
+        })
+        .from(accountsPayable)
+        .where(inArray(accountsPayable.type, ["producao", "frete"]))
+        .groupBy(accountsPayable.campaignId, accountsPayable.type);
+
+      // Map: campaignId -> { producao: {...}, frete: {...} }
+      type PayableStatus = {
+        installmentsTotal: number;
+        installmentsPaid: number;
+        amountTotal: number;
+        amountPaid: number;
+      };
+      const payableMap: Record<number, { producao?: PayableStatus; frete?: PayableStatus }> = {};
+      for (const row of payableAgg) {
+        if (!payableMap[row.campaignId]) payableMap[row.campaignId] = {};
+        const entry: PayableStatus = {
+          installmentsTotal: row.count,
+          installmentsPaid: row.paidCount,
+          amountTotal: parseFloat(row.totalAmount),
+          amountPaid: parseFloat(row.paidAmount),
+        };
+        if (row.type === "producao") payableMap[row.campaignId].producao = entry;
+        else if (row.type === "frete") payableMap[row.campaignId].frete = entry;
+      }
+
       return campaignRows.map((c) => {
         const cost = costMap[c.id];
         const dur = c.contractDuration;
@@ -971,6 +1101,8 @@ export const financialRouter = router({
 
         const totalCosts = productionTotal + freightTotal + restaurantCost + (isBonificada ? 0 : taxAmount + restAmount + partnerCommission);
 
+        const payables = payableMap[c.id] || {};
+
         return {
           campaignId: c.id,
           campaignName: c.name,
@@ -996,6 +1128,11 @@ export const financialRouter = router({
           totalCosts,
           margin: revenue > 0 ? revenue - totalCosts : 0,
           marginPct: revenue > 0 ? ((revenue - totalCosts) / revenue) * 100 : 0,
+          // Status de pagamento das parcelas geradas em Contas a Pagar
+          payables: {
+            producao: payables.producao ?? null,
+            frete: payables.frete ?? null,
+          },
         };
       });
     }),
@@ -1013,20 +1150,34 @@ export const financialRouter = router({
 
       const existing = await db.select().from(operationalCosts).where(eq(operationalCosts.campaignId, input.campaignId));
 
+      let row;
       if (existing.length > 0) {
         const [updated] = await db
           .update(operationalCosts)
           .set({ productionCost: input.productionCost, freightCost: input.freightCost, notes: input.notes, updatedAt: new Date() })
           .where(eq(operationalCosts.campaignId, input.campaignId))
           .returning();
-        return updated;
+        row = updated;
       } else {
         const [created] = await db
           .insert(operationalCosts)
           .values({ campaignId: input.campaignId, productionCost: input.productionCost, freightCost: input.freightCost, notes: input.notes })
           .returning();
-        return created;
+        row = created;
       }
+
+      // Sincroniza contas a pagar correspondentes (produção e frete, por parcela)
+      let syncResult: Array<{ type: string; created: number; removed: number }> = [];
+      try {
+        syncResult = await syncCampaignCostPayables(db, input.campaignId, {
+          productionCost: Number(input.productionCost) || 0,
+          freightCost: Number(input.freightCost) || 0,
+        });
+      } catch (err) {
+        console.warn("[upsertCost] syncCampaignCostPayables failed:", err);
+      }
+
+      return { ...row, syncResult };
     }),
 
   report: protectedProcedure

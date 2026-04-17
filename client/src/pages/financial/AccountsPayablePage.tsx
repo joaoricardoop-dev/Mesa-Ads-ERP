@@ -19,7 +19,7 @@ import {
 import { formatCurrency } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import { Check, Plus, Trash2, Pencil, Factory, Truck, HandCoins, CircleDollarSign, Crown, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 function formatDate(d: string | null | undefined): string {
@@ -44,8 +44,24 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function AccountsPayablePage() {
+  // Lê ?campaignId=X da URL (navegação vinda da tela de Custos)
+  const [campaignIdFilter, setCampaignIdFilter] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const param = new URLSearchParams(window.location.search).get("campaignId");
+    const n = param ? parseInt(param) : NaN;
+    return Number.isFinite(n) ? n : null;
+  });
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("");
+
+  // Mantém a URL sincronizada se o filtro de campanha mudar programaticamente
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (campaignIdFilter) url.searchParams.set("campaignId", String(campaignIdFilter));
+    else url.searchParams.delete("campaignId");
+    window.history.replaceState({}, "", url.toString());
+  }, [campaignIdFilter]);
   const [payDialogId, setPayDialogId] = useState<number | null>(null);
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
   const [proofUrl, setProofUrl] = useState("");
@@ -66,6 +82,7 @@ export default function AccountsPayablePage() {
   const filters: any = {};
   if (statusFilter) filters.status = statusFilter;
   if (typeFilter) filters.type = typeFilter;
+  if (campaignIdFilter) filters.campaignId = campaignIdFilter;
   const { data: payables, isLoading } = trpc.financial.listAccountsPayable.useQuery(
     Object.keys(filters).length > 0 ? filters : undefined
   );
@@ -99,13 +116,13 @@ export default function AccountsPayablePage() {
   const totalGeral = (payables || []).reduce((s, p) => s + Number(p.amount), 0);
 
   return (
-    <PageContainer>
+    <PageContainer
+      title="Contas a Pagar"
+      description="Gerencie pagamentos de produção, frete, comissões e repasses"
+    >
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Contas a Pagar</h1>
-            <p className="text-sm text-muted-foreground mt-1">Gerencie pagamentos de produção, frete e comissões</p>
-          </div>
+          <div />
           <Button size="sm" className="gap-1.5" onClick={() => setCreateDialog(true)}>
             <Plus className="w-4 h-4" /> Nova Conta
           </Button>
@@ -148,12 +165,31 @@ export default function AccountsPayablePage() {
               <SelectItem value="producao">Produção</SelectItem>
               <SelectItem value="frete">Frete</SelectItem>
               <SelectItem value="comissao">Comissão</SelectItem>
+              <SelectItem value="repasse_vip">Repasse VIP</SelectItem>
               <SelectItem value="outro">Outro</SelectItem>
             </SelectContent>
           </Select>
 
-          {(statusFilter || typeFilter) && (
-            <Button variant="ghost" size="sm" className="h-9 text-xs gap-1" onClick={() => { setStatusFilter(""); setTypeFilter(""); }}>
+          {campaignIdFilter && (
+            <Badge variant="outline" className="h-9 px-3 gap-2 text-xs bg-primary/10 text-primary border-primary/30">
+              Campanha #{campaignIdFilter}
+              <button onClick={() => setCampaignIdFilter(null)} className="hover:text-foreground">
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          )}
+
+          {(statusFilter || typeFilter || campaignIdFilter) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 text-xs gap-1"
+              onClick={() => {
+                setStatusFilter("");
+                setTypeFilter("");
+                setCampaignIdFilter(null);
+              }}
+            >
               <X className="w-3 h-3" /> Limpar
             </Button>
           )}

@@ -7,10 +7,11 @@ import { trpc } from "@/lib/trpc";
 import {
   Save, Calculator, BarChart3, Layers, TrendingUp, DollarSign,
   Truck, Factory, Percent, ChevronDown, ChevronUp, Users,
-  Receipt, PiggyBank,
+  Receipt, PiggyBank, CircleDollarSign, ExternalLink,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 function fmtPct(v: number): string {
   return `${(v ?? 0).toFixed(1).replace(".", ",")}%`;
@@ -25,6 +26,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function OperationalCosts() {
+  const [, navigate] = useLocation();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editProduction, setEditProduction] = useState("");
   const [editFreight, setEditFreight] = useState("");
@@ -34,11 +36,22 @@ export default function OperationalCosts() {
   const { data: costs, isLoading } = trpc.financial.listCosts.useQuery();
 
   const upsertMutation = trpc.financial.upsertCost.useMutation({
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       utils.financial.listCosts.invalidate();
+      utils.financial.listAccountsPayable.invalidate();
       utils.financial.dashboard.invalidate();
       setEditingId(null);
-      toast.success("Custos atualizados");
+      // Toast informativo sobre quantas parcelas foram criadas/removidas
+      const sync = (result?.syncResult ?? []) as Array<{ type: string; created: number; removed: number }>;
+      const totalCreated = sync.reduce((a, s) => a + s.created, 0);
+      const totalRemoved = sync.reduce((a, s) => a + s.removed, 0);
+      if (totalCreated > 0 || totalRemoved > 0) {
+        toast.success(
+          `Custos atualizados — ${totalCreated} parcela(s) criada(s)${totalRemoved > 0 ? `, ${totalRemoved} removida(s)` : ""} em Contas a Pagar`,
+        );
+      } else {
+        toast.success("Custos atualizados");
+      }
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -214,14 +227,56 @@ export default function OperationalCosts() {
 
                     <div className={`grid gap-3 ${isBonificada ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}>
                       <div className="rounded-lg border p-3">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Produção</p>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Produção</p>
+                          {c.payables?.producao && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[9px] ${
+                                c.payables.producao.installmentsPaid === c.payables.producao.installmentsTotal && c.payables.producao.installmentsTotal > 0
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                  : c.payables.producao.installmentsPaid > 0
+                                  ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                                  : "bg-red-500/10 text-red-400 border-red-500/30"
+                              }`}
+                            >
+                              {c.payables.producao.installmentsPaid}/{c.payables.producao.installmentsTotal}
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm font-bold font-mono">{formatCurrency(c.productionTotal)}</p>
                         <p className="text-[10px] text-muted-foreground">{formatCurrency(c.productionPerMonth)}/mês × {c.contractDuration}</p>
+                        {c.payables?.producao && (
+                          <p className="text-[10px] text-emerald-400/80 mt-0.5">
+                            Pago: {formatCurrency(c.payables.producao.amountPaid)}
+                          </p>
+                        )}
                       </div>
                       <div className="rounded-lg border p-3">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Frete</p>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Frete</p>
+                          {c.payables?.frete && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[9px] ${
+                                c.payables.frete.installmentsPaid === c.payables.frete.installmentsTotal && c.payables.frete.installmentsTotal > 0
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                  : c.payables.frete.installmentsPaid > 0
+                                  ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                                  : "bg-red-500/10 text-red-400 border-red-500/30"
+                              }`}
+                            >
+                              {c.payables.frete.installmentsPaid}/{c.payables.frete.installmentsTotal}
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm font-bold font-mono">{formatCurrency(c.freightTotal)}</p>
                         <p className="text-[10px] text-muted-foreground">{formatCurrency(c.freightPerMonth)}/mês × {c.contractDuration}</p>
+                        {c.payables?.frete && (
+                          <p className="text-[10px] text-emerald-400/80 mt-0.5">
+                            Pago: {formatCurrency(c.payables.frete.amountPaid)}
+                          </p>
+                        )}
                       </div>
                       {!isBonificada && (
                         <>
@@ -333,17 +388,32 @@ export default function OperationalCosts() {
                       </tbody>
                     </table>
 
-                    <div className="flex justify-end gap-2">
-                      {isEditing ? (
-                        <>
-                          <Button variant="ghost" size="sm" className="text-xs" onClick={() => setEditingId(null)}>Cancelar</Button>
-                          <Button size="sm" className="text-xs gap-1.5" onClick={saveEdit} disabled={upsertMutation.isPending}>
-                            <Save className="w-3 h-3" /> Salvar
+                    <div className="flex justify-between items-center gap-2">
+                      <div>
+                        {(c.payables?.producao || c.payables?.frete) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                            onClick={() => navigate(`/financeiro/contas-pagar?campaignId=${c.campaignId}`)}
+                          >
+                            <CircleDollarSign className="w-3 h-3" /> Ver em Contas a Pagar
+                            <ExternalLink className="w-3 h-3" />
                           </Button>
-                        </>
-                      ) : (
-                        <Button variant="outline" size="sm" className="text-xs" onClick={() => startEditing(c)}>Editar Custos</Button>
-                      )}
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        {isEditing ? (
+                          <>
+                            <Button variant="ghost" size="sm" className="text-xs" onClick={() => setEditingId(null)}>Cancelar</Button>
+                            <Button size="sm" className="text-xs gap-1.5" onClick={saveEdit} disabled={upsertMutation.isPending}>
+                              <Save className="w-3 h-3" /> Salvar
+                            </Button>
+                          </>
+                        ) : (
+                          <Button variant="outline" size="sm" className="text-xs" onClick={() => startEditing(c)}>Editar Custos</Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
