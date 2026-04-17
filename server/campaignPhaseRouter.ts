@@ -203,6 +203,39 @@ export const campaignPhaseRouter = router({
       return updated;
     }),
 
+  // Avança ou desfaz uma etapa da timeline do batch.
+  // - markStage: grava NOW() na coluna correspondente (idempotente)
+  // - clearStage: zera a coluna
+  advanceStage: comercialProcedure
+    .input(z.object({
+      phaseId: z.number(),
+      stage: z.enum(["briefing", "design", "aprovacao", "producao", "distribuicao", "veiculacao", "concluida"]),
+      action: z.enum(["mark", "clear"]).default("mark"),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const colMap: Record<typeof input.stage, string> = {
+        briefing: "briefingEnteredAt",
+        design: "designEnteredAt",
+        aprovacao: "aprovacaoEnteredAt",
+        producao: "producaoEnteredAt",
+        distribuicao: "distribuicaoEnteredAt",
+        veiculacao: "veiculacaoEnteredAt",
+        concluida: "concluidaAt",
+      };
+      const col = colMap[input.stage];
+      const value = input.action === "mark" ? "NOW()" : "NULL";
+      await db.execute(sql.raw(
+        `UPDATE "campaign_phases" SET "${col}" = ${value}, "updatedAt" = NOW() WHERE id = ${input.phaseId}`
+      ));
+      // Se marcou "concluida", também muda status pra concluida
+      if (input.stage === "concluida" && input.action === "mark") {
+        await db.update(campaignPhases).set({ status: "concluida", updatedAt: new Date() }).where(eq(campaignPhases.id, input.phaseId));
+      }
+      const [updated] = await db.select().from(campaignPhases).where(eq(campaignPhases.id, input.phaseId));
+      return updated;
+    }),
+
   deletePhase: comercialProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {

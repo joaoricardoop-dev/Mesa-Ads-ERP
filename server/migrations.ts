@@ -527,6 +527,16 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     // Idempotente: só atualiza nomes que ainda não estão no formato novo.
     // Adiciona timestamps de timeline própria por batch (mesmas etapas
     // do pipeline da campanha) em campaign_phases. Idempotente.
+    name: "add_campaign_phase_id_to_service_orders",
+    sql: `
+      ALTER TABLE "service_orders"
+        ADD COLUMN IF NOT EXISTS "campaignPhaseId" integer
+        REFERENCES "campaign_phases"(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS "idx_service_orders_campaign_phase_id"
+        ON "service_orders" ("campaignPhaseId");
+    `,
+  },
+  {
     name: "add_batch_timeline_columns",
     sql: `
       ALTER TABLE "campaign_phases"

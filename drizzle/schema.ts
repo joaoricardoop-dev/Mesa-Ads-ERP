@@ -642,6 +642,8 @@ export const serviceOrders = pgTable("service_orders", {
   orderNumber: varchar("orderNumber", { length: 30 }).notNull().unique(),
   type: serviceOrderTypeEnum("type").notNull(),
   campaignId: integer("campaignId").references(() => campaigns.id, { onDelete: "set null" }),
+  // Batch específico que esta OS atende. Nullable pra OS antigas/agrupadas.
+  campaignPhaseId: integer("campaignPhaseId").references(() => campaignPhases.id, { onDelete: "set null" }),
   clientId: integer("clientId").references(() => clients.id, { onDelete: "set null" }),
   quotationId: integer("quotationId").references(() => quotations.id, { onDelete: "set null" }),
   description: text("description"),

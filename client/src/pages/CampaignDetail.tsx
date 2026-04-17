@@ -468,10 +468,35 @@ export default function CampaignDetail() {
   const { data: restaurantsList = [] } = trpc.restaurant.list.useQuery();
   const { data: proofsList = [] } = trpc.campaign.getProofs.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignBatchList = [] } = trpc.batch.getCampaignBatches.useQuery({ campaignId }, { enabled: campaignId > 0 });
-  const { data: campaignInvoices = [] } = trpc.financial.listInvoices.useQuery({ campaignId }, { enabled: campaignId > 0 });
-  const { data: campaignSoList = [] } = trpc.serviceOrder.list.useQuery({ campaignId }, { enabled: campaignId > 0 });
+  const { data: campaignInvoicesAll = [] } = trpc.financial.listInvoices.useQuery({ campaignId }, { enabled: campaignId > 0 });
+  const { data: campaignSoListAll = [] } = trpc.serviceOrder.list.useQuery({ campaignId }, { enabled: campaignId > 0 });
   const { data: campaignReportsList = [], refetch: refetchReports } = trpc.campaignReport.list.useQuery({ campaignId }, { enabled: campaignId > 0 });
-  const { data: campaignPayables = [], refetch: refetchPayables } = trpc.financial.listAccountsPayable.useQuery({ campaignId }, { enabled: campaignId > 0 });
+  const { data: campaignPayablesAll = [], refetch: refetchPayables } = trpc.financial.listAccountsPayable.useQuery({ campaignId }, { enabled: campaignId > 0 });
+
+  // Filtra Financeiro/Distribuição pelo batch atual (quando estamos na rota /batch/:phaseId)
+  const campaignInvoices = useMemo(
+    () => currentPhaseId != null
+      ? (campaignInvoicesAll as any[]).filter((i) => i.campaignPhaseId === currentPhaseId)
+      : campaignInvoicesAll,
+    [campaignInvoicesAll, currentPhaseId],
+  );
+  const campaignPayables = useMemo(
+    () => currentPhaseId != null
+      ? (campaignPayablesAll as any[]).filter((p) => p.campaignPhaseId === currentPhaseId)
+      : campaignPayablesAll,
+    [campaignPayablesAll, currentPhaseId],
+  );
+  const campaignSoList = useMemo(
+    () => currentPhaseId != null
+      ? (campaignSoListAll as any[]).filter((s) => s.campaignPhaseId === currentPhaseId)
+      : campaignSoListAll,
+    [campaignSoListAll, currentPhaseId],
+  );
+
+  const filteredByBatch = currentPhaseId != null;
+  const hiddenInvoiceCount = filteredByBatch ? (campaignInvoicesAll as any[]).length - campaignInvoices.length : 0;
+  const hiddenPayableCount = filteredByBatch ? (campaignPayablesAll as any[]).length - campaignPayables.length : 0;
+  const hiddenSoCount = filteredByBatch ? (campaignSoListAll as any[]).length - campaignSoList.length : 0;
   const generatePayablesMutation = trpc.financial.generateCampaignPayables.useMutation({
     onSuccess: (data) => { refetchPayables(); toast.success(`${data.generated} lançamentos gerados`); },
   });
@@ -2133,6 +2158,14 @@ export default function CampaignDetail() {
                 </Button>
               </div>
               <BatchTimeline phase={currentPhase as any} />
+              {(hiddenInvoiceCount > 0 || hiddenPayableCount > 0 || hiddenSoCount > 0) && (
+                <div className="text-[11px] text-muted-foreground px-3 py-1.5 rounded border border-border/30 bg-muted/20">
+                  Aba Financeiro / Distribuição filtradas por este batch.
+                  {hiddenInvoiceCount > 0 && <> {hiddenInvoiceCount} fatura(s) de outros batches ocultas.</>}
+                  {hiddenPayableCount > 0 && <> {hiddenPayableCount} conta(s) ocultas.</>}
+                  {hiddenSoCount > 0 && <> {hiddenSoCount} OS ocultas.</>}
+                </div>
+              )}
             </>
           )}
 
