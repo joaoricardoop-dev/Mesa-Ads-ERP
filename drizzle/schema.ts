@@ -176,6 +176,67 @@ export const campaigns = pgTable("campaigns", {
 export type Campaign = typeof campaigns.$inferSelect;
 export type InsertCampaign = typeof campaigns.$inferInsert;
 
+// ─── Campaign Phases (fases/períodos de uma campanha) ────────────────────────
+// Ex: campanha Unipar de 3 meses → 3 fases (Jan, Fev, Mar).
+// Cada fase tem seu período de veiculação, status e itens (produtos).
+
+export const campaignPhaseStatusEnum = pgEnum("campaign_phase_status", [
+  "planejada",
+  "ativa",
+  "concluida",
+  "cancelada",
+]);
+
+export const campaignPhases = pgTable("campaign_phases", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(), // ordem 1,2,3...
+  label: varchar("label", { length: 100 }).notNull(), // "Mês 1", "Ciclo Jan/25"
+  periodStart: date("periodStart").notNull(),
+  periodEnd: date("periodEnd").notNull(),
+  status: campaignPhaseStatusEnum("status").default("planejada").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_campaign_phases_campaign_id").on(t.campaignId),
+  index("idx_campaign_phases_status").on(t.status),
+  index("idx_campaign_phases_period").on(t.periodStart, t.periodEnd),
+  unique("uq_campaign_phase_sequence").on(t.campaignId, t.sequence),
+]);
+
+export type CampaignPhase = typeof campaignPhases.$inferSelect;
+export type InsertCampaignPhase = typeof campaignPhases.$inferInsert;
+
+// ─── Campaign Items (itens/produtos dentro de uma fase) ──────────────────────
+// Ex: fase 1 tem [3000 coasters @ R$ 0,80, 10 telas @ R$ 500/mês].
+// É onde vivem quantidade, preço unitário, custos de produção e frete
+// específicos por produto/fase.
+
+export const campaignItems = pgTable("campaign_items", {
+  id: serial("id").primaryKey(),
+  campaignPhaseId: integer("campaignPhaseId").notNull().references(() => campaignPhases.id, { onDelete: "cascade" }),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "restrict" }),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unitPrice", { precision: 12, scale: 4 }).notNull().default("0.0000"),
+  // Preço total (quantity × unitPrice), armazenado pra facilitar relatórios.
+  // Nullable: se for null, calcular em runtime. Útil pra produtos com preço
+  // não-linear (ex: mensalidade fixa independente de qty).
+  totalPrice: decimal("totalPrice", { precision: 14, scale: 2 }),
+  // Custos previstos (serão sincronizados com accounts_payable)
+  productionCost: decimal("productionCost", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  freightCost: decimal("freightCost", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_campaign_items_phase_id").on(t.campaignPhaseId),
+  index("idx_campaign_items_product_id").on(t.productId),
+]);
+
+export type CampaignItem = typeof campaignItems.$inferSelect;
+export type InsertCampaignItem = typeof campaignItems.$inferInsert;
+
 // ─── Campaign ↔ Restaurant (junction) ────────────────────────────────────────
 
 export const campaignRestaurants = pgTable("campaign_restaurants", {
@@ -351,6 +412,9 @@ export type InsertRestaurantPayment = typeof restaurantPayments.$inferInsert;
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  // Fase específica que esta fatura cobre. Nullable por compat com invoices
+  // antigas e pra permitir faturas "soltas" (não-faseadas) no futuro.
+  campaignPhaseId: integer("campaignPhaseId").references(() => campaignPhases.id, { onDelete: "set null" }),
   clientId: integer("clientId").notNull().references(() => clients.id, { onDelete: "cascade" }),
   invoiceNumber: varchar("invoiceNumber", { length: 20 }).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
@@ -374,6 +438,7 @@ export const invoices = pgTable("invoices", {
   index("idx_invoices_client_id").on(t.clientId),
   index("idx_invoices_status").on(t.status),
   index("idx_invoices_due_date").on(t.dueDate),
+  index("idx_invoices_campaign_phase_id").on(t.campaignPhaseId),
 ]);
 
 export type Invoice = typeof invoices.$inferSelect;
@@ -1119,6 +1184,10 @@ export type MediaKitSettings = typeof mediaKitSettings.$inferSelect;
 export const accountsPayable = pgTable("accounts_payable", {
   id: serial("id").primaryKey(),
   campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  // Rastreabilidade fase/item — permite saber qual item da qual fase gerou
+  // este custo. Nullable pra compat com lançamentos antigos e despesas avulsas.
+  campaignPhaseId: integer("campaignPhaseId").references(() => campaignPhases.id, { onDelete: "set null" }),
+  campaignItemId: integer("campaignItemId").references(() => campaignItems.id, { onDelete: "set null" }),
   invoiceId: integer("invoiceId").references(() => invoices.id, { onDelete: "set null" }),
   supplierId: integer("supplierId").references(() => suppliers.id, { onDelete: "set null" }),
   vipProviderId: integer("vipProviderId").references(() => vipProviders.id, { onDelete: "set null" }),
@@ -1138,6 +1207,8 @@ export const accountsPayable = pgTable("accounts_payable", {
   index("idx_accounts_payable_status").on(t.status),
   index("idx_accounts_payable_type").on(t.type),
   index("idx_accounts_payable_vip_provider_id").on(t.vipProviderId),
+  index("idx_accounts_payable_campaign_phase_id").on(t.campaignPhaseId),
+  index("idx_accounts_payable_campaign_item_id").on(t.campaignItemId),
 ]);
 
 export type AccountPayable = typeof accountsPayable.$inferSelect;

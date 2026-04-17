@@ -218,6 +218,164 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "issRetained" BOOLEAN NOT NULL DEFAULT false;
     `,
   },
+  {
+    // FASE 1 da refatoração multi-produto + fases:
+    // Cria tabelas campaign_phases e campaign_items.
+    // Não-destrutivo: mantém campos antigos de campaigns (coastersPerRestaurant,
+    // batchCost, etc.) em paralelo. Backfill automático em seguida.
+    name: "create_campaign_phases_and_items",
+    sql: `
+      DO $$ BEGIN
+        CREATE TYPE campaign_phase_status AS ENUM ('planejada', 'ativa', 'concluida', 'cancelada');
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+      CREATE TABLE IF NOT EXISTS "campaign_phases" (
+        "id" SERIAL PRIMARY KEY NOT NULL,
+        "campaignId" INTEGER NOT NULL REFERENCES "campaigns"("id") ON DELETE CASCADE,
+        "sequence" INTEGER NOT NULL,
+        "label" VARCHAR(100) NOT NULL,
+        "periodStart" DATE NOT NULL,
+        "periodEnd" DATE NOT NULL,
+        "status" campaign_phase_status NOT NULL DEFAULT 'planejada',
+        "notes" TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL,
+        "updatedAt" TIMESTAMP DEFAULT NOW() NOT NULL,
+        CONSTRAINT "uq_campaign_phase_sequence" UNIQUE("campaignId", "sequence")
+      );
+      CREATE INDEX IF NOT EXISTS "idx_campaign_phases_campaign_id" ON "campaign_phases" ("campaignId");
+      CREATE INDEX IF NOT EXISTS "idx_campaign_phases_status" ON "campaign_phases" ("status");
+      CREATE INDEX IF NOT EXISTS "idx_campaign_phases_period" ON "campaign_phases" ("periodStart", "periodEnd");
+
+      CREATE TABLE IF NOT EXISTS "campaign_items" (
+        "id" SERIAL PRIMARY KEY NOT NULL,
+        "campaignPhaseId" INTEGER NOT NULL REFERENCES "campaign_phases"("id") ON DELETE CASCADE,
+        "productId" INTEGER NOT NULL REFERENCES "products"("id") ON DELETE RESTRICT,
+        "quantity" INTEGER NOT NULL DEFAULT 1,
+        "unitPrice" NUMERIC(12,4) NOT NULL DEFAULT 0,
+        "totalPrice" NUMERIC(14,2),
+        "productionCost" NUMERIC(12,2) NOT NULL DEFAULT 0,
+        "freightCost" NUMERIC(12,2) NOT NULL DEFAULT 0,
+        "notes" TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL,
+        "updatedAt" TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_campaign_items_phase_id" ON "campaign_items" ("campaignPhaseId");
+      CREATE INDEX IF NOT EXISTS "idx_campaign_items_product_id" ON "campaign_items" ("productId");
+    `,
+  },
+  {
+    // FASE 1: FKs em invoices e accounts_payable pra ligar com fase/item.
+    name: "add_phase_item_fks_to_financial_tables",
+    sql: `
+      ALTER TABLE "invoices"
+        ADD COLUMN IF NOT EXISTS "campaignPhaseId" INTEGER
+        REFERENCES "campaign_phases"("id") ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS "idx_invoices_campaign_phase_id"
+        ON "invoices" ("campaignPhaseId");
+
+      ALTER TABLE "accounts_payable"
+        ADD COLUMN IF NOT EXISTS "campaignPhaseId" INTEGER
+        REFERENCES "campaign_phases"("id") ON DELETE SET NULL;
+      ALTER TABLE "accounts_payable"
+        ADD COLUMN IF NOT EXISTS "campaignItemId" INTEGER
+        REFERENCES "campaign_items"("id") ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS "idx_accounts_payable_campaign_phase_id"
+        ON "accounts_payable" ("campaignPhaseId");
+      CREATE INDEX IF NOT EXISTS "idx_accounts_payable_campaign_item_id"
+        ON "accounts_payable" ("campaignItemId");
+    `,
+  },
+  {
+    // FASE 1 - Backfill: pra cada campanha existente, cria fases mensais
+    // baseadas em contractDuration, e 1 item "default" por fase com o produto
+    // atual + coastersPerRestaurant como quantity (quando produto for coaster).
+    // Idempotente: só cria fases se a campanha não tiver nenhuma.
+    name: "backfill_campaign_phases_and_items",
+    sql: `
+      DO $$
+      DECLARE
+        c RECORD;
+        months INT;
+        i INT;
+        phase_start DATE;
+        phase_end DATE;
+        phase_id INT;
+        resolved_product_id INT;
+        resolved_qty INT;
+        resolved_unit_price NUMERIC(12,4);
+        resolved_total_price NUMERIC(14,2);
+      BEGIN
+        FOR c IN
+          SELECT cp.*
+          FROM "campaigns" cp
+          WHERE NOT EXISTS (
+            SELECT 1 FROM "campaign_phases" ph WHERE ph."campaignId" = cp."id"
+          )
+        LOOP
+          months := GREATEST(COALESCE(c."contractDuration", 1), 1);
+          resolved_product_id := c."productId";
+
+          -- Se campanha não tem productId, pega o primeiro produto disponível
+          -- (fallback pra dados realmente antigos)
+          IF resolved_product_id IS NULL THEN
+            SELECT id INTO resolved_product_id FROM "products" ORDER BY id LIMIT 1;
+          END IF;
+
+          resolved_qty := COALESCE(c."coastersPerRestaurant", 0) * COALESCE(c."activeRestaurants", 0);
+          IF resolved_qty <= 0 THEN resolved_qty := 1; END IF;
+
+          resolved_unit_price := COALESCE(c."fixedPrice"::numeric, 0);
+          IF resolved_unit_price = 0 AND resolved_qty > 0 THEN
+            resolved_unit_price := 0;
+          END IF;
+          resolved_total_price := resolved_unit_price * resolved_qty;
+
+          FOR i IN 1..months LOOP
+            phase_start := (c."startDate"::date) + ((i - 1) * INTERVAL '1 month');
+            phase_end := phase_start + INTERVAL '1 month' - INTERVAL '1 day';
+
+            INSERT INTO "campaign_phases" (
+              "campaignId", "sequence", "label", "periodStart", "periodEnd",
+              "status", "notes", "createdAt", "updatedAt"
+            ) VALUES (
+              c.id, i,
+              'Mês ' || i,
+              phase_start,
+              phase_end,
+              CASE
+                WHEN c."status" IN ('completed', 'archived', 'inativa') THEN 'concluida'::campaign_phase_status
+                WHEN c."status" IN ('cancelada') THEN 'cancelada'::campaign_phase_status
+                WHEN c."status" IN ('veiculacao', 'executar') THEN 'ativa'::campaign_phase_status
+                ELSE 'planejada'::campaign_phase_status
+              END,
+              'Fase gerada automaticamente no backfill',
+              NOW(), NOW()
+            )
+            RETURNING id INTO phase_id;
+
+            -- Cria 1 item default por fase (se tiver produto resolvido)
+            IF resolved_product_id IS NOT NULL THEN
+              INSERT INTO "campaign_items" (
+                "campaignPhaseId", "productId", "quantity",
+                "unitPrice", "totalPrice",
+                "productionCost", "freightCost",
+                "notes", "createdAt", "updatedAt"
+              ) VALUES (
+                phase_id, resolved_product_id,
+                COALESCE(c."coastersPerRestaurant", 1),
+                resolved_unit_price,
+                resolved_unit_price * COALESCE(c."coastersPerRestaurant", 1),
+                COALESCE(c."batchCost"::numeric, 0),
+                COALESCE(c."freightCost"::numeric, 0),
+                'Item gerado automaticamente no backfill',
+                NOW(), NOW()
+              );
+            END IF;
+          END LOOP;
+        END LOOP;
+      END $$;
+    `,
+  },
 ];
 
 export async function runMigrations() {
