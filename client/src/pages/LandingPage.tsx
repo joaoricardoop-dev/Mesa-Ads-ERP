@@ -199,15 +199,26 @@ function Hero() {
         <div>
           <img src="/logo-white.png" alt="mesa.ads" className="h-8" />
         </div>
-        <a
-          href="#contato"
-          className="hidden md:block text-sm font-medium transition-colors"
-          style={{ color: "hsl(0 0% 50%)" }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = "hsl(0 0% 95%)")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "hsl(0 0% 50%)")}
-        >
-          Contato
-        </a>
+        <div className="flex items-center gap-6">
+          <a
+            href="/montar-campanha"
+            className="text-sm font-medium transition-colors"
+            style={{ color: "hsl(0 0% 50%)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "hsl(0 0% 95%)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "hsl(0 0% 50%)")}
+          >
+            Montar campanha
+          </a>
+          <a
+            href="#contato"
+            className="hidden md:block text-sm font-medium transition-colors"
+            style={{ color: "hsl(0 0% 50%)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "hsl(0 0% 95%)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "hsl(0 0% 50%)")}
+          >
+            Contato
+          </a>
+        </div>
       </motion.nav>
 
       <div className="relative z-10 container mx-auto px-6">

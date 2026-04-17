@@ -60,6 +60,7 @@ import ParceiroOnboarding from "./pages/ParceiroOnboarding";
 import ParceiroTabelaPrecos from "./pages/ParceiroTabelaPrecos";
 import ParceiroLeads from "./pages/ParceiroLeads";
 import BudgetCreator from "./pages/BudgetCreator";
+import MontarCampanha from "./pages/MontarCampanha";
 
 function AnuncianteRouter() {
   return (
@@ -275,7 +276,11 @@ function DevLoginButton() {
 }
 
 function ClerkLoginPage() {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">(() => {
+    if (typeof window === "undefined") return "signin";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("mode") === "signup" ? "signup" : "signin";
+  });
 
   return (
     <div className="h-screen w-full flex items-center justify-center" style={{ background: "hsl(0 0% 4%)" }}>
@@ -539,6 +544,7 @@ function App() {
           <Switch>
             <Route path="/parceiro/convite/:token" component={RestaurantInviteAccept} />
             <Route path="/parceiro" component={RestaurantOnboarding} />
+            <Route path="/montar-campanha" component={MontarCampanha} />
             <Route path="/cotacao/assinar/:token" component={QuotationSign} />
             <Route>{() => <AuthenticatedApp />}</Route>
           </Switch>
