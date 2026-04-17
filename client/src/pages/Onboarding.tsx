@@ -166,8 +166,8 @@ export default function Onboarding({ userName }: OnboardingProps) {
 
           {step === 1 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
                   <Label className="text-xs text-[hsl(0,0%,55%)]">Logradouro</Label>
                   <Input value={form.address} onChange={(e) => update("address", e.target.value)} placeholder="Rua, Av..." className="mt-1 bg-[hsl(0,0%,11%)] border-[hsl(0,0%,18%)] text-white" />
                 </div>

@@ -1123,13 +1123,13 @@ export default function AnunciantePortal() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
+      <div className="max-w-5xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
 
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 pb-6 border-b">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6 pb-4 sm:pb-6 border-b">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Portal do Anunciante</p>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{profile.company || profile.name}</h1>
-            <p className="text-sm text-muted-foreground mt-1">Olá, {user?.firstName || profile.name}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 sm:mb-2">Portal do Anunciante</p>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">{profile.company || profile.name}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">Olá, {user?.firstName || profile.name}</p>
             <div className="mt-3 flex items-center gap-2 flex-wrap">
               <Button
                 onClick={() => setBuilderOpen(true)}
@@ -1154,34 +1154,34 @@ export default function AnunciantePortal() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-5 sm:gap-7 flex-wrap">
+          <div className="flex items-center gap-4 sm:gap-7 flex-wrap">
             <div>
-              <p className="text-2xl font-bold tabular-nums">{campaigns.length}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Campanhas</p>
+              <p className="text-xl sm:text-2xl font-bold tabular-nums">{campaigns.length}</p>
+              <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5">Campanhas</p>
             </div>
             <div className="w-px h-7 bg-border hidden sm:block" />
             <div>
-              <p className="text-2xl font-bold tabular-nums">{quotations.length}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Cotações</p>
+              <p className="text-xl sm:text-2xl font-bold tabular-nums">{quotations.length}</p>
+              <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5">Cotações</p>
             </div>
             <div className="w-px h-7 bg-border hidden sm:block" />
             <div>
-              <p className="text-2xl font-bold tabular-nums">{pendingInvoices.length}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Faturas pendentes</p>
+              <p className="text-xl sm:text-2xl font-bold tabular-nums">{pendingInvoices.length}</p>
+              <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5">Faturas pendentes</p>
             </div>
             {totalInvoiced > 0 && (
               <>
                 <div className="w-px h-7 bg-border hidden sm:block" />
                 <div>
-                  <p className="text-2xl font-bold tabular-nums">{fmt(totalInvoiced)}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Total faturado</p>
+                  <p className="text-xl sm:text-2xl font-bold tabular-nums">{fmt(totalInvoiced)}</p>
+                  <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5">Total faturado</p>
                 </div>
               </>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-1 border-b overflow-x-auto">
+        <div className="flex items-center gap-1 border-b overflow-x-auto scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
           <button
             onClick={() => navigateTo("home")}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
@@ -1897,10 +1897,10 @@ export default function AnunciantePortal() {
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Editar Perfil</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>E-mail de contato</Label>
                 <Input value={editForm.contactEmail} onChange={e => setEditForm({ ...editForm, contactEmail: e.target.value })} />
@@ -1914,8 +1914,8 @@ export default function AnunciantePortal() {
               <Label>Instagram</Label>
               <Input value={editForm.instagram} onChange={e => setEditForm({ ...editForm, instagram: e.target.value })} placeholder="@perfil" />
             </div>
-            <div className="grid grid-cols-4 gap-4">
-              <div className="col-span-3 space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="sm:col-span-3 space-y-2">
                 <Label>Endereço</Label>
                 <Input value={editForm.address} onChange={e => setEditForm({ ...editForm, address: e.target.value })} />
               </div>
@@ -1924,7 +1924,7 @@ export default function AnunciantePortal() {
                 <Input value={editForm.addressNumber} onChange={e => setEditForm({ ...editForm, addressNumber: e.target.value })} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Bairro</Label>
                 <Input value={editForm.neighborhood} onChange={e => setEditForm({ ...editForm, neighborhood: e.target.value })} />
