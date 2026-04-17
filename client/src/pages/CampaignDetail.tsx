@@ -1115,6 +1115,23 @@ export default function CampaignDetail() {
     };
   }
 
+  // Regra tela vs bolacha: produtos digitais (telas/janelas) não têm
+  // produção física, frete nem comissão de restaurante.
+  const isDigitalProduct = campaign.productTipo === "telas" || campaign.productTipo === "janelas_digitais";
+  if (isDigitalProduct) {
+    p = {
+      ...p,
+      productionCostPerRest: 0,
+      freightPerRest: 0,
+      restCommPerRest: 0,
+      totalProductionCost: 0,
+      totalFreight: 0,
+      totalRestComm: 0,
+      totalCostsPerRest: p.totalCostsPerRest - (p.productionCostPerRest + p.freightPerRest + p.restCommPerRest),
+      totalCosts: Math.max(0, p.totalCosts - (p.totalProductionCost + p.totalFreight + p.totalRestComm)),
+    };
+  }
+
   const client = clientsList.find((cl) => cl.id === campaign.clientId);
   const isBonif = !!(campaign as any).isBonificada;
 
@@ -1148,7 +1165,7 @@ export default function CampaignDetail() {
     { name: "Com. Vendedor", value: p.totalSellerComm, color: "#f59e0b" },
     { name: "Impostos", value: p.totalTax, color: "#ef4444" },
     { name: "Lucro", value: Math.max(0, p.monthlyProfit), color: "#8b5cf6" },
-  ];
+  ].filter(d => d.value > 0);
 
   const perRestBarData = isBonif ? [
     { name: "Produção", custo: p.productionCostPerRest },
@@ -1512,7 +1529,7 @@ export default function CampaignDetail() {
             </div>
           )}
 
-          {campaign.status === "producao" && (
+          {campaign.status === "producao" && !isDigitalProduct && (
             <div className="bg-card border border-amber-500/30 rounded-lg p-5 space-y-3">
               <div className="flex items-center gap-2">
                 <Package className="w-5 h-5 text-amber-400" />
@@ -1933,7 +1950,7 @@ export default function CampaignDetail() {
           )}
 
           {/* ── Rastreamentos de Frete (always visible when OS exists) ── */}
-          {(prodSo || distSo) && !["producao", "distribuicao"].includes(campaign.status) && (
+          {(prodSo || distSo) && !isDigitalProduct && !["producao", "distribuicao"].includes(campaign.status) && (
             <div className="bg-card border border-border/30 rounded-lg p-5 space-y-4">
               <div className="flex items-center gap-2">
                 <Truck className="w-5 h-5 text-primary" />
@@ -2578,7 +2595,7 @@ export default function CampaignDetail() {
               {(prodSo || distSo || prodTrackings.length > 0 || distTrackings.length > 0 || (campaign as any).artPdfUrl || (campaign as any).artImageUrls) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* OS de Produção */}
-                  {(prodSo || (campaign as any).artPdfUrl) && (
+                  {!isDigitalProduct && (prodSo || (campaign as any).artPdfUrl) && (
                     <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
                       <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
                         <Package className="w-3 h-3" /> Produção Gráfica
@@ -2620,7 +2637,7 @@ export default function CampaignDetail() {
                   )}
 
                   {/* OS de Distribuição */}
-                  {(distSo || distTrackings.length > 0) && (
+                  {!isDigitalProduct && (distSo || distTrackings.length > 0) && (
                     <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
                       <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
                         <Truck className="w-3 h-3" /> Distribuição & Frete
@@ -2799,13 +2816,15 @@ export default function CampaignDetail() {
                           contract={p.totalSellerComm * (campaign.contractDuration || 1)}
                           sub warn
                         />
-                        <DRECampRow
-                          label="(-) Comissão Restaurante"
-                          monthly={p.totalRestComm}
-                          pct={p.monthlyRevenue > 0 ? (p.totalRestComm / p.monthlyRevenue) * 100 : 0}
-                          contract={p.totalRestComm * (campaign.contractDuration || 1)}
-                          sub warn
-                        />
+                        {!isDigitalProduct && (
+                          <DRECampRow
+                            label="(-) Comissão Restaurante"
+                            monthly={p.totalRestComm}
+                            pct={p.monthlyRevenue > 0 ? (p.totalRestComm / p.monthlyRevenue) * 100 : 0}
+                            contract={p.totalRestComm * (campaign.contractDuration || 1)}
+                            sub warn
+                          />
+                        )}
                         <DRECampRow separator label="" />
                         <DRECampRow
                           label="= Líquido"
@@ -2816,14 +2835,18 @@ export default function CampaignDetail() {
                           accent={dreCalc.liquido > 0}
                           warn={dreCalc.liquido <= 0}
                         />
-                        <DRECampRow separator label="" />
-                        <DRECampRow
-                          label="(-) Custos de Produção"
-                          monthly={dreCalc.custos}
-                          pct={p.monthlyRevenue > 0 ? (dreCalc.custos / p.monthlyRevenue) * 100 : 0}
-                          contract={dreCalc.custosContrato}
-                          sub warn
-                        />
+                        {!isDigitalProduct && (
+                          <>
+                            <DRECampRow separator label="" />
+                            <DRECampRow
+                              label="(-) Custos de Produção"
+                              monthly={dreCalc.custos}
+                              pct={p.monthlyRevenue > 0 ? (dreCalc.custos / p.monthlyRevenue) * 100 : 0}
+                              contract={dreCalc.custosContrato}
+                              sub warn
+                            />
+                          </>
+                        )}
                         <DRECampRow separator label="" />
                         <DRECampRow
                           label="= Resultado Mesa Ads"
@@ -2885,8 +2908,12 @@ export default function CampaignDetail() {
                     <MiniStat label="Restaurantes" value={`${restaurantsConfigured}/${campaign.activeRestaurants}`}
                       warn={restaurantsMissing > 0}
                     />
-                    <MiniStat label="Coasters/Rest." value={(restaurantsConfigured > 0 ? Math.round(totalCoastersDistributed / restaurantsConfigured) : campaign.coastersPerRestaurant).toLocaleString("pt-BR")} />
-                    <MiniStat label="Total Coasters" value={expectedTotalCoasters.toLocaleString("pt-BR")} />
+                    {!isDigitalProduct && (
+                      <>
+                        <MiniStat label="Coasters/Rest." value={(restaurantsConfigured > 0 ? Math.round(totalCoastersDistributed / restaurantsConfigured) : campaign.coastersPerRestaurant).toLocaleString("pt-BR")} />
+                        <MiniStat label="Total Coasters" value={expectedTotalCoasters.toLocaleString("pt-BR")} />
+                      </>
+                    )}
                     <MiniStat label="Alocação" value={`${allocationPct.toFixed(0)}%`} warn={allocationPct < 100} />
                   </div>
                 </div>
@@ -3318,28 +3345,32 @@ export default function CampaignDetail() {
                         <td className="py-1.5 text-right px-3 font-medium text-xs">{formatCurrency(m(baseAposImpostos))}</td>
                       </tr>
 
-                      <tr className="border-t border-border/10">
-                        <td className="py-1.5 text-red-400/80 pl-4">(-) Comissão Restaurante <span className="text-[10px]">({restCommRate}%)</span></td>
-                        <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(commRest)}</td>
-                        <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(m(commRest))}</td>
-                      </tr>
-                      <tr className="bg-muted/20">
-                        <td className="py-1.5 font-medium pl-2 text-xs">= Base após Comissões</td>
-                        <td className="py-1.5 text-right px-3 font-medium text-xs">{formatCurrency(baseAposComRest)}</td>
-                        <td className="py-1.5 text-right px-3 font-medium text-xs">{formatCurrency(m(baseAposComRest))}</td>
-                      </tr>
+                      {!isDigitalProduct && (
+                        <>
+                          <tr className="border-t border-border/10">
+                            <td className="py-1.5 text-red-400/80 pl-4">(-) Comissão Restaurante <span className="text-[10px]">({restCommRate}%)</span></td>
+                            <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(commRest)}</td>
+                            <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(m(commRest))}</td>
+                          </tr>
+                          <tr className="bg-muted/20">
+                            <td className="py-1.5 font-medium pl-2 text-xs">= Base após Comissões</td>
+                            <td className="py-1.5 text-right px-3 font-medium text-xs">{formatCurrency(baseAposComRest)}</td>
+                            <td className="py-1.5 text-right px-3 font-medium text-xs">{formatCurrency(m(baseAposComRest))}</td>
+                          </tr>
 
-                      <tr className="border-t border-border/10">
-                        <td className="py-1.5 text-red-400/80 pl-4">(-) Custo Produção <span className="text-[10px]">({campaign.batchSize} un × R$ {p.unitCost.toFixed(2)})</span></td>
-                        <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(prodCost)}</td>
-                        <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(m(prodCost))}</td>
-                      </tr>
-                      {freteCost > 0 && (
-                        <tr>
-                          <td className="py-1.5 text-red-400/80 pl-4">(-) Custo Frete</td>
-                          <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(freteCost)}</td>
-                          <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(m(freteCost))}</td>
-                        </tr>
+                          <tr className="border-t border-border/10">
+                            <td className="py-1.5 text-red-400/80 pl-4">(-) Custo Produção <span className="text-[10px]">({campaign.batchSize} un × R$ {p.unitCost.toFixed(2)})</span></td>
+                            <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(prodCost)}</td>
+                            <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(m(prodCost))}</td>
+                          </tr>
+                          {freteCost > 0 && (
+                            <tr>
+                              <td className="py-1.5 text-red-400/80 pl-4">(-) Custo Frete</td>
+                              <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(freteCost)}</td>
+                              <td className="py-1.5 text-right px-3 text-red-400/80">{formatCurrency(m(freteCost))}</td>
+                            </tr>
+                          )}
+                        </>
                       )}
                       <tr className="bg-muted/20">
                         <td className="py-1.5 font-medium pl-2 text-xs">= Base{pName ? " Comissão Parceiro" : ""}</td>

@@ -657,10 +657,13 @@ export const financialRouter = router({
             ${invoices.amount}::numeric * (COALESCE(${invoices.issRate}, 0)::numeric / 100)
           `,
           restaurantRepasseAmount: sql<string>`
-            CASE WHEN COALESCE(${campaigns.isBonificada}, false) THEN 0
-            ELSE ${invoices.amount}::numeric * (COALESCE(${campaigns.restaurantCommission}, 0)::numeric / 100)
+            CASE
+              WHEN COALESCE(${campaigns.isBonificada}, false) THEN 0
+              WHEN ${products.tipo} IN ('telas', 'janelas_digitais') THEN 0
+              ELSE ${invoices.amount}::numeric * (COALESCE(${campaigns.restaurantCommission}, 0)::numeric / 100)
             END
           `,
+          productTipo: products.tipo,
           vipRepasseAmount: sql<string>`
             CASE
               WHEN COALESCE(${campaigns.isBonificada}, false) THEN 0
@@ -824,6 +827,12 @@ export const financialRouter = router({
         try {
           const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, updated.campaignId));
           if (campaign && !(campaign as any).isBonificada) {
+            // Skip restaurant commission for digital products (telas/janelas)
+            let isDigitalProd = false;
+            if (campaign.productId) {
+              const [prod] = await db.select({ tipo: products.tipo }).from(products).where(eq(products.id, campaign.productId)).limit(1);
+              isDigitalProd = prod?.tipo === "telas" || prod?.tipo === "janelas_digitais";
+            }
             const existing = await db.select({ id: accountsPayable.id })
               .from(accountsPayable)
               .where(and(
@@ -831,7 +840,7 @@ export const financialRouter = router({
                 eq(accountsPayable.invoiceId, input.id),
                 eq(accountsPayable.type, "comissao"),
               ));
-            if (existing.length === 0) {
+            if (existing.length === 0 && !isDigitalProd) {
               const invoiceAmt = Number(updated.amount);
               const restCommRate = Number(campaign.restaurantCommission || 0);
               const commAmount = invoiceAmt * (restCommRate / 100);
@@ -1008,6 +1017,14 @@ export const financialRouter = router({
       const costMap: Record<number, typeof costRows[0]> = {};
       for (const c of costRows) costMap[c.campaignId] = c;
 
+      // Map productId -> tipo (digital/physical) para regra tela vs bolacha
+      const productTipoMap: Record<number, string | null> = {};
+      const productIds = uniqueIds(campaignRows.map((c) => c.productId));
+      if (productIds.length > 0) {
+        const prodRows = await db.select({ id: products.id, tipo: products.tipo }).from(products).where(inArray(products.id, productIds));
+        for (const p of prodRows) productTipoMap[p.id] = p.tipo;
+      }
+
       const rpRows = await db
         .select({
           campaignId: restaurantPayments.campaignId,
@@ -1091,16 +1108,20 @@ export const financialRouter = router({
       return campaignRows.map((c) => {
         const cost = costMap[c.id];
         const dur = c.contractDuration;
+        const tipo = c.productId ? productTipoMap[c.productId] : null;
+        const isDigitalOnly = tipo === "telas" || tipo === "janelas_digitais";
         const batchCost = parseFloat(c.batchCost || "0");
-        const productionPerMonth = parseFloat(cost?.productionCost || "0") > 0
+        const productionPerMonthRaw = parseFloat(cost?.productionCost || "0") > 0
           ? parseFloat(cost.productionCost) / dur
           : batchCost;
+        const productionPerMonth = isDigitalOnly ? 0 : productionPerMonthRaw;
         const productionTotal = productionPerMonth * dur;
 
-        const freightPerMonth = parseFloat(c.freightCost || "0");
+        const freightPerMonthRaw = parseFloat(c.freightCost || "0");
+        const freightPerMonth = isDigitalOnly ? 0 : freightPerMonthRaw;
         const freightTotal = freightPerMonth * dur;
 
-        const restaurantCost = rpMap[c.id] || 0;
+        const restaurantCost = isDigitalOnly ? 0 : (rpMap[c.id] || 0);
 
         const isBonificada = !!(c as any).isBonificada;
         const revenue = isBonificada ? 0 : (
@@ -1112,8 +1133,8 @@ export const financialRouter = router({
         const taxRate = parseFloat(c.taxRate || "0");
         const taxAmount = isBonificada ? 0 : revenue * (taxRate / 100);
 
-        const restRate = parseFloat(c.restaurantCommission || "0");
-        const restAmount = isBonificada ? 0 : (revenue - taxAmount) * (restRate / 100);
+        const restRate = isDigitalOnly ? 0 : parseFloat(c.restaurantCommission || "0");
+        const restAmount = (isBonificada || isDigitalOnly) ? 0 : (revenue - taxAmount) * (restRate / 100);
 
         const pId = c.quotationId ? null : (c as any).partnerId || clientPartnerMap[c.clientId] || null;
         const resolvedPartnerId = pId;
