@@ -51,7 +51,6 @@ import {
   Building2,
   Calculator,
   ChevronRight,
-  CircleDollarSign,
   DollarSign,
   Factory,
   FileBarChart,
@@ -148,7 +147,6 @@ const NAV_ENTRIES: NavEntry[] = [
     items: [
       { icon: BarChart3, label: "Dashboard", path: "/financeiro" },
       { icon: Receipt, label: "Faturamento", path: "/financeiro/faturamento" },
-      { icon: CircleDollarSign, label: "Contas a Pagar", path: "/financeiro/contas-pagar" },
       { icon: Calculator, label: "Custos", path: "/financeiro/custos" },
       { icon: FileBarChart, label: "Relatórios", path: "/financeiro/relatorios" },
     ],
