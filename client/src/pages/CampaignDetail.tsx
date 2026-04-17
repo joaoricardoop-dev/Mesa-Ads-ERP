@@ -76,7 +76,9 @@ import {
   Download,
   X,
   Users,
+  CalendarRange,
 } from "lucide-react";
+import CampaignPhases from "@/components/CampaignPhases";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -2047,6 +2049,7 @@ export default function CampaignDetail() {
             <div className="overflow-x-auto -mx-1 px-1 scrollbar-hide">
               <TabsList className="bg-card border border-border/30 inline-flex w-auto min-w-full sm:w-auto">
                 <TabsTrigger value="resumo" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>
+                <TabsTrigger value="fases" className="gap-1.5 text-xs"><CalendarRange className="w-3.5 h-3.5" /> Fases</TabsTrigger>
                 <TabsTrigger value="financeiro" className="gap-1.5 text-xs"><CircleDollarSign className="w-3.5 h-3.5" /> Financeiro</TabsTrigger>
                 <TabsTrigger value="restaurantes" className="gap-1.5 text-xs"><Store className="w-3.5 h-3.5" /> Distribuição</TabsTrigger>
                 <TabsTrigger value="cliente" className="gap-1.5 text-xs"><Building2 className="w-3.5 h-3.5" /> Cliente</TabsTrigger>
@@ -2684,6 +2687,15 @@ export default function CampaignDetail() {
                   </>
                 )}
               </div>
+            </TabsContent>
+
+            {/* ─── FASES ─── */}
+            <TabsContent value="fases" className="space-y-4">
+              <CampaignPhases
+                campaignId={campaign.id}
+                contractDuration={campaign.contractDuration}
+                startDate={campaign.startDate}
+              />
             </TabsContent>
 
             {/* ─── FINANCEIRO ─── */}
