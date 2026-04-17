@@ -333,6 +333,43 @@ interface RestaurantSelection {
   neighborhood: string;
 }
 
+const BV_PADRAO = 0.20;
+
+function DRECampRow({
+  label, monthly, pct, contract, bold, accent, warn, sub, muted, separator,
+}: {
+  label: string; monthly?: number; pct?: number; contract?: number;
+  bold?: boolean; accent?: boolean; warn?: boolean; sub?: boolean; muted?: boolean; separator?: boolean;
+}) {
+  if (separator) {
+    return <tr><td colSpan={4} className="py-0.5"><div className="border-t border-border/20" /></td></tr>;
+  }
+  const textClass = warn
+    ? "text-red-400"
+    : accent
+      ? "text-emerald-400"
+      : muted
+        ? "text-muted-foreground/50"
+        : bold
+          ? "text-foreground"
+          : "text-muted-foreground";
+  const fontClass = bold ? "font-semibold" : "font-normal";
+  return (
+    <tr className={`text-xs ${textClass}`}>
+      <td className={`py-1.5 ${sub ? "pl-4" : "pl-0"} ${fontClass}`}>{label}</td>
+      <td className={`py-1.5 text-right font-mono tabular-nums ${fontClass}`}>
+        {monthly !== undefined ? formatCurrency(monthly) : ""}
+      </td>
+      <td className={`py-1.5 text-right font-mono tabular-nums text-[10px] opacity-70`}>
+        {pct !== undefined ? `${pct.toFixed(1)}%` : ""}
+      </td>
+      <td className={`py-1.5 text-right font-mono tabular-nums ${fontClass}`}>
+        {contract !== undefined ? formatCurrency(contract) : ""}
+      </td>
+    </tr>
+  );
+}
+
 export default function CampaignDetail() {
   const [, navigate] = useLocation();
   const [match, params] = useRoute("/campanhas/:id");
@@ -1037,8 +1074,23 @@ export default function CampaignDetail() {
   }
 
   const client = clientsList.find((cl) => cl.id === campaign.clientId);
-
   const isBonif = !!(campaign as any).isBonificada;
+
+  const bvMonthly = p.monthlyRevenue * BV_PADRAO;
+  const dreCalc = (() => {
+    const liquido = p.monthlyRevenue - p.totalTax - bvMonthly - p.totalSellerComm - p.totalRestComm;
+    const custos = p.totalProductionCost + p.totalFreight;
+    const resultado = liquido - custos;
+    const dur = campaign.contractDuration || 1;
+    return {
+      liquido,
+      liquidoContrato: liquido * dur,
+      custos,
+      custosContrato: custos * dur,
+      resultado,
+      resultadoContrato: resultado * dur,
+    };
+  })();
 
   const costBreakdownData = isBonif ? [
     { name: "Produção", value: p.totalProductionCost, color: "#22c55e" },
@@ -2568,6 +2620,97 @@ export default function CampaignDetail() {
                   </>
                 )}
               </div>
+
+              {/* ─── DRE: Resultado da Campanha ─── */}
+              {!isBonif && p.monthlyRevenue > 0 && (
+                <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border/20 flex items-center gap-2">
+                    <FileBarChart2 className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-semibold">Resultado da Campanha</h3>
+                    <span className="text-[10px] text-muted-foreground ml-1">— mensal · contrato {campaign.contractDuration}m</span>
+                  </div>
+                  <div className="px-4 py-3 overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/20">
+                          <th className="text-left pb-2 font-medium">Componente</th>
+                          <th className="text-right pb-2 font-medium w-32">Mensal</th>
+                          <th className="text-right pb-2 font-medium w-20">% Rec.</th>
+                          <th className="text-right pb-2 font-medium w-32">Contrato</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <DRECampRow
+                          label="Faturamento"
+                          monthly={p.monthlyRevenue}
+                          pct={100}
+                          contract={p.contractRevenue}
+                          bold
+                        />
+                        <DRECampRow separator label="" />
+                        <DRECampRow
+                          label="(-) Imposto"
+                          monthly={p.totalTax}
+                          pct={p.monthlyRevenue > 0 ? (p.totalTax / p.monthlyRevenue) * 100 : 0}
+                          contract={p.totalTax * (campaign.contractDuration || 1)}
+                          sub warn
+                        />
+                        <DRECampRow
+                          label={`(-) BV de Agência${(campaign as any).partnerId ? " → Agência Parceira" : " (sem agência)"}`}
+                          monthly={bvMonthly}
+                          pct={BV_PADRAO * 100}
+                          contract={bvMonthly * (campaign.contractDuration || 1)}
+                          sub
+                          warn={!!(campaign as any).partnerId}
+                          muted={!(campaign as any).partnerId}
+                        />
+                        <DRECampRow
+                          label="(-) Comissão Interna"
+                          monthly={p.totalSellerComm}
+                          pct={p.monthlyRevenue > 0 ? (p.totalSellerComm / p.monthlyRevenue) * 100 : 0}
+                          contract={p.totalSellerComm * (campaign.contractDuration || 1)}
+                          sub warn
+                        />
+                        <DRECampRow
+                          label="(-) Comissão Restaurante"
+                          monthly={p.totalRestComm}
+                          pct={p.monthlyRevenue > 0 ? (p.totalRestComm / p.monthlyRevenue) * 100 : 0}
+                          contract={p.totalRestComm * (campaign.contractDuration || 1)}
+                          sub warn
+                        />
+                        <DRECampRow separator label="" />
+                        <DRECampRow
+                          label="= Líquido"
+                          monthly={dreCalc.liquido}
+                          pct={p.monthlyRevenue > 0 ? (dreCalc.liquido / p.monthlyRevenue) * 100 : 0}
+                          contract={dreCalc.liquidoContrato}
+                          bold
+                          accent={dreCalc.liquido > 0}
+                          warn={dreCalc.liquido <= 0}
+                        />
+                        <DRECampRow separator label="" />
+                        <DRECampRow
+                          label="(-) Custos de Produção"
+                          monthly={dreCalc.custos}
+                          pct={p.monthlyRevenue > 0 ? (dreCalc.custos / p.monthlyRevenue) * 100 : 0}
+                          contract={dreCalc.custosContrato}
+                          sub warn
+                        />
+                        <DRECampRow separator label="" />
+                        <DRECampRow
+                          label="= Resultado Mesa Ads"
+                          monthly={dreCalc.resultado}
+                          pct={p.monthlyRevenue > 0 ? (dreCalc.resultado / p.monthlyRevenue) * 100 : 0}
+                          contract={dreCalc.resultadoContrato}
+                          bold
+                          accent={dreCalc.resultado > 0}
+                          warn={dreCalc.resultado <= 0}
+                        />
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="bg-card border border-border/30 rounded-lg p-4 space-y-3">
