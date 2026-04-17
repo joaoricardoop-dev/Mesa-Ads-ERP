@@ -196,6 +196,14 @@ export const campaignPhases = pgTable("campaign_phases", {
   periodEnd: date("periodEnd").notNull(),
   status: campaignPhaseStatusEnum("status").default("planejada").notNull(),
   notes: text("notes"),
+  // Timeline própria por batch (mesmas etapas do pipeline da campanha)
+  briefingEnteredAt: timestamp("briefingEnteredAt"),
+  designEnteredAt: timestamp("designEnteredAt"),
+  aprovacaoEnteredAt: timestamp("aprovacaoEnteredAt"),
+  producaoEnteredAt: timestamp("producaoEnteredAt"),
+  distribuicaoEnteredAt: timestamp("distribuicaoEnteredAt"),
+  veiculacaoEnteredAt: timestamp("veiculacaoEnteredAt"),
+  concluidaAt: timestamp("concluidaAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [

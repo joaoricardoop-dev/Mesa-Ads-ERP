@@ -125,6 +125,8 @@ function Router() {
       <Route path="/configuracoes/provedores-sala-vip" component={VipProvidersPage} />
       {/* Rota antiga mantida como alias pra não quebrar links existentes */}
       <Route path="/financeiro/provedores-vip" component={VipProvidersPage} />
+      <Route path="/campanhas/:id/batch/:phaseId" component={CampaignDetail} />
+      {/* Rota antiga mantida como alias pra não quebrar links existentes */}
       <Route path="/campanhas/:id/fase/:phaseId" component={CampaignDetail} />
       <Route path="/campanhas/:id" component={CampaignOverview} />
       <Route path="/campanhas" component={Campaigns} />

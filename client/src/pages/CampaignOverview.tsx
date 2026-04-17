@@ -94,7 +94,7 @@ function PhaseCard({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Fase</span>
+              <span className="text-sm text-muted-foreground">Batch</span>
               <span className="text-lg font-semibold tabular-nums">{phase.sequence}</span>
             </div>
             <div className="text-xs text-muted-foreground">{phase.label}</div>
@@ -133,7 +133,7 @@ function PhaseCard({
       </div>
 
       <div className="flex items-center justify-end text-xs text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-        Abrir fase <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+        Abrir batch <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
       </div>
     </button>
   );
@@ -212,7 +212,7 @@ export default function CampaignOverview() {
               )}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
-              Selecione uma fase para abrir o painel, timeline e operação.
+              Selecione um batch para abrir o painel, timeline e operação.
             </p>
           </div>
         </div>
@@ -221,7 +221,7 @@ export default function CampaignOverview() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-card border border-border/30 rounded-xl p-4">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Layers className="w-3.5 h-3.5" /> Fases
+              <Layers className="w-3.5 h-3.5" /> Batches
             </div>
             <div className="text-2xl font-semibold tabular-nums mt-1">
               {phases.length}
@@ -252,14 +252,14 @@ export default function CampaignOverview() {
         </div>
 
         {isLoading && (
-          <div className="text-center py-12 text-sm text-muted-foreground">Carregando fases…</div>
+          <div className="text-center py-12 text-sm text-muted-foreground">Carregando batches…</div>
         )}
 
         {!isLoading && phases.length === 0 && (
           <div className="bg-card border border-dashed border-border/40 rounded-xl p-10 text-center">
             <Layers className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
             <div className="text-sm text-muted-foreground">
-              Esta campanha ainda não tem fases cadastradas.
+              Esta campanha ainda não tem batches cadastrados.
             </div>
           </div>
         )}
@@ -270,7 +270,7 @@ export default function CampaignOverview() {
               <Cookie className="w-4 h-4 text-primary" />
               <h2 className="text-sm font-semibold uppercase tracking-wider">Bolacha</h2>
               <span className="text-xs text-muted-foreground">
-                ({(phases as PhaseRow[]).filter((p) => p.items.some((it) => !DIGITAL_TIPOS.has(it.productTipo ?? ""))).length} fases)
+                ({(phases as PhaseRow[]).filter((p) => p.items.some((it) => !DIGITAL_TIPOS.has(it.productTipo ?? ""))).length} batches)
               </span>
             </header>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -281,7 +281,7 @@ export default function CampaignOverview() {
                     key={`b-${p.id}`}
                     phase={p}
                     filterTipo="bolacha"
-                    onOpen={() => setLocation(`/campanhas/${campaignId}/fase/${p.id}`)}
+                    onOpen={() => setLocation(`/campanhas/${campaignId}/batch/${p.id}`)}
                   />
                 ))}
             </div>
@@ -294,7 +294,7 @@ export default function CampaignOverview() {
               <Monitor className="w-4 h-4 text-primary" />
               <h2 className="text-sm font-semibold uppercase tracking-wider">Telas / Janelas Digitais</h2>
               <span className="text-xs text-muted-foreground">
-                ({(phases as PhaseRow[]).filter((p) => p.items.some((it) => DIGITAL_TIPOS.has(it.productTipo ?? ""))).length} fases)
+                ({(phases as PhaseRow[]).filter((p) => p.items.some((it) => DIGITAL_TIPOS.has(it.productTipo ?? ""))).length} batches)
               </span>
             </header>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -305,7 +305,7 @@ export default function CampaignOverview() {
                     key={`t-${p.id}`}
                     phase={p}
                     filterTipo="tela"
-                    onOpen={() => setLocation(`/campanhas/${campaignId}/fase/${p.id}`)}
+                    onOpen={() => setLocation(`/campanhas/${campaignId}/batch/${p.id}`)}
                   />
                 ))}
             </div>
@@ -316,7 +316,7 @@ export default function CampaignOverview() {
           <section className="space-y-3">
             <header className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-primary" />
-              <h2 className="text-sm font-semibold uppercase tracking-wider">Fases</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wider">Batches</h2>
             </header>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {(phases as PhaseRow[]).map((p) => (
@@ -324,7 +324,7 @@ export default function CampaignOverview() {
                   key={p.id}
                   phase={p}
                   filterTipo="bolacha"
-                  onOpen={() => setLocation(`/campanhas/${campaignId}/fase/${p.id}`)}
+                  onOpen={() => setLocation(`/campanhas/${campaignId}/batch/${p.id}`)}
                 />
               ))}
             </div>

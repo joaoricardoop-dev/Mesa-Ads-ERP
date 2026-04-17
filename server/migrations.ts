@@ -525,6 +525,21 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     // Renomeia todas as campanhas existentes para o padrão
     // "<Cliente> — Lote <Mês>/<Ano>" (ex: "Brahma — Lote Jan/2026").
     // Idempotente: só atualiza nomes que ainda não estão no formato novo.
+    // Adiciona timestamps de timeline própria por batch (mesmas etapas
+    // do pipeline da campanha) em campaign_phases. Idempotente.
+    name: "add_batch_timeline_columns",
+    sql: `
+      ALTER TABLE "campaign_phases"
+        ADD COLUMN IF NOT EXISTS "briefingEnteredAt" timestamp,
+        ADD COLUMN IF NOT EXISTS "designEnteredAt" timestamp,
+        ADD COLUMN IF NOT EXISTS "aprovacaoEnteredAt" timestamp,
+        ADD COLUMN IF NOT EXISTS "producaoEnteredAt" timestamp,
+        ADD COLUMN IF NOT EXISTS "distribuicaoEnteredAt" timestamp,
+        ADD COLUMN IF NOT EXISTS "veiculacaoEnteredAt" timestamp,
+        ADD COLUMN IF NOT EXISTS "concluidaAt" timestamp;
+    `,
+  },
+  {
     name: "rename_campaigns_to_lote_format",
     sql: `
       UPDATE "campaigns" c

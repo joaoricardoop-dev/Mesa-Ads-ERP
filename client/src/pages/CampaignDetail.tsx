@@ -79,6 +79,7 @@ import {
   CalendarRange,
 } from "lucide-react";
 import CampaignPhases from "@/components/CampaignPhases";
+import { BatchTimeline } from "@/components/BatchTimeline";
 import CampaignConsolidation from "@/components/CampaignConsolidation";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -372,7 +373,10 @@ function DRECampRow({
 
 export default function CampaignDetail() {
   const [, navigate] = useLocation();
-  const [matchPhase, phaseParams] = useRoute<{ id: string; phaseId: string }>("/campanhas/:id/fase/:phaseId");
+  const [matchBatch, batchParams] = useRoute<{ id: string; phaseId: string }>("/campanhas/:id/batch/:phaseId");
+  const [matchPhaseLegacy, phaseParamsLegacy] = useRoute<{ id: string; phaseId: string }>("/campanhas/:id/fase/:phaseId");
+  const matchPhase = matchBatch || matchPhaseLegacy;
+  const phaseParams = matchBatch ? batchParams : phaseParamsLegacy;
   const [matchLegacy, legacyParams] = useRoute<{ id: string }>("/campanhas/:id");
   const campaignId = matchPhase
     ? parseInt(phaseParams!.id)
@@ -2111,22 +2115,25 @@ export default function CampaignDetail() {
           )}
 
           {currentPhase && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-xs">
-              <CalendarRange className="w-3.5 h-3.5 text-primary" />
-              <span className="text-muted-foreground">Você está vendo:</span>
-              <span className="font-semibold">
-                Fase {currentPhase.sequence} — {currentPhase.label}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-auto h-6 text-xs"
-                onClick={() => navigate(`/campanhas/${campaignId}`)}
-                data-testid="button-back-overview"
-              >
-                <ArrowLeft className="w-3 h-3 mr-1" /> Todas as fases
-              </Button>
-            </div>
+            <>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-xs">
+                <CalendarRange className="w-3.5 h-3.5 text-primary" />
+                <span className="text-muted-foreground">Você está vendo:</span>
+                <span className="font-semibold">
+                  Batch {currentPhase.sequence} — {currentPhase.label}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-6 text-xs"
+                  onClick={() => navigate(`/campanhas/${campaignId}`)}
+                  data-testid="button-back-overview"
+                >
+                  <ArrowLeft className="w-3 h-3 mr-1" /> Todos os batches
+                </Button>
+              </div>
+              <BatchTimeline phase={currentPhase as any} />
+            </>
           )}
 
           <Tabs defaultValue="resumo" className="space-y-4">
