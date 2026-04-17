@@ -34,7 +34,10 @@ import { ObjectUploader } from "@/components/ObjectUploader";
 import { SEMANAS_OPTIONS } from "@/hooks/useBudgetCalculator";
 import { cn } from "@/lib/utils";
 
-type TipoProduct = "impressos" | "eletronicos" | "telas";
+type TipoProduct = "impressos" | "eletronicos" | "telas" | "janelas_digitais";
+
+// Produtos que disparam repasse automático ao provedor de sala VIP
+const VIP_TIPOS: TipoProduct[] = ["telas", "janelas_digitais"];
 type ImpressionFormulaType = "por_coaster" | "por_tela" | "por_visitante" | "por_evento" | "manual";
 type DistributionType = "rede" | "local_especifico";
 
@@ -55,12 +58,14 @@ const tipoLabels: Record<TipoProduct, string> = {
   impressos: "Impressos",
   eletronicos: "Eletrônicos",
   telas: "Telas",
+  janelas_digitais: "Janelas Digitais",
 };
 
 const tipoColors: Record<TipoProduct, string> = {
   impressos: "bg-blue-500/10 text-blue-400 border-blue-500/30",
   eletronicos: "bg-violet-500/10 text-violet-400 border-violet-500/30",
   telas: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+  janelas_digitais: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
 };
 
 interface TierForm {
@@ -118,6 +123,8 @@ interface ProductListItem {
   loopDurationSeconds?: number | null;
   frequenciaAparicoes?: string | null;
   distributionType?: string | null;
+  vipProviderId?: number | null;
+  vipProviderCommissionPercent?: string | null;
 }
 
 interface ProductForm {
@@ -145,6 +152,8 @@ interface ProductForm {
   frequenciaAparicoes: string;
   distributionType: DistributionType;
   locationIds: number[];
+  vipProviderId: string; // "" = nenhum; senão ID numérico como string
+  vipProviderCommissionPercent: string; // "" = usar padrão do provedor
 }
 
 const emptyProduct: ProductForm = {
@@ -172,11 +181,14 @@ const emptyProduct: ProductForm = {
   frequenciaAparicoes: "1.00",
   distributionType: "rede",
   locationIds: [],
+  vipProviderId: "",
+  vipProviderCommissionPercent: "",
 };
 
 export default function Products() {
   const utils = trpc.useUtils();
   const { data: productsList = [], isLoading } = trpc.product.list.useQuery();
+  const { data: vipProvidersList = [] } = trpc.vipProvider.list.useQuery({ status: "active" });
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -261,6 +273,8 @@ export default function Products() {
       frequenciaAparicoes: p.frequenciaAparicoes || "1.00",
       distributionType: (p.distributionType as DistributionType) || "rede",
       locationIds,
+      vipProviderId: p.vipProviderId != null ? String(p.vipProviderId) : "",
+      vipProviderCommissionPercent: p.vipProviderCommissionPercent ?? "",
     });
     setDialogOpen(true);
   }
@@ -291,6 +305,13 @@ export default function Products() {
       frequenciaAparicoes: form.frequenciaAparicoes,
       distributionType: form.distributionType,
       locationIds: form.distributionType === "local_especifico" ? form.locationIds : [],
+      // Campos VIP só se aplicam a telas/janelas digitais — caso contrário, zeramos.
+      vipProviderId: VIP_TIPOS.includes(form.tipo) && form.vipProviderId !== ""
+        ? parseInt(form.vipProviderId)
+        : null,
+      vipProviderCommissionPercent: VIP_TIPOS.includes(form.tipo) && form.vipProviderCommissionPercent.trim() !== ""
+        ? form.vipProviderCommissionPercent
+        : null,
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...payload });
@@ -503,6 +524,58 @@ export default function Products() {
                 </SelectContent>
               </Select>
             </div>
+
+            {VIP_TIPOS.includes(form.tipo) && (
+              <div className="border border-cyan-500/30 rounded-lg p-3 space-y-3 bg-cyan-500/5">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-cyan-400">Sala VIP — Repasse ao Provedor</h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Quando uma campanha com este produto for paga, será gerado automaticamente um lançamento em Contas a Pagar (tipo <code>repasse_vip</code>) para o provedor selecionado.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Provedor da Sala VIP</Label>
+                    <Select
+                      value={form.vipProviderId || "none"}
+                      onValueChange={v => setForm({ ...form, vipProviderId: v === "none" ? "" : v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o provedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Nenhum (sem repasse) —</SelectItem>
+                        {vipProvidersList.map((p) => (
+                          <SelectItem key={p.id} value={String(p.id)}>
+                            {p.name}{p.company ? ` — ${p.company}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {vipProvidersList.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Nenhum provedor cadastrado. Cadastre em Financeiro → Provedores VIP.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Label>% Repasse (opcional)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Usar padrão do provedor"
+                      value={form.vipProviderCommissionPercent}
+                      onChange={e => setForm({ ...form, vipProviderCommissionPercent: e.target.value })}
+                      disabled={!form.vipProviderId}
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Sobrepõe o % do provedor para este produto específico.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
               <Switch checked={form.temDistribuicaoPorLocal} onCheckedChange={v => setForm({ ...form, temDistribuicaoPorLocal: v })} />
               <Label className="text-sm">Distribuição por local</Label>

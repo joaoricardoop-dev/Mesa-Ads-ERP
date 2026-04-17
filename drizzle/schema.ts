@@ -26,7 +26,7 @@ export const leadTypeEnum = pgEnum("lead_type", ["anunciante", "restaurante"]);
 export const serviceOrderTypeEnum = pgEnum("service_order_type", ["anunciante", "producao", "distribuicao"]);
 export const serviceOrderStatusEnum = pgEnum("service_order_status", ["rascunho", "enviada", "assinada", "execucao", "concluida"]);
 export const termStatusEnum = pgEnum("term_status", ["rascunho", "enviado", "assinado", "vigente", "encerrado"]);
-export const productTypeEnum = pgEnum("product_type", ["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro", "impressos", "eletronicos", "telas"]);
+export const productTypeEnum = pgEnum("product_type", ["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro", "impressos", "eletronicos", "telas", "janelas_digitais"]);
 export const productionStatusEnum = pgEnum("production_status", ["pending", "producing", "ready", "shipped"]);
 export const pricingModeEnum = pgEnum("pricing_mode", ["cost_based", "price_based"]);
 export const entryTypeEnum = pgEnum("entry_type", ["tiers", "fixed_quantities"]);
@@ -472,6 +472,31 @@ export const partners = pgTable("partners", {
 export type Partner = typeof partners.$inferSelect;
 export type InsertPartner = typeof partners.$inferInsert;
 
+// ─── VIP Providers (provedores de sala VIP — recebem repasse de telas/janelas) ─
+
+export const vipProviders = pgTable("vip_providers", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  company: varchar("company", { length: 255 }),
+  cnpj: varchar("cnpj", { length: 20 }),
+  contactName: varchar("contactName", { length: 255 }),
+  contactPhone: varchar("contactPhone", { length: 50 }),
+  contactEmail: varchar("contactEmail", { length: 320 }),
+  location: varchar("location", { length: 255 }),
+  commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("10.00").notNull(),
+  billingMode: billingModeEnum("billingMode").default("bruto").notNull(),
+  status: statusEnum("status").default("active").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_vip_providers_status").on(t.status),
+  index("idx_vip_providers_cnpj").on(t.cnpj),
+]);
+
+export type VipProvider = typeof vipProviders.$inferSelect;
+export type InsertVipProvider = typeof vipProviders.$inferInsert;
+
 // ─── Leads ───────────────────────────────────────────────────────────────────
 
 export const leads = pgTable("leads", {
@@ -859,6 +884,8 @@ export const products = pgTable("products", {
   defaultPessoasPorMesa: decimal("defaultPessoasPorMesa", { precision: 4, scale: 2 }).default("3.00").notNull(),
   loopDurationSeconds: integer("loopDurationSeconds").default(30).notNull(),
   frequenciaAparicoes: decimal("frequenciaAparicoes", { precision: 4, scale: 2 }).default("1.00").notNull(),
+  vipProviderId: integer("vipProviderId").references(() => vipProviders.id, { onDelete: "set null" }),
+  vipProviderCommissionPercent: decimal("vipProviderCommissionPercent", { precision: 5, scale: 2 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -1089,6 +1116,7 @@ export const accountsPayable = pgTable("accounts_payable", {
   campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
   invoiceId: integer("invoiceId").references(() => invoices.id, { onDelete: "set null" }),
   supplierId: integer("supplierId").references(() => suppliers.id, { onDelete: "set null" }),
+  vipProviderId: integer("vipProviderId").references(() => vipProviders.id, { onDelete: "set null" }),
   type: varchar("type", { length: 30 }).notNull(),
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
@@ -1104,6 +1132,7 @@ export const accountsPayable = pgTable("accounts_payable", {
   index("idx_accounts_payable_campaign_id").on(t.campaignId),
   index("idx_accounts_payable_status").on(t.status),
   index("idx_accounts_payable_type").on(t.type),
+  index("idx_accounts_payable_vip_provider_id").on(t.vipProviderId),
 ]);
 
 export type AccountPayable = typeof accountsPayable.$inferSelect;

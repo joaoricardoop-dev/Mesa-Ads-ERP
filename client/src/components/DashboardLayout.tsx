@@ -82,6 +82,7 @@ import {
   X,
   Zap,
   BookOpen,
+  Crown,
   type LucideIcon,
 } from "lucide-react";
 import { NotificationBell } from "./NotificationPanel";
@@ -148,6 +149,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: BarChart3, label: "Dashboard", path: "/financeiro" },
       { icon: Receipt, label: "Faturamento", path: "/financeiro/faturamento" },
       { icon: CircleDollarSign, label: "Contas a Pagar", path: "/financeiro/contas-pagar" },
+      { icon: Crown, label: "Provedores VIP", path: "/financeiro/provedores-vip" },
       { icon: Calculator, label: "Custos", path: "/financeiro/custos" },
       { icon: FileBarChart, label: "Relatórios", path: "/financeiro/relatorios" },
     ],

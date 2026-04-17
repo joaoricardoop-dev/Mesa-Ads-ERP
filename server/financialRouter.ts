@@ -13,7 +13,10 @@ import {
   serviceOrders,
   accountsPayable,
   suppliers,
+  products,
+  vipProviders,
 } from "../drizzle/schema";
+import { VIP_PRODUCT_TIPOS } from "./productRouter";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -622,6 +625,60 @@ export const financialRouter = router({
                   recipientType: "restaurante",
                   status: "pendente",
                 });
+              }
+            }
+          }
+
+          // ── Repasse para Provedor de Sala VIP (telas e janelas digitais) ─────
+          // Quando o produto da campanha é do tipo 'telas' ou 'janelas_digitais'
+          // e está vinculado a um vip_provider, gera uma conta a pagar do tipo
+          // 'repasse_vip' baseada no % configurado no produto (com fallback para
+          // o % padrão do provedor).
+          if (campaign && !(campaign as any).isBonificada && campaign.productId) {
+            const [product] = await db
+              .select()
+              .from(products)
+              .where(eq(products.id, campaign.productId));
+
+            if (
+              product &&
+              product.vipProviderId &&
+              (VIP_PRODUCT_TIPOS as readonly string[]).includes(product.tipo ?? "")
+            ) {
+              const existingVip = await db.select({ id: accountsPayable.id })
+                .from(accountsPayable)
+                .where(and(
+                  eq(accountsPayable.campaignId, updated.campaignId),
+                  eq(accountsPayable.invoiceId, input.id),
+                  eq(accountsPayable.type, "repasse_vip"),
+                ));
+
+              if (existingVip.length === 0) {
+                const [provider] = await db
+                  .select()
+                  .from(vipProviders)
+                  .where(eq(vipProviders.id, product.vipProviderId));
+
+                if (provider && provider.status === "active") {
+                  const invoiceAmt = Number(updated.amount);
+                  // % específico do produto tem prioridade; fallback no % do provedor
+                  const rate = Number(
+                    product.vipProviderCommissionPercent ?? provider.commissionPercent ?? 0,
+                  );
+                  const amount = invoiceAmt * (rate / 100);
+                  if (amount > 0) {
+                    await db.insert(accountsPayable).values({
+                      campaignId: updated.campaignId,
+                      invoiceId: input.id,
+                      vipProviderId: provider.id,
+                      type: "repasse_vip",
+                      description: `Repasse Sala VIP - ${provider.name} (${rate}%) - NF ${updated.invoiceNumber || updated.id}`,
+                      amount: amount.toFixed(2),
+                      recipientType: "vip_provider",
+                      status: "pendente",
+                    });
+                  }
+                }
               }
             }
           }

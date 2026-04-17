@@ -39,6 +39,7 @@ import OperationalCosts from "./pages/financial/OperationalCosts";
 import FinancialReport from "./pages/financial/FinancialReport";
 import PartnerCommissionReport from "./pages/financial/PartnerCommissionReport";
 import AccountsPayablePage from "./pages/financial/AccountsPayablePage";
+import VipProvidersPage from "./pages/financial/VipProvidersPage";
 import PriceTable from "./pages/PriceTable";
 import AnunciantePortal from "./pages/AnunciantePortal";
 import RestaurantePortal from "./pages/RestaurantePortal";
@@ -120,6 +121,7 @@ function Router() {
       <Route path="/financeiro/relatorios" component={FinancialReport} />
       <Route path="/financeiro/comissao-parceiros" component={PartnerCommissionReport} />
       <Route path="/financeiro/contas-pagar" component={AccountsPayablePage} />
+      <Route path="/financeiro/provedores-vip" component={VipProvidersPage} />
       <Route path="/campanhas/:id" component={CampaignDetail} />
       <Route path="/campanhas" component={Campaigns} />
       <Route path="/ordens-servico" component={ServiceOrders} />

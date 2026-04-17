@@ -170,6 +170,47 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "drop_recipient_name_from_accounts_payable",
     sql: `ALTER TABLE "accounts_payable" DROP COLUMN IF EXISTS "recipientName";`,
   },
+  {
+    name: "add_janelas_digitais_to_product_type_enum",
+    sql: `ALTER TYPE product_type ADD VALUE IF NOT EXISTS 'janelas_digitais';`,
+  },
+  {
+    name: "create_vip_providers_table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS "vip_providers" (
+        "id" SERIAL PRIMARY KEY NOT NULL,
+        "name" VARCHAR(255) NOT NULL,
+        "company" VARCHAR(255),
+        "cnpj" VARCHAR(20),
+        "contactName" VARCHAR(255),
+        "contactPhone" VARCHAR(50),
+        "contactEmail" VARCHAR(320),
+        "location" VARCHAR(255),
+        "commissionPercent" NUMERIC(5,2) NOT NULL DEFAULT 10.00,
+        "billingMode" billing_mode NOT NULL DEFAULT 'bruto',
+        "status" status NOT NULL DEFAULT 'active',
+        "notes" TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL,
+        "updatedAt" TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_vip_providers_status" ON "vip_providers" ("status");
+      CREATE INDEX IF NOT EXISTS "idx_vip_providers_cnpj" ON "vip_providers" ("cnpj");
+    `,
+  },
+  {
+    name: "add_vip_provider_to_products",
+    sql: `
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "vipProviderId" INTEGER REFERENCES "vip_providers"("id") ON DELETE SET NULL;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "vipProviderCommissionPercent" NUMERIC(5,2);
+    `,
+  },
+  {
+    name: "extend_accounts_payable_recipient_for_vip",
+    sql: `
+      ALTER TABLE "accounts_payable" ADD COLUMN IF NOT EXISTS "vipProviderId" INTEGER REFERENCES "vip_providers"("id") ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS "idx_accounts_payable_vip_provider_id" ON "accounts_payable" ("vipProviderId");
+    `,
+  },
 ];
 
 export async function runMigrations() {

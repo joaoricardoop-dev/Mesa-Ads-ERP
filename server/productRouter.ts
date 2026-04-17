@@ -11,7 +11,11 @@ async function getDatabase() {
   return d;
 }
 
-const TIPO_ENUM = ["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro", "impressos", "eletronicos", "telas"] as const;
+const TIPO_ENUM = ["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro", "impressos", "eletronicos", "telas", "janelas_digitais"] as const;
+
+// Produtos veiculados em ambientes de sala VIP (telas e janelas digitais)
+// geram repasse automático ao provedor vinculado quando a fatura é paga.
+export const VIP_PRODUCT_TIPOS = ["telas", "janelas_digitais"] as const;
 const IMPRESSION_FORMULA_ENUM = ["por_coaster", "por_tela", "por_visitante", "por_evento", "manual"] as const;
 const DISTRIBUTION_TYPE_ENUM = ["rede", "local_especifico"] as const;
 const WORKFLOW_TEMPLATE_ENUM = ["fisico", "eletronico_cliente_envia", "ativacao_evento"] as const;
@@ -62,6 +66,8 @@ export const productRouter = router({
       defaultPessoasPorMesa: z.string().default("3.00"),
       loopDurationSeconds: z.number().int().default(30),
       frequenciaAparicoes: z.string().default("1.00"),
+      vipProviderId: z.number().int().nullable().optional(),
+      vipProviderCommissionPercent: z.string().nullable().optional(),
       locationIds: z.array(z.number().int()).optional(),
     }))
     .mutation(async ({ input }) => {
@@ -104,6 +110,8 @@ export const productRouter = router({
       defaultPessoasPorMesa: z.string().optional(),
       loopDurationSeconds: z.number().int().optional(),
       frequenciaAparicoes: z.string().optional(),
+      vipProviderId: z.number().int().nullable().optional(),
+      vipProviderCommissionPercent: z.string().nullable().optional(),
       locationIds: z.array(z.number().int()).optional(),
     }))
     .mutation(async ({ input }) => {
