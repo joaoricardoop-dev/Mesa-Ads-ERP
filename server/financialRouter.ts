@@ -110,13 +110,26 @@ async function syncCampaignCostPayables(
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId));
   if (!campaign) return [];
 
+  // ── Regra tela vs bolacha ────────────────────────────────────────────────
+  // Produtos digitais (telas / janelas digitais) não geram custo de produção
+  // física nem frete — apenas repasse_vip (gerado em outro fluxo).
+  // Coaster (bolacha) e demais produtos físicos mantêm produção + frete.
+  let productTipo: string | null = null;
+  if (campaign.productId) {
+    const [prod] = await db.select({ tipo: products.tipo }).from(products).where(eq(products.id, campaign.productId)).limit(1);
+    productTipo = prod?.tipo ?? null;
+  }
+  const isDigitalOnly = productTipo === "telas" || productTipo === "janelas_digitais";
+  const effectiveProduction = isDigitalOnly ? 0 : costs.productionCost;
+  const effectiveFreight = isDigitalOnly ? 0 : costs.freightCost;
+
   const duration = Math.max(1, campaign.contractDuration ?? 1);
   const today = new Date();
   const summary: { type: string; created: number; removed: number }[] = [];
 
   for (const { type, totalValue, label, recipient } of [
-    { type: "producao", totalValue: costs.productionCost, label: "Produção Gráfica", recipient: "fornecedor" },
-    { type: "frete", totalValue: costs.freightCost, label: "Frete/Logística", recipient: "transportadora" },
+    { type: "producao", totalValue: effectiveProduction, label: "Produção Gráfica", recipient: "fornecedor" },
+    { type: "frete", totalValue: effectiveFreight, label: "Frete/Logística", recipient: "transportadora" },
   ] as const) {
     // Custo total já está "mensal" no operational_costs (padrão atual).
     // Portanto cada parcela = totalValue (não dividimos).

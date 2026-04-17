@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { getDb } from "./db";
 import { quotations, clients, leads, serviceOrders, quotationRestaurants, activeRestaurants, campaigns, campaignHistory, campaignRestaurants, campaignBatches, campaignBatchAssignments, invoices, quotationItems, products } from "../drizzle/schema";
 import { eq, inArray, asc, sql } from "drizzle-orm";
+import { buildCampaignName } from "./utils/campaignName";
 
 async function getDatabase() {
   const d = await getDb();
@@ -250,7 +251,8 @@ export function setupPublicSigningRoutes(app: express.Express) {
       const avgCommission = totalCoasters > 0 ? (weightedCommissionSum / totalCoasters).toFixed(2) : "20.00";
 
       const campaignNumber = await generateCampaignNumber(db);
-      const campaignName = quotation[0].quotationName || quotation[0].quotationNumber;
+      const [cliRowSign] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, resolvedClientId)).limit(1);
+      const campaignName = buildCampaignName(cliRowSign?.name, firstBatch.startDate);
       const maskedCpf = `***.***.${cpfClean.substring(6, 9)}-${cpfClean.substring(9)}`;
       const isBonificada = !!quotation[0].isBonificada;
 

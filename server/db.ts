@@ -32,6 +32,7 @@ import {
   type InsertBudgetItem,
 } from "../drizzle/schema";
 import { calcularRating, temCamposRatingCompletos } from "../shared/rating";
+import { buildCampaignName, isFormattedCampaignName } from "./utils/campaignName";
 
 neonConfig.webSocketConstructor = ws;
 
@@ -404,7 +405,20 @@ export async function getCampaign(id: number) {
 export async function createCampaign(data: Omit<InsertCampaign, "id" | "createdAt" | "updatedAt">) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(campaigns).values(data).returning({ id: campaigns.id });
+
+  let finalName = data.name;
+  if (!isFormattedCampaignName(finalName)) {
+    try {
+      const [cli] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, data.clientId)).limit(1);
+      if (cli?.name) {
+        finalName = buildCampaignName(cli.name, data.startDate);
+      }
+    } catch {
+      // mantém o nome original se a busca falhar
+    }
+  }
+
+  const result = await db.insert(campaigns).values({ ...data, name: finalName }).returning({ id: campaigns.id });
   return { id: result[0].id };
 }
 

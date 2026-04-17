@@ -2098,7 +2098,7 @@ export default function CampaignDetail() {
             </div>
           )}
 
-          <Tabs defaultValue="resumo" className="space-y-4">
+          <Tabs defaultValue="fases" className="space-y-4">
             <div className="overflow-x-auto -mx-1 px-1 scrollbar-hide">
               <TabsList className="bg-card border border-border/30 inline-flex w-auto min-w-full sm:w-auto">
                 <TabsTrigger value="resumo" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>

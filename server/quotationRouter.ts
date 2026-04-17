@@ -6,6 +6,7 @@ import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { createCrmNotification } from "./notificationRouter";
+import { buildCampaignName } from "./utils/campaignName";
 
 const MONTH_NAMES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -499,7 +500,8 @@ export const quotationRouter = router({
       if (quotation[0].status === "win") throw new TRPCError({ code: "BAD_REQUEST", message: "Cotação já foi convertida" });
 
       const campaignNumber = await generateCampaignNumber(db);
-      const campaignName = quotation[0].quotationName || quotation[0].quotationNumber;
+      const [cliRow] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, quotation[0].clientId!)).limit(1);
+      const campaignName = buildCampaignName(cliRow?.name, input.startDate);
 
       const [campaign] = await db.insert(campaigns).values({
         campaignNumber,
@@ -810,7 +812,8 @@ export const quotationRouter = router({
       const avgCommission = totalCoasters > 0 ? (weightedCommissionSum / totalCoasters).toFixed(2) : "20.00";
 
       const campaignNumber = await generateCampaignNumber(db);
-      const campaignName = quotation[0].quotationName || quotation[0].quotationNumber;
+      const [cliRow2] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, quotation[0].clientId!)).limit(1);
+      const campaignName = buildCampaignName(cliRow2?.name, derivedStartDate);
       const isBonificada = !!quotation[0].isBonificada;
 
       const [campaign] = await db.insert(campaigns).values({

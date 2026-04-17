@@ -376,6 +376,97 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       END $$;
     `,
   },
+  {
+    // Refaz o backfill de fases — a versão original quebrava porque comparava
+    // c.status com 'cancelada' (que não existe em campaign_status). Idempotente.
+    name: "backfill_campaign_phases_v2",
+    sql: `
+      DO $$
+      DECLARE
+        c RECORD;
+        months INT;
+        i INT;
+        phase_start DATE;
+        phase_end DATE;
+        phase_id INT;
+        resolved_product_id INT;
+      BEGIN
+        FOR c IN
+          SELECT cp.*
+          FROM "campaigns" cp
+          WHERE NOT EXISTS (
+            SELECT 1 FROM "campaign_phases" ph WHERE ph."campaignId" = cp."id"
+          )
+        LOOP
+          months := GREATEST(COALESCE(c."contractDuration", 1), 1);
+          resolved_product_id := c."productId";
+          IF resolved_product_id IS NULL THEN
+            SELECT id INTO resolved_product_id FROM "products" ORDER BY id LIMIT 1;
+          END IF;
+
+          FOR i IN 1..months LOOP
+            phase_start := (c."startDate"::date) + ((i - 1) * INTERVAL '1 month');
+            phase_end := phase_start + INTERVAL '1 month' - INTERVAL '1 day';
+
+            INSERT INTO "campaign_phases" (
+              "campaignId", "sequence", "label", "periodStart", "periodEnd",
+              "status", "notes", "createdAt", "updatedAt"
+            ) VALUES (
+              c.id, i,
+              'Mês ' || i,
+              phase_start,
+              phase_end,
+              CASE
+                WHEN c."status"::text IN ('completed','archived','inativa') THEN 'concluida'::campaign_phase_status
+                WHEN c."status"::text IN ('veiculacao','executar','distribuicao') THEN 'ativa'::campaign_phase_status
+                ELSE 'planejada'::campaign_phase_status
+              END,
+              'Fase gerada automaticamente no backfill',
+              NOW(), NOW()
+            )
+            RETURNING id INTO phase_id;
+
+            IF resolved_product_id IS NOT NULL THEN
+              INSERT INTO "campaign_items" (
+                "campaignPhaseId", "productId", "quantity",
+                "unitPrice", "totalPrice",
+                "productionCost", "freightCost",
+                "notes", "createdAt", "updatedAt"
+              ) VALUES (
+                phase_id, resolved_product_id,
+                COALESCE(c."coastersPerRestaurant", 1),
+                COALESCE(c."fixedPrice"::numeric, 0),
+                COALESCE(c."fixedPrice"::numeric, 0) * COALESCE(c."coastersPerRestaurant", 1),
+                COALESCE(c."batchCost"::numeric, 0),
+                COALESCE(c."freightCost"::numeric, 0),
+                'Item gerado automaticamente no backfill',
+                NOW(), NOW()
+              );
+            END IF;
+          END LOOP;
+        END LOOP;
+      END $$;
+    `,
+  },
+  {
+    // Renomeia todas as campanhas existentes para o padrão
+    // "<Cliente> — Lote <Mês>/<Ano>" (ex: "Brahma — Lote Jan/2026").
+    // Idempotente: só atualiza nomes que ainda não estão no formato novo.
+    name: "rename_campaigns_to_lote_format",
+    sql: `
+      UPDATE "campaigns" c
+      SET "name" = cli."name" || ' — Lote ' ||
+        (CASE EXTRACT(MONTH FROM c."startDate"::date)::int
+          WHEN 1 THEN 'Jan' WHEN 2 THEN 'Fev' WHEN 3 THEN 'Mar' WHEN 4 THEN 'Abr'
+          WHEN 5 THEN 'Mai' WHEN 6 THEN 'Jun' WHEN 7 THEN 'Jul' WHEN 8 THEN 'Ago'
+          WHEN 9 THEN 'Set' WHEN 10 THEN 'Out' WHEN 11 THEN 'Nov' WHEN 12 THEN 'Dez'
+        END) || '/' || EXTRACT(YEAR FROM c."startDate"::date)::int::text,
+        "updatedAt" = NOW()
+      FROM "clients" cli
+      WHERE cli.id = c."clientId"
+        AND c."name" !~ ' — Lote (Jan|Fev|Mar|Abr|Mai|Jun|Jul|Ago|Set|Out|Nov|Dez)/[0-9]{4}\\b';
+    `,
+  },
 ];
 
 export async function runMigrations() {
