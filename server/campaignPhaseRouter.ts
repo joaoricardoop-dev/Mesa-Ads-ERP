@@ -307,6 +307,164 @@ export const campaignPhaseRouter = router({
       return { success: true };
     }),
 
+  // ── Consolidação financeira da campanha (previsto vs realizado) ──────────
+  // Agrega totais por fase, por produto e geral. Usado pra relatório de
+  // fechamento mostrando margem real da campanha.
+  consolidation: protectedProcedure
+    .input(z.object({ campaignId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
+
+      const phases = await db
+        .select()
+        .from(campaignPhases)
+        .where(eq(campaignPhases.campaignId, input.campaignId))
+        .orderBy(asc(campaignPhases.sequence));
+
+      const phaseIds = phases.map((p) => p.id);
+
+      // Itens com produto
+      const items = phaseIds.length > 0
+        ? await db
+            .select({
+              item: campaignItems,
+              productName: products.name,
+              productTipo: products.tipo,
+            })
+            .from(campaignItems)
+            .leftJoin(products, eq(products.id, campaignItems.productId))
+            .where(sql`${campaignItems.campaignPhaseId} IN (${sql.join(phaseIds.map((id) => sql`${id}`), sql`, `)})`)
+        : [];
+
+      // Faturas e contas a pagar da campanha (toda)
+      const campaignInvoices = await db
+        .select()
+        .from(invoices)
+        .where(eq(invoices.campaignId, input.campaignId));
+
+      const campaignPayables = await db
+        .select()
+        .from(accountsPayable)
+        .where(eq(accountsPayable.campaignId, input.campaignId));
+
+      // Agregações por fase
+      const phaseBreakdown = phases.map((p) => {
+        const phaseItems = items.filter((i) => i.item.campaignPhaseId === p.id);
+        const expectedRevenue = phaseItems.reduce((s, i) => {
+          return s + (i.item.totalPrice != null
+            ? parseFloat(i.item.totalPrice)
+            : i.item.quantity * parseFloat(i.item.unitPrice));
+        }, 0);
+        const expectedCosts = phaseItems.reduce(
+          (s, i) => s + parseFloat(i.item.productionCost) + parseFloat(i.item.freightCost),
+          0,
+        );
+
+        const phaseInvoices = campaignInvoices.filter((inv) => inv.campaignPhaseId === p.id);
+        const invoiced = phaseInvoices
+          .filter((inv) => inv.status !== "cancelada")
+          .reduce((s, inv) => s + parseFloat(inv.amount), 0);
+        const received = phaseInvoices
+          .filter((inv) => inv.status === "paga")
+          .reduce((s, inv) => s + parseFloat(inv.amount), 0);
+
+        const phasePayables = campaignPayables.filter((ap) => ap.campaignPhaseId === p.id);
+        const payableDue = phasePayables
+          .filter((ap) => ap.status !== "cancelado")
+          .reduce((s, ap) => s + parseFloat(ap.amount), 0);
+        const paid = phasePayables
+          .filter((ap) => ap.status === "pago")
+          .reduce((s, ap) => s + parseFloat(ap.amount), 0);
+
+        return {
+          phaseId: p.id,
+          sequence: p.sequence,
+          label: p.label,
+          status: p.status,
+          periodStart: p.periodStart,
+          periodEnd: p.periodEnd,
+          itemCount: phaseItems.length,
+          expectedRevenue,
+          expectedCosts,
+          expectedMargin: expectedRevenue - expectedCosts,
+          invoiced,
+          received,
+          payableDue,
+          paid,
+          realMargin: received - paid,
+          realMarginPct: received > 0 ? ((received - paid) / received) * 100 : 0,
+        };
+      });
+
+      // Breakdown por produto (agregado em todas as fases)
+      const productAgg: Record<number, {
+        productId: number;
+        productName: string;
+        productTipo: string | null;
+        totalQuantity: number;
+        totalRevenue: number;
+        totalProductionCost: number;
+        totalFreightCost: number;
+        phaseCount: number;
+      }> = {};
+      for (const { item, productName, productTipo } of items) {
+        const agg = productAgg[item.productId] ?? {
+          productId: item.productId,
+          productName: productName ?? "—",
+          productTipo,
+          totalQuantity: 0,
+          totalRevenue: 0,
+          totalProductionCost: 0,
+          totalFreightCost: 0,
+          phaseCount: 0,
+        };
+        agg.totalQuantity += item.quantity;
+        agg.totalRevenue += item.totalPrice != null
+          ? parseFloat(item.totalPrice)
+          : item.quantity * parseFloat(item.unitPrice);
+        agg.totalProductionCost += parseFloat(item.productionCost);
+        agg.totalFreightCost += parseFloat(item.freightCost);
+        agg.phaseCount += 1;
+        productAgg[item.productId] = agg;
+      }
+      const productBreakdown = Object.values(productAgg);
+
+      // Totais gerais
+      const summary = {
+        expectedRevenue: phaseBreakdown.reduce((s, p) => s + p.expectedRevenue, 0),
+        expectedCosts: phaseBreakdown.reduce((s, p) => s + p.expectedCosts, 0),
+        invoiced: phaseBreakdown.reduce((s, p) => s + p.invoiced, 0),
+        received: phaseBreakdown.reduce((s, p) => s + p.received, 0),
+        payableDue: phaseBreakdown.reduce((s, p) => s + p.payableDue, 0),
+        paid: phaseBreakdown.reduce((s, p) => s + p.paid, 0),
+      };
+      const computed = {
+        expectedMargin: summary.expectedRevenue - summary.expectedCosts,
+        expectedMarginPct: summary.expectedRevenue > 0 ? ((summary.expectedRevenue - summary.expectedCosts) / summary.expectedRevenue) * 100 : 0,
+        realMargin: summary.received - summary.paid,
+        realMarginPct: summary.received > 0 ? ((summary.received - summary.paid) / summary.received) * 100 : 0,
+        invoicedVsExpectedPct: summary.expectedRevenue > 0 ? (summary.invoiced / summary.expectedRevenue) * 100 : 0,
+        receivedVsInvoicedPct: summary.invoiced > 0 ? (summary.received / summary.invoiced) * 100 : 0,
+        paidVsDuePct: summary.payableDue > 0 ? (summary.paid / summary.payableDue) * 100 : 0,
+      };
+
+      return {
+        campaign: {
+          id: campaign.id,
+          name: campaign.name,
+          status: campaign.status,
+          startDate: campaign.startDate,
+          endDate: campaign.endDate,
+          isBonificada: (campaign as any).isBonificada ?? false,
+        },
+        summary: { ...summary, ...computed },
+        phaseBreakdown,
+        productBreakdown,
+      };
+    }),
+
   // ── Wizard: cria campanha completa com fases e itens de uma vez ──────────
   // Não cria a campanha (isso é do campaignRouter); apenas fases + itens em
   // lote. Útil pro wizard de criação/edição em massa.

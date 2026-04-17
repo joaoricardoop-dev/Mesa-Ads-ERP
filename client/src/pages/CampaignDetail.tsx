@@ -79,6 +79,7 @@ import {
   CalendarRange,
 } from "lucide-react";
 import CampaignPhases from "@/components/CampaignPhases";
+import CampaignConsolidation from "@/components/CampaignConsolidation";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -2050,6 +2051,7 @@ export default function CampaignDetail() {
               <TabsList className="bg-card border border-border/30 inline-flex w-auto min-w-full sm:w-auto">
                 <TabsTrigger value="resumo" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>
                 <TabsTrigger value="fases" className="gap-1.5 text-xs"><CalendarRange className="w-3.5 h-3.5" /> Fases</TabsTrigger>
+                <TabsTrigger value="consolidado" className="gap-1.5 text-xs"><CircleDollarSign className="w-3.5 h-3.5" /> Consolidado</TabsTrigger>
                 <TabsTrigger value="financeiro" className="gap-1.5 text-xs"><CircleDollarSign className="w-3.5 h-3.5" /> Financeiro</TabsTrigger>
                 <TabsTrigger value="restaurantes" className="gap-1.5 text-xs"><Store className="w-3.5 h-3.5" /> Distribuição</TabsTrigger>
                 <TabsTrigger value="cliente" className="gap-1.5 text-xs"><Building2 className="w-3.5 h-3.5" /> Cliente</TabsTrigger>
@@ -2696,6 +2698,11 @@ export default function CampaignDetail() {
                 contractDuration={campaign.contractDuration}
                 startDate={campaign.startDate}
               />
+            </TabsContent>
+
+            {/* ─── CONSOLIDADO ─── */}
+            <TabsContent value="consolidado" className="space-y-4">
+              <CampaignConsolidation campaignId={campaign.id} />
             </TabsContent>
 
             {/* ─── FINANCEIRO ─── */}
