@@ -15,6 +15,8 @@ import {
   suppliers,
   products,
   vipProviders,
+  campaignPhases,
+  campaignItems,
 } from "../drizzle/schema";
 import { VIP_PRODUCT_TIPOS } from "./productRouter";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
@@ -598,6 +600,7 @@ export const financialRouter = router({
       status: z.enum(["emitida", "paga", "vencida", "cancelada"]).optional(),
       clientId: z.number().optional(),
       campaignId: z.number().optional(),
+      campaignPhaseId: z.number().optional(),
       startDate: z.string().optional(),
       endDate: z.string().optional(),
     }).optional())
@@ -609,6 +612,7 @@ export const financialRouter = router({
       if (input?.status) conditions.push(eq(invoices.status, input.status));
       if (input?.clientId) conditions.push(eq(invoices.clientId, input.clientId));
       if (input?.campaignId) conditions.push(eq(invoices.campaignId, input.campaignId));
+      if (input?.campaignPhaseId) conditions.push(eq(invoices.campaignPhaseId, input.campaignPhaseId));
       if (input?.startDate) conditions.push(gte(invoices.issueDate, input.startDate));
       if (input?.endDate) conditions.push(lte(invoices.issueDate, input.endDate));
 
@@ -631,6 +635,7 @@ export const financialRouter = router({
           withheldTax: invoices.withheldTax,
           issRate: invoices.issRate,
           issRetained: invoices.issRetained,
+          campaignPhaseId: invoices.campaignPhaseId,
           createdAt: invoices.createdAt,
           updatedAt: invoices.updatedAt,
           // Campos computados
@@ -655,11 +660,14 @@ export const financialRouter = router({
           `,
           vipProviderName: vipProviders.name,
           restaurantCommissionPercent: campaigns.restaurantCommission,
+          phaseLabel: campaignPhases.label,
+          phaseSequence: campaignPhases.sequence,
         })
         .from(invoices)
         .leftJoin(campaigns, eq(campaigns.id, invoices.campaignId))
         .leftJoin(products, eq(products.id, campaigns.productId))
         .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId))
+        .leftJoin(campaignPhases, eq(campaignPhases.id, invoices.campaignPhaseId))
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(invoices.createdAt));
 
@@ -688,6 +696,7 @@ export const financialRouter = router({
   createInvoice: protectedProcedure
     .input(z.object({
       campaignId: z.number(),
+      campaignPhaseId: z.number().optional(),
       amount: z.string(),
       dueDate: z.string(),
       issueDate: z.string().optional(),
@@ -731,6 +740,7 @@ export const financialRouter = router({
 
       const [created] = await db.insert(invoices).values({
         campaignId: input.campaignId,
+        campaignPhaseId: input.campaignPhaseId ?? null,
         clientId: campaign[0].clientId,
         invoiceNumber,
         amount: input.amount,
@@ -1670,6 +1680,8 @@ export const financialRouter = router({
   createAccountPayable: protectedProcedure
     .input(z.object({
       campaignId: z.number(),
+      campaignPhaseId: z.number().optional(),
+      campaignItemId: z.number().optional(),
       invoiceId: z.number().optional(),
       supplierId: z.number().optional(),
       type: z.string(),
@@ -1684,6 +1696,8 @@ export const financialRouter = router({
       const db = await getDatabase();
       const [row] = await db.insert(accountsPayable).values({
         campaignId: input.campaignId,
+        campaignPhaseId: input.campaignPhaseId ?? null,
+        campaignItemId: input.campaignItemId ?? null,
         invoiceId: input.invoiceId ?? null,
         supplierId: input.supplierId ?? null,
         type: input.type,

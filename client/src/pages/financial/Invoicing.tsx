@@ -62,12 +62,18 @@ export default function Invoicing() {
   const [newWithheldTax, setNewWithheldTax] = useState("");
   const [newIssRate, setNewIssRate] = useState("");
   const [newIssRetained, setNewIssRetained] = useState(true);
+  const [newPhaseId, setNewPhaseId] = useState<string>("");
 
   const utils = trpc.useUtils();
   const { data: invoiceList, isLoading } = trpc.financial.listInvoices.useQuery(
     statusFilter ? { status: statusFilter as any } : undefined
   );
   const { data: campaignsForInvoice } = trpc.financial.campaignsForInvoice.useQuery();
+  // Carrega fases da campanha selecionada pra oferecer no seletor
+  const { data: phasesOfSelectedCamp = [] } = trpc.campaignPhase.listByCampaign.useQuery(
+    { campaignId: newCampaignId ? parseInt(newCampaignId) : 0 },
+    { enabled: !!newCampaignId },
+  );
 
   function resetForm() {
     setNewCampaignId("");
@@ -81,6 +87,7 @@ export default function Invoicing() {
     setNewWithheldTax("");
     setNewIssRate("");
     setNewIssRetained(true);
+    setNewPhaseId("");
   }
 
   const createMutation = trpc.financial.createInvoice.useMutation({
@@ -120,6 +127,7 @@ export default function Invoicing() {
     }
     createMutation.mutate({
       campaignId: parseInt(newCampaignId),
+      campaignPhaseId: newPhaseId ? parseInt(newPhaseId) : undefined,
       amount: newAmount,
       issueDate: newIssueDate,
       dueDate: newDueDate,
@@ -193,6 +201,38 @@ export default function Invoicing() {
                       </p>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Fase da campanha (quando aplicável) */}
+              {phasesOfSelectedCamp.length > 0 && (
+                <div>
+                  <Label>Fase <span className="text-muted-foreground text-xs font-normal">— opcional</span></Label>
+                  <Select
+                    value={newPhaseId || "none"}
+                    onValueChange={(v) => {
+                      setNewPhaseId(v === "none" ? "" : v);
+                      const phase = phasesOfSelectedCamp.find((p: any) => String(p.id) === v);
+                      if (phase && phase.expectedRevenue > 0) {
+                        setNewAmount(phase.expectedRevenue.toFixed(2));
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Fatura da campanha toda (sem fase)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— sem fase (campanha toda) —</SelectItem>
+                      {phasesOfSelectedCamp.map((p: any) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          #{p.sequence} · {p.label} — receita prev. {formatCurrency(p.expectedRevenue)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Se selecionar, o valor será pré-preenchido com a receita prevista da fase.
+                  </p>
                 </div>
               )}
 
@@ -452,7 +492,16 @@ export default function Invoicing() {
                     >
                       <td className="px-4 py-3 font-mono text-xs">{inv.invoiceNumber}</td>
                       <td className="px-4 py-3">{inv.clientName}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{inv.campaignName}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        <div>
+                          {inv.campaignName}
+                          {(inv as any).phaseLabel && (
+                            <div className="text-[10px] text-primary/80 font-medium">
+                              Fase #{(inv as any).phaseSequence} · {(inv as any).phaseLabel}
+                            </div>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <div title={totalDeducted > 0 ? breakdownLines : undefined}>
                           <span className="font-semibold text-emerald-400">{formatCurrency(ourShare)}</span>
