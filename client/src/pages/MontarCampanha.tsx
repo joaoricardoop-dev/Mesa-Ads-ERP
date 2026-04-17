@@ -14,6 +14,17 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { captureTrackingFromUrl } from "@/lib/utmTracking";
+import CampaignWizard from "@/components/campaign-wizard/CampaignWizard";
+
+const WIZARD_ROLES = new Set([
+  "anunciante",
+  "parceiro",
+  "admin",
+  "comercial",
+  "manager",
+  "operacoes",
+  "financeiro",
+]);
 
 function portalPathForRole(role: string | null | undefined): string {
   if (!role) return "/";
@@ -55,6 +66,10 @@ export default function MontarCampanha() {
     captureTrackingFromUrl("/montar-campanha");
   }, []);
 
+  if (isAuthenticated && userRole && WIZARD_ROLES.has(userRole)) {
+    return <CampaignWizard />;
+  }
+
   const handleAdvertiserClick = () => {
     if (isLoading) return;
 
@@ -93,34 +108,14 @@ export default function MontarCampanha() {
   };
 
   return (
-    <div
-      className="min-h-screen w-full flex flex-col"
-      style={{ background: "hsl(0 0% 4%)" }}
-    >
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full opacity-[0.05]"
-          style={{
-            background:
-              "radial-gradient(circle, #27d803 0%, transparent 70%)",
-          }}
-        />
-      </div>
-
+    <div className="min-h-screen w-full flex flex-col text-chalk">
       <header className="relative z-10 px-6 sm:px-10 py-6 flex items-center justify-between">
         <a href="/" className="inline-flex items-center">
           <img src="/logo-white.png" alt="mesa.ads" className="h-7" />
         </a>
         <a
           href="/"
-          className="text-xs sm:text-sm font-medium transition-colors"
-          style={{ color: "hsl(0 0% 50%)" }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.color = "hsl(0 0% 95%)")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.color = "hsl(0 0% 50%)")
-          }
+          className="text-xs sm:text-sm font-medium text-chalk-muted hover:text-chalk transition-colors"
         >
           Voltar para o site
         </a>
@@ -131,30 +126,17 @@ export default function MontarCampanha() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="text-center mb-10"
           >
-            <span
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider mb-5"
-              style={{
-                background: "rgba(39, 216, 3, 0.08)",
-                color: "#27d803",
-                border: "1px solid rgba(39, 216, 3, 0.2)",
-              }}
-            >
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] mb-5 text-mesa-neon glow-neon bg-ink-900">
               <Sparkles className="w-3.5 h-3.5" />
               Onboarding mesa.ads
             </span>
-            <h1
-              className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight tracking-tight mb-4"
-              style={{ color: "hsl(0 0% 95%)" }}
-            >
+            <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold leading-tight tracking-tight mb-4 text-balance text-chalk">
               Como você quer entrar?
             </h1>
-            <p
-              className="text-sm sm:text-base max-w-xl mx-auto leading-relaxed"
-              style={{ color: "hsl(0 0% 55%)" }}
-            >
+            <p className="text-sm sm:text-base max-w-xl mx-auto leading-relaxed text-chalk-muted">
               Escolha o caminho certo para começar. Você pode criar uma
               campanha como anunciante ou acessar a plataforma se já tem
               conta de parceiro, agência ou time interno.
@@ -220,56 +202,36 @@ export default function MontarCampanha() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
               whileHover={{ y: -2 }}
-              className="group relative text-left rounded-2xl p-6 sm:p-7 overflow-hidden transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-              style={{
-                background:
-                  "linear-gradient(180deg, rgba(39, 216, 3, 0.06), rgba(39, 216, 3, 0.02))",
-                border: "1px solid rgba(39, 216, 3, 0.25)",
-              }}
+              className="group relative text-left rounded-2xl p-6 sm:p-7 overflow-hidden transition-all duration-500 disabled:opacity-60 disabled:cursor-not-allowed bg-ink-900 border border-hairline hover:border-mesa-neon/40 glow-neon"
             >
               <div
                 className="absolute -top-20 -right-20 w-56 h-56 rounded-full opacity-30 blur-3xl pointer-events-none"
-                style={{ background: "rgba(39, 216, 3, 0.4)" }}
+                style={{ background: "rgba(0, 230, 64, 0.4)" }}
               />
               <div className="relative">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
-                  style={{
-                    background: "rgba(39, 216, 3, 0.15)",
-                    border: "1px solid rgba(39, 216, 3, 0.3)",
-                  }}
-                >
-                  <Megaphone className="w-6 h-6 text-[#27d803]" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 bg-mesa-neon/15 border border-mesa-neon/30">
+                  <Megaphone className="w-6 h-6 text-mesa-neon" />
                 </div>
-                <h2
-                  className="text-lg sm:text-xl font-bold mb-2"
-                  style={{ color: "hsl(0 0% 95%)" }}
-                >
+                <h2 className="font-display text-lg sm:text-xl font-bold mb-2 text-chalk">
                   Quero anunciar
                 </h2>
-                <p
-                  className="text-sm leading-relaxed mb-5"
-                  style={{ color: "hsl(0 0% 55%)" }}
-                >
+                <p className="text-sm leading-relaxed mb-5 text-chalk-muted">
                   Crie sua conta de anunciante e monte sua primeira
                   campanha em porta-copos.
                 </p>
 
-                <div className="flex flex-col gap-2 mb-6 text-xs" style={{ color: "hsl(0 0% 50%)" }}>
+                <div className="flex flex-col gap-2 mb-6 text-xs text-chalk-dim">
                   <div className="flex items-center gap-2">
-                    <Building2 className="w-3.5 h-3.5 text-[#27d803] shrink-0" />
+                    <Building2 className="w-3.5 h-3.5 text-mesa-neon shrink-0" />
                     <span>Cadastro rápido da sua marca</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-[#27d803] shrink-0" />
+                    <Sparkles className="w-3.5 h-3.5 text-mesa-neon shrink-0" />
                     <span>Briefing guiado e cotação na hora</span>
                   </div>
                 </div>
 
-                <span
-                  className="inline-flex items-center gap-2 text-sm font-semibold transition-transform group-hover:translate-x-1"
-                  style={{ color: "#27d803" }}
-                >
+                <span className="inline-flex items-center gap-2 text-sm font-semibold transition-transform group-hover:translate-x-1 text-mesa-neon">
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -297,54 +259,32 @@ export default function MontarCampanha() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
               whileHover={{ y: -2 }}
-              className="group relative text-left rounded-2xl p-6 sm:p-7 overflow-hidden transition-all"
-              style={{
-                background: "hsl(0 0% 7%)",
-                border: "1px solid hsl(0 0% 14%)",
-              }}
+              className="group relative text-left rounded-2xl p-6 sm:p-7 overflow-hidden transition-all duration-500 bg-ink-900 border border-hairline hover:border-hairline-bold"
             >
               <div className="relative">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
-                  style={{
-                    background: "hsl(0 0% 11%)",
-                    border: "1px solid hsl(0 0% 18%)",
-                  }}
-                >
-                  <LogIn
-                    className="w-6 h-6"
-                    style={{ color: "hsl(0 0% 80%)" }}
-                  />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 bg-ink-800 border border-hairline-bold">
+                  <LogIn className="w-6 h-6 text-chalk" />
                 </div>
-                <h2
-                  className="text-lg sm:text-xl font-bold mb-2"
-                  style={{ color: "hsl(0 0% 95%)" }}
-                >
+                <h2 className="font-display text-lg sm:text-xl font-bold mb-2 text-chalk">
                   Já sou parceiro, agência ou interno
                 </h2>
-                <p
-                  className="text-sm leading-relaxed mb-5"
-                  style={{ color: "hsl(0 0% 55%)" }}
-                >
+                <p className="text-sm leading-relaxed mb-5 text-chalk-muted">
                   Acesse sua conta existente. Você será direcionado
                   automaticamente para o portal certo.
                 </p>
 
-                <div className="flex flex-col gap-2 mb-6 text-xs" style={{ color: "hsl(0 0% 50%)" }}>
+                <div className="flex flex-col gap-2 mb-6 text-xs text-chalk-dim">
                   <div className="flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5 shrink-0" style={{ color: "hsl(0 0% 70%)" }} />
+                    <Users className="w-3.5 h-3.5 shrink-0 text-chalk-muted" />
                     <span>Parceiros e agências</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Store className="w-3.5 h-3.5 shrink-0" style={{ color: "hsl(0 0% 70%)" }} />
+                    <Store className="w-3.5 h-3.5 shrink-0 text-chalk-muted" />
                     <span>Locais parceiros e times internos</span>
                   </div>
                 </div>
 
-                <span
-                  className="inline-flex items-center gap-2 text-sm font-semibold transition-transform group-hover:translate-x-1"
-                  style={{ color: "hsl(0 0% 90%)" }}
-                >
+                <span className="inline-flex items-center gap-2 text-sm font-semibold transition-transform group-hover:translate-x-1 text-chalk">
                   Entrar
                   <ArrowRight className="w-4 h-4" />
                 </span>
@@ -353,12 +293,11 @@ export default function MontarCampanha() {
           </div>
 
           <div className="text-center mt-8">
-            <p className="text-xs" style={{ color: "hsl(0 0% 40%)" }}>
+            <p className="text-xs text-chalk-dim">
               É um local que quer receber porta-copos?{" "}
               <a
                 href="/parceiro"
-                className="underline-offset-2 hover:underline"
-                style={{ color: "#27d803" }}
+                className="underline-offset-2 hover:underline text-mesa-neon"
               >
                 Cadastre seu estabelecimento
               </a>
@@ -368,9 +307,8 @@ export default function MontarCampanha() {
       </main>
 
       <footer className="relative z-10 py-6 text-center">
-        <p className="text-[11px]" style={{ color: "hsl(0 0% 30%)" }}>
-          mesa.ads &copy; {new Date().getFullYear()} &mdash; Plataforma de
-          gestão
+        <p className="text-[11px] text-chalk-dim/60 tracking-[0.2em] uppercase">
+          mesa.ads &copy; {new Date().getFullYear()} &mdash; Manaus · AM
         </p>
       </footer>
     </div>

@@ -1062,6 +1062,36 @@ export const appRouter = router({
       }).optional())
       .query(({ input }) => listClients(input ?? undefined)),
 
+    listByPartner: protectedProcedure
+      .input(z.object({ partnerId: z.number().optional() }).optional())
+      .query(async ({ input, ctx }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) return [];
+        const { clients: clientsTable } = await import("../drizzle/schema");
+        const { eq, asc } = await import("drizzle-orm");
+        const userRole = ctx.user.role || "user";
+        let partnerId: number | null = null;
+        if (userRole === "parceiro") {
+          partnerId = ctx.user.partnerId ?? null;
+          if (!partnerId) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a um parceiro." });
+          }
+        } else if (["admin", "comercial", "manager", "operacoes", "financeiro"].includes(userRole)) {
+          partnerId = input?.partnerId ?? null;
+        } else {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Sem permissão." });
+        }
+        if (partnerId == null) {
+          return db.select().from(clientsTable).orderBy(asc(clientsTable.name));
+        }
+        return db
+          .select()
+          .from(clientsTable)
+          .where(eq(clientsTable.partnerId, partnerId))
+          .orderBy(asc(clientsTable.name));
+      }),
+
     // Keep listPaged as backward-compatible alias
     listPaged: protectedProcedure
       .input(z.object({ page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(200).default(25), search: z.string().optional() }))

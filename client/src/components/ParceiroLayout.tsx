@@ -1,5 +1,5 @@
 import { useClerk } from "@clerk/clerk-react";
-import { LogOut, LayoutDashboard, Tag, Users, Eye } from "lucide-react";
+import { LogOut, LayoutDashboard, Tag, Users, Eye, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLocation } from "wouter";
@@ -16,6 +16,7 @@ interface ParceiroLayoutProps {
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/leads", label: "Meus Leads", icon: Users },
+  { href: "/montar-campanha", label: "Montar Campanha", icon: Megaphone },
   { href: "/tabela-precos", label: "Tabela de Preços", icon: Tag },
 ];
 

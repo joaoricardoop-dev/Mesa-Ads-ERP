@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
 import { ParceiroLayout } from "./components/ParceiroLayout";
+import { ExternalShell } from "./components/ExternalShell";
 import DevToolsPanel from "./components/DevToolsPanel";
 import { useAuth } from "./hooks/use-auth";
 import { SignIn, SignUp, useClerk } from "@clerk/clerk-react";
@@ -68,6 +69,7 @@ function AnuncianteRouter() {
     <Switch>
       <Route path="/" component={AnunciantePortal} />
       <Route path="/portal" component={AnunciantePortal} />
+      <Route path="/montar-campanha" component={MontarCampanha} />
       <Route component={AnunciantePortal} />
     </Switch>
   );
@@ -88,6 +90,7 @@ function ParceiroRouter() {
     <Switch>
       <Route path="/" component={ParceiroPortal} />
       <Route path="/portal" component={ParceiroPortal} />
+      <Route path="/montar-campanha" component={MontarCampanha} />
       <Route path="/tabela-precos" component={ParceiroTabelaPrecos} />
       <Route path="/leads" component={ParceiroLeads} />
       <Route component={ParceiroPortal} />
@@ -103,6 +106,7 @@ function Router() {
       <Route path="/comercial/simulador" component={Home} />
       <Route path="/comercial/tabela-precos" component={PriceTable} />
       <Route path="/comercial/orcamento" component={BudgetCreator} />
+      <Route path="/comercial/montar-campanha" component={MontarCampanha} />
       <Route path="/comercial/cotacoes/:id" component={QuotationDetail} />
       <Route path="/comercial/cotacoes" component={Quotations} />
       <Route path="/comercial/leads" component={Leads} />
@@ -491,12 +495,12 @@ function AuthenticatedApp() {
 
   if (isAnunciante) {
     return (
-      <div className="h-screen flex overflow-hidden min-h-0">
+      <ExternalShell className="h-screen flex overflow-hidden min-h-0">
         <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)}>
           <AnuncianteRouter key={devClientIdOverride ?? "no-client"} />
         </DashboardLayout>
         {devToolsPanel}
-      </div>
+      </ExternalShell>
     );
   }
 
@@ -513,7 +517,7 @@ function AuthenticatedApp() {
 
   if (isParceiro) {
     return (
-      <>
+      <ExternalShell>
         <ParceiroLayout
           user={effectiveUser}
           impersonation={impersonation}
@@ -522,7 +526,7 @@ function AuthenticatedApp() {
           <ParceiroRouter />
         </ParceiroLayout>
         {devToolsPanel}
-      </>
+      </ExternalShell>
     );
   }
 
@@ -549,7 +553,13 @@ function App() {
           <Switch>
             <Route path="/parceiro/convite/:token" component={RestaurantInviteAccept} />
             <Route path="/parceiro" component={RestaurantOnboarding} />
-            <Route path="/montar-campanha" component={MontarCampanha} />
+            <Route path="/montar-campanha">
+              {() => (
+                <ExternalShell>
+                  <MontarCampanha />
+                </ExternalShell>
+              )}
+            </Route>
             <Route path="/cotacao/assinar/:token" component={QuotationSign} />
             <Route>{() => <AuthenticatedApp />}</Route>
           </Switch>

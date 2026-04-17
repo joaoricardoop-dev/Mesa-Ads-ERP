@@ -1009,11 +1009,14 @@ export const quotationRouter = router({
 
   createFromBuilder: protectedProcedure
     .input(z.object({
-      clientId: z.number(),
-      source: z.enum(["self_service_anunciante", "self_service_parceiro"]),
+      clientId: z.number().nullable(),
+      source: z.enum(["self_service_anunciante", "self_service_parceiro", "internal"]),
       campaignName: z.string().min(1),
       startDate: z.string().optional(),
       briefing: z.string().optional(),
+      venueIds: z.array(z.number().int()).optional(),
+      estimatedTotal: z.number().optional(),
+      estimatedImpressions: z.number().optional(),
       items: z.array(z.object({
         productId: z.number(),
         productName: z.string(),
@@ -1024,16 +1027,24 @@ export const quotationRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await getDatabase();
       const userRole = ctx.user.role || "user";
+      const INTERNAL_ROLES = ["admin", "comercial", "manager", "operacoes", "financeiro"];
+      const isInternal = INTERNAL_ROLES.includes(userRole);
 
-      const [client] = await db.select({
-        name: clients.name,
-        company: clients.company,
-        partnerId: clients.partnerId,
-      })
-        .from(clients)
-        .where(eq(clients.id, input.clientId))
-        .limit(1);
-      if (!client) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado" });
+      let client: { name: string; company: string | null; partnerId: number | null } | null = null;
+      if (input.clientId != null) {
+        const [row] = await db.select({
+          name: clients.name,
+          company: clients.company,
+          partnerId: clients.partnerId,
+        })
+          .from(clients)
+          .where(eq(clients.id, input.clientId))
+          .limit(1);
+        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado" });
+        client = row;
+      } else if (!isInternal) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cliente é obrigatório." });
+      }
 
       const isPartnerFlow = userRole === "parceiro";
 
@@ -1049,13 +1060,17 @@ export const quotationRouter = router({
         if (!userPartnerId) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a um parceiro." });
         }
-        if (client.partnerId !== userPartnerId) {
+        if (!client || client.partnerId !== userPartnerId) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Este cliente não está vinculado ao seu parceiro." });
         }
         if (input.source !== "self_service_parceiro") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Source inválida para parceiro." });
         }
-      } else if (!["admin", "comercial", "manager"].includes(userRole)) {
+      } else if (isInternal) {
+        if (input.source !== "internal") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Source inválida para usuário interno." });
+        }
+      } else {
         throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para usar o campaign builder." });
       }
 
@@ -1082,7 +1097,7 @@ export const quotationRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: `Produto ${item.productId} não encontrado ou inativo.` });
         }
         const visibleFlag = isPartnerFlow ? prod.visibleToPartners : prod.visibleToAdvertisers;
-        if (!visibleFlag && !["admin", "comercial", "manager"].includes(userRole)) {
+        if (!visibleFlag && !isInternal) {
           throw new TRPCError({ code: "FORBIDDEN", message: `Produto "${prod.name}" não está disponível para este perfil.` });
         }
       }
@@ -1097,7 +1112,7 @@ export const quotationRouter = router({
 
       const BV_AGENCIA = 0.20;
       const DESCONTOS_PRAZO: Record<number, number> = { 4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11 };
-      const hasPartner = !!client.partnerId || isPartnerFlow;
+      const hasPartner = !!client?.partnerId || isPartnerFlow;
 
       function computeUnitPrice(prod: { irpj: string | null; comRestaurante: string | null; comComercial: string | null; pricingMode: string | null }, tier: typeof pricingTiersRows[0], volume: number): number {
         const irpj = parseFloat(prod.irpj ?? "6") / 100;
@@ -1157,22 +1172,29 @@ export const quotationRouter = router({
         computedItems.push({ productId: item.productId, productName: prod.name, volume: item.volume, weeks: item.weeks, unitPrice: finalUnitPrice, totalPrice: finalTotal });
       }
 
-      const entityName = client.company || client.name || "Cliente";
+      const entityName = client?.company || client?.name || "Sem cliente específico";
       const totalVolume = computedItems.reduce((sum, i) => sum + i.volume, 0);
       const totalValue = computedItems.reduce((sum, i) => sum + i.totalPrice, 0);
 
       const quotationNumber = await generateQuotationNumber(db);
       const quotationName = input.campaignName || generateQuotationName(entityName, totalVolume);
 
+      const briefingParts: string[] = [];
+      if (input.briefing) briefingParts.push(input.briefing);
+      if (input.venueIds?.length) briefingParts.push(`Locais selecionados (IDs): ${input.venueIds.join(", ")}`);
+      if (input.estimatedImpressions != null) briefingParts.push(`Impressões estimadas: ${input.estimatedImpressions.toLocaleString("pt-BR")}`);
+      if (input.estimatedTotal != null) briefingParts.push(`Total estimado (cliente): R$ ${input.estimatedTotal.toFixed(2)}`);
+      const notesText = briefingParts.length ? briefingParts.join("\n\n") : null;
+
       const insertValues: any = {
         quotationNumber,
         quotationName,
         clientId: input.clientId,
-        partnerId: client.partnerId ?? null,
+        partnerId: client?.partnerId ?? null,
         coasterVolume: totalVolume,
         totalValue: totalValue.toFixed(2),
         status: "rascunho",
-        notes: input.briefing || null,
+        notes: notesText,
         periodStart: input.startDate || null,
         source: input.source,
         isBonificada: false,
@@ -1197,7 +1219,7 @@ export const quotationRouter = router({
       await createCrmNotification(db, {
         eventType: "quotation_created",
         leadId: null,
-        partnerId: client.partnerId ?? null,
+        partnerId: client?.partnerId ?? null,
         message: `Nova cotação self-service ${quotationNumber} criada por ${entityName} (${input.source})`,
       });
 

@@ -114,6 +114,7 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 
 const ANUNCIANTE_NAV_ENTRIES: NavEntry[] = [
   { icon: BarChart3, label: "Meu Portal", path: "/" },
+  { icon: Megaphone, label: "Montar Campanha", path: "/montar-campanha" },
 ];
 
 const RESTAURANTE_NAV_ENTRIES: NavEntry[] = [
@@ -122,6 +123,7 @@ const RESTAURANTE_NAV_ENTRIES: NavEntry[] = [
 
 const PARCEIRO_NAV_ENTRIES: NavEntry[] = [
   { icon: Handshake, label: "Meu Portal", path: "/" },
+  { icon: Megaphone, label: "Montar Campanha", path: "/montar-campanha" },
 ];
 
 const NAV_ENTRIES: NavEntry[] = [
@@ -130,7 +132,9 @@ const NAV_ENTRIES: NavEntry[] = [
     icon: DollarSign,
     label: "Comercial",
     items: [
+      { icon: Calculator, label: "Simulador", path: "/comercial/simulador" },
       { icon: FileText, label: "Orçamento", path: "/comercial/orcamento" },
+      { icon: Megaphone, label: "Montar Campanha", path: "/comercial/montar-campanha" },
       { icon: ClipboardList, label: "Cotações", path: "/comercial/cotacoes" },
       { icon: Users, label: "Leads", path: "/comercial/leads" },
       { icon: UserPlus, label: "Contatos", path: "/comercial/contatos" },
