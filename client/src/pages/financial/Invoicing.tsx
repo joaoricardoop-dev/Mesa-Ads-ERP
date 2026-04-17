@@ -513,7 +513,7 @@ export default function Invoicing() {
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Número</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Anunciante</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Campanha</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Nossa parte</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Valor</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Emissão</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Vencimento</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
@@ -523,21 +523,10 @@ export default function Invoicing() {
               <tbody>
                 {invoiceList.map((inv) => {
                   const gross = parseFloat(inv.amount);
-                  const ourShare = parseFloat((inv as any).netAmount ?? inv.amount);
-                  const restaurantRepasse = parseFloat((inv as any).restaurantRepasseAmount ?? "0");
                   const vipRepasse = parseFloat((inv as any).vipRepasseAmount ?? "0");
                   const issAmount = parseFloat((inv as any).issAmount ?? "0");
                   const issRetained = !!(inv as any).issRetained;
                   const issRate = parseFloat((inv as any).issRate ?? "0");
-                  const issDeducted = issRetained ? issAmount : 0;
-                  const totalDeducted = restaurantRepasse + vipRepasse + issDeducted;
-                  const breakdownLines = [
-                    `Bruto: ${formatCurrency(gross)}`,
-                    restaurantRepasse > 0 ? `− Comissão restaurante: ${formatCurrency(restaurantRepasse)}` : null,
-                    vipRepasse > 0 ? `− Repasse VIP: ${formatCurrency(vipRepasse)}` : null,
-                    issDeducted > 0 ? `− ISS retido (${issRate.toFixed(2)}%): ${formatCurrency(issDeducted)}` : null,
-                    `= Nossa parte: ${formatCurrency(ourShare)}`,
-                  ].filter(Boolean).join("\n");
                   return (
                     <tr
                       key={inv.id}
@@ -560,11 +549,11 @@ export default function Invoicing() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div title={totalDeducted > 0 ? breakdownLines : undefined}>
-                          <span className="font-semibold text-emerald-400">{formatCurrency(ourShare)}</span>
-                          {totalDeducted > 0 && (
-                            <p className="text-[11px] text-muted-foreground">
-                              bruto {formatCurrency(gross)} · deduz. {formatCurrency(totalDeducted)}
+                        <div>
+                          <span className="font-semibold text-emerald-400">{formatCurrency(gross)}</span>
+                          {vipRepasse > 0 && (
+                            <p className="text-[11px] text-purple-400/90">
+                              repasse VIP{(inv as any).vipProviderName ? ` (${(inv as any).vipProviderName})` : ""}: {formatCurrency(vipRepasse)}
                             </p>
                           )}
                           {issAmount > 0 && !issRetained && (
@@ -673,7 +662,6 @@ export default function Invoicing() {
           {viewedInvoice && (() => {
             const inv: any = viewedInvoice;
             const gross = parseFloat(inv.amount);
-            const ourShare = parseFloat(inv.netAmount ?? inv.amount);
             const restaurantRepasse = parseFloat(inv.restaurantRepasseAmount ?? "0");
             const vipRepasse = parseFloat(inv.vipRepasseAmount ?? "0");
             const issAmount = parseFloat(inv.issAmount ?? "0");
@@ -702,42 +690,25 @@ export default function Invoicing() {
                 {/* Breakdown financeiro */}
                 <div className="rounded-md border border-border/30 p-3 space-y-1.5 bg-muted/5">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Detalhamento</p>
-                  <div className="flex justify-between text-sm">
-                    <span>Valor bruto</span>
-                    <span className="font-mono">{formatCurrency(gross)}</span>
+                  <div className="flex justify-between text-base font-semibold">
+                    <span>Total da fatura</span>
+                    <span className="font-mono text-emerald-400">{formatCurrency(gross)}</span>
                   </div>
-                  {restaurantRepasse > 0 && (
-                    <div className="flex justify-between text-sm text-amber-400/90">
-                      <span>− Comissão restaurante ({parseFloat(inv.restaurantCommissionPercent ?? "0").toFixed(2)}%)</span>
-                      <span className="font-mono">−{formatCurrency(restaurantRepasse)}</span>
-                    </div>
-                  )}
                   {vipRepasse > 0 && (
-                    <div className="flex justify-between text-sm text-amber-400/90">
-                      <span>− Repasse VIP{inv.vipProviderName ? ` (${inv.vipProviderName})` : ""}</span>
-                      <span className="font-mono">−{formatCurrency(vipRepasse)}</span>
-                    </div>
+                    <>
+                      <Separator className="my-1" />
+                      <div className="flex justify-between text-sm text-purple-400/90">
+                        <span>Repasse Sala VIP{inv.vipProviderName ? ` — ${inv.vipProviderName}` : ""}</span>
+                        <span className="font-mono">{formatCurrency(vipRepasse)}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Percentual sobre a receita líquida da tela/janela digital.
+                      </p>
+                    </>
                   )}
-                  {issDeducted > 0 && (
-                    <div className="flex justify-between text-sm text-amber-400/90">
-                      <span>− ISS retido ({issRate.toFixed(2)}%)</span>
-                      <span className="font-mono">−{formatCurrency(issDeducted)}</span>
-                    </div>
-                  )}
-                  {withheld > 0 && (
-                    <div className="flex justify-between text-sm text-amber-400/90">
-                      <span>− Retenção na fonte</span>
-                      <span className="font-mono">−{formatCurrency(withheld)}</span>
-                    </div>
-                  )}
-                  <Separator className="my-1" />
-                  <div className="flex justify-between text-sm font-semibold">
-                    <span>Nossa parte</span>
-                    <span className="font-mono text-emerald-400">{formatCurrency(ourShare)}</span>
-                  </div>
                   {issAmount > 0 && !issRetained && (
                     <p className="text-[11px] text-amber-400/80 mt-1">
-                      ISS {issRate.toFixed(2)}% a recolher: {formatCurrency(issAmount)} (não afeta líquido recebido)
+                      ISS {issRate.toFixed(2)}% a recolher: {formatCurrency(issAmount)}
                     </p>
                   )}
                 </div>
