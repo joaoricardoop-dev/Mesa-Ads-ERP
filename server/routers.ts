@@ -2892,6 +2892,15 @@ export const appRouter = router({
         state: z.string().optional(),
         cep: z.string().optional(),
         segment: z.string().optional(),
+        tracking: z.object({
+          utmSource: z.string().max(255).optional(),
+          utmMedium: z.string().max(255).optional(),
+          utmCampaign: z.string().max(255).optional(),
+          utmContent: z.string().max(255).optional(),
+          utmTerm: z.string().max(255).optional(),
+          referrer: z.string().max(500).optional(),
+          landingPath: z.string().max(255).optional(),
+        }).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const user = ctx.user;
@@ -2900,8 +2909,10 @@ export const appRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Onboarding já foi concluído." });
         }
 
+        const { tracking, ...clientFields } = input;
         const newClient = await createClient({
-          ...input,
+          ...clientFields,
+          ...(tracking || {}),
           selfRegistered: true,
           status: "active",
         });

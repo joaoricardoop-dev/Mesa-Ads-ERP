@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { getTracking, clearTracking } from "@/lib/utmTracking";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,7 @@ export default function Onboarding({ userName }: OnboardingProps) {
   const completeMutation = trpc.portal.completeOnboarding.useMutation({
     onSuccess: () => {
       toast.success("Cadastro concluído! Bem-vindo ao mesa.ads");
+      clearTracking();
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
     onError: (err) => {
@@ -76,6 +78,15 @@ export default function Onboarding({ userName }: OnboardingProps) {
     const data: any = {};
     for (const [k, v] of Object.entries(form)) {
       if (v.trim()) data[k] = v.trim();
+    }
+    const tracking = getTracking();
+    if (tracking) {
+      const t: any = {};
+      for (const [k, v] of Object.entries(tracking)) {
+        if (k === "capturedAt") continue;
+        if (typeof v === "string" && v.trim()) t[k] = v;
+      }
+      if (Object.keys(t).length > 0) data.tracking = t;
     }
     completeMutation.mutate(data);
   };

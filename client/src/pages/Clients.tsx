@@ -375,6 +375,11 @@ export default function Clients() {
                             Self-registered
                           </Badge>
                         )}
+                        {((c as any).utmSource || (c as any).utmCampaign) && (
+                          <Badge variant="outline" className="bg-sky-500/10 text-sky-400 border-sky-500/30 text-[10px] px-1.5 py-0" title={`Origem: ${[ (c as any).utmSource, (c as any).utmMedium, (c as any).utmCampaign ].filter(Boolean).join(' / ')}`}>
+                            {(c as any).utmSource || (c as any).utmCampaign}
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
@@ -519,6 +524,32 @@ export default function Clients() {
                                   <Tag className="w-3.5 h-3.5 text-muted-foreground" />
                                   <span className="text-muted-foreground">Segmento:</span>
                                   <span>{c.segment}</span>
+                                </div>
+                              )}
+                              {((c as any).utmSource || (c as any).utmCampaign || (c as any).referrer) && (
+                                <div className="pt-2 mt-2 border-t border-border/30 space-y-1">
+                                  <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">Origem</p>
+                                  {(c as any).utmSource && (
+                                    <div className="text-xs"><span className="text-muted-foreground">Source:</span> {(c as any).utmSource}</div>
+                                  )}
+                                  {(c as any).utmMedium && (
+                                    <div className="text-xs"><span className="text-muted-foreground">Medium:</span> {(c as any).utmMedium}</div>
+                                  )}
+                                  {(c as any).utmCampaign && (
+                                    <div className="text-xs"><span className="text-muted-foreground">Campanha:</span> {(c as any).utmCampaign}</div>
+                                  )}
+                                  {(c as any).utmContent && (
+                                    <div className="text-xs"><span className="text-muted-foreground">Content:</span> {(c as any).utmContent}</div>
+                                  )}
+                                  {(c as any).utmTerm && (
+                                    <div className="text-xs"><span className="text-muted-foreground">Term:</span> {(c as any).utmTerm}</div>
+                                  )}
+                                  {(c as any).referrer && (
+                                    <div className="text-xs truncate" title={(c as any).referrer}><span className="text-muted-foreground">Referrer:</span> {(c as any).referrer}</div>
+                                  )}
+                                  {(c as any).landingPath && (
+                                    <div className="text-xs"><span className="text-muted-foreground">Página:</span> {(c as any).landingPath}</div>
+                                  )}
                                 </div>
                               )}
                             </div>

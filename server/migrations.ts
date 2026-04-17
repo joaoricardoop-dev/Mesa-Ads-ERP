@@ -584,6 +584,20 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       ALTER TABLE "campaigns" ADD COLUMN IF NOT EXISTS "agencyBvPercent" numeric(5, 2) DEFAULT '20.00' NOT NULL;
     `,
   },
+  {
+    name: "add_utm_tracking_to_clients",
+    sql: `
+      ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "utm_source" varchar(255);
+      ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "utm_medium" varchar(255);
+      ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "utm_campaign" varchar(255);
+      ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "utm_content" varchar(255);
+      ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "utm_term" varchar(255);
+      ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "referrer" varchar(500);
+      ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "landing_path" varchar(255);
+      CREATE INDEX IF NOT EXISTS "idx_clients_utm_source" ON "clients" ("utm_source");
+      CREATE INDEX IF NOT EXISTS "idx_clients_utm_campaign" ON "clients" ("utm_campaign");
+    `,
+  },
 ];
 
 export async function runMigrations() {

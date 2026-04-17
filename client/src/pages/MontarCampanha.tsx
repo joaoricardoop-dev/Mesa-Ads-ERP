@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { captureTrackingFromUrl } from "@/lib/utmTracking";
 
 function portalPathForRole(role: string | null | undefined): string {
   if (!role) return "/";
@@ -51,6 +52,7 @@ export default function MontarCampanha() {
 
   useEffect(() => {
     document.title = "Montar campanha · mesa.ads";
+    captureTrackingFromUrl("/montar-campanha");
   }, []);
 
   const handleAdvertiserClick = () => {

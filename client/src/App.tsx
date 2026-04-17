@@ -47,6 +47,8 @@ import RestaurantePortal from "./pages/RestaurantePortal";
 import RestaurantOnboarding from "./pages/RestaurantOnboarding";
 import RestaurantInviteAccept from "./pages/RestaurantInviteAccept";
 import Onboarding from "./pages/Onboarding";
+import MontarCampanha from "./pages/MontarCampanha";
+import { captureTrackingFromUrl } from "./lib/utmTracking";
 import TermTemplates from "./pages/TermTemplates";
 import IntegrationSettings from "./pages/IntegrationSettings";
 import MediaKitSettings from "./pages/MediaKitSettings";
@@ -60,7 +62,6 @@ import ParceiroOnboarding from "./pages/ParceiroOnboarding";
 import ParceiroTabelaPrecos from "./pages/ParceiroTabelaPrecos";
 import ParceiroLeads from "./pages/ParceiroLeads";
 import BudgetCreator from "./pages/BudgetCreator";
-import MontarCampanha from "./pages/MontarCampanha";
 
 function AnuncianteRouter() {
   return (
@@ -536,6 +537,10 @@ function AuthenticatedApp() {
 }
 
 function App() {
+  useEffect(() => {
+    captureTrackingFromUrl();
+  }, []);
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
