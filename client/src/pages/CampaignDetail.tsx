@@ -1220,7 +1220,14 @@ export default function CampaignDetail() {
         <div className="border-b border-border/20 bg-card/30 px-4 lg:px-6 py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/campanhas")}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => navigate(currentPhaseId != null ? `/campanhas/${campaignId}` : "/campanhas")}
+                title={currentPhaseId != null ? "Voltar para os batches da campanha" : "Voltar para campanhas"}
+                data-testid="button-back-header"
+              >
                 <ArrowLeft className="w-4 h-4" />
               </Button>
               <div>
