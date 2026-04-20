@@ -21,6 +21,7 @@ import {
 import { VIP_PRODUCT_TIPOS } from "./productRouter";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { materializePayablesForInvoice } from "./finance/payables";
 
 function requireFinancialAccess(role: string | null) {
   if (role !== "admin" && role !== "financeiro" && role !== "manager") {
@@ -822,21 +823,26 @@ export const financialRouter = router({
         notes = notes ? `${parcelaLine}\n${notes}` : parcelaLine;
       }
 
-      const [created] = await db.insert(invoices).values({
-        campaignId: input.campaignId,
-        campaignPhaseId: input.campaignPhaseId ?? null,
-        clientId: campaign[0].clientId,
-        invoiceNumber,
-        amount: input.amount,
-        billingType: input.billingType ?? "bruto",
-        withheldTax: input.withheldTax && parseFloat(input.withheldTax) > 0 ? input.withheldTax : undefined,
-        issRate: input.issRate && parseFloat(input.issRate) > 0 ? input.issRate : "0.00",
-        issRetained: input.issRetained ?? false,
-        issueDate,
-        dueDate: input.dueDate,
-        paymentMethod: input.paymentMethod,
-        notes: notes || undefined,
-      }).returning();
+      // Finrefac fase 3: emissão + materialização de impostos atômica.
+      const created = await db.transaction(async (tx: any) => {
+        const [row] = await tx.insert(invoices).values({
+          campaignId: input.campaignId,
+          campaignPhaseId: input.campaignPhaseId ?? null,
+          clientId: campaign[0].clientId,
+          invoiceNumber,
+          amount: input.amount,
+          billingType: input.billingType ?? "bruto",
+          withheldTax: input.withheldTax && parseFloat(input.withheldTax) > 0 ? input.withheldTax : undefined,
+          issRate: input.issRate && parseFloat(input.issRate) > 0 ? input.issRate : "0.00",
+          issRetained: input.issRetained ?? false,
+          issueDate,
+          dueDate: input.dueDate,
+          paymentMethod: input.paymentMethod,
+          notes: notes || undefined,
+        }).returning();
+        await materializePayablesForInvoice(tx, row.id, "emitida");
+        return row;
+      });
 
       return created;
     }),
@@ -872,7 +878,19 @@ export const financialRouter = router({
       if (fields.withheldTax !== undefined) {
         updateData.withheldTax = fields.withheldTax && parseFloat(fields.withheldTax) > 0 ? fields.withheldTax : null;
       }
-      const [updated] = await db.update(invoices).set(updateData).where(eq(invoices.id, id)).returning();
+      // Finrefac fase 3: update + re-materialize taxes atomicamente quando
+      // amount/iss muda em fatura "emitida".
+      const updated = await db.transaction(async (tx: any) => {
+        const [row] = await tx.update(invoices).set(updateData).where(eq(invoices.id, id)).returning();
+        if (
+          row &&
+          row.status === "emitida" &&
+          (fields.amount !== undefined || fields.issRate !== undefined || fields.issRetained !== undefined)
+        ) {
+          await materializePayablesForInvoice(tx, row.id, "emitida");
+        }
+        return row;
+      });
       return updated;
     }),
 
@@ -885,104 +903,42 @@ export const financialRouter = router({
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
-      const [updated] = await db
-        .update(invoices)
-        .set({ status: "paga", paymentDate: input.paymentDate, paymentMethod: input.paymentMethod, updatedAt: new Date() })
-        .where(eq(invoices.id, input.id))
-        .returning();
-
-      if (updated && updated.campaignId) {
-        try {
-          const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, updated.campaignId));
-          if (campaign && !(campaign as any).isBonificada) {
-            // Skip restaurant commission for digital products (telas/janelas)
-            let isDigitalProd = false;
-            if (campaign.productId) {
-              const [prod] = await db.select({ tipo: products.tipo }).from(products).where(eq(products.id, campaign.productId)).limit(1);
-              isDigitalProd = prod?.tipo === "telas" || prod?.tipo === "janelas_digitais";
-            }
-            const existing = await db.select({ id: accountsPayable.id })
-              .from(accountsPayable)
-              .where(and(
-                eq(accountsPayable.campaignId, updated.campaignId),
-                eq(accountsPayable.invoiceId, input.id),
-                eq(accountsPayable.type, "comissao"),
-              ));
-            if (existing.length === 0 && !isDigitalProd) {
-              const invoiceAmt = Number(updated.amount);
-              const restCommRate = Number(campaign.restaurantCommission || 0);
-              const commAmount = invoiceAmt * (restCommRate / 100);
-              if (commAmount > 0) {
-                await db.insert(accountsPayable).values({
-                  campaignId: updated.campaignId,
-                  invoiceId: input.id,
-                  type: "comissao",
-                  description: `Comissão Restaurante (${restCommRate}%) - NF ${updated.invoiceNumber || updated.id}`,
-                  amount: commAmount.toFixed(2),
-                  recipientType: "restaurante",
-                  status: "pendente",
-                });
-              }
-            }
-          }
-
-          // ── Repasse para Provedor de Sala VIP (telas e janelas digitais) ─────
-          // Quando o produto da campanha é do tipo 'telas' ou 'janelas_digitais'
-          // e está vinculado a um vip_provider, gera uma conta a pagar do tipo
-          // 'repasse_vip' baseada no % configurado no produto (com fallback para
-          // o % padrão do provedor).
-          if (campaign && !(campaign as any).isBonificada && campaign.productId) {
-            const [product] = await db
-              .select()
-              .from(products)
-              .where(eq(products.id, campaign.productId));
-
-            if (
-              product &&
-              product.vipProviderId &&
-              (VIP_PRODUCT_TIPOS as readonly string[]).includes(product.tipo ?? "")
-            ) {
-              const existingVip = await db.select({ id: accountsPayable.id })
-                .from(accountsPayable)
-                .where(and(
-                  eq(accountsPayable.campaignId, updated.campaignId),
-                  eq(accountsPayable.invoiceId, input.id),
-                  eq(accountsPayable.type, "repasse_vip"),
-                ));
-
-              if (existingVip.length === 0) {
-                const [provider] = await db
-                  .select()
-                  .from(vipProviders)
-                  .where(eq(vipProviders.id, product.vipProviderId));
-
-                if (provider && provider.status === "active") {
-                  const invoiceAmt = Number(updated.amount);
-                  // % específico do produto tem prioridade; fallback no % do provedor
-                  const rate = Number(
-                    product.vipProviderCommissionPercent ?? provider.repassePercent ?? 0,
-                  );
-                  const amount = invoiceAmt * (rate / 100);
-                  if (amount > 0) {
-                    await db.insert(accountsPayable).values({
-                      campaignId: updated.campaignId,
-                      invoiceId: input.id,
-                      vipProviderId: provider.id,
-                      type: "repasse_vip",
-                      description: `Repasse Sala VIP - ${provider.name} (${rate}%) - NF ${updated.invoiceNumber || updated.id}`,
-                      amount: amount.toFixed(2),
-                      recipientType: "vip_provider",
-                      status: "pendente",
-                    });
-                  }
-                }
-              }
-            }
-          }
-        } catch (err) { console.warn("[markInvoicePaid] Auto-generate commission payable failed:", err); }
-      }
+      // Finrefac fase 3: pagamento + materialização atômicos.
+      const updated = await db.transaction(async (tx: any) => {
+        const [row] = await tx
+          .update(invoices)
+          .set({ status: "paga", paymentDate: input.paymentDate, paymentMethod: input.paymentMethod, updatedAt: new Date() })
+          .where(eq(invoices.id, input.id))
+          .returning();
+        if (row) {
+          await materializePayablesForInvoice(tx, row.id, "paga");
+        }
+        return row;
+      });
 
       return updated;
+    }),
+
+  revertInvoicePayment: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+
+      try {
+        return await db.transaction(async (tx: any) => {
+          // Bloqueia se algum derivado de pagamento já está pago.
+          await materializePayablesForInvoice(tx, input.id, "reverter_pagamento");
+          const [row] = await tx
+            .update(invoices)
+            .set({ status: "emitida", paymentDate: null, updatedAt: new Date() })
+            .where(eq(invoices.id, input.id))
+            .returning();
+          return row;
+        });
+      } catch (err: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: err?.message || "Falha ao reverter pagamento" });
+      }
     }),
 
   cancelInvoice: protectedProcedure
@@ -990,12 +946,21 @@ export const financialRouter = router({
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
-      const [updated] = await db
-        .update(invoices)
-        .set({ status: "cancelada", updatedAt: new Date() })
-        .where(eq(invoices.id, input.id))
-        .returning();
-      return updated;
+
+      try {
+        return await db.transaction(async (tx: any) => {
+          // Cancela todos os derivados não pagos; bloqueia se algum já está pago.
+          await materializePayablesForInvoice(tx, input.id, "cancelada");
+          const [row] = await tx
+            .update(invoices)
+            .set({ status: "cancelada", updatedAt: new Date() })
+            .where(eq(invoices.id, input.id))
+            .returning();
+          return row;
+        });
+      } catch (err: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: err?.message || "Falha ao cancelar fatura" });
+      }
     }),
 
   listPayments: protectedProcedure

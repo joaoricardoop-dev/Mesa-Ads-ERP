@@ -82,15 +82,26 @@ async function autoCreateInvoice(db: any, campaign: { id: number; clientId: numb
   const today = new Date().toISOString().split("T")[0];
   const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-  await db.insert(invoices).values({
-    campaignId: campaign.id,
-    clientId: campaign.clientId,
-    invoiceNumber,
-    amount,
-    issueDate: today,
-    dueDate,
-    status: "emitida",
-  });
+  // Finrefac fase 3: emissão + materialização de impostos atômicos.
+  try {
+    const { materializePayablesForInvoice } = await import("./finance/payables");
+    await db.transaction(async (tx: any) => {
+      const [created] = await tx.insert(invoices).values({
+        campaignId: campaign.id,
+        clientId: campaign.clientId,
+        invoiceNumber,
+        amount,
+        issueDate: today,
+        dueDate,
+        status: "emitida",
+      }).returning();
+      if (created) {
+        await materializePayablesForInvoice(tx, created.id, "emitida");
+      }
+    });
+  } catch (err) {
+    console.warn("[autoCreateInvoice] transaction falhou:", err);
+  }
 }
 
 async function generateOSNumber(db: any) {
