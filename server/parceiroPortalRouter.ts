@@ -187,6 +187,81 @@ export const parceiroPortalRouter = router({
       return created;
     }),
 
+  convertLeadToClient: parceiroProcedure
+    .input(z.object({
+      leadId: z.number().int().positive(),
+      adminPartnerId: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const partnerId = resolvePartnerId(ctx, input.adminPartnerId);
+      const db = await getDatabase();
+
+      const [lead] = await db
+        .select()
+        .from(leads)
+        .where(and(eq(leads.id, input.leadId), eq(leads.partnerId, partnerId)))
+        .limit(1);
+      if (!lead) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado ou sem permissão." });
+      }
+
+      if (lead.clientId) {
+        const [existing] = await db
+          .select()
+          .from(clients)
+          .where(eq(clients.id, lead.clientId))
+          .limit(1);
+        if (existing) return existing;
+      }
+
+      if (lead.cnpj) {
+        const cleanCnpj = lead.cnpj.replace(/\D/g, "");
+        if (cleanCnpj.length === 14) {
+          const [match] = await db
+            .select()
+            .from(clients)
+            .where(sql`regexp_replace(${clients.cnpj}, '[^0-9]', '', 'g') = ${cleanCnpj}`)
+            .limit(1);
+          if (match) {
+            await db.update(leads)
+              .set({ clientId: match.id, convertedToId: match.id, convertedToType: "client", updatedAt: new Date() })
+              .where(eq(leads.id, lead.id));
+            return match;
+          }
+        }
+      }
+
+      const [created] = await db.insert(clients).values({
+        name: lead.contactName || lead.name,
+        company: lead.company || lead.name,
+        razaoSocial: lead.razaoSocial,
+        cnpj: lead.cnpj,
+        contactPhone: lead.contactPhone,
+        contactEmail: lead.contactEmail,
+        instagram: lead.instagram,
+        address: lead.address,
+        addressNumber: lead.addressNumber,
+        neighborhood: lead.neighborhood,
+        city: lead.city,
+        state: lead.state,
+        cep: lead.cep,
+        partnerId,
+        status: "active",
+      }).returning();
+
+      await db.update(leads)
+        .set({
+          clientId: created.id,
+          convertedToId: created.id,
+          convertedToType: "client",
+          stage: "ganho",
+          updatedAt: new Date(),
+        })
+        .where(eq(leads.id, lead.id));
+
+      return created;
+    }),
+
   getQuotations: parceiroProcedure
     .input(z.object({ adminPartnerId: z.number().optional() }).optional())
     .query(async ({ ctx, input }) => {

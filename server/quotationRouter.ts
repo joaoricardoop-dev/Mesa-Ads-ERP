@@ -1042,7 +1042,7 @@ export const quotationRouter = router({
           .limit(1);
         if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado" });
         client = row;
-      } else if (!isInternal) {
+      } else if (userRole === "anunciante") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Cliente é obrigatório." });
       }
 
@@ -1060,7 +1060,7 @@ export const quotationRouter = router({
         if (!userPartnerId) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a um parceiro." });
         }
-        if (!client || client.partnerId !== userPartnerId) {
+        if (client && client.partnerId !== userPartnerId) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Este cliente não está vinculado ao seu parceiro." });
         }
         if (input.source !== "self_service_parceiro") {
