@@ -885,8 +885,13 @@ export const financialRouter = router({
         if (
           row &&
           row.status === "emitida" &&
-          (fields.amount !== undefined || fields.issRate !== undefined || fields.issRetained !== undefined)
+          (fields.amount !== undefined ||
+            fields.issRate !== undefined ||
+            fields.issRetained !== undefined ||
+            fields.issueDate !== undefined)
         ) {
+          // issueDate afeta competenceMonth dos impostos — re-materializa
+          // para manter o agregado por mês consistente.
           await materializePayablesForInvoice(tx, row.id, "emitida");
         }
         return row;
