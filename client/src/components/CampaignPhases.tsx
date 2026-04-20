@@ -39,6 +39,14 @@ const STATUS_COLORS: Record<string, string> = {
   cancelada: "bg-red-500/10 text-red-400 border-red-500/30",
 };
 
+const INVOICE_BADGE_META: Record<string, { label: string; cls: string }> = {
+  prevista: { label: "Fatura prevista", cls: "bg-zinc-500/10 text-zinc-300 border-zinc-500/30" },
+  emitida: { label: "Fatura emitida", cls: "bg-amber-500/10 text-amber-400 border-amber-500/30" },
+  paga: { label: "Fatura paga", cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
+  vencida: { label: "Fatura vencida", cls: "bg-red-500/10 text-red-400 border-red-500/30" },
+  cancelada: { label: "Fatura cancelada", cls: "bg-zinc-500/10 text-zinc-500 border-zinc-500/30" },
+};
+
 function fmtDate(d: string | null | undefined): string {
   if (!d) return "—";
   const [y, m, day] = d.split("-");
@@ -284,33 +292,8 @@ export default function CampaignPhases({ campaignId, contractDuration, startDate
 
   return (
     <div className="space-y-4">
-      {/* Resumo geral */}
-      {phases.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="rounded-xl border border-border/30 bg-card p-3">
-            <p className="text-[10px] uppercase text-muted-foreground">Receita prevista</p>
-            <p className="text-lg font-bold text-emerald-400 font-mono">{formatCurrency(totals.expectedRevenue)}</p>
-            <p className="text-[10px] text-muted-foreground">Recebido: {formatCurrency(totals.totalReceived)}</p>
-          </div>
-          <div className="rounded-xl border border-border/30 bg-card p-3">
-            <p className="text-[10px] uppercase text-muted-foreground">Custo previsto</p>
-            <p className="text-lg font-bold text-red-400 font-mono">{formatCurrency(totals.expectedCosts)}</p>
-            <p className="text-[10px] text-muted-foreground">Pago: {formatCurrency(totals.totalPaid)}</p>
-          </div>
-          <div className="rounded-xl border border-border/30 bg-card p-3">
-            <p className="text-[10px] uppercase text-muted-foreground">Margem prevista</p>
-            <p className={`text-lg font-bold font-mono ${totals.expectedMargin >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {formatCurrency(totals.expectedMargin)}
-            </p>
-            <p className="text-[10px] text-muted-foreground">{totals.expectedMarginPct.toFixed(1)}%</p>
-          </div>
-          <div className="rounded-xl border border-border/30 bg-card p-3">
-            <p className="text-[10px] uppercase text-muted-foreground">Faturas emitidas</p>
-            <p className="text-lg font-bold font-mono">{formatCurrency(totals.totalInvoiced)}</p>
-            <p className="text-[10px] text-muted-foreground">A pagar: {formatCurrency(totals.totalDue - totals.totalPaid)}</p>
-          </div>
-        </div>
-      )}
+      {/* Economics agregados ficam no Consolidado da Campanha (seção topo de
+          CampaignOverview). Este componente foca só em operação dos batches. */}
 
       {/* Barra de ações */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -547,6 +530,15 @@ export default function CampaignPhases({ campaignId, contractDuration, startDate
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="font-semibold text-sm">{p.label}</span>
                         <Badge variant="outline" className={`text-[9px] ${statusCls}`}>{statusLabel}</Badge>
+                        {(p as any).activeInvoice?.status && (() => {
+                          const invMeta = INVOICE_BADGE_META[(p as any).activeInvoice.status] ?? null;
+                          if (!invMeta) return null;
+                          return (
+                            <Badge variant="outline" className={`text-[9px] uppercase ${invMeta.cls}`} data-testid={`badge-row-invoice-${p.sequence}`}>
+                              {invMeta.label}
+                            </Badge>
+                          );
+                        })()}
                       </div>
                       <p className="text-[11px] text-muted-foreground">
                         {fmtDate(p.periodStart)} → {fmtDate(p.periodEnd)} · {p.itemCount} {p.itemCount === 1 ? "item" : "itens"}
@@ -554,42 +546,12 @@ export default function CampaignPhases({ campaignId, contractDuration, startDate
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-[9px] text-muted-foreground uppercase">Receita prev.</p>
-                      <p className="text-xs font-mono font-semibold text-emerald-400">{formatCurrency(p.expectedRevenue)}</p>
-                    </div>
-                    <div className="text-right hidden sm:block">
-                      <p className="text-[9px] text-muted-foreground uppercase">Custo prev.</p>
-                      <p className="text-xs font-mono font-semibold text-red-400">{formatCurrency(p.expectedCosts)}</p>
-                    </div>
                     {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                   </div>
                 </div>
 
                 {isExpanded && (
                   <div className="border-t border-border/20 p-4 space-y-3">
-                    {/* Status financeiro da fase */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      <div className="rounded-lg border p-2">
-                        <p className="text-[9px] uppercase text-muted-foreground">Faturado</p>
-                        <p className="text-xs font-mono font-bold">{formatCurrency(p.financial.totalInvoiced)}</p>
-                      </div>
-                      <div className="rounded-lg border p-2">
-                        <p className="text-[9px] uppercase text-muted-foreground">Recebido</p>
-                        <p className="text-xs font-mono font-bold text-emerald-400">{formatCurrency(p.financial.totalReceived)}</p>
-                      </div>
-                      <div className="rounded-lg border p-2">
-                        <p className="text-[9px] uppercase text-muted-foreground">A pagar</p>
-                        <p className="text-xs font-mono font-bold text-red-400">{formatCurrency(p.financial.totalDue - p.financial.totalPaid)}</p>
-                      </div>
-                      <div className="rounded-lg border p-2">
-                        <p className="text-[9px] uppercase text-muted-foreground">Margem prev.</p>
-                        <p className={`text-xs font-mono font-bold ${p.expectedRevenue - p.expectedCosts >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                          {formatCurrency(p.expectedRevenue - p.expectedCosts)}
-                        </p>
-                      </div>
-                    </div>
-
                     {/* Tabela de itens */}
                     <div className="border border-border/30 rounded-lg overflow-hidden">
                       <table className="w-full text-xs">

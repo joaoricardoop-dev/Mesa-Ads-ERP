@@ -19,7 +19,7 @@ import {
 export const statusEnum = pgEnum("status", ["active", "inactive"]);
 export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "paused", "completed", "quotation", "archived", "producao", "transito", "executar", "veiculacao", "inativa", "briefing", "design", "aprovacao", "distribuicao"]);
 export const budgetStatusEnum = pgEnum("budget_status", ["active", "expired", "rejected"]);
-export const invoiceStatusEnum = pgEnum("invoice_status", ["emitida", "paga", "vencida", "cancelada"]);
+export const invoiceStatusEnum = pgEnum("invoice_status", ["prevista", "emitida", "paga", "vencida", "cancelada"]);
 export const billingModeEnum = pgEnum("billing_mode", ["bruto", "liquido"]);
 export const quotationStatusEnum = pgEnum("quotation_status", ["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]);
 export const leadTypeEnum = pgEnum("lead_type", ["anunciante", "restaurante"]);

@@ -12,13 +12,14 @@ import {
   Monitor,
   Gift,
   Layers,
-  CircleDollarSign,
   Hash,
   FileText,
   ChevronDown,
   ExternalLink,
 } from "lucide-react";
 import { useState } from "react";
+import { CampaignConsolidated } from "@/components/campaign/CampaignConsolidated";
+import { getInvoiceBadgeMeta } from "@/components/campaign/InvoiceSchedule";
 
 function QuotationSection({ quotationId }: { quotationId: number }) {
   const [, setLocation] = useLocation();
@@ -218,20 +219,22 @@ function weeksBetween(start: string, end: string): number {
 function PhaseCard({
   phase,
   filterTipo,
+  invoiceStatus,
   onOpen,
 }: {
   phase: PhaseRow;
   filterTipo: "bolacha" | "tela";
+  invoiceStatus?: string;
   onOpen: () => void;
 }) {
   const items = phase.items.filter((it) => {
     const isDigital = it.productTipo != null && DIGITAL_TIPOS.has(it.productTipo);
     return filterTipo === "tela" ? isDigital : !isDigital;
   });
-  const total = items.reduce((s, it) => s + it.resolvedTotalPrice, 0);
   const totalQty = items.reduce((s, it) => s + it.quantity, 0);
   const meta = PHASE_STATUS_META[phase.status] ?? PHASE_STATUS_META.planejada;
   const weeks = weeksBetween(phase.periodStart, phase.periodEnd);
+  const invMeta = invoiceStatus ? getInvoiceBadgeMeta(invoiceStatus) : null;
 
   return (
     <button
@@ -270,19 +273,22 @@ function PhaseCard({
 
       <div className="border-t border-border/20 pt-3 flex items-end justify-between gap-2">
         <div>
-          <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Receita prevista</div>
-          <div className="text-lg font-semibold tabular-nums text-foreground">
-            {formatCurrency(total)}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-[10px] uppercase text-muted-foreground tracking-wider flex items-center justify-end gap-1">
+          <div className="text-[10px] uppercase text-muted-foreground tracking-wider flex items-center gap-1">
             <Hash className="w-3 h-3" /> {filterTipo === "tela" ? "telas" : "bolachas"}
           </div>
-          <div className="text-sm font-medium tabular-nums text-muted-foreground">
+          <div className="text-sm font-medium tabular-nums text-foreground">
             {totalQty.toLocaleString("pt-BR")}
           </div>
         </div>
+        {invMeta && (
+          <Badge
+            variant="outline"
+            className={`text-[10px] uppercase tracking-wide ${invMeta.cls}`}
+            data-testid={`badge-batch-invoice-${phase.sequence}`}
+          >
+            {invMeta.label}
+          </Badge>
+        )}
       </div>
 
       <div className="flex items-center justify-end text-xs text-primary opacity-0 group-hover:opacity-100 transition-opacity">
@@ -306,30 +312,25 @@ export default function CampaignOverview() {
     { enabled: campaignId > 0 },
   );
 
-  const { hasBolacha, hasTela, totals } = useMemo(() => {
+  const { hasBolacha, hasTela } = useMemo(() => {
     let bolacha = false;
     let tela = false;
-    let totalRevenue = 0;
-    let totalQtyBolacha = 0;
-    let totalQtyTela = 0;
     for (const p of phases as PhaseRow[]) {
       for (const it of p.items) {
         const isDigital = it.productTipo != null && DIGITAL_TIPOS.has(it.productTipo);
-        if (isDigital) {
-          tela = true;
-          totalQtyTela += it.quantity;
-        } else {
-          bolacha = true;
-          totalQtyBolacha += it.quantity;
-        }
-        totalRevenue += it.resolvedTotalPrice;
+        if (isDigital) tela = true;
+        else bolacha = true;
       }
     }
-    return {
-      hasBolacha: bolacha,
-      hasTela: tela,
-      totals: { totalRevenue, totalQtyBolacha, totalQtyTela },
-    };
+    return { hasBolacha: bolacha, hasTela: tela };
+  }, [phases]);
+
+  const invoiceStatusByPhase = useMemo(() => {
+    const map: Record<number, string> = {};
+    for (const p of phases as any[]) {
+      if (p.activeInvoice?.status) map[p.id] = p.activeInvoice.status;
+    }
+    return map;
   }, [phases]);
 
   if (campaignId <= 0) return null;
@@ -370,39 +371,8 @@ export default function CampaignOverview() {
           </div>
         </div>
 
-        {/* Resumo geral */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="bg-card border border-border/30 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Layers className="w-3.5 h-3.5" /> Batches
-            </div>
-            <div className="text-2xl font-semibold tabular-nums mt-1">
-              {phases.length}
-            </div>
-          </div>
-          <div className="bg-card border border-border/30 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <CircleDollarSign className="w-3.5 h-3.5" /> Receita prevista total
-            </div>
-            <div className="text-2xl font-semibold tabular-nums mt-1">
-              {formatCurrency(totals.totalRevenue)}
-            </div>
-          </div>
-          <div className="bg-card border border-border/30 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Hash className="w-3.5 h-3.5" /> Volume
-            </div>
-            <div className="text-sm tabular-nums mt-1 leading-snug">
-              {hasBolacha && (
-                <div>{totals.totalQtyBolacha.toLocaleString("pt-BR")} bolachas</div>
-              )}
-              {hasTela && (
-                <div>{totals.totalQtyTela.toLocaleString("pt-BR")} telas</div>
-              )}
-              {!hasBolacha && !hasTela && <div className="text-muted-foreground">—</div>}
-            </div>
-          </div>
-        </div>
+        {/* Consolidado da Campanha (economics + cronograma de faturamento) */}
+        <CampaignConsolidated campaignId={campaignId} />
 
         {!loadingCamp && campaign?.quotationId && (
           <QuotationSection quotationId={campaign.quotationId} />
@@ -438,6 +408,7 @@ export default function CampaignOverview() {
                     key={`b-${p.id}`}
                     phase={p}
                     filterTipo="bolacha"
+                    invoiceStatus={invoiceStatusByPhase[p.id]}
                     onOpen={() => setLocation(`/campanhas/${campaignId}/batch/${p.id}`)}
                   />
                 ))}
@@ -462,6 +433,7 @@ export default function CampaignOverview() {
                     key={`t-${p.id}`}
                     phase={p}
                     filterTipo="tela"
+                    invoiceStatus={invoiceStatusByPhase[p.id]}
                     onOpen={() => setLocation(`/campanhas/${campaignId}/batch/${p.id}`)}
                   />
                 ))}

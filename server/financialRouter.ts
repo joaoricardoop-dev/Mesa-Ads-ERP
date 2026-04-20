@@ -2800,4 +2800,171 @@ export const financialRouter = router({
       received: { count: received?.count || 0, total: parseFloat(received?.total || "0") },
     };
   }),
+
+  // ── Cronograma de faturamento por batch ──────────────────────────────────
+  // Regra: 1 batch (campaignPhase) = 1 mês de veiculação = 1 fatura.
+  // Cria 1 invoice em status 'prevista' por fase que ainda não tem fatura
+  // ativa (não-cancelada). Idempotente.
+  generateScheduledInvoices: protectedProcedure
+    .input(z.object({
+      campaignId: z.number(),
+      dueOffsetDays: z.number().int().min(0).max(120).default(15),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+
+      const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
+
+      const phases = await db
+        .select()
+        .from(campaignPhases)
+        .where(eq(campaignPhases.campaignId, input.campaignId))
+        .orderBy(campaignPhases.sequence);
+      if (phases.length === 0) {
+        return { created: 0, skipped: 0, total: 0 };
+      }
+
+      const phaseIds = phases.map((p) => p.id);
+      const items = await db
+        .select()
+        .from(campaignItems)
+        .where(inArray(campaignItems.campaignPhaseId, phaseIds));
+      const revenueByPhase: Record<number, number> = {};
+      for (const it of items) {
+        const v = it.totalPrice != null
+          ? parseFloat(it.totalPrice)
+          : it.quantity * parseFloat(it.unitPrice);
+        revenueByPhase[it.campaignPhaseId] = (revenueByPhase[it.campaignPhaseId] ?? 0) + v;
+      }
+
+      const existing = await db
+        .select({ phaseId: invoices.campaignPhaseId, status: invoices.status })
+        .from(invoices)
+        .where(and(
+          eq(invoices.campaignId, input.campaignId),
+          inArray(invoices.campaignPhaseId, phaseIds),
+          sql`${invoices.status} <> 'cancelada'`,
+        ));
+      const phasesWithInvoice = new Set<number>();
+      for (const row of existing) if (row.phaseId != null) phasesWithInvoice.add(row.phaseId);
+
+      const addDays = (iso: string, days: number) => {
+        const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
+        d.setUTCDate(d.getUTCDate() + days);
+        return d.toISOString().slice(0, 10);
+      };
+
+      const toInsert: any[] = [];
+      let skipped = 0;
+      for (const p of phases) {
+        if (phasesWithInvoice.has(p.id)) { skipped++; continue; }
+        const amount = (revenueByPhase[p.id] ?? 0).toFixed(2);
+        toInsert.push({
+          campaignId: input.campaignId,
+          campaignPhaseId: p.id,
+          clientId: campaign.clientId,
+          invoiceNumber: `PREV-${input.campaignId}-${p.sequence}`,
+          amount,
+          billingType: "bruto" as const,
+          issueDate: p.periodStart,
+          dueDate: addDays(p.periodStart, input.dueOffsetDays),
+          status: "prevista" as const,
+          notes: `Fatura prevista — Batch ${p.sequence} (${p.label})`,
+        });
+      }
+
+      if (toInsert.length > 0) {
+        await db.insert(invoices).values(toInsert);
+      }
+      return { created: toInsert.length, skipped, total: phases.length };
+    }),
+
+  // ── Confirmar emissão de uma fatura prevista ─────────────────────────────
+  // Promove status 'prevista' → 'emitida', grava número real da NF, datas e
+  // (opcional) URL do documento. Materializa contas a pagar após emitir.
+  confirmInvoiceEmission: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      invoiceNumber: z.string().min(1).max(20).optional(),
+      issueDate: z.string().optional(),
+      dueDate: z.string().optional(),
+      amount: z.string().optional(),
+      documentUrl: z.string().refine(
+        (v) => v === "" || /^https?:\/\//i.test(v.trim()),
+        { message: "URL do documento deve começar com http:// ou https://" },
+      ).optional(),
+      documentLabel: z.string().max(100).optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+
+      const [inv] = await db.select().from(invoices).where(eq(invoices.id, input.id));
+      if (!inv) throw new TRPCError({ code: "NOT_FOUND", message: "Fatura não encontrada" });
+      if (inv.status !== "prevista") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Fatura já está em status "${inv.status}". Só é possível confirmar emissão de previstas.`,
+        });
+      }
+
+      const issueDate = input.issueDate || inv.issueDate;
+      let invoiceNumber = input.invoiceNumber?.trim();
+      if (!invoiceNumber) {
+        const year = parseInt(issueDate.slice(0, 4), 10);
+        const prefix = `FAT-${year}-`;
+        const maxResult = await db
+          .select({ maxNum: sql<string>`MAX("invoiceNumber")` })
+          .from(invoices)
+          .where(sql`"invoiceNumber" LIKE ${prefix + '%'}`);
+        const maxStr = maxResult[0]?.maxNum;
+        let seqNum = 1;
+        if (maxStr && maxStr.startsWith(prefix)) {
+          const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
+          if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
+        }
+        invoiceNumber = `${prefix}${String(seqNum).padStart(4, "0")}`;
+      }
+
+      const updates: any = {
+        invoiceNumber,
+        issueDate,
+        dueDate: input.dueDate ?? inv.dueDate,
+        status: "emitida",
+        updatedAt: new Date(),
+      };
+      if (input.amount != null) updates.amount = input.amount;
+      if (input.documentUrl != null) updates.documentUrl = input.documentUrl;
+      if (input.documentLabel != null) updates.documentLabel = input.documentLabel;
+      if (input.notes != null) updates.notes = input.notes;
+
+      const [updated] = await db
+        .update(invoices)
+        .set(updates)
+        .where(eq(invoices.id, input.id))
+        .returning();
+
+      try {
+        await materializePayablesForInvoice(db as unknown as DbClient, updated.id, "emitida");
+      } catch (err) {
+        console.warn("[confirmInvoiceEmission] materializePayables failed:", err);
+      }
+      try {
+        await recordAudit(
+          db as unknown as DbClient,
+          { user: { id: ctx.user.id, role: (ctx.user as any).role ?? null } },
+          {
+            entityType: "invoice",
+            entityId: updated.id,
+            action: "update",
+            metadata: { reason: "confirm_emission", invoiceNumber, issueDate, dueDate: updates.dueDate },
+          },
+        );
+      } catch {}
+
+      return updated;
+    }),
 });

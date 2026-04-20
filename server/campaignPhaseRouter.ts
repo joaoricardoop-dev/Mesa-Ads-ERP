@@ -80,6 +80,38 @@ export const campaignPhaseRouter = router({
         }
       }
 
+      // Fatura ativa por fase (não-cancelada, mais recente). Usado pelo
+      // badge de status no card de batch (regra "1 batch = 1 fatura").
+      const activeInvoiceRows = await db
+        .select()
+        .from(invoices)
+        .where(sql`${invoices.campaignPhaseId} IN (${sql.join(phaseIds.map((id) => sql`${id}`), sql`, `)}) AND ${invoices.status} <> 'cancelada'`)
+        .orderBy(desc(invoices.id));
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const activeInvoiceByPhase: Record<number, {
+        id: number; invoiceNumber: string; amount: number;
+        status: "paga" | "emitida" | "vencida" | "prevista";
+        rawStatus: string; issueDate: string; dueDate: string;
+      }> = {};
+      for (const inv of activeInvoiceRows) {
+        if (inv.campaignPhaseId == null) continue;
+        if (activeInvoiceByPhase[inv.campaignPhaseId]) continue; // já temos a mais recente
+        let status: "paga" | "emitida" | "vencida" | "prevista" = "prevista";
+        if (inv.status === "paga") status = "paga";
+        else if (inv.status === "vencida") status = "vencida";
+        else if (inv.status === "emitida") status = inv.dueDate < todayIso ? "vencida" : "emitida";
+        else status = "prevista";
+        activeInvoiceByPhase[inv.campaignPhaseId] = {
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+          amount: parseFloat(inv.amount),
+          status,
+          rawStatus: inv.status,
+          issueDate: inv.issueDate,
+          dueDate: inv.dueDate,
+        };
+      }
+
       const payableAgg = await db
         .select({
           campaignPhaseId: accountsPayable.campaignPhaseId,
@@ -133,6 +165,7 @@ export const campaignPhaseRouter = router({
             totalDue: payableAggMap[p.id]?.totalDue ?? 0,
             totalPaid: payableAggMap[p.id]?.totalPaid ?? 0,
           },
+          activeInvoice: activeInvoiceByPhase[p.id] ?? null,
         };
       });
     }),
@@ -432,12 +465,16 @@ export const campaignPhaseRouter = router({
       const campaignInvoices = await db
         .select()
         .from(invoices)
-        .where(eq(invoices.campaignId, input.campaignId));
+        .where(eq(invoices.campaignId, input.campaignId))
+        .orderBy(asc(invoices.issueDate));
 
       const campaignPayables = await db
         .select()
         .from(accountsPayable)
         .where(eq(accountsPayable.campaignId, input.campaignId));
+
+      // Hoje (UTC date) para detectar vencidas
+      const todayIso = new Date().toISOString().slice(0, 10);
 
       // Agregações por fase
       const phaseBreakdown = phases.map((p) => {
@@ -451,7 +488,7 @@ export const campaignPhaseRouter = router({
 
         const phaseInvoices = campaignInvoices.filter((inv) => inv.campaignPhaseId === p.id);
         const invoiced = phaseInvoices
-          .filter((inv) => inv.status !== "cancelada")
+          .filter((inv) => inv.status !== "cancelada" && inv.status !== "prevista")
           .reduce((s, inv) => s + parseFloat(inv.amount), 0);
         const received = phaseInvoices
           .filter((inv) => inv.status === "paga")
@@ -464,6 +501,23 @@ export const campaignPhaseRouter = router({
         const paid = phasePayables
           .filter((ap) => ap.status === "pago")
           .reduce((s, ap) => s + parseFloat(ap.amount), 0);
+
+        // Fatura ativa do batch (1 ativa por phase). Se há mais de uma
+        // não-cancelada (caso de refaturamento mal feito), usa a mais recente.
+        const activeInvoices = phaseInvoices
+          .filter((inv) => inv.status !== "cancelada")
+          .sort((a, b) => (a.id < b.id ? 1 : -1));
+        const activeInvoice = activeInvoices[0] ?? null;
+        const invoiceStatus: "paga" | "emitida" | "vencida" | "prevista" | "cancelada" | "none" = (() => {
+          if (!activeInvoice) return "none";
+          if (activeInvoice.status === "paga") return "paga";
+          if (activeInvoice.status === "emitida") {
+            return activeInvoice.dueDate < todayIso ? "vencida" : "emitida";
+          }
+          if (activeInvoice.status === "vencida") return "vencida";
+          if (activeInvoice.status === "prevista") return "prevista";
+          return "cancelada";
+        })();
 
         return {
           phaseId: p.id,
@@ -482,6 +536,18 @@ export const campaignPhaseRouter = router({
           paid,
           realMargin: received - paid,
           realMarginPct: received > 0 ? ((received - paid) / received) * 100 : 0,
+          invoice: activeInvoice ? {
+            id: activeInvoice.id,
+            invoiceNumber: activeInvoice.invoiceNumber,
+            amount: parseFloat(activeInvoice.amount),
+            status: invoiceStatus,
+            rawStatus: activeInvoice.status,
+            issueDate: activeInvoice.issueDate,
+            dueDate: activeInvoice.dueDate,
+            paymentDate: activeInvoice.paymentDate,
+            documentUrl: activeInvoice.documentUrl,
+          } : null,
+          duplicateInvoiceCount: activeInvoices.length > 1 ? activeInvoices.length : 0,
         };
       });
 
@@ -574,62 +640,110 @@ export const campaignPhaseRouter = router({
         })).default([]),
       })),
       replaceExisting: z.boolean().default(false),
+      autoScheduleInvoices: z.boolean().default(true),
+      dueOffsetDays: z.number().int().min(0).max(120).default(15),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
       const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
       if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
 
-      if (input.replaceExisting) {
-        // Limpa fases atuais (e itens em cascata). Cuidado: isso também
-        // zera invoiceId/accountsPayable.campaignPhaseId via ON DELETE SET NULL
-        // preservando as faturas/contas existentes porém sem vínculo.
-        await db.delete(campaignPhases).where(eq(campaignPhases.campaignId, input.campaignId));
-      }
-
-      // Próximo sequence (caso não seja replace)
-      const [maxSeq] = await db
-        .select({ max: sql<number>`COALESCE(MAX(${campaignPhases.sequence}), 0)::int` })
-        .from(campaignPhases)
-        .where(eq(campaignPhases.campaignId, input.campaignId));
-      let nextSeq = (maxSeq?.max ?? 0) + 1;
-
-      const createdPhases: Array<{ phaseId: number; itemIds: number[] }> = [];
-
-      for (const ph of input.phases) {
-        const [createdPhase] = await db
-          .insert(campaignPhases)
-          .values({
-            campaignId: input.campaignId,
-            sequence: nextSeq++,
-            label: ph.label,
-            periodStart: ph.periodStart,
-            periodEnd: ph.periodEnd,
-            status: ph.status,
-          })
-          .returning();
-
-        const itemIds: number[] = [];
-        for (const it of ph.items) {
-          const total = (parseFloat(it.unitPrice) * it.quantity).toFixed(2);
-          const [createdItem] = await db
-            .insert(campaignItems)
-            .values({
-              campaignPhaseId: createdPhase.id,
-              productId: it.productId,
-              quantity: it.quantity,
-              unitPrice: it.unitPrice,
-              totalPrice: total,
-              productionCost: it.productionCost,
-              freightCost: it.freightCost,
-            })
-            .returning();
-          itemIds.push(createdItem.id);
+      // Toda a operação (deleção opcional + phases + items + faturas previstas)
+      // roda numa transação única — atomicidade garante que não ficamos com
+      // batches sem cronograma de faturamento em caso de falha parcial.
+      return await db.transaction(async (tx: any) => {
+        if (input.replaceExisting) {
+          await tx.delete(campaignPhases).where(eq(campaignPhases.campaignId, input.campaignId));
         }
 
-        createdPhases.push({ phaseId: createdPhase.id, itemIds });
-      }
+        const [maxSeq] = await tx
+          .select({ max: sql<number>`COALESCE(MAX(${campaignPhases.sequence}), 0)::int` })
+          .from(campaignPhases)
+          .where(eq(campaignPhases.campaignId, input.campaignId));
+        let nextSeq = (maxSeq?.max ?? 0) + 1;
 
-      return { createdPhases, count: createdPhases.length };
+        const createdPhases: Array<{ phaseId: number; itemIds: number[] }> = [];
+
+        for (const ph of input.phases) {
+          const [createdPhase] = await tx
+            .insert(campaignPhases)
+            .values({
+              campaignId: input.campaignId,
+              sequence: nextSeq++,
+              label: ph.label,
+              periodStart: ph.periodStart,
+              periodEnd: ph.periodEnd,
+              status: ph.status,
+            })
+            .returning();
+
+          const itemIds: number[] = [];
+          for (const it of ph.items) {
+            const total = (parseFloat(it.unitPrice) * it.quantity).toFixed(2);
+            const [createdItem] = await tx
+              .insert(campaignItems)
+              .values({
+                campaignPhaseId: createdPhase.id,
+                productId: it.productId,
+                quantity: it.quantity,
+                unitPrice: it.unitPrice,
+                totalPrice: total,
+                productionCost: it.productionCost,
+                freightCost: it.freightCost,
+              })
+              .returning();
+            itemIds.push(createdItem.id);
+          }
+
+          createdPhases.push({ phaseId: createdPhase.id, itemIds });
+        }
+
+        let scheduledInvoices = 0;
+        if (input.autoScheduleInvoices && createdPhases.length > 0) {
+          const addDays = (iso: string, days: number) => {
+            const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
+            d.setUTCDate(d.getUTCDate() + days);
+            return d.toISOString().slice(0, 10);
+          };
+          const newPhaseIds = createdPhases.map((cp) => cp.phaseId);
+          const phaseRows = await tx.select().from(campaignPhases).where(sql`${campaignPhases.id} IN (${sql.join(newPhaseIds.map((id) => sql`${id}`), sql`, `)})`);
+          const itemRows = await tx.select().from(campaignItems).where(sql`${campaignItems.campaignPhaseId} IN (${sql.join(newPhaseIds.map((id) => sql`${id}`), sql`, `)})`);
+          const revenueByPhase: Record<number, number> = {};
+          for (const it of itemRows) {
+            const v = it.totalPrice != null
+              ? parseFloat(it.totalPrice)
+              : it.quantity * parseFloat(it.unitPrice);
+            revenueByPhase[it.campaignPhaseId] = (revenueByPhase[it.campaignPhaseId] ?? 0) + v;
+          }
+          const existing = await tx
+            .select({ phaseId: invoices.campaignPhaseId })
+            .from(invoices)
+            .where(sql`${invoices.campaignPhaseId} IN (${sql.join(newPhaseIds.map((id) => sql`${id}`), sql`, `)}) AND ${invoices.status} <> 'cancelada'`);
+          const skip = new Set<number>(existing.map((r: any) => r.phaseId).filter((x: any): x is number => x != null));
+
+          const toInsert: any[] = [];
+          for (const p of phaseRows) {
+            if (skip.has(p.id)) continue;
+            toInsert.push({
+              campaignId: input.campaignId,
+              campaignPhaseId: p.id,
+              clientId: campaign.clientId,
+              invoiceNumber: `PREV-${input.campaignId}-${p.sequence}`,
+              amount: (revenueByPhase[p.id] ?? 0).toFixed(2),
+              billingType: "bruto" as const,
+              issueDate: p.periodStart,
+              dueDate: addDays(p.periodStart, input.dueOffsetDays),
+              status: "prevista" as const,
+              notes: `Fatura prevista — Batch ${p.sequence} (${p.label})`,
+            });
+          }
+          if (toInsert.length > 0) {
+            await tx.insert(invoices).values(toInsert);
+            scheduledInvoices = toInsert.length;
+          }
+        }
+
+        return { createdPhases, count: createdPhases.length, scheduledInvoices };
+      });
     }),
 });
