@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2, Building2, Search, UserX } from "lucide-react";
 import { trpc, type RouterOutputs } from "@/lib/trpc";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useWizardStore } from "./wizardStore";
 import { StepHero } from "./StepHero";
@@ -13,12 +12,14 @@ import { StepUpsell } from "./StepUpsell";
 import { StepCreative } from "./StepCreative";
 import { StepConfirm } from "./StepConfirm";
 import { StepSuccess } from "./StepSuccess";
+import { MesaButton, MesaAdsLogo } from "./mesa/MesaUI";
 import { cn } from "@/lib/utils";
 
 type Source = "self_service_anunciante" | "self_service_parceiro" | "internal";
+type ResolvedRole = "anunciante" | "parceiro" | "internal";
 
 function resolveRoleAndSource(role: string | null | undefined): {
-  role: "anunciante" | "parceiro" | "internal";
+  role: ResolvedRole;
   source: Source;
 } | null {
   if (!role) return null;
@@ -31,74 +32,133 @@ function resolveRoleAndSource(role: string | null | undefined): {
 }
 
 export default function CampaignWizard() {
-  const { user } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
   const step = useWizardStore((s) => s.step);
-  const reset = useWizardStore((s) => s.reset);
 
   const resolved = resolveRoleAndSource(user?.role);
 
-  // Reset wizard whenever the page mounts fresh.
-  useEffect(() => {
-    reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // While auth is resolving, don't flash the hero/picker — show a quiet loader.
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-chalk-muted">
+        <Loader2 className="w-4 h-4 animate-spin mr-2" /> carregando…
+      </div>
+    );
+  }
 
+  // Logged-out visitors: show hero immediately as a "guest". Any other step
+  // attempts a redirect to Clerk (preserving their selection in localStorage).
+  if (!isAuthenticated) {
+    if (step === "hero") {
+      return <StepHero role="guest" clientLabel={null} hasPartner={false} />;
+    }
+    return <RequireAuthGate />;
+  }
+
+  // Logged in but role isn't allowed in the checkout: send them home with a
+  // clear pointer to the right portal.
+  if (!resolved) {
+    const roleKey = (user?.role ?? "").toLowerCase();
+    const portal =
+      roleKey === "restaurante" || roleKey === "restaurant"
+        ? { href: "/parceiro", label: "ir para o portal do restaurante" }
+        : roleKey === "anunciante"
+        ? { href: "/portal", label: "ir para o portal do anunciante" }
+        : { href: "/", label: "voltar para o início" };
+    return (
+      <Centered
+        title="Seu perfil não tem acesso ao checkout."
+        icon={<UserX className="w-5 h-5 text-mesa-amber" />}
+      >
+        <p className="text-sm text-chalk-muted max-w-md mx-auto mb-5">
+          Esta conta não está habilitada para montar campanhas. Use o portal correspondente
+          ao seu perfil ou fale com o time mesa.ads.
+        </p>
+        <div className="flex items-center justify-center gap-3">
+          <a
+            href={portal.href}
+            className="inline-flex items-center gap-2 h-11 px-6 rounded-full bg-mesa-neon text-ink-950 font-semibold text-sm shadow-neon-sm hover:brightness-110 transition"
+          >
+            {portal.label}
+          </a>
+          <a
+            href="/"
+            className="text-xs text-chalk-muted hover:text-chalk underline-offset-2 hover:underline"
+          >
+            voltar para a home
+          </a>
+        </div>
+      </Centered>
+    );
+  }
+
+  return (
+    <ResolvedFlow
+      role={resolved.role}
+      source={resolved.source}
+      autoClientId={resolved.role === "anunciante" ? user?.clientId ?? null : null}
+      onboardingComplete={user?.onboardingComplete !== false}
+    />
+  );
+}
+
+function ResolvedFlow({
+  role,
+  source,
+  autoClientId,
+  onboardingComplete,
+}: {
+  role: ResolvedRole;
+  source: Source;
+  autoClientId: number | null;
+  onboardingComplete: boolean;
+}) {
   type ClientChoice = { kind: "client"; id: number } | { kind: "none" };
   const [choice, setChoice] = useState<ClientChoice | null>(null);
 
-  // Anunciante: clientId comes from user.clientId.
-  const autoClientId = resolved?.role === "anunciante" ? user?.clientId ?? null : null;
   const effectiveChoice: ClientChoice | null =
     autoClientId != null ? { kind: "client", id: autoClientId } : choice;
 
-  if (!resolved) {
+  const step = useWizardStore((s) => s.step);
+  const goTo = useWizardStore((s) => s.goTo);
+
+  if (role === "anunciante" && !autoClientId) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
-        Seu perfil não tem acesso ao wizard.
-      </div>
+      <Centered
+        title="Sua conta ainda não tem um cliente vinculado."
+        icon={<Building2 className="w-5 h-5 text-mesa-amber" />}
+      >
+        <p className="text-sm text-chalk-muted max-w-md">
+          {onboardingComplete
+            ? "Fale com o time mesa.ads para vincular seu cadastro de anunciante."
+            : "Complete o cadastro do anunciante antes de montar uma campanha."}
+        </p>
+      </Centered>
     );
   }
 
-  if (resolved.role === "anunciante" && !autoClientId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-6 text-center">
-        <div>
-          <div className="mx-auto size-12 rounded-full bg-amber-500/15 flex items-center justify-center mb-4">
-            <Building2 className="w-5 h-5 text-amber-400" />
-          </div>
-          <div className="font-semibold mb-1">Sua conta ainda não tem um cliente vinculado.</div>
-          <p className="text-sm text-muted-foreground max-w-md">
-            Complete o cadastro do anunciante antes de montar uma campanha.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (effectiveChoice == null && resolved.role !== "anunciante") {
+  // Partner & internal users must pick a client BEFORE seeing the hero/wizard.
+  if (effectiveChoice == null && role !== "anunciante") {
     return (
       <ClientPicker
-        role={resolved.role}
+        role={role}
         onPicked={(id) => setChoice({ kind: "client", id })}
-        onSkip={resolved.role === "internal" ? () => setChoice({ kind: "none" }) : undefined}
+        onSkip={role === "internal" ? () => setChoice({ kind: "none" }) : undefined}
+        onBack={() => goTo("hero")}
       />
     );
   }
 
-  if (effectiveChoice == null) {
-    return null;
-  }
+  if (effectiveChoice == null) return null;
+
+  const clientId = effectiveChoice.kind === "client" ? effectiveChoice.id : null;
 
   if (step === "success") {
-    return <StepSuccess role={resolved.role} />;
+    return <StepSuccess role={role} />;
   }
 
   return (
-    <ResolvedWizard
-      clientId={effectiveChoice.kind === "client" ? effectiveChoice.id : null}
-      role={resolved.role}
-      source={resolved.source}
-    />
+    <ResolvedWizard clientId={clientId} role={role} source={source} />
   );
 }
 
@@ -110,7 +170,7 @@ function ResolvedWizard({
   source,
 }: {
   clientId: number | null;
-  role: "anunciante" | "parceiro" | "internal";
+  role: ResolvedRole;
   source: Source;
 }) {
   const step = useWizardStore((s) => s.step);
@@ -150,16 +210,60 @@ function ResolvedWizard({
   }
 }
 
+function RequireAuthGate() {
+  const goTo = useWizardStore((s) => s.goTo);
+  useEffect(() => {
+    // Send the visitor to signup, telling Clerk to bring them back here.
+    window.location.href = "/?mode=signup&redirect=/montar-campanha";
+  }, []);
+  return (
+    <Centered title="redirecionando para o cadastro…">
+      <button
+        onClick={() => goTo("hero")}
+        className="text-xs text-chalk-muted underline-offset-2 hover:underline"
+      >
+        voltar para o início
+      </button>
+    </Centered>
+  );
+}
+
+function Centered({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="min-h-screen flex items-center justify-center px-6 text-center text-chalk">
+      <div>
+        {icon && (
+          <div className="mx-auto size-12 rounded-full bg-mesa-amber/15 flex items-center justify-center mb-4">
+            {icon}
+          </div>
+        )}
+        <div className="font-semibold mb-1">{title}</div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 type PartnerClient = RouterOutputs["advertiser"]["listByPartner"][number];
 
 function ClientPicker({
   role,
   onPicked,
   onSkip,
+  onBack,
 }: {
   role: "parceiro" | "internal";
   onPicked: (id: number) => void;
   onSkip?: () => void;
+  onBack: () => void;
 }) {
   const [query, setQuery] = useState("");
   const { data: clients = [], isLoading } = trpc.advertiser.listByPartner.useQuery({});
@@ -175,32 +279,44 @@ function ClientPicker({
   }, [clients, query]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border/40 bg-card/40 backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
-          <img src="/logo-white.png" alt="mesa.ads" className="h-5 hidden sm:block" />
-          <span className="text-xs text-muted-foreground border-l border-border/30 pl-3 hidden sm:block">
-            Montar campanha
+    <div className="min-h-screen text-chalk">
+      <header className="px-6 sm:px-10 pt-6 pb-4 flex items-center justify-between">
+        <a href="/" className="inline-flex items-center gap-3">
+          <MesaAdsLogo className="text-xl" />
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-chalk-dim border-l border-hairline pl-3">
+            auto-checkout
           </span>
-        </div>
+        </a>
+        <button
+          onClick={onBack}
+          className="text-[12px] text-chalk-muted hover:text-chalk transition-colors"
+        >
+          ← voltar para o início
+        </button>
       </header>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-1.5">
+      <div className="max-w-3xl mx-auto px-6 sm:px-10 py-10">
+        <div className="text-[10px] uppercase tracking-[0.22em] text-mesa-neon mb-3">
+          escolha o cliente
+        </div>
+        <h1
+          className="font-display font-semibold tracking-[-0.03em] text-chalk text-balance mb-3"
+          style={{ fontSize: "var(--text-title)" }}
+        >
           {role === "parceiro" ? "Para qual cliente?" : "Selecione o cliente"}
         </h1>
-        <p className="text-sm text-muted-foreground mb-6">
+        <p className="text-sm text-chalk-muted mb-8 max-w-xl">
           {role === "parceiro"
             ? "Escolha um dos seus clientes para montar a campanha."
             : "Escolha o cliente para o qual a cotação será criada."}
         </p>
 
         <div className="relative max-w-md mb-5">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-chalk-dim" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar cliente..."
-            className="pl-9"
+            className="pl-9 bg-ink-900/70 border-hairline text-chalk placeholder:text-chalk-dim"
           />
         </div>
 
@@ -208,31 +324,31 @@ function ClientPicker({
           <button
             type="button"
             onClick={onSkip}
-            className="mb-4 w-full flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-dashed border-border/60 bg-card/30 hover:border-primary hover:bg-primary/5 transition-colors text-left"
+            className="mb-4 w-full flex items-center justify-between gap-4 px-4 py-3 rounded-xl border border-dashed border-hairline-bold bg-ink-900/40 hover:border-mesa-neon/50 hover:bg-mesa-neon/5 transition-colors text-left"
             data-testid="button-skip-client"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="size-8 rounded-md bg-muted flex items-center justify-center shrink-0">
-                <UserX className="w-4 h-4 text-muted-foreground" />
+              <div className="size-9 rounded-lg bg-ink-800 flex items-center justify-center shrink-0">
+                <UserX className="w-4 h-4 text-chalk-muted" />
               </div>
               <div className="min-w-0">
-                <div className="font-medium">Sem cliente específico</div>
-                <div className="text-xs text-muted-foreground">
+                <div className="font-medium text-chalk">Sem cliente específico</div>
+                <div className="text-xs text-chalk-muted">
                   Criar cotação interna sem vincular a um cliente.
                 </div>
               </div>
             </div>
-            <Button size="sm" variant="ghost" tabIndex={-1}>Selecionar</Button>
+            <MesaButton variant="ghost" size="sm" tabIndex={-1}>Selecionar</MesaButton>
           </button>
         )}
 
         {isLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-chalk-muted">
             <Loader2 className="w-4 h-4 animate-spin" /> Carregando clientes...
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
-            <p className="text-sm text-muted-foreground mb-3">
+          <div className="rounded-xl border border-dashed border-hairline p-8 text-center">
+            <p className="text-sm text-chalk-muted mb-3">
               {role === "parceiro"
                 ? "Você ainda não tem clientes cadastrados."
                 : "Nenhum cliente encontrado."}
@@ -246,18 +362,18 @@ function ClientPicker({
                 type="button"
                 onClick={() => onPicked(c.id)}
                 className={cn(
-                  "w-full flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-border/40 bg-card/40 hover:border-primary hover:bg-primary/5 transition-colors text-left",
+                  "w-full flex items-center justify-between gap-4 px-4 py-3 rounded-xl border border-hairline bg-ink-900/40 hover:border-mesa-neon/40 hover:bg-mesa-neon/5 transition-colors text-left",
                 )}
               >
                 <div className="min-w-0">
-                  <div className="font-medium truncate">{c.company || c.name}</div>
+                  <div className="font-medium text-chalk truncate">{c.company || c.name}</div>
                   {c.company && c.name && (
-                    <div className="text-xs text-muted-foreground truncate">{c.name}</div>
+                    <div className="text-xs text-chalk-muted truncate">{c.name}</div>
                   )}
                 </div>
-                <Button size="sm" variant="ghost" tabIndex={-1}>
+                <MesaButton variant="ghost" size="sm" tabIndex={-1}>
                   Selecionar
-                </Button>
+                </MesaButton>
               </button>
             ))}
           </div>

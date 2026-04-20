@@ -1,7 +1,5 @@
 import { useEffect, useMemo } from "react";
 import { trpc, type RouterOutputs } from "@/lib/trpc";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useWizardStore } from "./wizardStore";
 import { WizardShell } from "./WizardShell";
 import { OrderSummary } from "./OrderSummary";
@@ -52,7 +50,6 @@ export function StepConfirm({ clientId, clientLabel, hasPartner, source }: Props
   const productData = product as ProductGet | undefined;
   const productName = productData?.name ?? "Produto";
 
-  // Pre-fill campaign name with sensible default
   useEffect(() => {
     if (!confirm.campaignName && productData) {
       const date = new Date();
@@ -122,10 +119,11 @@ export function StepConfirm({ clientId, clientLabel, hasPartner, source }: Props
 
   return (
     <WizardShell
+      eyebrow="07 · revisão"
       title="Revisar e enviar"
       subtitle="Esta cotação será criada como rascunho. O time comercial revisa e envia para você."
       onNext={handleSubmit}
-      nextLabel={createMutation.isPending ? "Enviando..." : "Enviar cotação"}
+      nextLabel={createMutation.isPending ? "enviando…" : "enviar cotação"}
       nextDisabled={!valid || createMutation.isPending}
       isLoading={createMutation.isPending}
       summary={
@@ -139,36 +137,48 @@ export function StepConfirm({ clientId, clientLabel, hasPartner, source }: Props
         />
       }
     >
-      <div className="rounded-xl border border-border/40 bg-card/40 p-5 space-y-5 max-w-2xl">
-        <div>
-          <label className="text-sm font-medium block mb-1.5">Nome da campanha *</label>
-          <Input
+      <div className="rounded-2xl border border-hairline bg-ink-900/50 backdrop-blur-md p-6 sm:p-8 space-y-6 max-w-2xl">
+        <Field label="nome da campanha *">
+          <input
+            type="text"
             value={confirm.campaignName}
             onChange={(e) => setConfirm({ campaignName: e.target.value })}
             placeholder="Ex: Lançamento Verão 2026"
+            className="w-full h-12 rounded-xl bg-ink-950/60 border border-hairline px-4 text-[14px] text-chalk placeholder:text-chalk-dim outline-none focus:border-mesa-neon/60 focus:ring-2 focus:ring-mesa-neon/20 transition"
           />
-        </div>
+        </Field>
 
-        <div>
-          <label className="text-sm font-medium block mb-1.5">Data desejada de início *</label>
-          <Input
+        <Field label="data desejada de início *">
+          <input
             type="date"
             value={confirm.startDate}
             onChange={(e) => setConfirm({ startDate: e.target.value })}
             min={new Date().toISOString().slice(0, 10)}
+            className="w-full h-12 rounded-xl bg-ink-950/60 border border-hairline px-4 text-[14px] text-chalk placeholder:text-chalk-dim outline-none focus:border-mesa-neon/60 focus:ring-2 focus:ring-mesa-neon/20 transition [color-scheme:dark]"
           />
-        </div>
+        </Field>
 
-        <div>
-          <label className="text-sm font-medium block mb-1.5">Observações para o time comercial</label>
-          <Textarea
+        <Field label="observações para o time comercial">
+          <textarea
             value={confirm.notes}
             onChange={(e) => setConfirm({ notes: e.target.value })}
             placeholder="Algo que devemos saber? (opcional)"
             rows={4}
+            className="w-full rounded-xl bg-ink-950/60 border border-hairline px-4 py-3 text-[14px] text-chalk placeholder:text-chalk-dim outline-none focus:border-mesa-neon/60 focus:ring-2 focus:ring-mesa-neon/20 transition resize-none"
           />
-        </div>
+        </Field>
       </div>
     </WizardShell>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-[10px] uppercase tracking-[0.22em] text-chalk-dim mb-2">
+        {label}
+      </label>
+      {children}
+    </div>
   );
 }

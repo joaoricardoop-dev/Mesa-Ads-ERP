@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export type WizardStep =
   | "hero"
@@ -87,7 +88,7 @@ const INITIAL_CONFIRM: ConfirmState = {
   notes: "",
 };
 
-export const useWizardStore = create<WizardState>((set, get) => ({
+export const useWizardStore = create<WizardState>()(persist((set, get) => ({
   step: "hero",
   productId: null,
   venueIds: [],
@@ -140,4 +141,16 @@ export const useWizardStore = create<WizardState>((set, get) => ({
       quotationNumber: null,
       quotationId: null,
     }),
+}), {
+  name: "mesa-wizard-state",
+  storage: createJSONStorage(() => localStorage),
+  partialize: (s) => ({
+    productId: s.productId,
+    venueIds: s.venueIds,
+    volume: s.volume,
+    weeks: s.weeks,
+    addOnIds: s.addOnIds,
+    creative: s.creative,
+    confirm: s.confirm,
+  }),
 }));

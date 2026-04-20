@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { Brush, Upload, Loader2, Trash2, Sparkles, FileText } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { useWizardStore } from "./wizardStore";
 import { WizardShell } from "./WizardShell";
 import { OrderSummary } from "./OrderSummary";
+import { MesaButton } from "./mesa/MesaUI";
 import { useUpload } from "@/hooks/use-upload";
 import { cn } from "@/lib/utils";
 import type { ProductLite, PricingTier, DiscountTier } from "./pricing";
@@ -59,6 +59,7 @@ export function StepCreative({ clientLabel, hasPartner }: Props) {
 
   return (
     <WizardShell
+      eyebrow="06 · arte"
       title="E a arte da campanha?"
       subtitle="Você pode enviar a arte pronta ou pedir para nossa equipe criar."
       onNext={next}
@@ -81,6 +82,7 @@ export function StepCreative({ clientLabel, hasPartner }: Props) {
           title="Tenho a arte pronta"
           desc="Envie um arquivo PDF, JPG ou PNG."
           onClick={() => setCreativeChoice("own")}
+          delay={0}
         />
         <ChoiceCard
           active={creative.choice === "agency"}
@@ -88,26 +90,31 @@ export function StepCreative({ clientLabel, hasPartner }: Props) {
           title="Quero que a agência crie"
           desc="Conte um pouco sobre a campanha."
           onClick={() => setCreativeChoice("agency")}
+          delay={0.06}
         />
       </div>
 
       {creative.choice === "own" && (
-        <div className="rounded-xl border border-border/40 bg-card/40 p-5">
+        <div className="rounded-2xl border border-hairline bg-ink-900/50 backdrop-blur-md p-6">
           {creative.fileUrl ? (
             <div className="flex items-center gap-3">
-              <FileText className="w-5 h-5 text-primary shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm truncate">{creative.fileName ?? "Arquivo"}</div>
-                <div className="text-[11px] text-muted-foreground truncate">{creative.fileUrl}</div>
+              <div className="size-10 rounded-lg bg-mesa-neon/10 border border-mesa-neon/30 flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4 text-mesa-neon" />
               </div>
-              <Button
-                variant="ghost"
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-[14px] text-chalk truncate">
+                  {creative.fileName ?? "Arquivo"}
+                </div>
+                <div className="text-[11px] text-chalk-dim truncate">{creative.fileUrl}</div>
+              </div>
+              <MesaButton
+                variant="quiet"
                 size="sm"
                 onClick={() => setCreativeFile(null, null)}
-                className="gap-1.5 text-destructive hover:text-destructive"
+                iconLeft={<Trash2 className="w-3.5 h-3.5" />}
               >
-                <Trash2 className="w-3.5 h-3.5" /> Remover
-              </Button>
+                remover
+              </MesaButton>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3 py-6 text-center">
@@ -121,42 +128,55 @@ export function StepCreative({ clientLabel, hasPartner }: Props) {
                   if (f) handleFile(f);
                 }}
               />
-              <Sparkles className="w-6 h-6 text-primary" />
-              <div className="text-sm font-medium">Selecione o arquivo da arte</div>
-              <Button onClick={() => fileRef.current?.click()} disabled={isUploading} className="gap-2">
-                {isUploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Enviando...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4" /> Escolher arquivo
-                  </>
-                )}
-              </Button>
-              {uploadError && <div className="text-xs text-destructive">{uploadError}</div>}
+              <div className="size-12 rounded-full bg-mesa-neon/10 border border-mesa-neon/30 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-mesa-neon" />
+              </div>
+              <div className="text-[14px] text-chalk font-medium">
+                Selecione o arquivo da arte
+              </div>
+              <MesaButton
+                variant="primary"
+                size="md"
+                onClick={() => fileRef.current?.click()}
+                disabled={isUploading}
+                iconLeft={
+                  isUploading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )
+                }
+              >
+                {isUploading ? "enviando…" : "escolher arquivo"}
+              </MesaButton>
+              {uploadError && (
+                <div className="text-[12px] text-rose-300">{uploadError}</div>
+              )}
             </div>
           )}
-          <Textarea
+          <textarea
             value={creative.briefing}
             onChange={(e) => setBriefing(e.target.value)}
-            placeholder="Observações sobre a arte (opcional)..."
-            className="mt-4"
+            placeholder="Observações sobre a arte (opcional)…"
             rows={3}
+            className="mt-5 w-full rounded-xl bg-ink-950/60 border border-hairline px-4 py-3 text-[13px] text-chalk placeholder:text-chalk-dim outline-none focus:border-mesa-neon/60 focus:ring-2 focus:ring-mesa-neon/20 transition resize-none"
           />
         </div>
       )}
 
       {creative.choice === "agency" && (
-        <div className="rounded-xl border border-border/40 bg-card/40 p-5">
-          <label className="text-sm font-medium block mb-2">Conte sobre a campanha</label>
-          <Textarea
+        <div className="rounded-2xl border border-hairline bg-ink-900/50 backdrop-blur-md p-6">
+          <label className="block text-[10px] uppercase tracking-[0.22em] text-chalk-dim mb-2">
+            briefing para a equipe
+          </label>
+          <textarea
             value={creative.briefing}
             onChange={(e) => setBriefing(e.target.value)}
-            placeholder="Sobre a marca, objetivo, oferta, tom de voz, referências de cores, prazo..."
+            placeholder="Sobre a marca, objetivo, oferta, tom de voz, referências de cores, prazo…"
             rows={6}
+            className="w-full rounded-xl bg-ink-950/60 border border-hairline px-4 py-3 text-[13px] text-chalk placeholder:text-chalk-dim outline-none focus:border-mesa-neon/60 focus:ring-2 focus:ring-mesa-neon/20 transition resize-none"
           />
-          <div className="mt-2 text-[11px] text-muted-foreground">
+          <div className="mt-2 text-[11px] text-chalk-dim">
             Mínimo 10 caracteres. Quanto mais detalhes, melhor.
           </div>
         </div>
@@ -171,32 +191,45 @@ function ChoiceCard({
   title,
   desc,
   onClick,
+  delay,
 }: {
   active: boolean;
   icon: React.ReactNode;
   title: string;
   desc: string;
   onClick: () => void;
+  delay: number;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay }}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.985 }}
       className={cn(
-        "text-left rounded-xl border p-5 transition-all",
-        active ? "border-primary bg-primary/5" : "border-border/40 hover:border-border bg-card/40",
+        "text-left rounded-2xl border p-5 transition-all backdrop-blur-md",
+        active
+          ? "border-mesa-neon bg-mesa-neon/10 shadow-neon-sm"
+          : "border-hairline bg-ink-900/50 hover:border-mesa-neon/40",
       )}
     >
       <div
         className={cn(
-          "size-10 rounded-lg flex items-center justify-center mb-3",
-          active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+          "size-10 rounded-xl flex items-center justify-center mb-3 transition-colors",
+          active
+            ? "bg-mesa-neon text-ink-950"
+            : "bg-white/5 text-chalk-muted border border-hairline",
         )}
       >
         {icon}
       </div>
-      <div className="font-semibold mb-1">{title}</div>
-      <div className="text-sm text-muted-foreground">{desc}</div>
-    </button>
+      <div className="font-display font-semibold text-[16px] tracking-tight text-chalk mb-1">
+        {title}
+      </div>
+      <div className="text-[13px] text-chalk-muted leading-relaxed">{desc}</div>
+    </motion.button>
   );
 }

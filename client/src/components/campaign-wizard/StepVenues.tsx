@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import { Loader2, MapPin, Search, Check } from "lucide-react";
+import { motion } from "framer-motion";
 import { trpc, type RouterOutputs } from "@/lib/trpc";
-
-type Restaurant = RouterOutputs["activeRestaurant"]["list"][number];
-import { Input } from "@/components/ui/input";
 import { useWizardStore } from "./wizardStore";
 import { WizardShell } from "./WizardShell";
 import { OrderSummary } from "./OrderSummary";
 import { cn } from "@/lib/utils";
 import type { ProductLite, PricingTier, DiscountTier } from "./pricing";
+
+type Restaurant = RouterOutputs["activeRestaurant"]["list"][number];
 
 interface Props {
   clientLabel: string | null;
@@ -48,8 +48,11 @@ export function StepVenues({ clientLabel, hasPartner }: Props) {
     );
   }, [restaurants, query]);
 
+  const allSelected = venueIds.length === filtered.length && filtered.length > 0;
+
   return (
     <WizardShell
+      eyebrow="02 · locais"
       title="Onde a campanha vai rodar?"
       subtitle="Escolha um ou mais locais parceiros. Você pode rever depois com o time comercial."
       onNext={next}
@@ -65,74 +68,81 @@ export function StepVenues({ clientLabel, hasPartner }: Props) {
         />
       }
     >
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-5">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-chalk-dim" />
+          <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por nome ou bairro..."
-            className="pl-9"
+            placeholder="buscar por nome ou bairro…"
+            className="w-full h-11 rounded-full bg-ink-900/70 border border-hairline pl-9 pr-4 text-[13px] text-chalk placeholder:text-chalk-dim outline-none focus:border-mesa-neon/60 focus:ring-2 focus:ring-mesa-neon/20 transition"
           />
         </div>
         <button
           type="button"
-          onClick={() =>
-            venueIds.length === filtered.length
-              ? setVenues([])
-              : setVenues(filtered.map((r) => r.id))
-          }
-          className="text-xs font-medium text-primary hover:underline"
+          onClick={() => (allSelected ? setVenues([]) : setVenues(filtered.map((r) => r.id)))}
+          className="text-[11px] uppercase tracking-[0.18em] font-semibold text-mesa-neon hover:brightness-110 transition"
         >
-          {venueIds.length === filtered.length && filtered.length > 0
-            ? "Desmarcar todos"
-            : "Selecionar todos"}
+          {allSelected ? "limpar" : "selecionar todos"}
         </button>
       </div>
 
       {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" /> Carregando locais...
+        <div className="flex items-center gap-2 text-sm text-chalk-muted">
+          <Loader2 className="w-4 h-4 animate-spin" /> carregando locais…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border/40 p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-dashed border-hairline p-10 text-center text-sm text-chalk-muted">
           Nenhum local encontrado.
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filtered.map((r) => {
+          {filtered.map((r, i) => {
             const active = venueIds.includes(r.id);
             return (
-              <button
+              <motion.button
                 key={r.id}
                 type="button"
                 onClick={() => toggleVenue(r.id)}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: Math.min(i, 12) * 0.025 }}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.985 }}
                 className={cn(
-                  "text-left rounded-xl border p-4 transition-all relative",
+                  "text-left rounded-2xl border p-4 transition-all relative backdrop-blur-md",
                   active
-                    ? "border-primary bg-primary/5"
-                    : "border-border/40 hover:border-border bg-card/40",
+                    ? "border-mesa-neon bg-mesa-neon/10 shadow-neon-sm"
+                    : "border-hairline bg-ink-900/50 hover:border-mesa-neon/40",
                 )}
               >
-                {active && (
-                  <div className="absolute top-2 right-2 size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                    <Check className="w-3 h-3" />
+                <span
+                  className={cn(
+                    "absolute top-3 right-3 size-5 rounded-full border flex items-center justify-center transition-all",
+                    active
+                      ? "bg-mesa-neon border-mesa-neon text-ink-950"
+                      : "border-hairline-bold bg-ink-800",
+                  )}
+                  aria-hidden
+                >
+                  {active && <Check className="w-3 h-3" strokeWidth={3} />}
+                </span>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-mesa-neon shrink-0" />
+                  <div className="font-display font-semibold text-[15px] text-chalk truncate">
+                    {r.name}
                   </div>
-                )}
-                <div className="flex items-center gap-2 mb-2">
-                  <MapPin className="w-4 h-4 text-primary shrink-0" />
-                  <div className="font-medium truncate">{r.name}</div>
                 </div>
-                <div className="text-xs text-muted-foreground truncate">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-chalk-dim truncate">
                   {r.neighborhood || r.address}
                 </div>
-                <div className="text-[11px] text-muted-foreground mt-2">
+                <div className="mt-3 text-[11px] text-chalk-muted tabular-nums">
                   {r.tableCount ? `${r.tableCount} mesas` : null}
                   {r.monthlyCustomers
                     ? ` · ${Number(r.monthlyCustomers).toLocaleString("pt-BR")} clientes/mês`
                     : null}
                 </div>
-              </button>
+              </motion.button>
             );
           })}
         </div>

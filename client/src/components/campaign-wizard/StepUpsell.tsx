@@ -1,5 +1,5 @@
-import { trpc } from "@/lib/trpc";
 import { Sparkles } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 import { useWizardStore } from "./wizardStore";
 import { WizardShell } from "./WizardShell";
 import { OrderSummary } from "./OrderSummary";
@@ -30,10 +30,11 @@ export function StepUpsell({ clientLabel, hasPartner }: Props) {
 
   return (
     <WizardShell
+      eyebrow="05 · adicionais"
       title="Quer algum adicional?"
       subtitle="Você pode incluir extras junto com sua campanha — opcional."
       onNext={next}
-      nextLabel="Pular adicionais"
+      nextLabel="pular adicionais"
       summary={
         <OrderSummary
           product={product as ProductLite | null}
@@ -45,12 +46,14 @@ export function StepUpsell({ clientLabel, hasPartner }: Props) {
         />
       }
     >
-      <div className="rounded-xl border border-dashed border-border/40 p-8 text-center">
-        <div className="mx-auto size-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-          <Sparkles className="w-5 h-5 text-primary" />
+      <div className="rounded-2xl border border-dashed border-hairline-bold bg-ink-900/40 backdrop-blur-md p-10 text-center">
+        <div className="mx-auto size-12 rounded-full bg-mesa-neon/10 border border-mesa-neon/30 flex items-center justify-center mb-4">
+          <Sparkles className="w-5 h-5 text-mesa-neon" />
         </div>
-        <div className="font-semibold mb-1">Sem adicionais por enquanto</div>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+        <div className="font-display font-semibold text-[18px] tracking-tight text-chalk mb-1.5">
+          Sem adicionais por enquanto
+        </div>
+        <p className="text-[13px] text-chalk-muted max-w-md mx-auto leading-relaxed">
           Se quiser combinar produtos ou contratar serviços extras (vídeo, ativação, etc.), o time
           comercial pode incluir depois na revisão da cotação.
         </p>

@@ -1,23 +1,28 @@
 import { ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useWizardStore, STEP_LABELS, STEP_ORDER, WizardStep } from "./wizardStore";
+import { motion, AnimatePresence } from "framer-motion";
+import { useWizardStore, STEP_ORDER, WizardStep } from "./wizardStore";
+import { MesaButton, MesaChip } from "./mesa/MesaUI";
+import { MesaProgressRail } from "./mesa/MesaProgressRail";
 import { cn } from "@/lib/utils";
 
 interface WizardShellProps {
   title: string;
-  subtitle?: string;
+  eyebrow?: string;
+  subtitle?: ReactNode;
   children: ReactNode;
   summary?: ReactNode;
   onNext?: () => void;
   nextLabel?: string;
   nextDisabled?: boolean;
   hideFooter?: boolean;
+  hideBack?: boolean;
   isLoading?: boolean;
 }
 
 export function WizardShell({
   title,
+  eyebrow,
   subtitle,
   children,
   summary,
@@ -25,97 +30,108 @@ export function WizardShell({
   nextLabel = "Continuar",
   nextDisabled,
   hideFooter,
+  hideBack,
   isLoading,
 }: WizardShellProps) {
   const step = useWizardStore((s) => s.step);
   const back = useWizardStore((s) => s.back);
   const next = useWizardStore((s) => s.next);
-  const goTo = useWizardStore((s) => s.goTo);
 
   const visible: WizardStep[] = STEP_ORDER.filter((s) => s !== "success");
   const idx = visible.indexOf(step);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Top progress rail */}
-      <header className="border-b border-border/40 bg-card/40 backdrop-blur-sm sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
-          <img src="/logo-white.png" alt="mesa.ads" className="h-5 hidden sm:block" />
-          <span className="text-xs text-muted-foreground border-l border-border/30 pl-3 hidden sm:block">
-            Montar campanha
+    <div className="relative min-h-screen text-chalk lg:pl-[124px] pt-[64px] lg:pt-0">
+      <MesaProgressRail />
+
+      <header className="relative z-10 px-6 sm:px-10 pt-6 pb-4 flex items-center justify-end">
+        <div className="flex items-center gap-3">
+          <MesaChip tone="neon" dot size="xs">
+            ao vivo
+          </MesaChip>
+          <span className="hidden md:inline text-[11px] uppercase tracking-[0.18em] text-chalk-dim tabular-nums">
+            etapa {String(idx + 1).padStart(2, "0")} / {String(visible.length).padStart(2, "0")}
           </span>
-          <div className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 overflow-x-auto">
-            {visible.map((s, i) => {
-              const state: "done" | "active" | "idle" =
-                i < idx ? "done" : i === idx ? "active" : "idle";
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  disabled={i > idx}
-                  onClick={() => i < idx && goTo(s as WizardStep)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium uppercase tracking-wide transition-colors shrink-0",
-                    state === "active" && "text-primary",
-                    state === "done" && "text-muted-foreground hover:text-foreground",
-                    state === "idle" && "text-muted-foreground/40 cursor-default",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "size-2 rounded-full",
-                      state === "active" && "bg-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.18)]",
-                      state === "done" && "bg-primary/60",
-                      state === "idle" && "bg-muted",
-                    )}
-                  />
-                  <span className="hidden md:inline">{STEP_LABELS[s]}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="text-[10px] tracking-widest uppercase text-muted-foreground hidden lg:block">
-            {idx + 1} / {visible.length}
-          </div>
         </div>
       </header>
 
-      <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-10 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 xl:gap-10">
+      <div className="relative z-10 mx-auto max-w-[1240px] px-6 sm:px-10 pb-24 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-8 lg:gap-12">
+        {/* Main pane */}
         <main className="min-w-0">
-          <div className="mb-6 sm:mb-8">
-            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-balance">{title}</h1>
-            {subtitle && <p className="text-sm text-muted-foreground mt-1.5">{subtitle}</p>}
-          </div>
-          {children}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="mb-8">
+                {eyebrow && (
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-mesa-neon mb-3">
+                    {eyebrow}
+                  </div>
+                )}
+                <h1
+                  className="font-display font-semibold leading-[1.02] tracking-[-0.03em] text-chalk text-balance"
+                  style={{ fontSize: "var(--text-title)" }}
+                >
+                  {title}
+                </h1>
+                {subtitle && (
+                  <p className="mt-3 max-w-[55ch] text-sm sm:text-[15px] leading-relaxed text-chalk-muted">
+                    {subtitle}
+                  </p>
+                )}
+              </div>
 
-          {!hideFooter && (
-            <div className="mt-8 flex items-center justify-between gap-3 border-t border-border/40 pt-6">
-              <Button
-                variant="ghost"
-                onClick={back}
-                disabled={idx <= 0}
-                className="gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Voltar
-              </Button>
-              <Button
-                onClick={onNext ?? next}
-                disabled={nextDisabled || isLoading}
-                className="gap-2"
-              >
-                {isLoading ? "Enviando..." : nextLabel}
-                {step === "confirm" ? <Check className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
-              </Button>
-            </div>
-          )}
+              {children}
+
+              {!hideFooter && (
+                <div className="mt-12 flex items-center justify-between gap-3 border-t border-hairline pt-6">
+                  {hideBack ? (
+                    <span />
+                  ) : (
+                    <MesaButton
+                      variant="quiet"
+                      size="md"
+                      onClick={back}
+                      disabled={idx <= 0}
+                      iconLeft={<ArrowLeft className="w-4 h-4" />}
+                    >
+                      Voltar
+                    </MesaButton>
+                  )}
+                  <MesaButton
+                    variant="primary"
+                    size="lg"
+                    onClick={onNext ?? next}
+                    disabled={nextDisabled || isLoading}
+                    iconRight={
+                      step === "confirm" ? (
+                        <Check className="w-5 h-5" />
+                      ) : (
+                        <ArrowRight className="w-5 h-5" />
+                      )
+                    }
+                  >
+                    {isLoading ? "Enviando..." : nextLabel}
+                  </MesaButton>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
 
+        {/* Order summary aside */}
         {summary && (
-          <aside className="xl:sticky xl:top-20 xl:self-start">
-            <div className="rounded-xl border border-border/40 bg-card/40 backdrop-blur-sm p-5">
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">
-                Resumo da campanha
+          <aside className="lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-auto">
+            <div className="rounded-2xl border border-hairline bg-ink-900/80 backdrop-blur-md p-6 shadow-soft">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[10px] uppercase tracking-[0.22em] text-chalk-dim">
+                  pedido
+                </span>
+                <MesaChip tone="ice" size="xs">estimativa</MesaChip>
               </div>
               {summary}
             </div>

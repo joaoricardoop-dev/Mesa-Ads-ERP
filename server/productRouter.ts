@@ -1,4 +1,4 @@
-import { protectedProcedure, adminProcedure, internalProcedure, router } from "./_core/trpc";
+import { protectedProcedure, adminProcedure, internalProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import { products, productPricingTiers, productDiscountPriceTiers, productLocations } from "../drizzle/schema";
@@ -25,6 +25,14 @@ export const productRouter = router({
   list: protectedProcedure.query(async () => {
     const db = await getDatabase();
     return db.select().from(products).orderBy(asc(products.name));
+  }),
+
+  // Lista pública: usada na tela /montar-campanha aberta a visitantes
+  // (logged out). Devolve apenas produtos ativos e visíveis para anunciantes.
+  listPublic: publicProcedure.query(async () => {
+    const db = await getDatabase();
+    const all = await db.select().from(products).orderBy(asc(products.name));
+    return all.filter((p) => p.isActive && p.visibleToAdvertisers);
   }),
 
   get: protectedProcedure

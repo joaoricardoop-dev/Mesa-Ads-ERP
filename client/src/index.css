@@ -46,6 +46,53 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Mesa.ads design tokens (used by wizard + external surfaces) */
+  --color-ink-950: #040405;
+  --color-ink-900: #0a0a0c;
+  --color-ink-800: #141416;
+  --color-ink-700: #1c1c20;
+  --color-ink-600: #252529;
+
+  --color-chalk: #f5f5f3;
+  --color-chalk-muted: #a6a6aa;
+  --color-chalk-dim: #6b6b70;
+
+  --color-mesa-neon: #00e640;
+  --color-mesa-neon-soft: #00ff56;
+  --color-mesa-magenta: #ff2e8a;
+  --color-mesa-amber: #f5e63a;
+  --color-mesa-orange: #f27a1a;
+  --color-mesa-ice: #b8f1ff;
+
+  --color-hairline: rgba(255, 255, 255, 0.08);
+  --color-hairline-bold: rgba(255, 255, 255, 0.14);
+
+  --text-mega: clamp(3.5rem, 9vw, 8rem);
+  --text-title: clamp(1.75rem, 3.5vw, 3rem);
+
+  --shadow-neon-sm:
+    0 0 0 1px color-mix(in srgb, #00e640 35%, transparent),
+    0 6px 24px -8px color-mix(in srgb, #00e640 45%, transparent);
+  --shadow-soft: 0 24px 60px -28px rgba(0, 0, 0, 0.65);
+
+  --ease-apple: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-swift: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --animate-pulse-neon: pulse-neon 2.6s var(--ease-apple) infinite;
+}
+
+@keyframes pulse-neon {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, #00e640 35%, transparent),
+      0 0 0 0 color-mix(in srgb, #00e640 0%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, #00e640 25%, transparent),
+      0 0 24px 0 color-mix(in srgb, #00e640 35%, transparent);
+  }
 }
 
 :root {

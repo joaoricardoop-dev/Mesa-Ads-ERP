@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { useWizardStore } from "./wizardStore";
 import { WizardShell } from "./WizardShell";
@@ -33,6 +34,7 @@ export function StepDuration({ clientLabel, hasPartner }: Props) {
 
   return (
     <WizardShell
+      eyebrow="04 · duração"
       title="Por quanto tempo?"
       subtitle="Campanhas mais longas têm desconto maior por prazo."
       onNext={next}
@@ -48,36 +50,46 @@ export function StepDuration({ clientLabel, hasPartner }: Props) {
       }
     >
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {SEMANAS_OPTIONS.map((w) => {
+        {SEMANAS_OPTIONS.map((w, i) => {
           const desc = DESCONTOS_PRAZO[w] ?? 0;
           const active = weeks === w;
+          const cycles = Math.max(1, Math.round(w / 4));
           return (
-            <button
+            <motion.button
               key={w}
               type="button"
               onClick={() => setWeeks(w)}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: i * 0.04 }}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.98 }}
               className={cn(
-                "rounded-xl border p-5 text-left transition-all",
+                "rounded-2xl border p-5 text-left transition-all backdrop-blur-md",
                 active
-                  ? "border-primary bg-primary/5"
-                  : "border-border/40 hover:border-border bg-card/40",
+                  ? "border-mesa-neon bg-mesa-neon/10 shadow-neon-sm"
+                  : "border-hairline bg-ink-900/50 hover:border-mesa-neon/40",
               )}
             >
-              <div className="text-3xl font-bold">{w}</div>
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">semanas</div>
+              <div className="font-display font-semibold text-[40px] leading-none tabular-nums text-chalk">
+                {w}
+              </div>
+              <div className="mt-1 text-[10px] uppercase tracking-[0.22em] text-chalk-dim">
+                semanas · {cycles} ciclo(s)
+              </div>
               {desc > 0 && (
                 <div
                   className={cn(
-                    "mt-3 inline-block text-[11px] font-semibold px-2 py-0.5 rounded",
+                    "mt-4 inline-flex items-center text-[10px] tracking-[0.18em] uppercase font-semibold px-2 py-0.5 rounded-full border",
                     active
-                      ? "bg-primary/15 text-primary"
-                      : "bg-muted text-muted-foreground",
+                      ? "bg-mesa-neon text-ink-950 border-mesa-neon"
+                      : "bg-mesa-neon/10 text-mesa-neon border-mesa-neon/30",
                   )}
                 >
                   -{desc}% prazo
                 </div>
               )}
-            </button>
+            </motion.button>
           );
         })}
       </div>

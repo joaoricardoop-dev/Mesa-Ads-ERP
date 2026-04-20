@@ -69,7 +69,6 @@ function AnuncianteRouter() {
     <Switch>
       <Route path="/" component={AnunciantePortal} />
       <Route path="/portal" component={AnunciantePortal} />
-      <Route path="/montar-campanha" component={MontarCampanha} />
       <Route component={AnunciantePortal} />
     </Switch>
   );
@@ -90,7 +89,6 @@ function ParceiroRouter() {
     <Switch>
       <Route path="/" component={ParceiroPortal} />
       <Route path="/portal" component={ParceiroPortal} />
-      <Route path="/montar-campanha" component={MontarCampanha} />
       <Route path="/tabela-precos" component={ParceiroTabelaPrecos} />
       <Route path="/leads" component={ParceiroLeads} />
       <Route component={ParceiroPortal} />
@@ -106,7 +104,6 @@ function Router() {
       <Route path="/comercial/simulador" component={Home} />
       <Route path="/comercial/tabela-precos" component={PriceTable} />
       <Route path="/comercial/orcamento" component={BudgetCreator} />
-      <Route path="/comercial/montar-campanha" component={MontarCampanha} />
       <Route path="/comercial/cotacoes/:id" component={QuotationDetail} />
       <Route path="/comercial/cotacoes" component={Quotations} />
       <Route path="/comercial/leads" component={Leads} />
@@ -286,6 +283,11 @@ function ClerkLoginPage() {
     const params = new URLSearchParams(window.location.search);
     return params.get("mode") === "signup" ? "signup" : "signin";
   });
+  const redirectTo = (() => {
+    if (typeof window === "undefined") return undefined;
+    const r = new URLSearchParams(window.location.search).get("redirect");
+    return r && r.startsWith("/") ? r : undefined;
+  })();
 
   return (
     <div className="h-screen w-full flex items-center justify-center" style={{ background: "hsl(0 0% 4%)" }}>
@@ -298,9 +300,19 @@ function ClerkLoginPage() {
       <div className="relative flex flex-col items-center">
         <img src="/logo-white.png" alt="mesa.ads" className="h-10 mb-8" />
         {mode === "signin" ? (
-          <SignIn appearance={clerkAppearance} signUpUrl="#" />
+          <SignIn
+            appearance={clerkAppearance}
+            signUpUrl="#"
+            forceRedirectUrl={redirectTo}
+            fallbackRedirectUrl={redirectTo}
+          />
         ) : (
-          <SignUp appearance={clerkAppearance} signInUrl="#" />
+          <SignUp
+            appearance={clerkAppearance}
+            signInUrl="#"
+            forceRedirectUrl={redirectTo}
+            fallbackRedirectUrl={redirectTo}
+          />
         )}
         <button
           onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
@@ -554,6 +566,13 @@ function App() {
             <Route path="/parceiro/convite/:token" component={RestaurantInviteAccept} />
             <Route path="/parceiro" component={RestaurantOnboarding} />
             <Route path="/montar-campanha">
+              {() => (
+                <ExternalShell>
+                  <MontarCampanha />
+                </ExternalShell>
+              )}
+            </Route>
+            <Route path="/comercial/montar-campanha">
               {() => (
                 <ExternalShell>
                   <MontarCampanha />
