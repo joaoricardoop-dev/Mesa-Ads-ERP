@@ -334,6 +334,15 @@ async function materializePartnerCommission(
   if (result.amount <= 0) return EMPTY;
 
   const compMonth = competenceMonthFor(invoice.paymentDate || invoice.issueDate);
+
+  // Serializa o agregado (partner, competenceMonth) por toda a transação.
+  // Sem isso, dois markInvoicePaid concorrentes para o mesmo
+  // (parceiro, mês) podem perder a contribuição de uma das invoices
+  // (lost-update em RMW, ou onConflictDoNothing dropando o segundo insert).
+  // Advisory locks transacionais são liberados no commit/rollback.
+  const lockKey = `partner_commission:${partner.id}:${compMonth}`;
+  await db.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+
   const existing = await db
     .select()
     .from(accountsPayable)
