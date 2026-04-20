@@ -115,14 +115,20 @@ function mapSourceForManualBucket(s: string | null | undefined): SourceType {
 }
 
 export default function AccountsPayablePage() {
-  const [location, navigate] = useLocation();
-  const params = new URLSearchParams(location.split("?")[1] || "");
+  // Wouter's useLocation strips the query string, so we read/write window.location.search directly.
+  // useLocation is kept only to get a stable navigate ref and trigger re-renders on path changes.
+  const [, navigate] = useLocation();
+  const initialParams = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search)
+    : new URLSearchParams("");
 
-  const tabParam = (params.get("tab") || "restaurant_commission") as SourceType;
-  const activeTab: SourceType = TABS.includes(tabParam) ? tabParam : "restaurant_commission";
+  const initialTab = (initialParams.get("tab") || "restaurant_commission") as SourceType;
+  const [activeTab, setActiveTabState] = useState<SourceType>(
+    TABS.includes(initialTab) ? initialTab : "restaurant_commission",
+  );
 
   const [campaignIdFilter, setCampaignIdFilter] = useState<number | null>(() => {
-    const v = params.get("campaignId");
+    const v = initialParams.get("campaignId");
     const n = v ? parseInt(v) : NaN;
     return Number.isFinite(n) ? n : null;
   });
@@ -132,9 +138,13 @@ export default function AccountsPayablePage() {
   const [dueTo, setDueTo] = useState<string>("");
 
   function setActiveTab(next: string) {
-    const np = new URLSearchParams(params);
-    np.set("tab", next);
-    navigate(`/financeiro/contas-pagar?${np.toString()}`);
+    if (!TABS.includes(next as SourceType)) return;
+    setActiveTabState(next as SourceType);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", next);
+      window.history.replaceState({}, "", url.toString());
+    }
   }
 
   useEffect(() => {
