@@ -120,7 +120,6 @@ function ResolvedFlow({
     autoClientId != null ? { kind: "client", id: autoClientId } : choice;
 
   const step = useWizardStore((s) => s.step);
-  const goTo = useWizardStore((s) => s.goTo);
 
   if (role === "anunciante" && !autoClientId) {
     return (
@@ -144,7 +143,9 @@ function ResolvedFlow({
         role={role}
         onPicked={(id) => setChoice({ kind: "client", id })}
         onSkip={() => setChoice({ kind: "none" })}
-        onBack={() => goTo("hero")}
+        onBack={() => {
+          window.location.href = "/";
+        }}
       />
     );
   }
