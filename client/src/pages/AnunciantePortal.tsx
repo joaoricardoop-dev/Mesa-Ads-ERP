@@ -1825,8 +1825,13 @@ export default function AnunciantePortal() {
               <div className="rounded-xl border bg-card p-4">
                 <p className="text-xs text-muted-foreground mb-1">Faturas pagas</p>
                 <p className="text-2xl font-bold text-emerald-400">
-                  {invoices.filter((i) => i.status === "paga").length}
+                  {invoices.filter((i) => (i.displayStatus || i.status) === "paga").length}
                 </p>
+                {invoices.filter((i) => i.displayStatus === "em_conciliacao").length > 0 && (
+                  <p className="text-[10px] text-cyan-500 mt-0.5">
+                    +{invoices.filter((i) => i.displayStatus === "em_conciliacao").length} em conciliação
+                  </p>
+                )}
               </div>
               <div className="rounded-xl border bg-card p-4">
                 <p className="text-xs text-muted-foreground mb-1">Pendentes</p>
