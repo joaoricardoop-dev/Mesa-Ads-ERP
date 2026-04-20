@@ -1,0 +1,231 @@
+Vou explorar a plataforma para entender o menu financeiro, suas abas e dependências.
+
+Aqui está o prompt pronto para o Replit. Ele é sistêmico — cobre menu, schema, terminologia, endpoints, auto-geração contábil e áreas dependentes (portals, campanhas).
+
+---
+
+# Prompt para Replit — Refatoração Sistêmica do Módulo Financeiro
+
+## Contexto
+
+O módulo Financeiro do Mesa-Ads ERP cresceu organicamente e hoje apresenta inconsistências estruturais, de terminologia e de lógica contábil. A navegação mistura financeiro com settings, telas estão incompletas, conceitos ("comissão", "repasse", "dedução") são usados de forma intercambiável, e processos que deveriam ser automáticos (comissão de parceiros, acrual de impostos) são manuais. Precisamos de uma refatoração sistêmica — não cosmética — que toque schema, routers, UI, portals externos e documentação.
+
+**Stack:** React + Wouter + TRPC + Drizzle (PostgreSQL) + Tailwind/shadcn.
+**Arquivos principais:**
+- Menu: `client/src/components/DashboardLayout.tsx` (linhas 148–156)
+- Páginas: `client/src/pages/financial/*`
+- Router: `server/financialRouter.ts` (2162 linhas)
+- Schema: `drizzle/schema.ts`
+
+---
+
+## 1. Padronização de Terminologia (fazer ANTES de qualquer código)
+
+Criar `docs/financeiro-glossario.md` e aplicar consistentemente em **UI, schema, enums e router**:
+
+| Termo padrão | Definição | Substitui |
+|---|---|---|
+| **Receita Bruta** | Valor faturado ao cliente (gross) | "Faturamento bruto", "Total" |
+| **Receita Líquida** | Receita Bruta − Comissões − Repasses − Impostos retidos | "Nossa parte" |
+| **Comissão Restaurante** | % pago ao restaurante anfitrião | "Comissão", "Pagamento restaurante" |
+| **Repasse Sala VIP** | % pago a provedor de sala VIP (telas/janelas digitais) | "Comissão VIP", "Repasse" |
+| **Comissão Parceiro** | % sobre Receita Líquida pago a agência/consultor/indicador | "BV", "Comissão agência" |
+| **Custo Operacional** | Produção + Frete da campanha | "Custo", "Despesa" |
+| **Conta a Pagar** | Qualquer obrigação financeira futura (custo, comissão, repasse, imposto) | "Pagamento", "Passivo" |
+| **Fatura** | Documento fiscal emitido ao cliente | "Invoice", "Cobrança", "Pedido" |
+| **Recebimento** | Data em que o valor efetivamente entrou (bank-cleared) | "Pagamento da fatura" |
+
+Renomear colunas/enums do schema para refletir isso. Criar migration reversível.
+
+---
+
+## 2. Reorganização do Menu Financeiro
+
+Estado atual (incorreto):
+```
+Financeiro
+├── Dashboard
+├── Faturamento
+├── Custos
+└── Relatórios
+```
+Com rotas órfãs fora do menu (`/financeiro/pagamentos`, `/financeiro/contas-pagar`, `/financeiro/comissao-parceiros`) e `VipProviders` escondido em `/configuracoes`.
+
+**Novo menu (executar em `DashboardLayout.tsx`):**
+```
+Financeiro (allowedRoles: admin, financeiro, manager)
+├── Dashboard                    → /financeiro
+├── Faturas a Receber            → /financeiro/faturas
+├── Contas a Pagar               → /financeiro/contas-pagar
+│   ├── tab: Custos Operacionais
+│   ├── tab: Comissões Restaurantes
+│   ├── tab: Repasses Sala VIP
+│   ├── tab: Comissões Parceiros
+│   └── tab: Impostos
+├── Fornecedores & Parceiros     → /financeiro/fornecedores
+│   ├── tab: Provedores Sala VIP
+│   ├── tab: Parceiros (Agências/Consultores)
+│   └── tab: Fornecedores de Produção
+├── Relatórios                   → /financeiro/relatorios
+│   ├── tab: DRE
+│   ├── tab: Receita por Cliente
+│   ├── tab: Eficiência Comercial
+│   └── tab: Exportações (CSV/PDF)
+└── Conciliação Bancária         → /financeiro/conciliacao  (nova — ver §6)
+```
+
+Remover alias `/financeiro/provedores-vip`. Redirect 301 → `/financeiro/fornecedores?tab=vip`.
+
+---
+
+## 3. Consolidar Contas a Pagar como Ledger Único
+
+Hoje: `operationalCosts`, `restaurantPayments`, `accountsPayable` e comissão de parceiro (calculada on-demand) são **quatro fontes de verdade diferentes** para obrigações financeiras. Isso quebra relatórios e DRE.
+
+**Tornar `accountsPayable` o ledger único** para TODA obrigação futura:
+- Custos operacionais (produção/frete) — mantém auto-sync ao editar `operationalCosts`
+- Comissões a restaurantes — trigger automático ao marcar fatura como paga
+- Repasses a Sala VIP — mesmo trigger
+- **Comissões a parceiros — gerar mensalmente via job/trigger ao fechar a fatura** (hoje é manual, precisa virar auto)
+- **Impostos (IRPJ, ISS a recolher, PIS/COFINS) — criar entries automáticos ao emitir fatura** (hoje IRPJ é só display)
+
+Adicionar colunas ao `accountsPayable`:
+- `sourceType` enum: `cost|restaurant_commission|vip_repasse|partner_commission|tax_irpj|tax_iss|tax_pis_cofins|manual`
+- `sourceRef` jsonb: `{ invoiceId?, campaignId?, partnerId?, competenceMonth? }`
+- `competenceMonth` (YYYY-MM) — para regime de competência
+- `createdBySystem` bool (distinguir entries auto vs manual)
+
+Deprecar `restaurantPayments` — migrar dados existentes para `accountsPayable` com `sourceType='restaurant_commission'`. Manter view SQL `restaurant_payments_v` para não quebrar portal.
+
+---
+
+## 4. Completar Telas Incompletas
+
+### 4.1 `AccountsPayablePage` (reformulada com abas)
+- Filtros globais: período, status, fornecedor/destinatário, campanha
+- Abas por `sourceType` (ver §2)
+- Cada linha: dueDate, destinatário, descrição, valor, status, proofUrl, ações (marcar pago, editar, anexar comprovante, cancelar)
+- Bulk actions: marcar múltiplos como pagos em lote, exportar selecionados
+- Modal "Nova conta manual" com validação por `sourceType`
+
+### 4.2 `RestaurantPaymentsPage` — **remover** (hoje é stub de 200 linhas)
+Substituir pela aba "Comissões Restaurantes" dentro de Contas a Pagar.
+
+### 4.3 `PartnerCommissionReport` — reformulado
+- Virar **relatório de conferência**, não fonte de geração
+- Mostra: campanhas do parceiro × comissões calculadas × `accountsPayable` já geradas × pagas × pendentes
+- Remover botão "Gerar comissão" manual — agora é auto
+
+### 4.4 `Invoicing` (Faturas a Receber)
+- Adicionar coluna "Recebido em" separada de "paymentDate" (payment promised vs cleared)
+- Ao marcar fatura paga, abrir modal que: (a) grava `paymentDate`, (b) pergunta se quer conciliar agora ou depois, (c) gera automaticamente os `accountsPayable` de comissão/repasse/impostos daquela fatura
+- Adicionar validação de numeração de NF sequencial por cliente+ano (opcional, via flag)
+
+---
+
+## 5. Trilha de Auditoria (requisito contábil)
+
+Criar tabela `financialAuditLog`:
+```
+id, entityType (invoice|account_payable|cost|vip_provider|partner)
+entityId, action (create|update|delete|mark_paid|cancel)
+actorUserId, before (jsonb), after (jsonb), createdAt
+```
+
+Interceptar todas mutations do `financialRouter` via middleware TRPC para gravar log. Expor `/financeiro/auditoria` para admin.
+
+---
+
+## 6. Conciliação Bancária (tela nova)
+
+Schema novo:
+```
+bankAccounts: id, name, bank, agency, account, initialBalance, currency
+bankTransactions: id, bankAccountId, date, amount, description, type (credit|debit),
+                  reconciled (bool), matchedEntityType (invoice|account_payable),
+                  matchedEntityId, importBatchId
+```
+
+Tela `/financeiro/conciliacao`:
+- Upload de OFX/CSV (Itaú, Bradesco, Inter, BB, Santander — formato CNAB se possível)
+- Split em duas colunas: "Transações do banco não conciliadas" × "Faturas/contas em aberto"
+- Sugestão automática de match por valor+data (±3 dias)
+- Ao conciliar, grava `paymentDate` real na fatura/conta
+
+Isso fecha o gap de "Liquidação vs Recebimento" mencionado na análise.
+
+---
+
+## 7. Impacto em Portals Externos (parte sistêmica)
+
+A refatoração não pode quebrar os portals. Ajustar:
+
+### `AnunciantePortal`
+- Ler de `accountsPayable` filtrado por cliente em vez de `restaurantPayments`
+- Histórico de faturas deve mostrar: emitida, vencida, paga, em conciliação
+- Download de NF via `documentUrl`
+
+### `RestaurantePortal`
+- Ler comissões de `accountsPayable` WHERE sourceType='restaurant_commission' AND recipientType='restaurante'
+- Mostrar previsão (pendente) separada de histórico (pago)
+- Exibir PIX key cadastrada + permitir atualização (hoje não permite)
+
+### `ParceiroPortal`
+- Substituir view atual pelo mesmo padrão: `accountsPayable` + `sourceType='partner_commission'`
+- Exibir competência (mês) + campanhas que compuseram + status
+
+---
+
+## 8. DRE e Dashboard (recalculados com regime de competência)
+
+Hoje o DRE mistura caixa (paymentDate) e competência (issueDate). Definir:
+- **DRE Gerencial (padrão)** — competência: receita no mês da emissão, custo no mês de referência
+- **DRE de Caixa (toggle)** — quando o dinheiro entra/sai
+
+Dashboard KPIs por regime escolhido. Persistir preferência do usuário.
+
+Adicionar no Dashboard:
+- Card "Inadimplência" (faturas vencidas e não pagas — hoje só existe "overdue" sem breakdown)
+- Card "DSO" (Days Sales Outstanding) — média de dias entre emissão e recebimento
+- Gráfico "Funil Cotação→Fatura→Recebido" (resolve gap item 9 da análise)
+
+---
+
+## 9. Validações e Constraints
+
+- `restaurantPayments` migrado: constraint que soma de comissões por campanha ≤ receita bruta da campanha
+- `invoices.invoiceNumber`: unique por `(clientId, year)` em vez de global
+- `accountsPayable.amount > 0`
+- `accountsPayable.dueDate >= createdAt` (quando `createdBySystem`)
+- Fatura só pode ser cancelada se não tem `accountsPayable` derivado pago
+
+---
+
+## 10. Entregáveis e Ordem de Execução
+
+Execute em fases commitáveis separadas, cada uma deixando o sistema funcional:
+
+1. **Glossário + migration de renomeação** — sem quebrar APIs, via aliases
+2. **Consolidação do ledger** — migrar `restaurantPayments` para `accountsPayable`, manter view de compatibilidade
+3. **Triggers automáticos** — comissão parceiro, impostos, repasses auto-gerados ao fechar fatura
+4. **Reorganização do menu + rotas** — nova estrutura com abas
+5. **Trilha de auditoria** — middleware + tela
+6. **Conciliação bancária** — schema, importador OFX, tela
+7. **DRE dual (competência/caixa) + novos KPIs**
+8. **Atualização dos 3 portals externos**
+9. **Testes** — e2e (Playwright) para cada fluxo: emitir fatura → gerar payables → marcar pago → conciliar; portal do restaurante mostra comissão pendente; portal do parceiro mostra competência correta
+10. **Documentação** — atualizar `docs/financeiro-glossario.md` + `README.md` com fluxograma
+
+---
+
+## Restrições
+
+- **Nenhuma migration destrutiva sem backup** — toda renomeação/consolidação preserva dados existentes
+- **Compatibilidade temporária** — rotas antigas via redirect 301 por 2 releases
+- **Performance** — `accountsPayable` vai crescer bastante; adicionar índices em `(status, dueDate)`, `(sourceType, competenceMonth)`, `(sourceRef->>'invoiceId')`
+- **Roles** — respeitar `role ∈ {admin, financeiro, manager}` em todo endpoint novo; portals externos têm seus próprios guards
+- **Não tocar em módulos fora do escopo** — Cotações, Campanhas, Produtos só devem ser lidos, não alterados, exceto para adicionar FKs mínimas
+
+---
+
+**Critério de aceite:** um novo contador consegue operar o sistema por uma semana sem precisar perguntar "o que isso significa?" ou "por que essa tela tem isso duplicado?". Se ele conseguir emitir fatura, ver comissões auto-geradas, conciliar pagamento bancário e fechar o DRE do mês pelo regime de competência sem intervenção manual — a refatoração está completa.
