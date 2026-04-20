@@ -5,6 +5,7 @@ import {
   devEnsureParceiro,
   devDeleteUser,
   devFindCampaignForPartner,
+  devSeedCampaignForPartner,
   trpcMutation,
   trpcQuery,
   todayIso,
@@ -58,15 +59,18 @@ test.describe("finance — portal parceiro (comissão por competência)", () => 
     const partnerId = ensured.partnerId;
 
     try {
-      let campaign;
+      // Tenta achar uma campanha existente que resolva para esse parceiro;
+      // se não houver, cria deterministicamente um par client+campaign
+      // amarrado ao partnerId — assim o teste roda em CI sem skip.
+      let campaign: { id: number; clientId: number; name: string };
       try {
         campaign = await devFindCampaignForPartner(request, partnerId);
       } catch (e) {
         if (e instanceof FixtureMissingError) {
-          test.skip(true, e.message);
-          return;
+          campaign = await devSeedCampaignForPartner(request, partnerId);
+        } else {
+          throw e;
         }
-        throw e;
       }
 
       // Snapshot do dashboard antes da ação para isolar o efeito da invoice.

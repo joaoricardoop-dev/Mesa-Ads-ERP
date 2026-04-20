@@ -1186,6 +1186,9 @@ async function mirrorRestaurantPaymentToLedger(
 
   // UPDATE-or-INSERT: preserva createdAt original (e portanto o bucket
   // histórico em relatórios). Só dispara INSERT se ainda não há mirror.
+  // OBS: todo placeholder dentro de jsonb_build_object precisa de cast
+  // explícito (Postgres não consegue inferir tipo de parâmetros nessa
+  // função polimórfica) — daí os ::int em todos os 3 valores.
   const updated = await db.execute(sql`
     UPDATE "accounts_payable"
        SET "campaignId"      = ${rp.campaignId},
@@ -1200,7 +1203,7 @@ async function mirrorRestaurantPaymentToLedger(
            "sourceRef"       = jsonb_build_object(
              'restaurantPaymentId', ${rp.id}::int,
              'restaurantId',       ${rp.restaurantId}::int,
-             'campaignId',         ${rp.campaignId}
+             'campaignId',         ${rp.campaignId}::int
            ),
            "updatedAt"       = NOW()
      WHERE "sourceType" = 'restaurant_commission'
@@ -1233,7 +1236,7 @@ async function mirrorRestaurantPaymentToLedger(
       jsonb_build_object(
         'restaurantPaymentId', ${rp.id}::int,
         'restaurantId',       ${rp.restaurantId}::int,
-        'campaignId',         ${rp.campaignId}
+        'campaignId',         ${rp.campaignId}::int
       ),
       ${rp.referenceMonth},
       true,

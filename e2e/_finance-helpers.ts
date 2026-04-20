@@ -77,6 +77,43 @@ export async function devFindCampaignForPartner(
   return (await res.json()) as { id: number; clientId: number; name: string };
 }
 
+export async function devSeedRestaurantPayment(
+  request: APIRequestContext,
+  restaurantId: number,
+  amount = "123.45",
+): Promise<{ id: number; amount: string; status: string }> {
+  const res = await request.post("/api/dev-seed-restaurant-payment", {
+    data: { restaurantId, amount },
+  });
+  if (!res.ok()) {
+    throw new Error(`dev-seed-restaurant-payment failed: ${res.status()} ${await res.text()}`);
+  }
+  return (await res.json()) as { id: number; amount: string; status: string };
+}
+
+export async function devSeedCampaignForPartner(
+  request: APIRequestContext,
+  partnerId: number,
+): Promise<{ id: number; clientId: number; name: string }> {
+  const res = await request.post("/api/dev-seed-campaign-for-partner", {
+    data: { partnerId },
+  });
+  if (!res.ok()) {
+    throw new Error(`dev-seed-campaign-for-partner failed: ${res.status()} ${await res.text()}`);
+  }
+  return (await res.json()) as { id: number; clientId: number; name: string };
+}
+
+export async function devEnsureBankAccount(
+  request: APIRequestContext,
+): Promise<{ id: number; created: boolean }> {
+  const res = await request.post("/api/dev-ensure-bank-account", { data: {} });
+  if (!res.ok()) {
+    throw new Error(`dev-ensure-bank-account failed: ${res.status()} ${await res.text()}`);
+  }
+  return (await res.json()) as { id: number; created: boolean };
+}
+
 export async function devDeleteUser(request: APIRequestContext, userId: string): Promise<void> {
   if (!userId.startsWith("e2e-")) return;
   const res = await request.post("/api/dev-delete-user", { data: { userId } });

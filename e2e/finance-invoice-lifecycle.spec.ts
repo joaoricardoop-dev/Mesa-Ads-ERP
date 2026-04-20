@@ -81,13 +81,23 @@ test.describe("finance — ciclo de vida de fatura", () => {
     const dso = await trpcQuery<DsoSummary>(request, "financial.dso");
     expect(dso.currentSampleSize).toBeGreaterThanOrEqual(1);
 
-    // listAccountsPayable retorna o ledger consolidado. Nem toda invoice
-    // amarra invoiceId nos derivados (partner_commission é agregada por
-    // mês via sourceRef.invoiceIds[]; restaurant_commission, ISS retido e
-    // outras dependem da configuração da campanha). O contrato mínimo
-    // verificável aqui é: o endpoint responde com array válido (prova que
-    // o materializador rodou sem exceção dentro da transação de pagamento).
+    // Payables derivadas: na emissão, materializePayablesForInvoice cria
+    // sempre payables de tipo "tax" (IRPJ/CSLL/PIS/COFINS/ISS conforme
+    // calc.computeInvoiceTaxes), com sourceRef.invoiceId apontando para a
+    // fatura. Verificamos esse vínculo causal — array vazio ou sem tax
+    // significa que o materializer não rodou.
     const payables = await trpcQuery<Payable[]>(request, "financial.listAccountsPayable");
     expect(Array.isArray(payables)).toBe(true);
+    const taxForInvoice = payables.filter(
+      (p) => p.sourceType === "tax" && p.invoiceId === created.id,
+    );
+    expect(
+      taxForInvoice.length,
+      `esperado ≥1 AP de tax vinculada à invoice ${created.id}`,
+    ).toBeGreaterThanOrEqual(1);
+    for (const p of taxForInvoice) {
+      expect(["pendente", "pago", "cancelada"]).toContain(p.status);
+      expect(parseFloat(p.amount)).toBeGreaterThan(0);
+    }
   });
 });

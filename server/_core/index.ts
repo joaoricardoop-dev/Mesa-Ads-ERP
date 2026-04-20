@@ -293,6 +293,125 @@ async function startServer() {
       }
     });
 
+    // Test fixture: insere uma restaurant_payment pendente para o restaurante
+    // informado, para que finance-restaurant-portal.spec.ts possa exercitar
+    // markPaymentPaid sem depender do estado pré-existente do banco.
+    app.post("/api/dev-seed-restaurant-payment", async (req, res) => {
+      try {
+        const { getDb, addRestaurantPayment } = await import("../db");
+        const { campaigns } = await import("../../drizzle/schema");
+        const db = await getDb();
+        if (!db) return res.status(500).json({ message: "Database not available." });
+
+        const restaurantId = Number(req.body?.restaurantId);
+        if (!Number.isFinite(restaurantId)) {
+          return res.status(400).json({ message: "restaurantId inválido." });
+        }
+        const amount = String(req.body?.amount ?? "123.45");
+        const refMonth = String(
+          req.body?.referenceMonth ?? new Date().toISOString().slice(0, 7),
+        );
+
+        // Precisa de uma campanha porque o mirror para accounts_payable
+        // dispara dual-write — a primeira disponível serve.
+        const [camp] = await db.select({ id: campaigns.id }).from(campaigns).limit(1);
+        if (!camp) {
+          return res.status(412).json({ message: "Nenhuma campanha cadastrada." });
+        }
+
+        // Usa o helper oficial (addRestaurantPayment) p/ que o ledger
+        // (accounts_payable) seja sincronizado já no seed — o portal do
+        // restaurante lê o pending dali, então sem mirror totalPending=0.
+        const [row] = await addRestaurantPayment({
+          restaurantId,
+          campaignId: camp.id,
+          amount,
+          referenceMonth: refMonth,
+          status: "pending",
+          notes: "e2e fixture",
+        });
+        res.json(row);
+      } catch (error) {
+        console.error("Dev seed restaurant payment error:", error);
+        res.status(500).json({ message: "Erro ao criar restaurant_payment de teste." });
+      }
+    });
+
+    // Test fixture: cria client + campaign vinculados ao parceiro informado
+    // (via campaigns.partnerId), garantindo que finance-partner-portal.spec.ts
+    // sempre tenha contra que emitir uma invoice.
+    app.post("/api/dev-seed-campaign-for-partner", async (req, res) => {
+      try {
+        const { getDb } = await import("../db");
+        const { clients, campaigns } = await import("../../drizzle/schema");
+        const db = await getDb();
+        if (!db) return res.status(500).json({ message: "Database not available." });
+
+        const partnerId = Number(req.body?.partnerId);
+        if (!Number.isFinite(partnerId)) {
+          return res.status(400).json({ message: "partnerId inválido." });
+        }
+
+        const tag = `e2e-${Date.now()}`;
+        const [client] = await db
+          .insert(clients)
+          .values({ name: `E2E Client ${tag}`, partnerId, status: "active" })
+          .returning();
+
+        const today = new Date();
+        const startDate = today.toISOString().slice(0, 10);
+        const endDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .slice(0, 10);
+
+        const [campaign] = await db
+          .insert(campaigns)
+          .values({
+            clientId: client.id,
+            partnerId,
+            name: `E2E Campaign ${tag}`,
+            startDate,
+            endDate,
+            status: "draft",
+          })
+          .returning();
+
+        res.json({ id: campaign.id, clientId: client.id, name: campaign.name });
+      } catch (error) {
+        console.error("Dev seed campaign-for-partner error:", error);
+        res.status(500).json({ message: "Erro ao criar campanha de teste." });
+      }
+    });
+
+    // Test fixture: garante que existe um bank_account para reconciliação
+    // bancária e2e. Reaproveita o primeiro disponível ou cria um novo.
+    app.post("/api/dev-ensure-bank-account", async (_req, res) => {
+      try {
+        const { getDb } = await import("../db");
+        const { bankAccounts } = await import("../../drizzle/schema");
+        const db = await getDb();
+        if (!db) return res.status(500).json({ message: "Database not available." });
+
+        const existing = await db.select({ id: bankAccounts.id }).from(bankAccounts).limit(1);
+        if (existing[0]) return res.json({ id: existing[0].id, created: false });
+
+        const [row] = await db
+          .insert(bankAccounts)
+          .values({
+            name: "E2E Bank Account",
+            bank: "Itau",
+            initialBalance: "0",
+            currency: "BRL",
+            active: true,
+          })
+          .returning();
+        res.json({ id: row.id, created: true });
+      } catch (error) {
+        console.error("Dev ensure bank-account error:", error);
+        res.status(500).json({ message: "Erro ao garantir bank account de teste." });
+      }
+    });
+
     app.post("/api/dev-delete-user", async (req, res) => {
       try {
         const id = String(req.body?.userId ?? "");

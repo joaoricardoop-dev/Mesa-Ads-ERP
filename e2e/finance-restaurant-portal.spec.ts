@@ -3,6 +3,7 @@ import {
   devLoginAdmin,
   devLoginAs,
   devEnsureRestaurante,
+  devSeedRestaurantPayment,
   devDeleteUser,
   trpcQuery,
   trpcMutation,
@@ -51,17 +52,16 @@ test.describe("finance — portal restaurante", () => {
     const e2eUserId = ensured.user.id;
 
     try {
-      const payments = await trpcQuery<RestaurantPayment[]>(
+      // Cria deterministicamente um pagamento pendente — não depende do
+      // estado pré-existente do banco de dev. Valor não-redondo p/ reduzir
+      // colisão com históricos (ainda comparamos por delta, não por valor).
+      const seedAmount = (Math.floor(Math.random() * 90000) / 100 + 100).toFixed(2);
+      const seeded = await devSeedRestaurantPayment(
         request,
-        "financial.listPayments",
-        { restaurantId: ensured.restaurantId, status: "pending" },
+        ensured.restaurantId,
+        seedAmount,
       );
-      if (!payments || payments.length === 0) {
-        test.skip(true, `Restaurante ${ensured.restaurantId} sem pagamentos pendentes`);
-        return;
-      }
-
-      const target = payments[0];
+      const target = seeded as RestaurantPayment;
       const targetAmount = parseFloat(target.amount);
       const today = new Date().toISOString().split("T")[0];
 
