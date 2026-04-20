@@ -722,6 +722,8 @@ export const financialRouter = router({
           issRate: invoices.issRate,
           issRetained: invoices.issRetained,
           campaignPhaseId: invoices.campaignPhaseId,
+          documentUrl: invoices.documentUrl,
+          documentLabel: invoices.documentLabel,
           createdAt: invoices.createdAt,
           updatedAt: invoices.updatedAt,
           // Campos computados
@@ -797,6 +799,11 @@ export const financialRouter = router({
       withheldTax: z.string().optional(),
       issRate: z.string().optional(),
       issRetained: z.boolean().optional(),
+      documentUrl: z.string().refine(
+        (v) => v === "" || /^https?:\/\//i.test(v.trim()),
+        { message: "URL do documento deve começar com http:// ou https://" }
+      ).optional(),
+      documentLabel: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
@@ -843,6 +850,8 @@ export const financialRouter = router({
           dueDate: input.dueDate,
           paymentMethod: input.paymentMethod,
           notes: notes || undefined,
+          documentUrl: input.documentUrl?.trim() || undefined,
+          documentLabel: input.documentLabel?.trim() || undefined,
         }).returning();
         await materializePayablesForInvoice(tx, row.id, "emitida");
         return row;
@@ -867,6 +876,11 @@ export const financialRouter = router({
       withheldTax: z.string().optional(),
       issRate: z.string().optional(),
       issRetained: z.boolean().optional(),
+      documentUrl: z.string().refine(
+        (v) => v === "" || /^https?:\/\//i.test(v.trim()),
+        { message: "URL do documento deve começar com http:// ou https://" }
+      ).optional(),
+      documentLabel: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
@@ -886,6 +900,14 @@ export const financialRouter = router({
       if (fields.issRetained !== undefined) updateData.issRetained = fields.issRetained;
       if (fields.withheldTax !== undefined) {
         updateData.withheldTax = fields.withheldTax && parseFloat(fields.withheldTax) > 0 ? fields.withheldTax : null;
+      }
+      if (fields.documentUrl !== undefined) {
+        const trimmed = fields.documentUrl.trim();
+        updateData.documentUrl = trimmed.length > 0 ? trimmed : null;
+      }
+      if (fields.documentLabel !== undefined) {
+        const trimmed = fields.documentLabel.trim();
+        updateData.documentLabel = trimmed.length > 0 ? trimmed : null;
       }
       // Finrefac fase 3: update + re-materialize taxes atomicamente quando
       // amount/iss muda em fatura "emitida".

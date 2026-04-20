@@ -3050,9 +3050,87 @@ export const appRouter = router({
         dueDate: invoices.dueDate,
         paymentDate: invoices.paymentDate,
         status: invoices.status,
+        documentUrl: invoices.documentUrl,
+        documentLabel: invoices.documentLabel,
       }).from(invoices)
         .leftJoin(campaigns, eq(invoices.campaignId, campaigns.id))
         .where(eq(invoices.clientId, user.clientId))
+        .orderBy(desc(invoices.issueDate));
+      return results;
+    }),
+
+    dashboard: anuncianteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.clientId) {
+        return { totalSpent: 0, totalImpressions: 0, activeCampaigns: 0, pendingAmount: 0 };
+      }
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return { totalSpent: 0, totalImpressions: 0, activeCampaigns: 0, pendingAmount: 0 };
+      const { invoices, campaigns, campaignReports } = await import("../drizzle/schema");
+      const { eq, and, sql, ne, inArray } = await import("drizzle-orm");
+
+      const [spentRow] = await db
+        .select({
+          totalSpent: sql<string>`COALESCE(SUM(CASE WHEN ${invoices.status} = 'paga' THEN ${invoices.amount}::numeric ELSE 0 END), 0)`,
+          pendingAmount: sql<string>`COALESCE(SUM(CASE WHEN ${invoices.status} IN ('emitida','vencida') THEN ${invoices.amount}::numeric ELSE 0 END), 0)`,
+        })
+        .from(invoices)
+        .where(eq(invoices.clientId, user.clientId));
+
+      const clientCampaigns = await db
+        .select({ id: campaigns.id, status: campaigns.status })
+        .from(campaigns)
+        .where(eq(campaigns.clientId, user.clientId));
+
+      const activeStatuses = new Set([
+        "veiculacao", "active", "executar", "producao", "transito",
+        "distribuicao", "briefing", "design", "aprovacao",
+      ]);
+      const activeCampaigns = clientCampaigns.filter((c) => activeStatuses.has(c.status as string)).length;
+
+      const campaignIds = clientCampaigns.map((c) => c.id);
+      let totalImpressions = 0;
+      if (campaignIds.length > 0) {
+        const [impRow] = await db
+          .select({ total: sql<string>`COALESCE(SUM(${campaignReports.totalImpressions}), 0)` })
+          .from(campaignReports)
+          .where(inArray(campaignReports.campaignId, campaignIds));
+        totalImpressions = parseInt(impRow?.total ?? "0", 10) || 0;
+      }
+
+      return {
+        totalSpent: parseFloat(spentRow?.totalSpent ?? "0") || 0,
+        pendingAmount: parseFloat(spentRow?.pendingAmount ?? "0") || 0,
+        totalImpressions,
+        activeCampaigns,
+      };
+    }),
+
+    myDocuments: anuncianteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.clientId) return [];
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return [];
+      const { invoices, campaigns } = await import("../drizzle/schema");
+      const { eq, and, isNotNull, ne, desc, sql } = await import("drizzle-orm");
+      const results = await db.select({
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        campaignName: campaigns.name,
+        documentUrl: invoices.documentUrl,
+        documentLabel: invoices.documentLabel,
+        issueDate: invoices.issueDate,
+        amount: invoices.amount,
+        status: invoices.status,
+      }).from(invoices)
+        .leftJoin(campaigns, eq(invoices.campaignId, campaigns.id))
+        .where(and(
+          eq(invoices.clientId, user.clientId),
+          isNotNull(invoices.documentUrl),
+          sql`${invoices.documentUrl} <> ''`,
+        ))
         .orderBy(desc(invoices.issueDate));
       return results;
     }),

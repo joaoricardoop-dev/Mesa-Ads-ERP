@@ -54,7 +54,12 @@ import {
   Target,
   UserCircle,
   Bell,
+  TrendingUp,
+  Eye as EyeIcon,
+  CircleDollarSign,
+  ExternalLink,
 } from "lucide-react";
+import CampaignPhases from "@/components/CampaignPhases";
 import { generateReportPdf } from "@/lib/generate-report-pdf";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
 import { CampaignBuilder } from "@/components/CampaignBuilder";
@@ -704,6 +709,16 @@ function CampaignDetail({ campaign, onBack, clientId }: { campaign: any; onBack:
         </div>
       </div>
 
+      <div className="rounded-xl border bg-card p-5" data-testid="campaign-timeline">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-1.5 rounded-lg bg-primary/10">
+            <Calendar className="w-4 h-4 text-primary" />
+          </div>
+          <p className="text-sm font-semibold">Cronograma de Fases</p>
+        </div>
+        <CampaignPhases campaignId={campaign.id} readOnly />
+      </div>
+
       {showFreight && (
         <div className="rounded-xl border bg-card p-5">
           <div className="flex items-center gap-2 mb-4">
@@ -996,6 +1011,9 @@ export default function AnunciantePortal() {
   const serviceOrders: any[] = serviceOrdersData;
   const { data: invoicesData = [] } = trpc.portal.myInvoices.useQuery();
   const invoices: any[] = invoicesData;
+  const { data: dashboardData } = trpc.portal.dashboard.useQuery();
+  const { data: documentsData = [] } = trpc.portal.myDocuments.useQuery();
+  const documents: any[] = documentsData;
   const { data: priceTableData } = trpc.portal.getPriceTable.useQuery();
   const { data: mediaKitData } = trpc.mediaKit.getPublicData.useQuery();
 
@@ -1217,6 +1235,18 @@ export default function AnunciantePortal() {
                 <ShoppingCart className="w-3.5 h-3.5" />
                 Montar Minha Campanha
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                asChild
+                data-testid="link-montar-campanha-fullscreen"
+              >
+                <a href="/montar-campanha">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Abrir em tela cheia
+                </a>
+              </Button>
               {mediaKitData?.pdfUrl && (
                 <Button
                   variant="outline"
@@ -1293,6 +1323,39 @@ export default function AnunciantePortal() {
 
         {activeTab === "home" && (
           <div className="space-y-6">
+
+            {dashboardData && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-xl border border-border/60 bg-card p-4" data-testid="card-dash-totalSpent">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CircleDollarSign className="w-4 h-4 text-emerald-500" />
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Investido</p>
+                  </div>
+                  <p className="text-xl font-bold tabular-nums">{fmtBRL(Number(dashboardData.totalSpent || 0))}</p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-card p-4" data-testid="card-dash-pending">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Receipt className="w-4 h-4 text-amber-500" />
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">A pagar</p>
+                  </div>
+                  <p className="text-xl font-bold tabular-nums">{fmtBRL(Number(dashboardData.pendingAmount || 0))}</p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-card p-4" data-testid="card-dash-impressions">
+                  <div className="flex items-center gap-2 mb-2">
+                    <EyeIcon className="w-4 h-4 text-primary" />
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Impressões</p>
+                  </div>
+                  <p className="text-xl font-bold tabular-nums">{fmtImpr(Number(dashboardData.totalImpressions || 0))}</p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-card p-4" data-testid="card-dash-active">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="w-4 h-4 text-blue-500" />
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Campanhas ativas</p>
+                  </div>
+                  <p className="text-xl font-bold tabular-nums">{dashboardData.activeCampaigns ?? 0}</p>
+                </div>
+              </div>
+            )}
 
             {activeCampaigns.length > 0 && (
               <div>
@@ -1798,10 +1861,68 @@ export default function AnunciantePortal() {
                       <div className="flex items-center gap-3 shrink-0">
                         <p className="text-sm font-bold">{fmt(inv.amount)}</p>
                         <StatusPill status={inv.status} cfg={cfg} />
+                        {inv.documentUrl && (
+                          <a
+                            href={inv.documentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-testid={`button-open-invoice-doc-${inv.id}`}
+                          >
+                            <Button size="sm" variant="outline" className="gap-1">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              Abrir
+                            </Button>
+                          </a>
+                        )}
                       </div>
                     </div>
                   );
                 })
+              )}
+            </div>
+
+            <div className="space-y-2 pt-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+                Documentos financeiros
+              </p>
+              {documents.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground rounded-xl border border-dashed">
+                  <FileText className="w-8 h-8 opacity-20" />
+                  <p className="text-sm">Nenhum documento financeiro disponível ainda</p>
+                </div>
+              ) : (
+                documents.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="rounded-xl border bg-card p-4 flex items-center gap-4"
+                    data-testid={`document-row-${doc.id}`}
+                  >
+                    <div className="p-2 rounded-lg bg-blue-500/10 shrink-0">
+                      <FileText className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">
+                        {doc.documentLabel || `Documento da fatura ${doc.invoiceNumber}`}
+                      </p>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
+                        <span className="font-mono">{doc.invoiceNumber}</span>
+                        {doc.campaignName && <span>{doc.campaignName}</span>}
+                        {doc.issueDate && <span>Emissão: {fmtDate(doc.issueDate)}</span>}
+                      </div>
+                    </div>
+                    <a
+                      href={doc.documentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid={`button-open-document-${doc.id}`}
+                    >
+                      <Button size="sm" variant="outline" className="gap-1">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Abrir
+                      </Button>
+                    </a>
+                  </div>
+                ))
               )}
             </div>
           </div>

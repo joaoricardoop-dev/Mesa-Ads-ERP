@@ -62,6 +62,8 @@ export default function Invoicing() {
   const [editIssRate, setEditIssRate] = useState("");
   const [editIssRetained, setEditIssRetained] = useState(false);
   const [editNotes, setEditNotes] = useState("");
+  const [editDocumentUrl, setEditDocumentUrl] = useState("");
+  const [editDocumentLabel, setEditDocumentLabel] = useState("");
 
   const today = new Date().toISOString().split("T")[0];
   const [newCampaignId, setNewCampaignId] = useState<string>("");
@@ -76,6 +78,8 @@ export default function Invoicing() {
   const [newIssRate, setNewIssRate] = useState("");
   const [newIssRetained, setNewIssRetained] = useState(true);
   const [newPhaseId, setNewPhaseId] = useState<string>("");
+  const [newDocumentUrl, setNewDocumentUrl] = useState("");
+  const [newDocumentLabel, setNewDocumentLabel] = useState("");
 
   const utils = trpc.useUtils();
   const { data: invoiceList, isLoading } = trpc.financial.listInvoices.useQuery(
@@ -101,6 +105,8 @@ export default function Invoicing() {
     setNewIssRate("");
     setNewIssRetained(true);
     setNewPhaseId("");
+    setNewDocumentUrl("");
+    setNewDocumentLabel("");
   }
 
   const createMutation = trpc.financial.createInvoice.useMutation({
@@ -155,6 +161,8 @@ export default function Invoicing() {
     setEditIssRate(inv.issRate && parseFloat(inv.issRate) > 0 ? inv.issRate : "");
     setEditIssRetained(!!inv.issRetained);
     setEditNotes(inv.notes ?? "");
+    setEditDocumentUrl(inv.documentUrl ?? "");
+    setEditDocumentLabel(inv.documentLabel ?? "");
   }
 
   function handleSaveEdit() {
@@ -170,6 +178,8 @@ export default function Invoicing() {
       withheldTax: editWithheldTax || undefined,
       issRate: editIssRate || "0",
       issRetained: editIssRate && parseFloat(editIssRate) > 0 ? editIssRetained : false,
+      documentUrl: editDocumentUrl,
+      documentLabel: editDocumentLabel,
     });
   }
 
@@ -194,6 +204,8 @@ export default function Invoicing() {
       withheldTax: newWithheldTax || undefined,
       issRate: newIssRate && parseFloat(newIssRate) > 0 ? newIssRate : undefined,
       issRetained: newIssRate && parseFloat(newIssRate) > 0 ? newIssRetained : false,
+      documentUrl: newDocumentUrl.trim() || undefined,
+      documentLabel: newDocumentLabel.trim() || undefined,
     });
   };
 
@@ -468,6 +480,32 @@ export default function Invoicing() {
                 />
               </div>
 
+              {/* Documento (link externo) */}
+              <div className="border border-border rounded-md p-3 space-y-2 bg-muted/10">
+                <Label className="text-xs font-semibold">
+                  Documento da fatura <span className="text-muted-foreground font-normal">— opcional</span>
+                </Label>
+                <div className="grid grid-cols-1 gap-2">
+                  <Input
+                    type="url"
+                    placeholder="URL do documento (ex: link do Google Drive)"
+                    value={newDocumentUrl}
+                    onChange={(e) => setNewDocumentUrl(e.target.value)}
+                    data-testid="input-new-document-url"
+                  />
+                  <Input
+                    placeholder="Rótulo (ex: NF-e 12345, Boleto, Recibo)"
+                    maxLength={100}
+                    value={newDocumentLabel}
+                    onChange={(e) => setNewDocumentLabel(e.target.value)}
+                    data-testid="input-new-document-label"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Quando informado, o anunciante verá o botão "Abrir" no portal para acessar o documento.
+                </p>
+              </div>
+
               <Button
                 className="w-full"
                 onClick={handleCreate}
@@ -738,6 +776,22 @@ export default function Invoicing() {
                       <p className="text-xs text-muted-foreground">Observações</p>
                       <p className="whitespace-pre-wrap text-sm">{inv.notes || "—"}</p>
                     </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">Documento da fatura</p>
+                      {inv.documentUrl ? (
+                        <a
+                          href={inv.documentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary underline-offset-2 hover:underline break-all"
+                          data-testid="link-invoice-document"
+                        >
+                          {inv.documentLabel || "Abrir documento"}
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">—</p>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -818,6 +872,28 @@ export default function Invoicing() {
                     <div>
                       <Label>Observações</Label>
                       <Textarea rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="resize-none" />
+                    </div>
+                    <div className="border border-border rounded-md p-3 space-y-2 bg-muted/10">
+                      <Label className="text-xs font-semibold">
+                        Documento da fatura <span className="text-muted-foreground font-normal">— opcional</span>
+                      </Label>
+                      <Input
+                        type="url"
+                        placeholder="URL do documento (ex: link do Google Drive)"
+                        value={editDocumentUrl}
+                        onChange={(e) => setEditDocumentUrl(e.target.value)}
+                        data-testid="input-edit-document-url"
+                      />
+                      <Input
+                        placeholder="Rótulo (ex: NF-e 12345, Boleto, Recibo)"
+                        maxLength={100}
+                        value={editDocumentLabel}
+                        onChange={(e) => setEditDocumentLabel(e.target.value)}
+                        data-testid="input-edit-document-label"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Quando informado, o anunciante verá o botão "Abrir" no portal.
+                      </p>
                     </div>
                   </div>
                 )}

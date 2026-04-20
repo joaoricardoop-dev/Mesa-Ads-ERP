@@ -51,9 +51,11 @@ interface Props {
   contractDuration?: number;
   /** Data de início da campanha, pra sugerir periodStart da fase 1. */
   startDate?: string;
+  /** Quando true, oculta todas as ações de edição (criar/editar/excluir fases e itens). */
+  readOnly?: boolean;
 }
 
-export default function CampaignPhases({ campaignId, contractDuration, startDate }: Props) {
+export default function CampaignPhases({ campaignId, contractDuration, startDate, readOnly = false }: Props) {
   const utils = trpc.useUtils();
   const { data: phases = [], isLoading } = trpc.campaignPhase.listByCampaign.useQuery({ campaignId });
   const { data: productsList = [] } = trpc.product.list.useQuery();
@@ -317,7 +319,7 @@ export default function CampaignPhases({ campaignId, contractDuration, startDate
           Fases da campanha ({phases.length})
         </h3>
         <div className="flex items-center gap-2">
-          {phases.length === 0 && (
+          {!readOnly && phases.length === 0 && (
             <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="default" className="gap-1.5 text-xs">
@@ -404,9 +406,11 @@ export default function CampaignPhases({ campaignId, contractDuration, startDate
               </DialogContent>
             </Dialog>
           )}
-          <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={openCreatePhase}>
-            <Plus className="w-3.5 h-3.5" /> Nova fase
-          </Button>
+          {!readOnly && (
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={openCreatePhase}>
+              <Plus className="w-3.5 h-3.5" /> Nova fase
+            </Button>
+          )}
         </div>
       </div>
 
@@ -519,7 +523,9 @@ export default function CampaignPhases({ campaignId, contractDuration, startDate
         <div className="border border-dashed border-border rounded-xl p-10 text-center text-sm text-muted-foreground">
           <CalendarRange className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
           <p>Nenhuma fase cadastrada.</p>
-          <p className="text-xs mt-1">Use o wizard para gerar várias fases de uma vez, ou crie manualmente.</p>
+          {!readOnly && (
+            <p className="text-xs mt-1">Use o wizard para gerar várias fases de uma vez, ou crie manualmente.</p>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
@@ -595,13 +601,13 @@ export default function CampaignPhases({ campaignId, contractDuration, startDate
                             <th className="text-right p-2 font-medium text-muted-foreground">Total</th>
                             <th className="text-right p-2 font-medium text-muted-foreground">Produção</th>
                             <th className="text-right p-2 font-medium text-muted-foreground">Frete</th>
-                            <th className="text-right p-2 font-medium text-muted-foreground w-16"></th>
+                            {!readOnly && <th className="text-right p-2 font-medium text-muted-foreground w-16"></th>}
                           </tr>
                         </thead>
                         <tbody>
                           {p.items.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="p-4 text-center text-muted-foreground">Nenhum item. Adicione abaixo.</td>
+                              <td colSpan={readOnly ? 6 : 7} className="p-4 text-center text-muted-foreground">{readOnly ? "Nenhum item." : "Nenhum item. Adicione abaixo."}</td>
                             </tr>
                           ) : (
                             p.items.map((it) => (
@@ -622,18 +628,20 @@ export default function CampaignPhases({ campaignId, contractDuration, startDate
                                 <td className="p-2 text-right font-mono font-semibold text-emerald-400">{formatCurrency(it.resolvedTotalPrice)}</td>
                                 <td className="p-2 text-right font-mono text-red-400/80">{formatCurrency(parseFloat(it.productionCost))}</td>
                                 <td className="p-2 text-right font-mono text-red-400/80">{formatCurrency(parseFloat(it.freightCost))}</td>
-                                <td className="p-2 text-right">
-                                  <div className="flex gap-0.5 justify-end">
-                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => openEditItem(p.id, it)}>
-                                      <Pencil className="w-3 h-3" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-400" onClick={() => {
-                                      if (confirm("Remover este item?")) deleteItem.mutate({ id: it.id });
-                                    }}>
-                                      <Trash2 className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                </td>
+                                {!readOnly && (
+                                  <td className="p-2 text-right">
+                                    <div className="flex gap-0.5 justify-end">
+                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => openEditItem(p.id, it)}>
+                                        <Pencil className="w-3 h-3" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-400" onClick={() => {
+                                        if (confirm("Remover este item?")) deleteItem.mutate({ id: it.id });
+                                      }}>
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                )}
                               </tr>
                             ))
                           )}
@@ -641,23 +649,25 @@ export default function CampaignPhases({ campaignId, contractDuration, startDate
                       </table>
                     </div>
 
-                    <div className="flex justify-between gap-2 items-center">
-                      <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={() => openCreateItem(p.id)}>
-                        <Plus className="w-3 h-3" /> Adicionar item
-                      </Button>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="ghost" className="text-xs" onClick={() => openEditPhase(p)}>
-                          <Pencil className="w-3 h-3 mr-1" /> Editar fase
+                    {!readOnly && (
+                      <div className="flex justify-between gap-2 items-center">
+                        <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={() => openCreateItem(p.id)}>
+                          <Plus className="w-3 h-3" /> Adicionar item
                         </Button>
-                        <Button size="sm" variant="ghost" className="text-xs text-red-400" onClick={() => {
-                          if (confirm(`Excluir a fase "${p.label}"? Isso só é permitido se não houver faturas nem contas a pagar vinculadas.`)) {
-                            deletePhase.mutate({ id: p.id });
-                          }
-                        }}>
-                          <Trash2 className="w-3 h-3 mr-1" /> Excluir
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="ghost" className="text-xs" onClick={() => openEditPhase(p)}>
+                            <Pencil className="w-3 h-3 mr-1" /> Editar fase
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-xs text-red-400" onClick={() => {
+                            if (confirm(`Excluir a fase "${p.label}"? Isso só é permitido se não houver faturas nem contas a pagar vinculadas.`)) {
+                              deletePhase.mutate({ id: p.id });
+                            }
+                          }}>
+                            <Trash2 className="w-3 h-3 mr-1" /> Excluir
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
