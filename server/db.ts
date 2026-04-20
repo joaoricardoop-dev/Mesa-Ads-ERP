@@ -1171,16 +1171,41 @@ async function mirrorRestaurantPaymentToLedger(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
   rp: { id: number; restaurantId: number; campaignId: number | null; amount: string; referenceMonth: string; status: string; paymentDate: string | null; notes: string | null; proofUrl: string | null },
 ) {
-  if (rp.campaignId == null) return;
+  // Lossless: TODO restaurant_payment é espelhado, mesmo sem campaignId.
+  // O CHECK constraint chk_accounts_payable_campaign_required permite NULL
+  // somente para sourceType='restaurant_commission'.
   const ledgerStatus = rp.status === "paid" ? "pago" : "pendente";
-  const dueDate = rp.paymentDate ?? new Date().toISOString().split("T")[0];
+  // dueDate determinístico: 1º dia do mês de referência (não usar NOW(),
+  // que reposicionaria a obrigação no tempo a cada update).
+  const dueDate = `${rp.referenceMonth}-01`;
+  const description = `Comissão Restaurante — ref ${rp.referenceMonth}`;
 
-  // Idempotência: remove o mirror antigo deste restaurantPayment, depois insere.
-  await db.execute(sql`
-    DELETE FROM "accounts_payable"
-    WHERE "sourceType" = 'restaurant_commission'
-      AND ("sourceRef"->>'restaurantPaymentId')::int = ${rp.id};
+  // UPDATE-or-INSERT: preserva createdAt original (e portanto o bucket
+  // histórico em relatórios). Só dispara INSERT se ainda não há mirror.
+  const updated = await db.execute(sql`
+    UPDATE "accounts_payable"
+       SET "campaignId"      = ${rp.campaignId},
+           "amount"          = ${rp.amount}::numeric,
+           "dueDate"         = ${dueDate}::date,
+           "paymentDate"     = ${rp.paymentDate}::date,
+           "status"          = ${ledgerStatus},
+           "description"     = ${description},
+           "notes"           = ${rp.notes},
+           "proofUrl"        = ${rp.proofUrl},
+           "competenceMonth" = ${rp.referenceMonth},
+           "sourceRef"       = jsonb_build_object(
+             'restaurantPaymentId', ${rp.id}::int,
+             'restaurantId',       ${rp.restaurantId}::int,
+             'campaignId',         ${rp.campaignId}
+           ),
+           "updatedAt"       = NOW()
+     WHERE "sourceType" = 'restaurant_commission'
+       AND ("sourceRef"->>'restaurantPaymentId')::int = ${rp.id};
   `);
+
+  // drizzle/neon retorna rowCount em result.rowCount; tipos variam por driver.
+  const rowCount = (updated as unknown as { rowCount?: number }).rowCount ?? 0;
+  if (rowCount > 0) return;
 
   await db.execute(sql`
     INSERT INTO "accounts_payable" (
@@ -1192,7 +1217,7 @@ async function mirrorRestaurantPaymentToLedger(
     ) VALUES (
       ${rp.campaignId},
       'comissao_restaurante',
-      ${"Comissão Restaurante — ref " + rp.referenceMonth},
+      ${description},
       ${rp.amount}::numeric,
       ${dueDate}::date,
       ${rp.paymentDate}::date,
@@ -1203,8 +1228,8 @@ async function mirrorRestaurantPaymentToLedger(
       'restaurant_commission'::accounts_payable_source_type,
       jsonb_build_object(
         'restaurantPaymentId', ${rp.id}::int,
-        'restaurantId', ${rp.restaurantId}::int,
-        'campaignId', ${rp.campaignId}::int
+        'restaurantId',       ${rp.restaurantId}::int,
+        'campaignId',         ${rp.campaignId}
       ),
       ${rp.referenceMonth},
       true,

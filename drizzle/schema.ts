@@ -1256,9 +1256,27 @@ export type MediaKitSettings = typeof mediaKitSettings.$inferSelect;
 
 // ─── Accounts Payable (Contas a Pagar) ──────────────────────────────────────
 
+// pgEnum espelhando o tipo `accounts_payable_source_type` criado em
+// finrefac_02_accounts_payable_ledger_columns. Mantém Drizzle alinhado
+// com o DB para tipagem forte das origens do ledger.
+export const accountsPayableSourceTypeEnum = pgEnum("accounts_payable_source_type", [
+  "restaurant_commission",
+  "vip_repasse",
+  "supplier_cost",
+  "freight_cost",
+  "partner_commission",
+  "seller_commission",
+  "tax",
+  "manual",
+]);
+
 export const accountsPayable = pgTable("accounts_payable", {
   id: serial("id").primaryKey(),
-  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  // campaignId é nullable porque restaurant_payments podem existir sem
+  // campanha vinculada e o ledger precisa espelhá-las (lossless). O CHECK
+  // chk_accounts_payable_campaign_required exige NOT NULL para todas as
+  // demais origens.
+  campaignId: integer("campaignId").references(() => campaigns.id, { onDelete: "cascade" }),
   // Rastreabilidade fase/item — permite saber qual item da qual fase gerou
   // este custo. Nullable pra compat com lançamentos antigos e despesas avulsas.
   campaignPhaseId: integer("campaignPhaseId").references(() => campaignPhases.id, { onDelete: "set null" }),
@@ -1280,7 +1298,7 @@ export const accountsPayable = pgTable("accounts_payable", {
   // sourceRef: ids da entidade-origem (ex.: { restaurantPaymentId, invoiceId }).
   // competenceMonth: mês de competência YYYY-MM para DRE.
   // createdBySystem: true quando linha foi gerada por trigger/sync, não por humano.
-  sourceType: varchar("sourceType", { length: 30 }).notNull().default("manual"),
+  sourceType: accountsPayableSourceTypeEnum("sourceType").notNull().default("manual"),
   sourceRef: jsonb("sourceRef").$type<Record<string, number | string | null>>(),
   competenceMonth: varchar("competenceMonth", { length: 7 }),
   createdBySystem: boolean("createdBySystem").notNull().default(false),

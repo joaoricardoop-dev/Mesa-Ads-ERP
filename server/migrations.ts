@@ -931,6 +931,80 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       WHERE ap."sourceType" = 'restaurant_commission';
     `,
   },
+  {
+    // Refatoração financeira fase 2 — corrige perda de dados / regressões:
+    //   (a) accounts_payable.campaignId vira NULLABLE para permitir
+    //       espelhar restaurant_payments órfãs (sem campaignId), mas
+    //       um CHECK garante que toda outra origem (supplier_cost,
+    //       freight_cost, etc.) continua exigindo campaignId.
+    //   (b) backfill agora cobre TAMBÉM rp.campaignId IS NULL — sem perda.
+    //   (c) competenceMonth fica alinhado a referenceMonth para todas as
+    //       linhas de origem 'restaurant_commission' já mirroreadas.
+    name: "finrefac_02_accounts_payable_lossless_fixes",
+    sql: `
+      ALTER TABLE "accounts_payable" ALTER COLUMN "campaignId" DROP NOT NULL;
+
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'chk_accounts_payable_campaign_required'
+        ) THEN
+          ALTER TABLE "accounts_payable"
+          ADD CONSTRAINT "chk_accounts_payable_campaign_required"
+          CHECK (
+            "campaignId" IS NOT NULL
+            OR "sourceType" = 'restaurant_commission'
+          );
+        END IF;
+      END$$;
+
+      INSERT INTO "accounts_payable" (
+        "campaignId", "type", "description", "amount",
+        "dueDate", "paymentDate", "status",
+        "recipientType", "notes", "proofUrl",
+        "sourceType", "sourceRef", "competenceMonth", "createdBySystem",
+        "createdAt", "updatedAt"
+      )
+      SELECT
+        rp."campaignId",
+        'comissao_restaurante',
+        'Comissão Restaurante — ref ' || rp."referenceMonth",
+        rp."amount"::numeric,
+        (rp."referenceMonth" || '-01')::date,
+        rp."paymentDate"::date,
+        CASE WHEN rp."status" = 'paid' THEN 'pago' ELSE 'pendente' END,
+        'restaurante',
+        rp."notes",
+        rp."proofUrl",
+        'restaurant_commission'::accounts_payable_source_type,
+        jsonb_build_object(
+          'restaurantPaymentId', rp."id",
+          'restaurantId',       rp."restaurantId",
+          'campaignId',         rp."campaignId"
+        ),
+        rp."referenceMonth",
+        true,
+        rp."createdAt",
+        rp."createdAt"
+      FROM "restaurant_payments" rp
+      WHERE rp."campaignId" IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM "accounts_payable" ap
+          WHERE ap."sourceType" = 'restaurant_commission'
+            AND (ap."sourceRef"->>'restaurantPaymentId')::int = rp."id"
+        );
+
+      -- Garante competenceMonth alinhado a referenceMonth para todas as
+      -- linhas espelhadas (idempotente).
+      UPDATE "accounts_payable" ap
+         SET "competenceMonth" = rp."referenceMonth"
+        FROM "restaurant_payments" rp
+       WHERE ap."sourceType" = 'restaurant_commission'
+         AND (ap."sourceRef"->>'restaurantPaymentId')::int = rp."id"
+         AND COALESCE(ap."competenceMonth", '') <> rp."referenceMonth";
+    `,
+  },
 ];
 
 export async function runMigrations() {

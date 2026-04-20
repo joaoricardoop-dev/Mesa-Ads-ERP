@@ -456,14 +456,16 @@ export const financialRouter = router({
         freight: sql<string>`COALESCE(SUM("freightCost"::numeric), 0)`,
       }).from(operationalCosts),
       // Restaurant commission costs lidos do ledger único (finrefac fase 2).
+      // Janelas temporais usam competenceMonth (YYYY-MM) para que updates
+      // não desloquem históricos: createdAt é hora de gravação, não período.
       db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(accountsPayable)
-        .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), gte(accountsPayable.createdAt, new Date(ytdStart)))),
+        .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), gte(accountsPayable.competenceMonth, ytdStart.slice(0, 7)))),
       db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)`, count: sql<number>`COUNT(*)::int` })
         .from(accountsPayable).where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"))),
       db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(accountsPayable)
-        .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), gte(accountsPayable.createdAt, new Date(currMonthStart)), lte(accountsPayable.createdAt, new Date(currMonthEnd + "T23:59:59")))),
+        .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), eq(accountsPayable.competenceMonth, currMonthStart.slice(0, 7)))),
       db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(accountsPayable)
-        .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), gte(accountsPayable.createdAt, new Date(prevMonthStart)), lte(accountsPayable.createdAt, new Date(prevMonthEnd + "T23:59:59")))),
+        .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), eq(accountsPayable.competenceMonth, prevMonthStart.slice(0, 7)))),
     ]);
 
     const totalProduction = parseFloat(totalCostRows[0]?.production || "0");
@@ -485,8 +487,9 @@ export const financialRouter = router({
         buildGrossInvoiceQuery(db)
           .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, mStart), lte(invoices.paymentDate, mEnd))),
         // Restaurant commission costs do mês — ledger único (finrefac fase 2).
+        // Janela por competenceMonth (YYYY-MM), preserva histórico em updates.
         db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(accountsPayable)
-          .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), gte(accountsPayable.createdAt, new Date(mStart)), lte(accountsPayable.createdAt, new Date(mEnd + "T23:59:59")))),
+          .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), eq(accountsPayable.competenceMonth, mStart.slice(0, 7)))),
       ]);
       monthlySeries.push({
         month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
@@ -1331,8 +1334,10 @@ export const financialRouter = router({
         .from(accountsPayable)
         .where(and(
           eq(accountsPayable.sourceType, "restaurant_commission"),
-          gte(accountsPayable.createdAt, new Date(input.startDate)),
-          lte(accountsPayable.createdAt, new Date(input.endDate)),
+          // Janela por mês de competência (YYYY-MM) para preservar
+          // bucket histórico mesmo após updates do espelho.
+          gte(accountsPayable.competenceMonth, input.startDate.slice(0, 7)),
+          lte(accountsPayable.competenceMonth, input.endDate.slice(0, 7)),
         ))
         .groupBy(accountsPayable.campaignId, sql`("sourceRef"->>'restaurantId')`);
 
