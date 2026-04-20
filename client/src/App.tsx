@@ -25,6 +25,7 @@ import CampaignOverview from "./pages/CampaignOverview";
 import QuotationPreview from "./pages/QuotationPreview";
 import Economics from "./pages/Economics";
 import Production from "./pages/Production";
+import OperationsCalendar from "./pages/OperationsCalendar";
 import Members from "./pages/Members";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import Library from "./pages/Library";
@@ -143,6 +144,7 @@ function Router() {
       <Route path="/ordens-servico" component={ServiceOrders} />
       <Route path="/economics" component={Economics} />
       <Route path="/producao" component={Production} />
+      <Route path="/operacoes/calendario" component={OperationsCalendar} />
       <Route path="/configuracoes/batches" component={BatchManagement} />
       <Route path="/configuracoes/termos" component={TermTemplates} />
       <Route path="/membros" component={Members} />

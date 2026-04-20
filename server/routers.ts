@@ -19,6 +19,7 @@ import { mediaKitRouter } from "./mediaKitRouter";
 import { anunciantePortalRouter } from "./anunciantePortalRouter";
 import { seasonalMultiplierRouter } from "./seasonalMultiplierRouter";
 import { bankRouter } from "./bankRouter";
+import { opsRouter } from "./opsRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, anuncianteProcedure, restauranteProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -101,6 +102,7 @@ export const appRouter = router({
   anunciantePortal: anunciantePortalRouter,
   seasonalMultiplier: seasonalMultiplierRouter,
   bank: bankRouter,
+  ops: opsRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
 

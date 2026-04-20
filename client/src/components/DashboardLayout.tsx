@@ -84,6 +84,7 @@ import {
   Crown,
   History,
   Sparkles,
+  CalendarRange,
   type LucideIcon,
 } from "lucide-react";
 import { NotificationBell } from "./NotificationPanel";
@@ -146,6 +147,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { icon: Building2, label: "Anunciantes", path: "/clientes" },
   { icon: Megaphone, label: "Campanhas", path: "/campanhas" },
   { icon: ClipboardList, label: "Ordens de Serviço", path: "/ordens-servico", allowedRoles: ["admin", "manager", "operacoes", "comercial"] },
+  { icon: CalendarRange, label: "Calendário Ops", path: "/operacoes/calendario", allowedRoles: ["admin", "manager", "operacoes"] },
   {
     icon: Wallet,
     label: "Financeiro",
