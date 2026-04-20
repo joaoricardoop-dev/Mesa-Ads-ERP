@@ -1,7 +1,7 @@
 import { parceiroProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { partners, leads, quotations, clients, users, leadInteractions, products, productPricingTiers, productDiscountPriceTiers, accountsPayable } from "../drizzle/schema";
+import { partners, leads, quotations, clients, users, leadInteractions, products, productPricingTiers, productDiscountPriceTiers, accountsPayable, campaigns } from "../drizzle/schema";
 import { eq, desc, and, sql, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
@@ -56,30 +56,67 @@ export const parceiroPortalRouter = router({
       const partnerIdStr = String(partnerId);
       const commissionRows = await db
         .select({
+          id: accountsPayable.id,
           amount: accountsPayable.amount,
           status: accountsPayable.status,
           competenceMonth: accountsPayable.competenceMonth,
           paymentDate: accountsPayable.paymentDate,
+          campaignId: accountsPayable.campaignId,
+          campaignName: campaigns.name,
+          campaignNumber: campaigns.campaignNumber,
+          clientName: clients.name,
         })
         .from(accountsPayable)
+        .leftJoin(campaigns, eq(campaigns.id, accountsPayable.campaignId))
+        .leftJoin(clients, eq(clients.id, campaigns.clientId))
         .where(and(
           eq(accountsPayable.sourceType, "partner_commission"),
           sql`${accountsPayable.sourceRef}->>'partnerId' = ${partnerIdStr}`,
         ));
 
+      type CampaignItem = {
+        accountPayableId: number;
+        campaignId: number | null;
+        campaignName: string | null;
+        campaignNumber: string | null;
+        clientName: string | null;
+        amount: number;
+        status: "paid" | "pending" | "cancelled";
+        paymentDate: string | null;
+      };
+      type MonthEntry = {
+        competenceMonth: string;
+        paid: number;
+        pending: number;
+        total: number;
+        items: CampaignItem[];
+      };
       let commissionPaid = 0;
       let commissionPending = 0;
-      const byMonthMap = new Map<string, { competenceMonth: string; paid: number; pending: number; total: number }>();
+      const byMonthMap = new Map<string, MonthEntry>();
       for (const r of commissionRows) {
         const v = Number(r.amount || 0);
         const cm = r.competenceMonth || "—";
         const isPaid = r.status === "pago";
+        const isCancelled = r.status === "cancelada";
         if (isPaid) commissionPaid += v;
-        else if (r.status !== "cancelada") commissionPending += v;
-        const entry = byMonthMap.get(cm) ?? { competenceMonth: cm, paid: 0, pending: 0, total: 0 };
+        else if (!isCancelled) commissionPending += v;
+        const entry = byMonthMap.get(cm) ?? { competenceMonth: cm, paid: 0, pending: 0, total: 0, items: [] };
         if (isPaid) entry.paid += v;
-        else if (r.status !== "cancelada") entry.pending += v;
+        else if (!isCancelled) entry.pending += v;
         entry.total = entry.paid + entry.pending;
+        if (!isCancelled) {
+          entry.items.push({
+            accountPayableId: r.id,
+            campaignId: r.campaignId,
+            campaignName: r.campaignName,
+            campaignNumber: r.campaignNumber,
+            clientName: r.clientName,
+            amount: v,
+            status: isPaid ? "paid" : "pending",
+            paymentDate: r.paymentDate ? String(r.paymentDate) : null,
+          });
+        }
         byMonthMap.set(cm, entry);
       }
       const commissionByMonth = Array.from(byMonthMap.values()).sort((a, b) => b.competenceMonth.localeCompare(a.competenceMonth));

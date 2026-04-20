@@ -338,10 +338,89 @@ export default function ParceiroPortal() {
           />
           <KpiCard
             icon={DollarSign}
-            label="Comissão Estimada"
-            value={formatCurrency(dashboard?.commissionEstimated ?? 0)}
+            label="Comissão Total"
+            value={formatCurrency(commissionPaidTotal + commissionPendingTotal)}
+            sub={`${formatCurrency(commissionPaidTotal)} pago · ${formatCurrency(commissionPendingTotal)} a receber`}
             color="bg-amber-500/10 text-amber-500"
           />
+        </div>
+      )}
+
+      {commissionByMonth.length > 0 && (
+        <div className="bg-card border border-border/30 rounded-xl overflow-hidden" data-testid="section-commission-breakdown">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border/20">
+            <h2 className="font-semibold text-sm flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-amber-500" /> Comissões por Competência
+            </h2>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Campanhas que compuseram cada mês</span>
+          </div>
+          <div className="divide-y divide-border/20">
+            {commissionByMonth.slice(0, 12).map((m) => {
+              const [yy, mm] = m.competenceMonth.split("-");
+              const label = yy && mm
+                ? new Date(Number(yy), Number(mm) - 1, 1).toLocaleString("pt-BR", { month: "long", year: "numeric" })
+                : m.competenceMonth;
+              const items = (m as any).items as Array<{
+                accountPayableId: number;
+                campaignId: number | null;
+                campaignName: string | null;
+                campaignNumber: string | null;
+                clientName: string | null;
+                amount: number;
+                status: "paid" | "pending";
+                paymentDate: string | null;
+              }> ?? [];
+              return (
+                <details key={m.competenceMonth} className="group" data-testid={`row-commission-${m.competenceMonth}`}>
+                  <summary className="px-5 py-3 flex items-center justify-between cursor-pointer hover:bg-muted/30 list-none">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium capitalize">{label}</span>
+                      <span className="text-[10px] text-muted-foreground">{items.length} campanha{items.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
+                        {formatCurrency(m.paid)} pago
+                      </span>
+                      <span className="text-amber-600 dark:text-amber-400 font-mono tabular-nums">
+                        {formatCurrency(m.pending)} pendente
+                      </span>
+                      <span className="font-bold font-mono tabular-nums">
+                        {formatCurrency(m.total)}
+                      </span>
+                    </div>
+                  </summary>
+                  <div className="bg-muted/10 px-5 py-2 divide-y divide-border/10">
+                    {items.length === 0 ? (
+                      <div className="py-2 text-xs text-muted-foreground italic">Sem itens detalhados.</div>
+                    ) : items.map((it) => (
+                      <div key={it.accountPayableId} className="py-2 flex items-center justify-between gap-3 text-xs">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">
+                            {it.campaignNumber ? `${it.campaignNumber} · ` : ""}{it.campaignName || "Campanha sem nome"}
+                          </p>
+                          {it.clientName && (
+                            <p className="text-muted-foreground truncate">{it.clientName}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span
+                            className={
+                              it.status === "paid"
+                                ? "px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                : "px-2 py-0.5 rounded-full text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            }
+                          >
+                            {it.status === "paid" ? `pago${it.paymentDate ? ` em ${new Date(it.paymentDate).toLocaleDateString("pt-BR")}` : ""}` : "a receber"}
+                          </span>
+                          <span className="font-mono tabular-nums font-semibold">{formatCurrency(it.amount)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              );
+            })}
+          </div>
         </div>
       )}
 

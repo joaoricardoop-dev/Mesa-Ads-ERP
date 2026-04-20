@@ -272,7 +272,7 @@ export default function RestaurantePortal() {
         email: restaurant.email || "",
         financialEmail: restaurant.financialEmail || "",
         instagram: restaurant.instagram || "",
-        pixKey: (restaurant as any).pixKey || "",
+        pixKey: restaurant.pixKey || "",
       });
     }
     setEditOpen(true);
@@ -1117,7 +1117,7 @@ export default function RestaurantePortal() {
                     <div>
                       <p className="text-sm text-muted-foreground">Chave Pix (recebimento de comissões)</p>
                       <p data-testid="text-restaurante-pix" className="font-mono text-sm">
-                        {(restaurant as any).pixKey || <span className="text-muted-foreground italic font-sans">Não cadastrada</span>}
+                        {restaurant.pixKey || <span className="text-muted-foreground italic font-sans">Não cadastrada</span>}
                       </p>
                     </div>
                   </div>
