@@ -186,12 +186,24 @@ export default function ParceiroPortal() {
   // BV agora vem do ledger (accounts_payable, sourceType='partner_commission')
   // agregado por competenceMonth pelo backend. Substitui o cálculo live sobre
   // quotations.status='win' que ignorava recebimento real.
-  const commissionByMonth = (dashboard?.commissionByMonth ?? []) as Array<{
+  type CommissionItem = {
+    accountPayableId: number;
+    campaignId: number | null;
+    campaignName: string | null;
+    campaignNumber: string | null;
+    clientName: string | null;
+    amount: number;
+    status: "paid" | "pending";
+    paymentDate: string | null;
+  };
+  type CommissionMonth = {
     competenceMonth: string;
     paid: number;
     pending: number;
     total: number;
-  }>;
+    items: CommissionItem[];
+  };
+  const commissionByMonth: CommissionMonth[] = dashboard?.commissionByMonth ?? [];
   const pad2 = (n: number) => String(n).padStart(2, "0");
   const currentCm = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
   const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -360,16 +372,7 @@ export default function ParceiroPortal() {
               const label = yy && mm
                 ? new Date(Number(yy), Number(mm) - 1, 1).toLocaleString("pt-BR", { month: "long", year: "numeric" })
                 : m.competenceMonth;
-              const items = (m as any).items as Array<{
-                accountPayableId: number;
-                campaignId: number | null;
-                campaignName: string | null;
-                campaignNumber: string | null;
-                clientName: string | null;
-                amount: number;
-                status: "paid" | "pending";
-                paymentDate: string | null;
-              }> ?? [];
+              const items = m.items ?? [];
               return (
                 <details key={m.competenceMonth} className="group" data-testid={`row-commission-${m.competenceMonth}`}>
                   <summary className="px-5 py-3 flex items-center justify-between cursor-pointer hover:bg-muted/30 list-none">
