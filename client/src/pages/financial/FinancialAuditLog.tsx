@@ -89,17 +89,17 @@ function DiffRow({ k, before, after }: { k: string; before: JsonObject; after: J
   const a = asObject(before)?.[k];
   const b = asObject(after)?.[k];
   return (
-    <tr className="border-t border-[hsl(0,0%,14%)]">
-      <td className="py-1.5 px-2 text-xs font-mono text-zinc-400">{k}</td>
-      <td className="py-1.5 px-2 text-xs font-mono text-red-300/80 break-all max-w-[280px]">{fmtVal(a)}</td>
-      <td className="py-1.5 px-2 text-xs font-mono text-emerald-300/80 break-all max-w-[280px]">{fmtVal(b)}</td>
+    <tr className="border-t border-border/30">
+      <td className="py-1.5 px-2 text-xs font-mono text-muted-foreground">{k}</td>
+      <td className="py-1.5 px-2 text-xs font-mono text-red-600 dark:text-red-300/80 break-all max-w-[280px]">{fmtVal(a)}</td>
+      <td className="py-1.5 px-2 text-xs font-mono text-emerald-700 dark:text-emerald-300/80 break-all max-w-[280px]">{fmtVal(b)}</td>
     </tr>
   );
 }
 
 function AuditRow({ row }: { row: AuditRowData }) {
   const [open, setOpen] = useState(false);
-  const action = ACTION_LABELS[row.action] || { label: row.action, color: "bg-zinc-500/10 text-zinc-400 border-zinc-500/30" };
+  const action = ACTION_LABELS[row.action] || { label: row.action, color: "bg-zinc-500/10 text-muted-foreground border-zinc-500/30" };
   const entity = ENTITY_LABELS[row.entityType] || row.entityType;
   const before = row.before as JsonObject;
   const after = row.after as JsonObject;
@@ -110,37 +110,37 @@ function AuditRow({ row }: { row: AuditRowData }) {
   return (
     <>
       <tr
-        className="border-t border-[hsl(0,0%,14%)] hover:bg-[hsl(0,0%,9%)] cursor-pointer"
+        className="border-t border-border/30 hover:bg-muted/30 cursor-pointer"
         onClick={() => hasDetails && setOpen((v) => !v)}
       >
-        <td className="py-2 px-3 text-xs text-zinc-500">
+        <td className="py-2 px-3 text-xs text-muted-foreground">
           {hasDetails ? (open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />) : null}
         </td>
-        <td className="py-2 px-3 text-xs text-zinc-300 whitespace-nowrap">{formatDateTime(row.createdAt)}</td>
+        <td className="py-2 px-3 text-xs text-foreground whitespace-nowrap">{formatDateTime(row.createdAt)}</td>
         <td className="py-2 px-3">
           <Badge variant="outline" className={action.color + " text-[10px] uppercase tracking-wide"}>
             {action.label}
           </Badge>
         </td>
-        <td className="py-2 px-3 text-xs text-zinc-300">{entity}</td>
-        <td className="py-2 px-3 text-xs text-zinc-300 font-mono">{row.entityId ?? "—"}</td>
-        <td className="py-2 px-3 text-xs text-zinc-400">
+        <td className="py-2 px-3 text-xs text-foreground">{entity}</td>
+        <td className="py-2 px-3 text-xs text-foreground font-mono">{row.entityId ?? "—"}</td>
+        <td className="py-2 px-3 text-xs text-muted-foreground">
           {row.actorRole ? <span className="text-[10px] uppercase mr-1">{row.actorRole}</span> : null}
           <span className="font-mono text-[11px]">{row.actorUserId || "—"}</span>
         </td>
-        <td className="py-2 px-3 text-xs text-zinc-400">
+        <td className="py-2 px-3 text-xs text-muted-foreground">
           {changedKeys.length > 0 ? `${changedKeys.length} campo(s)` : "—"}
         </td>
       </tr>
       {open && hasDetails && (
-        <tr className="bg-[hsl(0,0%,5%)]">
+        <tr className="bg-muted/50">
           <td colSpan={7} className="px-6 py-4">
             {changedKeys.length > 0 && (
               <div className="mb-3">
-                <div className="text-[11px] uppercase text-zinc-500 mb-1.5">Mudanças</div>
+                <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Mudanças</div>
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="text-[10px] uppercase text-zinc-500">
+                    <tr className="text-[10px] uppercase text-muted-foreground">
                       <th className="py-1 px-2">Campo</th>
                       <th className="py-1 px-2">Antes</th>
                       <th className="py-1 px-2">Depois</th>
@@ -156,8 +156,8 @@ function AuditRow({ row }: { row: AuditRowData }) {
             )}
             {metadata && (
               <div className="mt-3">
-                <div className="text-[11px] uppercase text-zinc-500 mb-1.5">Metadados</div>
-                <pre className="text-[11px] font-mono text-zinc-300 bg-[hsl(0,0%,3%)] p-2 rounded overflow-auto max-h-64">
+                <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Metadados</div>
+                <pre className="text-[11px] font-mono text-foreground bg-muted p-2 rounded overflow-auto max-h-64">
                   {JSON.stringify(metadata, null, 2)}
                 </pre>
               </div>
@@ -165,14 +165,14 @@ function AuditRow({ row }: { row: AuditRowData }) {
             {!changedKeys.length && (before || after) && (
               <div className="mt-2 grid grid-cols-2 gap-3">
                 <div>
-                  <div className="text-[11px] uppercase text-zinc-500 mb-1.5">Antes</div>
-                  <pre className="text-[11px] font-mono text-zinc-300 bg-[hsl(0,0%,3%)] p-2 rounded overflow-auto max-h-64">
+                  <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Antes</div>
+                  <pre className="text-[11px] font-mono text-foreground bg-muted p-2 rounded overflow-auto max-h-64">
                     {before ? JSON.stringify(before, null, 2) : "—"}
                   </pre>
                 </div>
                 <div>
-                  <div className="text-[11px] uppercase text-zinc-500 mb-1.5">Depois</div>
-                  <pre className="text-[11px] font-mono text-zinc-300 bg-[hsl(0,0%,3%)] p-2 rounded overflow-auto max-h-64">
+                  <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Depois</div>
+                  <pre className="text-[11px] font-mono text-foreground bg-muted p-2 rounded overflow-auto max-h-64">
                     {after ? JSON.stringify(after, null, 2) : "—"}
                   </pre>
                 </div>
@@ -223,9 +223,9 @@ export default function FinancialAuditLog() {
   if (!isAdmin) {
     return (
       <PageContainer title="Auditoria Financeira">
-        <div className="flex flex-col items-center justify-center py-20 text-zinc-400">
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
           <ShieldX className="w-12 h-12 mb-3 text-red-400/60" />
-          <h2 className="text-lg font-medium text-zinc-200">Acesso restrito</h2>
+          <h2 className="text-lg font-medium text-foreground">Acesso restrito</h2>
           <p className="text-sm mt-1">A trilha de auditoria financeira é exclusiva para administradores.</p>
         </div>
       </PageContainer>
@@ -248,9 +248,9 @@ export default function FinancialAuditLog() {
       }
     >
 
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4 p-3 bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-lg">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4 p-3 bg-card border border-border/30 rounded-lg">
         <div>
-          <Label className="text-[10px] uppercase text-zinc-500 tracking-wide">Entidade</Label>
+          <Label className="text-[10px] uppercase text-muted-foreground tracking-wide">Entidade</Label>
           <Select value={entityType || "all"} onValueChange={(v) => { setEntityType(v === "all" ? "" : v); setPage(0); }}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -262,7 +262,7 @@ export default function FinancialAuditLog() {
           </Select>
         </div>
         <div>
-          <Label className="text-[10px] uppercase text-zinc-500 tracking-wide">Ação</Label>
+          <Label className="text-[10px] uppercase text-muted-foreground tracking-wide">Ação</Label>
           <Select value={action || "all"} onValueChange={(v) => { setAction(v === "all" ? "" : v); setPage(0); }}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -274,7 +274,7 @@ export default function FinancialAuditLog() {
           </Select>
         </div>
         <div>
-          <Label className="text-[10px] uppercase text-zinc-500 tracking-wide">Usuário</Label>
+          <Label className="text-[10px] uppercase text-muted-foreground tracking-wide">Usuário</Label>
           <Select value={actorUserId || "all"} onValueChange={(v) => { setActorUserId(v === "all" ? "" : v); setPage(0); }}>
             <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
             <SelectContent>
@@ -288,24 +288,24 @@ export default function FinancialAuditLog() {
           </Select>
         </div>
         <div>
-          <Label className="text-[10px] uppercase text-zinc-500 tracking-wide">ID Entidade</Label>
+          <Label className="text-[10px] uppercase text-muted-foreground tracking-wide">ID Entidade</Label>
           <Input value={entityId} onChange={(e) => { setEntityId(e.target.value.replace(/\D/g, "")); setPage(0); }} className="h-8 text-xs" />
         </div>
         <div>
-          <Label className="text-[10px] uppercase text-zinc-500 tracking-wide">De</Label>
+          <Label className="text-[10px] uppercase text-muted-foreground tracking-wide">De</Label>
           <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(0); }} className="h-8 text-xs" />
         </div>
         <div>
-          <Label className="text-[10px] uppercase text-zinc-500 tracking-wide">Até</Label>
+          <Label className="text-[10px] uppercase text-muted-foreground tracking-wide">Até</Label>
           <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(0); }} className="h-8 text-xs" />
         </div>
       </div>
 
-      <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-lg overflow-hidden">
+      <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-[hsl(0,0%,9%)]">
-              <tr className="text-[10px] uppercase text-zinc-500 tracking-wide">
+            <thead className="bg-muted/30">
+              <tr className="text-[10px] uppercase text-muted-foreground tracking-wide">
                 <th className="py-2 px-3 w-8"></th>
                 <th className="py-2 px-3">Quando</th>
                 <th className="py-2 px-3">Ação</th>
@@ -317,14 +317,14 @@ export default function FinancialAuditLog() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="py-12 text-center text-zinc-500 text-sm">Carregando…</td></tr>
+                <tr><td colSpan={7} className="py-12 text-center text-muted-foreground text-sm">Carregando…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={7} className="py-12 text-center text-zinc-500 text-sm">Nenhuma entrada encontrada.</td></tr>
+                <tr><td colSpan={7} className="py-12 text-center text-muted-foreground text-sm">Nenhuma entrada encontrada.</td></tr>
               ) : rows.map((r: AuditRowData) => <AuditRow key={r.id} row={r} />)}
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t border-[hsl(0,0%,14%)] px-3 py-2 text-xs text-zinc-500">
+        <div className="flex items-center justify-between border-t border-border/30 px-3 py-2 text-xs text-muted-foreground">
           <div>{total} registros</div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
