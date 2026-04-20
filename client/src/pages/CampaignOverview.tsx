@@ -14,7 +14,160 @@ import {
   Layers,
   CircleDollarSign,
   Hash,
+  FileText,
+  ChevronDown,
+  ExternalLink,
 } from "lucide-react";
+import { useState } from "react";
+
+function QuotationSection({ quotationId }: { quotationId: number }) {
+  const [, setLocation] = useLocation();
+  const [open, setOpen] = useState(true);
+  const { data: quotation, isLoading: loadingQ } = trpc.quotation.get.useQuery({ id: quotationId });
+  const { data: items = [], isLoading: loadingI } = trpc.quotation.listItems.useQuery({ quotationId });
+
+  const isLoading = loadingQ || loadingI;
+  const itemsTotal = items.reduce((s, it) => s + parseFloat(it.totalPrice ?? "0"), 0);
+  const headerTotal = quotation?.totalValue ? parseFloat(quotation.totalValue) : itemsTotal;
+
+  const fmtDate = (s?: string | null) => {
+    if (!s) return "—";
+    const d = new Date(s.length === 10 ? `${s}T00:00:00` : s);
+    return isNaN(d.getTime()) ? s : d.toLocaleDateString("pt-BR");
+  };
+
+  return (
+    <section className="bg-card border border-border/30 rounded-xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-primary" />
+          <h2 className="text-sm font-semibold uppercase tracking-wider">Orçamento Original</h2>
+          {quotation?.quotationNumber && (
+            <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+              {quotation.quotationNumber}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {!isLoading && (
+            <span className="text-sm font-semibold tabular-nums">{formatCurrency(headerTotal)}</span>
+          )}
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+
+      {open && (
+        <div className="border-t border-border/30 p-4 space-y-4">
+          {isLoading ? (
+            <div className="text-sm text-muted-foreground py-4 text-center">Carregando orçamento…</div>
+          ) : !quotation ? (
+            <div className="text-sm text-muted-foreground py-4 text-center">Orçamento não encontrado.</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <div className="text-muted-foreground uppercase tracking-wide text-[10px] mb-0.5">Cliente</div>
+                  <div className="font-medium">{quotation.clientName || quotation.leadName || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground uppercase tracking-wide text-[10px] mb-0.5">Status</div>
+                  <div className="font-medium">{quotation.status ?? "—"}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground uppercase tracking-wide text-[10px] mb-0.5">Validade</div>
+                  <div className="font-medium">{fmtDate(quotation.validUntil)}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground uppercase tracking-wide text-[10px] mb-0.5">Assinado em</div>
+                  <div className="font-medium">{fmtDate(quotation.signedAt as unknown as string)}</div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border/30 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/30">
+                    <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      <th className="text-left px-3 py-2 font-medium">Produto</th>
+                      <th className="text-right px-3 py-2 font-medium">Quantidade</th>
+                      <th className="text-right px-3 py-2 font-medium">Preço Unit.</th>
+                      <th className="text-right px-3 py-2 font-medium">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-3 py-6 text-center text-muted-foreground text-xs">
+                          Sem itens detalhados — orçamento legado em formato consolidado.
+                        </td>
+                      </tr>
+                    ) : (
+                      items.map((it) => {
+                        const unitLabel = it.quantity === 1
+                          ? (it.productUnitLabel ?? "un")
+                          : (it.productUnitLabelPlural ?? it.productUnitLabel ?? "un");
+                        return (
+                          <tr key={it.id} className="border-t border-border/30">
+                            <td className="px-3 py-2">
+                              <div className="font-medium">{it.productName}</div>
+                              {it.notes && <div className="text-[11px] text-muted-foreground mt-0.5">{it.notes}</div>}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums">
+                              {it.quantity.toLocaleString("pt-BR")} {unitLabel}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                              {it.unitPrice ? formatCurrency(parseFloat(it.unitPrice)) : "—"}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                              {it.totalPrice ? formatCurrency(parseFloat(it.totalPrice)) : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                  {items.length > 0 && (
+                    <tfoot>
+                      <tr className="border-t border-border/30 bg-muted/20">
+                        <td className="px-3 py-2 text-xs uppercase tracking-wide text-muted-foreground" colSpan={3}>
+                          Total do contrato
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums font-bold text-primary">
+                          {formatCurrency(itemsTotal)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+
+              {quotation.notes && (
+                <div className="text-xs">
+                  <div className="text-muted-foreground uppercase tracking-wide text-[10px] mb-1">Observações</div>
+                  <p className="whitespace-pre-wrap">{quotation.notes}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLocation(`/comercial/cotacoes/${quotationId}`)}
+                  className="gap-1.5"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Abrir orçamento completo
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
 
 type PhaseRow = {
   id: number;
@@ -250,6 +403,10 @@ export default function CampaignOverview() {
             </div>
           </div>
         </div>
+
+        {!loadingCamp && (campaign as any)?.quotationId && (
+          <QuotationSection quotationId={(campaign as any).quotationId} />
+        )}
 
         {isLoading && (
           <div className="text-center py-12 text-sm text-muted-foreground">Carregando batches…</div>
