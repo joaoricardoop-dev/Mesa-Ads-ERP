@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +20,7 @@ import {
 import { toast } from "sonner";
 import DOMPurify from "dompurify";
 import RestaurantAvatar from "@/components/RestaurantAvatar";
+import { NotificationBell } from "@/components/NotificationPanel";
 import { generateTermPdf } from "@/lib/generate-term-pdf";
 import { generateCommissionStatementPdf, buildCommissionStatementData, type CommissionStatementRestaurant } from "@/lib/generate-commission-statement-pdf";
 import { Textarea } from "@/components/ui/textarea";
@@ -124,8 +126,25 @@ function formatDateTime(d: string | Date | null | undefined) {
   return new Date(d).toLocaleString("pt-BR");
 }
 
+const VALID_TABS = ["campaigns", "calendar", "commissions", "os", "terms", "profile"] as const;
+type RestaurantePortalTab = typeof VALID_TABS[number];
+
+function getInitialTab(): RestaurantePortalTab {
+  if (typeof window === "undefined") return "campaigns";
+  const params = new URLSearchParams(window.location.search);
+  const t = params.get("tab");
+  return (VALID_TABS as readonly string[]).includes(t ?? "") ? (t as RestaurantePortalTab) : "campaigns";
+}
+
 export default function RestaurantePortal() {
   const { user } = useAuth();
+  const [location] = useLocation();
+  const [activeTab, setActiveTab] = useState<RestaurantePortalTab>(getInitialTab);
+
+  useEffect(() => {
+    const next = getInitialTab();
+    setActiveTab(next);
+  }, [location]);
   const { data: restaurant, isLoading } = trpc.restaurantePortal.myRestaurant.useQuery();
   const { data: campaigns = [] } = trpc.restaurantePortal.myCampaigns.useQuery();
   const { data: terms = [] } = trpc.restaurantePortal.myTerms.useQuery();
@@ -325,6 +344,7 @@ export default function RestaurantePortal() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBell isAdmin={false} isRestaurante />
             <RestaurantAvatar name={restaurant.name} logoUrl={(restaurant as any).logoUrl} size="sm" />
             <Badge variant="outline" className="text-sm px-3 py-1">
               {restaurant.name}
@@ -403,7 +423,7 @@ export default function RestaurantePortal() {
           </Card>
         </div>
 
-        <Tabs defaultValue="campaigns" className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as RestaurantePortalTab)} className="w-full">
           <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
             <TabsTrigger value="campaigns" className="gap-1.5">
               <Megaphone className="w-4 h-4" />

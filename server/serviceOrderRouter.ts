@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { serviceOrders, campaigns, clients, quotations, campaignHistory, products, invoices, serviceOrderTrackings } from "../drizzle/schema";
 import { eq, and, desc, sql, inArray, ilike } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { createCampaignRestaurantStatusNotifications } from "./notificationRouter";
 
 async function getDatabase() {
   const d = await getDb();
@@ -291,6 +292,21 @@ export const serviceOrderRouter = router({
         expectedDate: input.expectedDate || null,
         label: input.label || null,
       }).returning();
+
+      const [so] = await db
+        .select({ type: serviceOrders.type, campaignId: serviceOrders.campaignId })
+        .from(serviceOrders)
+        .where(eq(serviceOrders.id, input.serviceOrderId))
+        .limit(1);
+      if (so?.type === "distribuicao" && so.campaignId) {
+        const providerLabel = input.freightProvider ? ` via ${input.freightProvider}` : "";
+        await createCampaignRestaurantStatusNotifications({
+          campaignId: so.campaignId,
+          status: "transito",
+          message: `Material da campanha #${so.campaignId} em trânsito${providerLabel}. Rastreamento: ${input.trackingCode}.`,
+        });
+      }
+
       return created;
     }),
 

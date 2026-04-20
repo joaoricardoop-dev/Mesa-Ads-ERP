@@ -1,7 +1,7 @@
-import { adminProcedure, anuncianteProcedure, router } from "./_core/trpc";
+import { adminProcedure, anuncianteProcedure, restauranteProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { crmNotifications, leads, partners, clients } from "../drizzle/schema";
+import { crmNotifications, leads, partners, clients, campaignRestaurants } from "../drizzle/schema";
 import { eq, isNull, desc, and, gte, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { drizzle } from "drizzle-orm/neon-serverless";
@@ -75,6 +75,57 @@ export async function createCampaignStatusNotification(data: {
     });
   } catch (err) {
     console.error("Failed to create campaign status notification:", err);
+  }
+}
+
+export async function createCampaignRestaurantStatusNotifications(data: {
+  campaignId: number;
+  status: string;
+  message: string;
+}) {
+  try {
+    const db = await getDb();
+    if (!db) return;
+
+    const linked = await db
+      .select({ restaurantId: campaignRestaurants.restaurantId })
+      .from(campaignRestaurants)
+      .where(eq(campaignRestaurants.campaignId, data.campaignId));
+
+    if (linked.length === 0) return;
+
+    const eventType = `campaign_status:${data.status}`;
+    const dedupeWindowMs = 60 * 60 * 1000;
+    const since = new Date(Date.now() - dedupeWindowMs);
+
+    for (const row of linked) {
+      const existing = await db
+        .select({ id: crmNotifications.id })
+        .from(crmNotifications)
+        .where(
+          and(
+            eq(crmNotifications.campaignId, data.campaignId),
+            eq(crmNotifications.eventType, eventType),
+            eq(crmNotifications.restaurantId, row.restaurantId),
+            gte(crmNotifications.createdAt, since)
+          )
+        )
+        .limit(1);
+
+      if (existing.length > 0) continue;
+
+      await db.insert(crmNotifications).values({
+        eventType,
+        leadId: null,
+        partnerId: null,
+        campaignId: data.campaignId,
+        clientId: null,
+        restaurantId: row.restaurantId,
+        message: data.message,
+      });
+    }
+  } catch (err) {
+    console.error("Failed to create restaurant campaign status notifications:", err);
   }
 }
 
@@ -239,6 +290,100 @@ export const notificationRouter = router({
         .where(
           and(
             eq(crmNotifications.clientId, clientId),
+            sql`${crmNotifications.eventType} LIKE ${"campaign_status:%"}`,
+            isNull(crmNotifications.readAt)
+          )
+        );
+      return { success: true };
+    }),
+
+  listForRestaurante: restauranteProcedure
+    .input(z.object({
+      limit: z.number().int().min(1).max(100).default(50),
+      offset: z.number().int().min(0).default(0),
+      unreadOnly: z.boolean().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const db = await getDatabase();
+      const restaurantId = ctx.user?.restaurantId;
+      if (!restaurantId) return [];
+
+      const conditions = [
+        eq(crmNotifications.restaurantId, restaurantId),
+        sql`${crmNotifications.eventType} LIKE ${"campaign_status:%"}`,
+      ];
+      if (input?.unreadOnly) conditions.push(isNull(crmNotifications.readAt));
+
+      const rows = await db
+        .select({
+          id: crmNotifications.id,
+          eventType: crmNotifications.eventType,
+          campaignId: crmNotifications.campaignId,
+          restaurantId: crmNotifications.restaurantId,
+          message: crmNotifications.message,
+          readAt: crmNotifications.readAt,
+          createdAt: crmNotifications.createdAt,
+        })
+        .from(crmNotifications)
+        .where(and(...conditions))
+        .orderBy(desc(crmNotifications.createdAt))
+        .limit(input?.limit ?? 50)
+        .offset(input?.offset ?? 0);
+
+      return rows;
+    }),
+
+  unreadCountForRestaurante: restauranteProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDatabase();
+      const restaurantId = ctx.user?.restaurantId;
+      if (!restaurantId) return { count: 0 };
+
+      const result = await db
+        .select({ id: crmNotifications.id })
+        .from(crmNotifications)
+        .where(
+          and(
+            eq(crmNotifications.restaurantId, restaurantId),
+            sql`${crmNotifications.eventType} LIKE ${"campaign_status:%"}`,
+            isNull(crmNotifications.readAt)
+          )
+        );
+      return { count: result.length };
+    }),
+
+  markReadForRestaurante: restauranteProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDatabase();
+      const restaurantId = ctx.user?.restaurantId;
+      if (!restaurantId) throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db
+        .update(crmNotifications)
+        .set({ readAt: new Date() })
+        .where(
+          and(
+            eq(crmNotifications.id, input.id),
+            eq(crmNotifications.restaurantId, restaurantId),
+            isNull(crmNotifications.readAt)
+          )
+        );
+      return { success: true };
+    }),
+
+  markAllReadForRestaurante: restauranteProcedure
+    .mutation(async ({ ctx }) => {
+      const db = await getDatabase();
+      const restaurantId = ctx.user?.restaurantId;
+      if (!restaurantId) throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db
+        .update(crmNotifications)
+        .set({ readAt: new Date() })
+        .where(
+          and(
+            eq(crmNotifications.restaurantId, restaurantId),
             sql`${crmNotifications.eventType} LIKE ${"campaign_status:%"}`,
             isNull(crmNotifications.readAt)
           )

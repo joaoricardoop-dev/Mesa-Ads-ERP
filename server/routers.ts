@@ -1745,6 +1745,14 @@ export const appRouter = router({
               message: `O design da campanha "${campaign.name}" foi aprovado e está em produção gráfica.`,
             });
           }
+          if (campaign.status !== "producao") {
+            const { createCampaignRestaurantStatusNotifications } = await import("./notificationRouter");
+            await createCampaignRestaurantStatusNotifications({
+              campaignId: input.id,
+              status: "producao",
+              message: `O material da campanha "${campaign.name}" entrou em produção e em breve será enviado ao seu restaurante.`,
+            });
+          }
         } catch (err) { console.warn("[approveDesign] notification failed:", err); }
 
         const { getDb: getDatabase } = await import("./db");
@@ -1814,6 +1822,12 @@ export const appRouter = router({
               message: `O material da campanha "${campaign.name}" foi recebido e está em distribuição.`,
             });
           }
+          const { createCampaignRestaurantStatusNotifications } = await import("./notificationRouter");
+          await createCampaignRestaurantStatusNotifications({
+            campaignId: input.id,
+            status: "distribuicao",
+            message: `O material da campanha "${campaign.name}" está em trânsito/distribuição para o seu restaurante. Acompanhe na aba OS.`,
+          });
         } catch (err) { console.warn("[receiveMaterial] notification failed:", err); }
 
         const { getDb: getDatabase } = await import("./db");
@@ -1944,6 +1958,8 @@ export const appRouter = router({
         const u = ctx.user;
         const uName = u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "Sistema" : "Sistema";
         const { id, ...artData } = input;
+        const prev = await getCampaign(id);
+        const wasAlreadyProducao = prev?.status === "producao";
         await updateCampaign(id, { ...artData, status: "producao" });
         await addCampaignHistory(id, "art_uploaded", "Arte enviada — campanha em produção", u?.id, uName);
 
@@ -1956,6 +1972,14 @@ export const appRouter = router({
               clientId: notifCampaign.clientId,
               status: "producao",
               message: `A arte da campanha "${notifCampaign.name}" foi enviada e está em produção.`,
+            });
+          }
+          if (notifCampaign && !wasAlreadyProducao) {
+            const { createCampaignRestaurantStatusNotifications } = await import("./notificationRouter");
+            await createCampaignRestaurantStatusNotifications({
+              campaignId: id,
+              status: "producao",
+              message: `O material da campanha "${notifCampaign.name}" entrou em produção e em breve será enviado ao seu restaurante.`,
             });
           }
         } catch (err) { console.warn("[uploadArt] notification failed:", err); }

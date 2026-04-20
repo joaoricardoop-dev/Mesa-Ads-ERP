@@ -1126,6 +1126,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_users_preferences_jsonb",
     sql: `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "preferences" jsonb DEFAULT '{}'::jsonb;`,
   },
+  {
+    name: "add_restaurant_id_to_crm_notifications",
+    sql: `ALTER TABLE "crm_notifications" ADD COLUMN IF NOT EXISTS "restaurantId" integer; CREATE INDEX IF NOT EXISTS "idx_crm_notifications_restaurant_id" ON "crm_notifications" ("restaurantId");`,
+  },
 ];
 
 export async function runMigrations() {
