@@ -543,10 +543,11 @@ const OS_STATUS: Record<string, { label: string; color: string }> = {
 };
 
 const INV_STATUS: Record<string, { label: string; color: string }> = {
-  emitida:  { label: "Emitida",   color: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
-  paga:     { label: "Paga",      color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
-  vencida:  { label: "Vencida",   color: "text-red-400 bg-red-500/10 border-red-500/20" },
-  cancelada:{ label: "Cancelada", color: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20" },
+  emitida:        { label: "Emitida",         color: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+  paga:           { label: "Paga",            color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+  em_conciliacao: { label: "Em conciliação",  color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20" },
+  vencida:        { label: "Vencida",         color: "text-red-400 bg-red-500/10 border-red-500/20" },
+  cancelada:      { label: "Cancelada",       color: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20" },
 };
 
 type CampaignSO = {
@@ -1841,7 +1842,8 @@ export default function AnunciantePortal() {
                 </div>
               ) : (
                 invoices.map((inv) => {
-                  const cfg = INV_STATUS[inv.status] ?? INV_STATUS.emitida;
+                  const effectiveStatus = inv.displayStatus || inv.status;
+                  const cfg = INV_STATUS[effectiveStatus] ?? INV_STATUS.emitida;
                   return (
                     <div key={inv.id} className="rounded-xl border bg-card p-4 flex items-center gap-4">
                       <div className="p-2 rounded-lg bg-amber-500/10 shrink-0">

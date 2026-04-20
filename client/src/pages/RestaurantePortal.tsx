@@ -161,6 +161,7 @@ export default function RestaurantePortal() {
     email: "",
     financialEmail: "",
     instagram: "",
+    pixKey: "",
   });
 
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
@@ -271,6 +272,7 @@ export default function RestaurantePortal() {
         email: restaurant.email || "",
         financialEmail: restaurant.financialEmail || "",
         instagram: restaurant.instagram || "",
+        pixKey: (restaurant as any).pixKey || "",
       });
     }
     setEditOpen(true);
@@ -1112,6 +1114,12 @@ export default function RestaurantePortal() {
                         <p>{restaurant.contactName} {restaurant.contactRole ? `(${restaurant.contactRole})` : ""}</p>
                       </div>
                     )}
+                    <div>
+                      <p className="text-sm text-muted-foreground">Chave Pix (recebimento de comissões)</p>
+                      <p data-testid="text-restaurante-pix" className="font-mono text-sm">
+                        {(restaurant as any).pixKey || <span className="text-muted-foreground italic font-sans">Não cadastrada</span>}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1237,6 +1245,16 @@ export default function RestaurantePortal() {
                   onChange={(e) => setEditForm({ ...editForm, instagram: e.target.value })}
                   placeholder="@perfil"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Chave Pix (recebimento de comissões)</Label>
+                <Input
+                  value={editForm.pixKey}
+                  onChange={(e) => setEditForm({ ...editForm, pixKey: e.target.value })}
+                  placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"
+                  data-testid="input-restaurante-pix"
+                />
+                <p className="text-xs text-muted-foreground">Esta chave será usada pela Mesa para repasses mensais de comissão.</p>
               </div>
             </div>
             <DialogFooter>

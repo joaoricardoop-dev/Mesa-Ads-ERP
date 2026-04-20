@@ -1,7 +1,7 @@
 import { parceiroProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { partners, leads, quotations, clients, users, leadInteractions, products, productPricingTiers, productDiscountPriceTiers } from "../drizzle/schema";
+import { partners, leads, quotations, clients, users, leadInteractions, products, productPricingTiers, productDiscountPriceTiers, accountsPayable } from "../drizzle/schema";
 import { eq, desc, and, sql, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
@@ -48,7 +48,45 @@ export const parceiroPortalRouter = router({
         .where(and(eq(quotations.partnerId, partnerId), eq(quotations.status, "win")));
 
       const totalRevenue = wonQuotations.reduce((s, q) => s + Number(q.totalValue || 0), 0);
-      const commissionEstimated = totalRevenue * Number(partner.commissionPercent) / 100;
+
+      // Comissão real do parceiro vive em accounts_payable (ledger único,
+      // finrefac fase 2). sourceType='partner_commission' agregada por
+      // (partnerId, competenceMonth). Substitui o cálculo live sobre
+      // quotations.status='win' (que ignorava recebimento real).
+      const partnerIdStr = String(partnerId);
+      const commissionRows = await db
+        .select({
+          amount: accountsPayable.amount,
+          status: accountsPayable.status,
+          competenceMonth: accountsPayable.competenceMonth,
+          paymentDate: accountsPayable.paymentDate,
+        })
+        .from(accountsPayable)
+        .where(and(
+          eq(accountsPayable.sourceType, "partner_commission"),
+          sql`${accountsPayable.sourceRef}->>'partnerId' = ${partnerIdStr}`,
+        ));
+
+      let commissionPaid = 0;
+      let commissionPending = 0;
+      const byMonthMap = new Map<string, { competenceMonth: string; paid: number; pending: number; total: number }>();
+      for (const r of commissionRows) {
+        const v = Number(r.amount || 0);
+        const cm = r.competenceMonth || "—";
+        const isPaid = r.status === "pago";
+        if (isPaid) commissionPaid += v;
+        else if (r.status !== "cancelada") commissionPending += v;
+        const entry = byMonthMap.get(cm) ?? { competenceMonth: cm, paid: 0, pending: 0, total: 0 };
+        if (isPaid) entry.paid += v;
+        else if (r.status !== "cancelada") entry.pending += v;
+        entry.total = entry.paid + entry.pending;
+        byMonthMap.set(cm, entry);
+      }
+      const commissionByMonth = Array.from(byMonthMap.values()).sort((a, b) => b.competenceMonth.localeCompare(a.competenceMonth));
+      const commissionTotal = commissionPaid + commissionPending;
+      // Mantém commissionEstimated como alias do total realizado/em-aberto
+      // (compat com clientes antigos do dashboard).
+      const commissionEstimated = commissionTotal;
 
       const pendingQuotations = await db
         .select({ count: sql<number>`COUNT(*)` })
@@ -65,6 +103,10 @@ export const parceiroPortalRouter = router({
         wonDeals: wonQuotations.length,
         totalRevenue,
         commissionEstimated,
+        commissionPaid,
+        commissionPending,
+        commissionTotal,
+        commissionByMonth,
         pendingQuotations: Number(pendingQuotations[0]?.count || 0),
       };
     }),

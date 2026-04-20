@@ -183,23 +183,28 @@ export default function ParceiroPortal() {
   const currentMonth = now.toLocaleString("pt-BR", { month: "long", year: "numeric" });
   const commissionPercent = dashboard?.partner?.commissionPercent ?? 0;
 
-  const thisMonthWon = (quotations as any[]).filter((q: any) => {
-    if (q.status !== "win") return false;
-    const d = q.createdAt ? new Date(q.createdAt) : null;
-    return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-  const thisMonthRevenue = thisMonthWon.reduce((s: number, q: any) => s + Number(q.totalValue || 0), 0);
-  const bvEstimadoMes = thisMonthRevenue * Number(commissionPercent) / 100;
-
+  // BV agora vem do ledger (accounts_payable, sourceType='partner_commission')
+  // agregado por competenceMonth pelo backend. Substitui o cálculo live sobre
+  // quotations.status='win' que ignorava recebimento real.
+  const commissionByMonth = (dashboard?.commissionByMonth ?? []) as Array<{
+    competenceMonth: string;
+    paid: number;
+    pending: number;
+    total: number;
+  }>;
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const currentCm = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
   const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastCm = `${lastMonthDate.getFullYear()}-${pad2(lastMonthDate.getMonth() + 1)}`;
   const lastMonthName = lastMonthDate.toLocaleString("pt-BR", { month: "long" });
-  const lastMonthWon = (quotations as any[]).filter((q: any) => {
-    if (q.status !== "win") return false;
-    const d = q.createdAt ? new Date(q.createdAt) : null;
-    return d && d.getMonth() === lastMonthDate.getMonth() && d.getFullYear() === lastMonthDate.getFullYear();
-  });
-  const lastMonthRevenue = lastMonthWon.reduce((s: number, q: any) => s + Number(q.totalValue || 0), 0);
-  const bvLastMonth = lastMonthRevenue * Number(commissionPercent) / 100;
+  const currentMonthEntry = commissionByMonth.find((m) => m.competenceMonth === currentCm);
+  const lastMonthEntry = commissionByMonth.find((m) => m.competenceMonth === lastCm);
+  const bvEstimadoMes = currentMonthEntry?.total ?? 0;
+  const bvLastMonth = lastMonthEntry?.total ?? 0;
+  const bvCurrentPaid = currentMonthEntry?.paid ?? 0;
+  const bvCurrentPending = currentMonthEntry?.pending ?? 0;
+  const commissionPaidTotal = dashboard?.commissionPaid ?? 0;
+  const commissionPendingTotal = dashboard?.commissionPending ?? 0;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -272,7 +277,7 @@ export default function ParceiroPortal() {
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Estimativa {now.toLocaleString("pt-BR", { month: "short" })}</p>
               <p className="text-3xl font-black text-amber-600 dark:text-amber-400 font-mono tabular-nums">{formatCurrency(bvEstimadoMes)}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                {thisMonthWon.length} negócio{thisMonthWon.length !== 1 ? "s" : ""} fechado{thisMonthWon.length !== 1 ? "s" : ""} · {commissionPercent}% de {formatCurrency(thisMonthRevenue)}
+                {formatCurrency(bvCurrentPaid)} pago{bvCurrentPaid !== 1 ? "s" : ""} · {formatCurrency(bvCurrentPending)} a receber
               </p>
             </div>
             <div className="w-px h-10 bg-border hidden sm:block" />
@@ -284,16 +289,20 @@ export default function ParceiroPortal() {
                 </p>
                 <p className="text-lg font-bold font-mono text-muted-foreground">{formatCurrency(bvLastMonth)}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  {lastMonthWon.length} negócio{lastMonthWon.length !== 1 ? "s" : ""}
+                  {formatCurrency(lastMonthEntry?.paid ?? 0)} pago
                 </p>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">
                   <CalendarDays className="w-3 h-3 inline mr-1" />
-                  Total acumulado
+                  Acumulado
                 </p>
-                <p className="text-lg font-bold font-mono text-muted-foreground">{formatCurrency(dashboard?.commissionEstimated ?? 0)}</p>
-                <p className="text-[10px] text-muted-foreground">{dashboard?.wonDeals ?? 0} negócios no total</p>
+                <p className="text-lg font-bold font-mono text-muted-foreground" data-testid="text-commission-total">
+                  {formatCurrency(commissionPaidTotal + commissionPendingTotal)}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {formatCurrency(commissionPaidTotal)} pago · {formatCurrency(commissionPendingTotal)} a receber
+                </p>
               </div>
             </div>
           </div>

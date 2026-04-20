@@ -2579,6 +2579,7 @@ export const appRouter = router({
         email: z.string().optional(),
         financialEmail: z.string().optional(),
         instagram: z.string().optional(),
+        pixKey: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const user = ctx.user;
@@ -2754,33 +2755,43 @@ export const appRouter = router({
       const { getDb: getDatabase } = await import("./db");
       const db = await getDatabase();
       if (!db) return { totalAmount: 0, totalPaid: 0, totalPending: 0, paymentCount: 0, byCampaign: [], payments: [] };
-      const { restaurantPayments, campaigns: campaignsTbl, clients } = await import("../drizzle/schema");
-      const { eq, desc } = await import("drizzle-orm");
+      const { accountsPayable, campaigns: campaignsTbl, clients } = await import("../drizzle/schema");
+      const { eq, and, desc, sql } = await import("drizzle-orm");
 
+      // Ledger único (finrefac fase 2): comissão restaurante vive em
+      // accounts_payable WHERE sourceType='restaurant_commission'.
+      // Filtro por restaurante usa sourceRef->>'restaurantId'.
+      const restaurantIdStr = String(user.restaurantId);
       const rows = await db.select({
-        id: restaurantPayments.id,
-        amount: restaurantPayments.amount,
-        referenceMonth: restaurantPayments.referenceMonth,
-        paymentDate: restaurantPayments.paymentDate,
-        status: restaurantPayments.status,
-        notes: restaurantPayments.notes,
-        proofUrl: restaurantPayments.proofUrl,
-        periodStart: restaurantPayments.periodStart,
-        periodEnd: restaurantPayments.periodEnd,
-        campaignId: restaurantPayments.campaignId,
+        id: accountsPayable.id,
+        amount: accountsPayable.amount,
+        referenceMonth: accountsPayable.competenceMonth,
+        paymentDate: accountsPayable.paymentDate,
+        status: accountsPayable.status,
+        notes: accountsPayable.notes,
+        proofUrl: accountsPayable.proofUrl,
+        campaignId: accountsPayable.campaignId,
         campaignNumber: campaignsTbl.campaignNumber,
         campaignName: campaignsTbl.name,
         clientName: clients.name,
         clientCompany: clients.company,
       })
-        .from(restaurantPayments)
-        .leftJoin(campaignsTbl, eq(campaignsTbl.id, restaurantPayments.campaignId))
+        .from(accountsPayable)
+        .leftJoin(campaignsTbl, eq(campaignsTbl.id, accountsPayable.campaignId))
         .leftJoin(clients, eq(clients.id, campaignsTbl.clientId))
-        .where(eq(restaurantPayments.restaurantId, user.restaurantId))
-        .orderBy(desc(restaurantPayments.referenceMonth), desc(restaurantPayments.createdAt));
+        .where(and(
+          eq(accountsPayable.sourceType, "restaurant_commission"),
+          sql`${accountsPayable.sourceRef}->>'restaurantId' = ${restaurantIdStr}`,
+          sql`${accountsPayable.status} <> 'cancelada'`,
+        ))
+        .orderBy(desc(accountsPayable.competenceMonth), desc(accountsPayable.createdAt));
 
+      // Mantém shape legado (status paid/pending) p/ não quebrar UI/PDF.
       const payments = rows.map(r => ({
         ...r,
+        periodStart: null as string | null,
+        periodEnd: null as string | null,
+        status: r.status === "pago" ? "paid" : (r.status === "pendente" ? "pending" : r.status),
         amountNumber: parseFloat(r.amount || "0"),
       }));
 
@@ -3077,6 +3088,7 @@ export const appRouter = router({
         issueDate: invoices.issueDate,
         dueDate: invoices.dueDate,
         paymentDate: invoices.paymentDate,
+        receivedDate: invoices.receivedDate,
         status: invoices.status,
         documentUrl: invoices.documentUrl,
         documentLabel: invoices.documentLabel,
@@ -3084,7 +3096,13 @@ export const appRouter = router({
         .leftJoin(campaigns, eq(invoices.campaignId, campaigns.id))
         .where(eq(invoices.clientId, user.clientId))
         .orderBy(desc(invoices.issueDate));
-      return results;
+      // displayStatus: 'paga' sem receivedDate (caixa ainda não confirmado pela
+      // conciliação OFX/CSV) → 'em_conciliacao'. Senão preserva status original.
+      return results.map((r) => ({
+        ...r,
+        displayStatus:
+          r.status === "paga" && !r.receivedDate ? "em_conciliacao" : r.status,
+      }));
     }),
 
     dashboard: anuncianteProcedure.query(async ({ ctx }) => {
