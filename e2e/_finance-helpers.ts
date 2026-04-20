@@ -21,26 +21,14 @@ export async function devLoginAs(request: APIRequestContext, userId: string): Pr
   return (await res.json()) as DevUser;
 }
 
-// Erro lançado quando uma pré-condição de fixture (412 Precondition Failed)
-// não está satisfeita — sinaliza ao caller que o teste deve dar test.skip,
-// não falhar. Qualquer outro erro (500, 4xx ≠ 412) deve propagar e fazer o
-// teste falhar para evitar mascarar regressões reais.
-export class FixtureMissingError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "FixtureMissingError";
-  }
-}
-
+// Após finrefac #9, todos os endpoints dev-ensure-* auto-criam o recurso
+// quando ausente (CI sem skip). Mantemos o helper só p/ DRY de POST + erro.
 async function devEnsure<T>(
   request: APIRequestContext,
   url: string,
   body: Record<string, unknown>,
 ): Promise<T> {
   const res = await request.post(url, { data: body });
-  if (res.status() === 412) {
-    throw new FixtureMissingError(`${url}: ${(await res.json()).message ?? "Precondition failed"}`);
-  }
   if (!res.ok()) {
     throw new Error(`${url} failed: ${res.status()} ${await res.text()}`);
   }
@@ -59,22 +47,6 @@ export async function devEnsureParceiro(
   partnerId?: number,
 ): Promise<{ user: DevUser; partnerId: number }> {
   return devEnsure(request, "/api/dev-ensure-parceiro", partnerId ? { partnerId } : {});
-}
-
-// Busca campanha cuja resolução de parceiro (campaign / quotation / client)
-// case com partnerId. Lança FixtureMissingError se nenhuma existir.
-export async function devFindCampaignForPartner(
-  request: APIRequestContext,
-  partnerId: number,
-): Promise<{ id: number; clientId: number; name: string }> {
-  const res = await request.get(`/api/dev-find-campaign-for-partner?partnerId=${partnerId}`);
-  if (res.status() === 412) {
-    throw new FixtureMissingError(`Sem campanha vinculada ao partner ${partnerId}`);
-  }
-  if (!res.ok()) {
-    throw new Error(`dev-find-campaign-for-partner failed: ${res.status()} ${await res.text()}`);
-  }
-  return (await res.json()) as { id: number; clientId: number; name: string };
 }
 
 export async function devSeedRestaurantPayment(
@@ -202,15 +174,3 @@ export async function pickAnyCampaign(
   return rows.length > 0 ? rows[0] : null;
 }
 
-export async function pickAnyCampaignWithPartner(
-  request: APIRequestContext,
-  partnerId: number,
-): Promise<{ id: number; clientId: number; name: string } | null> {
-  const result = await trpcQuery<unknown>(request, "campaign.list");
-  const rows: Array<{ id: number; clientId: number; name: string; partnerId?: number | null }> =
-    Array.isArray(result)
-      ? (result as Array<{ id: number; clientId: number; name: string; partnerId?: number | null }>)
-      : ((result as { items?: Array<{ id: number; clientId: number; name: string; partnerId?: number | null }> })?.items ?? []);
-  const match = rows.find((c) => c.partnerId === partnerId);
-  return match ?? null;
-}

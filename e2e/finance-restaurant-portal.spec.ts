@@ -7,7 +7,6 @@ import {
   devDeleteUser,
   trpcQuery,
   trpcMutation,
-  FixtureMissingError,
 } from "./_finance-helpers";
 
 type RestaurantPayment = {
