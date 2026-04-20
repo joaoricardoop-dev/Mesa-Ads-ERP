@@ -144,7 +144,11 @@ async function materializeTaxes(
         ),
       );
     const description = `${tax.description} - NF ${invoice.invoiceNumber || invoice.id}`;
-    if (existing.length === 0) {
+    // Considera apenas linhas vivas (não canceladas) para decidir
+    // INSERT vs UPDATE. Se só existem rows canceladas, recriamos —
+    // ex.: ISS retido virou não retido, então o ISS volta a ser devido.
+    const live = existing.find((r) => r.status !== "cancelada");
+    if (!live) {
       await db.insert(accountsPayable).values({
         campaignId: invoice.campaignId,
         invoiceId: invoice.id,
@@ -161,8 +165,8 @@ async function materializeTaxes(
       }).onConflictDoNothing();
       created++;
     } else {
-      const ap = existing[0];
-      if (ap.status === "pago" || ap.status === "cancelada") continue;
+      const ap = live;
+      if (ap.status === "pago") continue;
       const sameAmount = Math.abs(num(ap.amount) - tax.amount) < 0.005;
       const sameComp = ap.competenceMonth === compMonth;
       if (!sameAmount || !sameComp) {
