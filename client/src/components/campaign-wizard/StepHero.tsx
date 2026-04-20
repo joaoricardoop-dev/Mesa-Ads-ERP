@@ -141,6 +141,7 @@ export function StepHero({ role }: Props) {
                       <motion.button
                         key={p.id}
                         type="button"
+                        data-testid={`product-pill-${p.id}`}
                         onClick={() => setProduct(p.id)}
                         onMouseEnter={() => setHovered(p.id)}
                         onMouseLeave={() => setHovered(null)}

@@ -45,3 +45,4 @@ The application utilizes a sidebar-based layout built with `shadcn/ui`, offering
 - **Multer**: Middleware for handling multipart/form-data, used for file uploads.
 - **Anthropic AI SDK**: `@anthropic-ai/sdk` for AI-powered features, using `claude-sonnet-4-20250514`.
 - **Melhor Envio**: OAuth2-based freight integration for tracking shipments and calculating freight, with auto-refreshing tokens and a dedicated settings page.
+- **Playwright**: End-to-end browser tests live in `e2e/` and run with `pnpm run test:e2e`. The open-checkout flow at `/montar-campanha` is covered for guest visitors (hero + product list, localStorage persistence) and internal/partner users (auto-routing to the client picker). Tests log internal users in via the dev `/api/dev-login` cookie.
