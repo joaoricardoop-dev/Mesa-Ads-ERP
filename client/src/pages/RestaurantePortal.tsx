@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import DOMPurify from "dompurify";
 import RestaurantAvatar from "@/components/RestaurantAvatar";
 import { generateTermPdf } from "@/lib/generate-term-pdf";
+import { Textarea } from "@/components/ui/textarea";
 import {
   UtensilsCrossed,
   Megaphone,
@@ -43,7 +44,72 @@ import {
   Bell,
   Star,
   Boxes,
+  CalendarDays,
+  DollarSign,
+  ClipboardList,
+  Users,
+  Wine,
+  Armchair,
+  Ban,
 } from "lucide-react";
+
+const EXCLUDED_CATEGORIES = [
+  "Concorrentes diretos",
+  "Bebidas alcoólicas",
+  "Bebidas não alcoólicas",
+  "Alimentação (marcas de comida, snacks, etc.)",
+  "Cafeterias e docerias",
+  "Sorveterias / açaí / sobremesas",
+  "Apps de delivery e marketplaces",
+  "Farmácia e saúde",
+  "Beleza e cosméticos",
+  "Moda e acessórios",
+  "Fitness e academia",
+  "Pet (ração, veterinária, petshop)",
+  "Seguros e planos de saúde",
+  "Bancos e cartões",
+  "Pagamentos (maquininha, carteiras digitais)",
+  "Cripto/investimentos de alto risco",
+  "Empréstimos agressivos",
+  "Contabilidade e serviços B2B",
+  "Telefonia / internet",
+];
+
+function parseExcluded(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const p = JSON.parse(raw);
+    if (Array.isArray(p)) return p;
+  } catch {}
+  if (raw.includes("||")) return raw.split("||").map(s => s.trim()).filter(Boolean);
+  return raw.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function formatBRL(v: number) {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatRefMonth(m: string | null | undefined) {
+  if (!m) return "—";
+  const [y, mo] = m.split("-");
+  if (!y || !mo) return m;
+  const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  return `${months[parseInt(mo) - 1] || mo}/${y}`;
+}
+
+const osStatusConfig: Record<string, { label: string; color: string }> = {
+  rascunho: { label: "Rascunho", color: "bg-gray-500/10 text-gray-400" },
+  enviada: { label: "Enviada", color: "bg-blue-500/10 text-blue-400" },
+  assinada: { label: "Assinada", color: "bg-emerald-500/10 text-emerald-400" },
+  execucao: { label: "Em execução", color: "bg-purple-500/10 text-purple-400" },
+  concluida: { label: "Concluída", color: "bg-gray-500/10 text-gray-400" },
+};
+
+const osTypeLabel: Record<string, string> = {
+  anunciante: "Anunciante",
+  producao: "Produção",
+  distribuicao: "Distribuição",
+};
 
 const campaignStatusConfig: Record<string, { label: string; color: string; icon: typeof CircleDot }> = {
   draft: { label: "Rascunho", color: "bg-gray-500/10 text-gray-500", icon: CircleDot },
@@ -84,6 +150,9 @@ export default function RestaurantePortal() {
   const { data: terms = [] } = trpc.restaurantePortal.myTerms.useQuery();
   const { data: pendingData } = trpc.restaurantePortal.pendingTerms.useQuery();
   const { data: acceptances = [] } = trpc.restaurantePortal.myAcceptances.useQuery();
+  const { data: occupancy } = trpc.restaurantePortal.myOccupancyCalendar.useQuery();
+  const { data: commissions } = trpc.restaurantePortal.myCommissions.useQuery();
+  const { data: serviceOrdersList = [] } = trpc.restaurantePortal.myServiceOrders.useQuery();
 
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -107,12 +176,40 @@ export default function RestaurantePortal() {
     accepted: false,
   });
 
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    monthlyCustomers: 0,
+    monthlyDrinksSold: 0,
+    tableCount: 0,
+    seatCount: 0,
+    excludedCategories: [] as string[],
+    excludedOther: "",
+  });
+
   const utils = trpc.useUtils();
   const updateContactMutation = trpc.restaurantePortal.updateContact.useMutation({
     onSuccess: () => {
       utils.restaurantePortal.myRestaurant.invalidate();
       setEditOpen(false);
       toast.success("Dados de contato atualizados!");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateProfileMutation = trpc.restaurantePortal.updateProfile.useMutation({
+    onSuccess: () => {
+      utils.restaurantePortal.myRestaurant.invalidate();
+      setProfileOpen(false);
+      toast.success("Dados operacionais atualizados!");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const confirmMaterialMutation = trpc.restaurantePortal.confirmMaterialReceived.useMutation({
+    onSuccess: () => {
+      utils.restaurantePortal.myCampaigns.invalidate();
+      utils.restaurantePortal.myServiceOrders.invalidate();
+      toast.success("Recebimento confirmado!");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -140,6 +237,29 @@ export default function RestaurantePortal() {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const openProfileDialog = () => {
+    if (restaurant) {
+      setProfileForm({
+        monthlyCustomers: (restaurant as any).monthlyCustomers || 0,
+        monthlyDrinksSold: (restaurant as any).monthlyDrinksSold || 0,
+        tableCount: (restaurant as any).tableCount || 0,
+        seatCount: (restaurant as any).seatCount || 0,
+        excludedCategories: parseExcluded((restaurant as any).excludedCategories),
+        excludedOther: (restaurant as any).excludedOther || "",
+      });
+    }
+    setProfileOpen(true);
+  };
+
+  const toggleProfileCategory = (cat: string) => {
+    setProfileForm(prev => ({
+      ...prev,
+      excludedCategories: prev.excludedCategories.includes(cat)
+        ? prev.excludedCategories.filter(c => c !== cat)
+        : [...prev.excludedCategories, cat],
+    }));
+  };
 
   const openEditDialog = () => {
     if (restaurant) {
@@ -301,10 +421,27 @@ export default function RestaurantePortal() {
         </div>
 
         <Tabs defaultValue="campaigns" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
             <TabsTrigger value="campaigns" className="gap-1.5">
               <Megaphone className="w-4 h-4" />
               Campanhas
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-1.5">
+              <CalendarDays className="w-4 h-4" />
+              Calendário
+            </TabsTrigger>
+            <TabsTrigger value="commissions" className="gap-1.5">
+              <DollarSign className="w-4 h-4" />
+              Comissões
+            </TabsTrigger>
+            <TabsTrigger value="os" className="gap-1.5">
+              <ClipboardList className="w-4 h-4" />
+              OS
+              {campaignsAwaitingMaterialConfirm.length > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+                  {campaignsAwaitingMaterialConfirm.length}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="terms" className="gap-1.5">
               <FileText className="w-4 h-4" />
@@ -363,7 +500,8 @@ export default function RestaurantePortal() {
                                 <Button
                                   size="sm"
                                   className="gap-1.5 text-xs bg-amber-500 hover:bg-amber-600 text-white"
-                                  onClick={() => toast.info("Para confirmar o recebimento, entre em contato com a equipe Mesa Ads.")}
+                                  disabled={confirmMaterialMutation.isPending}
+                                  onClick={() => confirmMaterialMutation.mutate({ campaignId: campaign.campaignId ?? campaign.id })}
                                 >
                                   <Package className="w-3.5 h-3.5" />
                                   Confirmar recebimento
@@ -377,6 +515,279 @@ export default function RestaurantePortal() {
                               )}
                             </div>
                           </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="calendar" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarDays className="w-5 h-5 text-primary" />
+                  Calendário de ocupação
+                </CardTitle>
+                <CardDescription>
+                  Períodos em que seu local tem campanhas programadas ou em veiculação
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!occupancy || occupancy.campaigns.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <CalendarDays className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                    <p>Nenhuma campanha agendada</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {occupancy.campaigns.map((c: any) => {
+                      const phases = occupancy.phases.filter((p: any) => p.campaignId === c.id);
+                      const cfg = campaignStatusConfig[c.status] || campaignStatusConfig.draft;
+                      return (
+                        <div key={c.id} className="rounded-lg border bg-card p-4">
+                          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+                            <div>
+                              <p className="font-medium">{c.name}</p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                {c.campaignNumber && <span className="font-mono">{c.campaignNumber}</span>}
+                                {c.clientLabel && <span>· {c.clientLabel}</span>}
+                              </div>
+                            </div>
+                            <Badge className={cfg.color}>{cfg.label}</Badge>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                            <div className="rounded-md border border-border/30 bg-background/40 px-3 py-2">
+                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Período total</p>
+                              <p className="font-medium">{formatDate(c.startDate)} — {formatDate(c.endDate)}</p>
+                            </div>
+                            {(c.veiculacaoStartDate || c.veiculacaoEndDate) && (
+                              <div className="rounded-md border border-border/30 bg-background/40 px-3 py-2">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Veiculação</p>
+                                <p className="font-medium">{formatDate(c.veiculacaoStartDate)} — {formatDate(c.veiculacaoEndDate)}</p>
+                              </div>
+                            )}
+                          </div>
+                          {phases.length > 0 && (
+                            <div className="mt-3 space-y-1.5">
+                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Fases / Ciclos</p>
+                              {phases.map((p: any) => (
+                                <div key={p.id} className="flex items-center justify-between text-sm rounded-md border border-border/20 bg-background/30 px-3 py-1.5">
+                                  <span className="font-medium">{p.label}</span>
+                                  <span className="text-xs text-muted-foreground">{formatDate(p.periodStart)} — {formatDate(p.periodEnd)}</span>
+                                  <Badge variant="outline" className="text-[10px] capitalize">{p.status}</Badge>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="commissions" className="mt-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-xs text-muted-foreground">Total acumulado</p>
+                  <p className="text-2xl font-bold tabular-nums mt-1">{formatBRL(commissions?.totalAmount || 0)}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {commissions?.paymentCount || 0} {commissions?.paymentCount === 1 ? "pagamento" : "pagamentos"}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-xs text-muted-foreground">Já recebido</p>
+                  <p className="text-2xl font-bold tabular-nums text-emerald-400 mt-1">{formatBRL(commissions?.totalPaid || 0)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-xs text-muted-foreground">A receber</p>
+                  <p className="text-2xl font-bold tabular-nums text-amber-400 mt-1">{formatBRL(commissions?.totalPending || 0)}</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-emerald-500" />
+                  Comissões por campanha
+                </CardTitle>
+                <CardDescription>Detalhamento dos repasses por campanha vinculada ao seu local</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!commissions || commissions.byCampaign.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <DollarSign className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                    <p>Nenhuma comissão registrada ainda</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {commissions.byCampaign.map((g: any) => (
+                      <div key={`${g.campaignId ?? "none"}`} className="rounded-lg border bg-card">
+                        <div className="p-4 flex items-center justify-between gap-3 flex-wrap border-b border-border/30">
+                          <div>
+                            <p className="font-medium">{g.campaignName}</p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                              {g.campaignNumber && <span className="font-mono">{g.campaignNumber}</span>}
+                              {g.clientLabel && <span>· {g.clientLabel}</span>}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold tabular-nums">{formatBRL(g.totalAmount)}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {g.paymentCount} {g.paymentCount === 1 ? "pagamento" : "pagamentos"} · pago {formatBRL(g.paidAmount)} · a receber {formatBRL(g.pendingAmount)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="divide-y divide-border/20">
+                          {g.payments.map((p: any) => {
+                            const isPaid = p.status === "pago" || p.status === "paid";
+                            return (
+                              <div key={p.id} className="px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
+                                <div className="flex items-center gap-3">
+                                  <Badge variant="outline" className="text-xs">{formatRefMonth(p.referenceMonth)}</Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {p.periodStart ? `${formatDate(p.periodStart)} — ${formatDate(p.periodEnd)}` : (p.paymentDate ? `Pago em ${formatDate(p.paymentDate)}` : "Sem data")}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="font-mono tabular-nums">{formatBRL(p.amountNumber)}</span>
+                                  <Badge className={isPaid ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}>
+                                    {isPaid ? "Pago" : "Pendente"}
+                                  </Badge>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="os" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5 text-primary" />
+                  Ordens de Serviço
+                </CardTitle>
+                <CardDescription>
+                  OS vinculadas às suas campanhas, com rastreamento e confirmação de recebimento
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {serviceOrdersList.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                    <p>Nenhuma OS registrada</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {serviceOrdersList.map((os: any) => {
+                      const cfg = osStatusConfig[os.status] || osStatusConfig.rascunho;
+                      const isDistribution = os.type === "distribuicao";
+                      const needsConfirm = isDistribution && os.campaignId && !os.materialReceivedDate;
+                      return (
+                        <div key={os.id} className={`rounded-lg border p-4 ${needsConfirm ? "border-amber-500/30 bg-amber-500/5" : "bg-card"}`}>
+                          <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-primary/10">
+                                <Truck className="w-4 h-4 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-mono text-sm font-medium">{os.orderNumber}</p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                  <Badge variant="outline" className="text-[10px]">{osTypeLabel[os.type] || os.type}</Badge>
+                                  {os.campaignNumber && <span className="font-mono">{os.campaignNumber}</span>}
+                                  {os.campaignName && <span>· {os.campaignName}</span>}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge className={cfg.color}>{cfg.label}</Badge>
+                              {needsConfirm && (
+                                <Button
+                                  size="sm"
+                                  className="gap-1.5 text-xs bg-amber-500 hover:bg-amber-600 text-white"
+                                  disabled={confirmMaterialMutation.isPending}
+                                  onClick={() => confirmMaterialMutation.mutate({ campaignId: os.campaignId })}
+                                >
+                                  <Package className="w-3.5 h-3.5" />
+                                  Confirmar recebimento
+                                </Button>
+                              )}
+                              {os.materialReceivedDate && (
+                                <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Recebido em {formatDate(os.materialReceivedDate)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mt-2">
+                            {(os.periodStart || os.periodEnd) && (
+                              <div className="rounded-md border border-border/20 bg-background/30 px-2.5 py-1.5">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Período</p>
+                                <p>{formatDate(os.periodStart)} — {formatDate(os.periodEnd)}</p>
+                              </div>
+                            )}
+                            {os.estimatedDeadline && (
+                              <div className="rounded-md border border-border/20 bg-background/30 px-2.5 py-1.5">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Prazo estimado</p>
+                                <p>{formatDate(os.estimatedDeadline)}</p>
+                              </div>
+                            )}
+                            {os.coasterVolume != null && (
+                              <div className="rounded-md border border-border/20 bg-background/30 px-2.5 py-1.5">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Volume</p>
+                                <p>{Number(os.coasterVolume).toLocaleString("pt-BR")} un.</p>
+                              </div>
+                            )}
+                          </div>
+                          {(os.trackings.length > 0 || os.trackingCode) && (
+                            <div className="mt-3 space-y-1.5">
+                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Rastreamentos</p>
+                              {os.trackingCode && os.trackings.length === 0 && (
+                                <div className="flex items-center justify-between text-xs rounded-md border border-border/20 bg-background/30 px-2.5 py-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <Truck className="w-3.5 h-3.5 text-muted-foreground" />
+                                    <span className="font-mono">{os.trackingCode}</span>
+                                    {os.freightProvider && <span className="text-muted-foreground">· {os.freightProvider}</span>}
+                                  </div>
+                                  {os.freightExpectedDate && (
+                                    <span className="text-muted-foreground">previsto {formatDate(os.freightExpectedDate)}</span>
+                                  )}
+                                </div>
+                              )}
+                              {os.trackings.map((t: any) => (
+                                <div key={t.id} className="flex items-center justify-between text-xs rounded-md border border-border/20 bg-background/30 px-2.5 py-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <Truck className="w-3.5 h-3.5 text-muted-foreground" />
+                                    <span className="font-mono">{t.trackingCode}</span>
+                                    {t.freightProvider && <span className="text-muted-foreground">· {t.freightProvider}</span>}
+                                    {t.label && <span className="text-muted-foreground">· {t.label}</span>}
+                                  </div>
+                                  {t.expectedDate && (
+                                    <span className="text-muted-foreground">previsto {formatDate(t.expectedDate)}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -626,6 +1037,81 @@ export default function RestaurantePortal() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Dados Operacionais</CardTitle>
+                    <CardDescription>Capacidade, fluxo de clientes e categorias bloqueadas para anúncios</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={openProfileDialog}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Editar
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  <div className="rounded-lg border border-border/30 bg-card p-3 flex items-center gap-2.5">
+                    <Users className="w-4 h-4 text-primary shrink-0" />
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Clientes/mês</p>
+                      <p className="text-lg font-bold tabular-nums">{((restaurant as any).monthlyCustomers || 0).toLocaleString("pt-BR")}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border/30 bg-card p-3 flex items-center gap-2.5">
+                    <Wine className="w-4 h-4 text-primary shrink-0" />
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Bebidas/mês</p>
+                      <p className="text-lg font-bold tabular-nums">{((restaurant as any).monthlyDrinksSold || 0).toLocaleString("pt-BR")}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border/30 bg-card p-3 flex items-center gap-2.5">
+                    <Boxes className="w-4 h-4 text-primary shrink-0" />
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Mesas</p>
+                      <p className="text-lg font-bold tabular-nums">{(restaurant as any).tableCount || 0}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border/30 bg-card p-3 flex items-center gap-2.5">
+                    <Armchair className="w-4 h-4 text-primary shrink-0" />
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Lugares</p>
+                      <p className="text-lg font-bold tabular-nums">{(restaurant as any).seatCount || 0}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Ban className="w-4 h-4 text-red-400" />
+                    <p className="text-sm font-medium">Categorias bloqueadas para anúncios</p>
+                  </div>
+                  {(() => {
+                    const cats = parseExcluded((restaurant as any).excludedCategories);
+                    const other = (restaurant as any).excludedOther;
+                    if (cats.length === 0 && !other) {
+                      return <p className="text-sm text-muted-foreground">Nenhuma categoria bloqueada.</p>;
+                    }
+                    return (
+                      <>
+                        <div className="flex flex-wrap gap-1.5">
+                          {cats.map((c, i) => (
+                            <Badge key={i} variant="outline" className="text-xs border-red-500/30 text-red-300">{c}</Badge>
+                          ))}
+                        </div>
+                        {other && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            <span className="font-medium">Outras:</span> {other}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
@@ -683,6 +1169,91 @@ export default function RestaurantePortal() {
                 disabled={updateContactMutation.isPending}
               >
                 {updateContactMutation.isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Dados Operacionais</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Clientes por mês</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={profileForm.monthlyCustomers}
+                    onChange={(e) => setProfileForm({ ...profileForm, monthlyCustomers: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Bebidas vendidas por mês</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={profileForm.monthlyDrinksSold}
+                    onChange={(e) => setProfileForm({ ...profileForm, monthlyDrinksSold: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Quantidade de mesas</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={profileForm.tableCount}
+                    onChange={(e) => setProfileForm({ ...profileForm, tableCount: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Quantidade de lugares</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={profileForm.seatCount}
+                    onChange={(e) => setProfileForm({ ...profileForm, seatCount: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Categorias bloqueadas para anúncios</Label>
+                <p className="text-xs text-muted-foreground">Marque as categorias que você NÃO deseja que apareçam em sua veiculação.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[260px] overflow-y-auto rounded-md border border-border/30 p-3">
+                  {EXCLUDED_CATEGORIES.map((cat) => (
+                    <label key={cat} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent/40 rounded px-1.5 py-1">
+                      <Checkbox
+                        checked={profileForm.excludedCategories.includes(cat)}
+                        onCheckedChange={() => toggleProfileCategory(cat)}
+                      />
+                      <span className={profileForm.excludedCategories.includes(cat) ? "text-red-300" : ""}>{cat}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Outras categorias bloqueadas (texto livre)</Label>
+                <Textarea
+                  value={profileForm.excludedOther}
+                  onChange={(e) => setProfileForm({ ...profileForm, excludedOther: e.target.value })}
+                  placeholder="Categorias adicionais que você não quer anunciar..."
+                  className="min-h-[60px]"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setProfileOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => updateProfileMutation.mutate(profileForm)}
+                disabled={updateProfileMutation.isPending}
+              >
+                {updateProfileMutation.isPending ? "Salvando..." : "Salvar"}
               </Button>
             </DialogFooter>
           </DialogContent>

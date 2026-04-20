@@ -2661,6 +2661,266 @@ export const appRouter = router({
         return acceptance;
       }),
 
+    myOccupancyCalendar: restauranteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.restaurantId) return { campaigns: [], phases: [] };
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return { campaigns: [], phases: [] };
+      const { campaignRestaurants, campaigns: campaignsTbl, campaignPhases, clients } = await import("../drizzle/schema");
+      const { eq, inArray, asc } = await import("drizzle-orm");
+
+      const linked = await db.select({ campaignId: campaignRestaurants.campaignId })
+        .from(campaignRestaurants)
+        .where(eq(campaignRestaurants.restaurantId, user.restaurantId));
+      const campaignIds = linked.map(r => r.campaignId);
+      if (campaignIds.length === 0) return { campaigns: [], phases: [] };
+
+      const camps = await db.select({
+        id: campaignsTbl.id,
+        campaignNumber: campaignsTbl.campaignNumber,
+        name: campaignsTbl.name,
+        status: campaignsTbl.status,
+        startDate: campaignsTbl.startDate,
+        endDate: campaignsTbl.endDate,
+        veiculacaoStartDate: campaignsTbl.veiculacaoStartDate,
+        veiculacaoEndDate: campaignsTbl.veiculacaoEndDate,
+        clientId: campaignsTbl.clientId,
+        clientName: clients.name,
+        clientCompany: clients.company,
+      })
+        .from(campaignsTbl)
+        .leftJoin(clients, eq(clients.id, campaignsTbl.clientId))
+        .where(inArray(campaignsTbl.id, campaignIds))
+        .orderBy(asc(campaignsTbl.startDate));
+
+      const phases = await db.select({
+        id: campaignPhases.id,
+        campaignId: campaignPhases.campaignId,
+        sequence: campaignPhases.sequence,
+        label: campaignPhases.label,
+        periodStart: campaignPhases.periodStart,
+        periodEnd: campaignPhases.periodEnd,
+        status: campaignPhases.status,
+      })
+        .from(campaignPhases)
+        .where(inArray(campaignPhases.campaignId, campaignIds))
+        .orderBy(asc(campaignPhases.periodStart));
+
+      return {
+        campaigns: camps.map(c => ({
+          ...c,
+          clientLabel: c.clientCompany ? `${c.clientName} (${c.clientCompany})` : (c.clientName || ""),
+        })),
+        phases,
+      };
+    }),
+
+    myCommissions: restauranteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.restaurantId) {
+        return { totalAmount: 0, totalPaid: 0, totalPending: 0, paymentCount: 0, byCampaign: [], payments: [] };
+      }
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return { totalAmount: 0, totalPaid: 0, totalPending: 0, paymentCount: 0, byCampaign: [], payments: [] };
+      const { restaurantPayments, campaigns: campaignsTbl, clients } = await import("../drizzle/schema");
+      const { eq, desc } = await import("drizzle-orm");
+
+      const rows = await db.select({
+        id: restaurantPayments.id,
+        amount: restaurantPayments.amount,
+        referenceMonth: restaurantPayments.referenceMonth,
+        paymentDate: restaurantPayments.paymentDate,
+        status: restaurantPayments.status,
+        notes: restaurantPayments.notes,
+        proofUrl: restaurantPayments.proofUrl,
+        periodStart: restaurantPayments.periodStart,
+        periodEnd: restaurantPayments.periodEnd,
+        campaignId: restaurantPayments.campaignId,
+        campaignNumber: campaignsTbl.campaignNumber,
+        campaignName: campaignsTbl.name,
+        clientName: clients.name,
+        clientCompany: clients.company,
+      })
+        .from(restaurantPayments)
+        .leftJoin(campaignsTbl, eq(campaignsTbl.id, restaurantPayments.campaignId))
+        .leftJoin(clients, eq(clients.id, campaignsTbl.clientId))
+        .where(eq(restaurantPayments.restaurantId, user.restaurantId))
+        .orderBy(desc(restaurantPayments.referenceMonth), desc(restaurantPayments.createdAt));
+
+      const payments = rows.map(r => ({
+        ...r,
+        amountNumber: parseFloat(r.amount || "0"),
+      }));
+
+      let totalAmount = 0;
+      let totalPaid = 0;
+      let totalPending = 0;
+      const byCampaignMap = new Map<string, {
+        campaignId: number | null;
+        campaignNumber: string | null;
+        campaignName: string;
+        clientLabel: string;
+        totalAmount: number;
+        paidAmount: number;
+        pendingAmount: number;
+        paymentCount: number;
+        payments: typeof payments;
+      }>();
+
+      for (const p of payments) {
+        const isPaid = p.status === "pago" || p.status === "paid";
+        totalAmount += p.amountNumber;
+        if (isPaid) totalPaid += p.amountNumber;
+        else totalPending += p.amountNumber;
+
+        const key = p.campaignId ? `c${p.campaignId}` : "none";
+        const existing = byCampaignMap.get(key);
+        const clientLabel = p.clientCompany ? `${p.clientName} (${p.clientCompany})` : (p.clientName || "");
+        if (existing) {
+          existing.totalAmount += p.amountNumber;
+          if (isPaid) existing.paidAmount += p.amountNumber;
+          else existing.pendingAmount += p.amountNumber;
+          existing.paymentCount += 1;
+          existing.payments.push(p);
+        } else {
+          byCampaignMap.set(key, {
+            campaignId: p.campaignId,
+            campaignNumber: p.campaignNumber,
+            campaignName: p.campaignName || "Sem campanha vinculada",
+            clientLabel,
+            totalAmount: p.amountNumber,
+            paidAmount: isPaid ? p.amountNumber : 0,
+            pendingAmount: isPaid ? 0 : p.amountNumber,
+            paymentCount: 1,
+            payments: [p],
+          });
+        }
+      }
+
+      return {
+        totalAmount,
+        totalPaid,
+        totalPending,
+        paymentCount: payments.length,
+        byCampaign: Array.from(byCampaignMap.values()).sort((a, b) => b.totalAmount - a.totalAmount),
+        payments,
+      };
+    }),
+
+    myServiceOrders: restauranteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.restaurantId) return [];
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) return [];
+      const { campaignRestaurants, campaigns: campaignsTbl, serviceOrders, serviceOrderTrackings } = await import("../drizzle/schema");
+      const { eq, inArray, desc, asc } = await import("drizzle-orm");
+
+      const linked = await db.select({ campaignId: campaignRestaurants.campaignId })
+        .from(campaignRestaurants)
+        .where(eq(campaignRestaurants.restaurantId, user.restaurantId));
+      const campaignIds = linked.map(r => r.campaignId);
+      if (campaignIds.length === 0) return [];
+
+      const orders = await db.select({
+        id: serviceOrders.id,
+        orderNumber: serviceOrders.orderNumber,
+        type: serviceOrders.type,
+        status: serviceOrders.status,
+        description: serviceOrders.description,
+        periodStart: serviceOrders.periodStart,
+        periodEnd: serviceOrders.periodEnd,
+        estimatedDeadline: serviceOrders.estimatedDeadline,
+        trackingCode: serviceOrders.trackingCode,
+        freightProvider: serviceOrders.freightProvider,
+        freightExpectedDate: serviceOrders.freightExpectedDate,
+        coasterVolume: serviceOrders.coasterVolume,
+        campaignId: serviceOrders.campaignId,
+        campaignName: campaignsTbl.name,
+        campaignNumber: campaignsTbl.campaignNumber,
+        materialReceivedDate: campaignsTbl.materialReceivedDate,
+        createdAt: serviceOrders.createdAt,
+      })
+        .from(serviceOrders)
+        .leftJoin(campaignsTbl, eq(campaignsTbl.id, serviceOrders.campaignId))
+        .where(inArray(serviceOrders.campaignId, campaignIds))
+        .orderBy(desc(serviceOrders.createdAt));
+
+      if (orders.length === 0) return [];
+
+      const orderIds = orders.map(o => o.id);
+      const trackings = await db.select()
+        .from(serviceOrderTrackings)
+        .where(inArray(serviceOrderTrackings.serviceOrderId, orderIds))
+        .orderBy(asc(serviceOrderTrackings.createdAt));
+
+      const trackByOs: Record<number, typeof trackings> = {};
+      for (const t of trackings) {
+        if (!trackByOs[t.serviceOrderId]) trackByOs[t.serviceOrderId] = [];
+        trackByOs[t.serviceOrderId].push(t);
+      }
+
+      return orders.map(o => ({ ...o, trackings: trackByOs[o.id] || [] }));
+    }),
+
+    confirmMaterialReceived: restauranteProcedure
+      .input(z.object({ campaignId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const user = ctx.user;
+        if (!user || !user.restaurantId) throw new TRPCError({ code: "FORBIDDEN", message: "Sem restaurante vinculado" });
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { campaignRestaurants, campaigns: campaignsTbl, campaignHistory } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+
+        const link = await db.select().from(campaignRestaurants)
+          .where(and(eq(campaignRestaurants.campaignId, input.campaignId), eq(campaignRestaurants.restaurantId, user.restaurantId)))
+          .limit(1);
+        if (!link.length) throw new TRPCError({ code: "FORBIDDEN", message: "Campanha não pertence ao seu local" });
+
+        const today = new Date().toISOString().split("T")[0];
+        const [updated] = await db.update(campaignsTbl)
+          .set({ materialReceivedDate: today, updatedAt: new Date() })
+          .where(eq(campaignsTbl.id, input.campaignId))
+          .returning();
+
+        if (updated) {
+          await db.insert(campaignHistory).values({
+            campaignId: input.campaignId,
+            action: "material_received_confirmed",
+            details: `Local confirmou recebimento do material em ${today}`,
+            userId: user.id,
+            userName: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email || "Restaurante",
+          });
+        }
+        return updated;
+      }),
+
+    updateProfile: restauranteProcedure
+      .input(z.object({
+        monthlyCustomers: z.number().int().min(0).optional(),
+        monthlyDrinksSold: z.number().int().min(0).optional(),
+        tableCount: z.number().int().min(0).optional(),
+        seatCount: z.number().int().min(0).optional(),
+        excludedCategories: z.array(z.string()).optional(),
+        excludedOther: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const user = ctx.user;
+        if (!user || !user.restaurantId) throw new TRPCError({ code: "FORBIDDEN", message: "Sem restaurante vinculado" });
+        const data: Record<string, any> = {};
+        if (input.monthlyCustomers !== undefined) data.monthlyCustomers = input.monthlyCustomers;
+        if (input.monthlyDrinksSold !== undefined) data.monthlyDrinksSold = input.monthlyDrinksSold;
+        if (input.tableCount !== undefined) data.tableCount = input.tableCount;
+        if (input.seatCount !== undefined) data.seatCount = input.seatCount;
+        if (input.excludedCategories !== undefined) data.excludedCategories = JSON.stringify(input.excludedCategories);
+        if (input.excludedOther !== undefined) data.excludedOther = input.excludedOther;
+        return updateActiveRestaurant(user.restaurantId, data);
+      }),
+
     myAcceptances: restauranteProcedure.query(async ({ ctx }) => {
       const user = ctx.user;
       if (!user || !user.restaurantId) return [];
