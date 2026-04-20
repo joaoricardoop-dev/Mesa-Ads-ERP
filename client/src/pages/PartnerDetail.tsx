@@ -46,6 +46,8 @@ import {
   ChevronDown,
   ChevronUp,
   Calendar,
+  AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 import { LOGO_WHITE_BASE64 } from "@/lib/pdf-assets";
 
@@ -533,6 +535,24 @@ export default function PartnerDetail() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/comercial/parceiros")} className="gap-2">
           <ArrowLeft className="w-4 h-4" /> Voltar
         </Button>
+      </div>
+
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 sm:p-4 flex items-start gap-3">
+        <div className="p-1.5 rounded-md bg-amber-500/15 shrink-0">
+          <AlertTriangle className="w-4 h-4 text-amber-500" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">Construtor de Campanha</p>
+            <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40 gap-1 text-[10px] uppercase tracking-wider font-bold">
+              <Sparkles className="w-3 h-3" /> Modo Beta
+            </Badge>
+          </div>
+          <p className="text-xs text-amber-700/80 dark:text-amber-300/80 leading-relaxed">
+            Esta visão ainda <strong>não está 100% funcional</strong>. Algumas ações podem apresentar comportamento inesperado —
+            estamos refinando a experiência. Se encontrar algo estranho, por favor reporte ao time.
+          </p>
+        </div>
       </div>
 
       <div className="flex items-start justify-between">
