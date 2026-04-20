@@ -139,6 +139,16 @@ export default function Invoicing() {
     },
   });
 
+  const revertPaymentMutation = trpc.financial.revertInvoicePayment.useMutation({
+    onSuccess: () => {
+      utils.financial.listInvoices.invalidate();
+      utils.financial.dashboard.invalidate();
+      setViewInvoiceId(null);
+      toast.success("Recebimento revertido");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const updateMutation = trpc.financial.updateInvoice.useMutation({
     onSuccess: () => {
       utils.financial.listInvoices.invalidate();
@@ -970,6 +980,24 @@ export default function Invoicing() {
                         }}
                       >
                         <X className="w-3.5 h-3.5 mr-1.5" /> Cancelar fatura
+                      </Button>
+                    </div>
+                  )}
+                  {!isEditing && inv.status === "paga" && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-amber-500 border-amber-500/30"
+                        disabled={revertPaymentMutation.isPending}
+                        onClick={() => {
+                          if (confirm("Cancelar o recebimento desta fatura? Ela voltará para 'emitida' e os pagamentos derivados (comissões, repasses) serão revertidos. Pagamentos já liquidados a parceiros bloqueiam a operação.")) {
+                            revertPaymentMutation.mutate({ id: inv.id });
+                          }
+                        }}
+                      >
+                        <X className="w-3.5 h-3.5 mr-1.5" />
+                        {revertPaymentMutation.isPending ? "Revertendo..." : "Cancelar recebimento"}
                       </Button>
                     </div>
                   )}
