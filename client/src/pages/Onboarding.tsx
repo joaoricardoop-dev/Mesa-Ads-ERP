@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { getTracking, clearTracking } from "@/lib/utmTracking";
 import { useQueryClient } from "@tanstack/react-query";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, MapPin, Phone, ChevronRight, ChevronLeft, Check, Loader2 } from "lucide-react";
+import { Building2, MapPin, Phone, ChevronRight, ChevronLeft, Check, Loader2, ShoppingCart } from "lucide-react";
 
 const SEGMENTS = [
   "Alimentação",
@@ -35,6 +35,16 @@ interface OnboardingProps {
 export default function Onboarding({ userName }: OnboardingProps) {
   const [step, setStep] = useState(0);
   const queryClient = useQueryClient();
+  const [fromCheckout, setFromCheckout] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("mesa-checkout-pending") === "1") {
+        setFromCheckout(true);
+      }
+    } catch {}
+  }, []);
+
   const [form, setForm] = useState({
     name: "",
     company: "",
@@ -56,12 +66,38 @@ export default function Onboarding({ userName }: OnboardingProps) {
     onSuccess: () => {
       toast.success("Cadastro concluído! Bem-vindo ao mesa.ads");
       clearTracking();
+      if (fromCheckout) {
+        try {
+          localStorage.removeItem("mesa-checkout-pending");
+        } catch {}
+        window.location.href = "/montar-campanha?step=venues";
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
     onError: (err) => {
       toast.error(err.message || "Erro ao finalizar cadastro");
     },
   });
+
+  const handleCheckoutFinish = () => {
+    if (!form.name.trim()) {
+      toast.error("Nome da empresa é obrigatório");
+      return;
+    }
+    const data: any = { name: form.name.trim() };
+    if (form.cnpj.trim()) data.cnpj = form.cnpj.trim();
+    const tracking = getTracking();
+    if (tracking) {
+      const t: any = {};
+      for (const [k, v] of Object.entries(tracking)) {
+        if (k === "capturedAt") continue;
+        if (typeof v === "string" && v.trim()) t[k] = v;
+      }
+      if (Object.keys(t).length > 0) data.tracking = t;
+    }
+    completeMutation.mutate(data);
+  };
 
   const update = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
 
@@ -96,6 +132,99 @@ export default function Onboarding({ userName }: OnboardingProps) {
     { icon: MapPin, title: "Endereço", subtitle: "Localização do seu negócio" },
     { icon: Phone, title: "Contato", subtitle: "Como podemos falar com você" },
   ];
+
+  if (fromCheckout) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "hsl(0 0% 4%)" }}>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.03]"
+            style={{ background: "radial-gradient(circle, #27d803 0%, transparent 70%)" }}
+          />
+        </div>
+
+        <div className="relative w-full max-w-md px-6 py-12">
+          <div className="text-center mb-8">
+            <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-6" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#27d803]/10 border border-[#27d803]/30 mb-4">
+              <ShoppingCart className="w-3.5 h-3.5 text-[#27d803]" />
+              <span className="text-[11px] font-medium text-[#27d803] uppercase tracking-wider">
+                continuar montagem
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-1">
+              {userName ? `Olá, ${userName}!` : "Quase lá!"}
+            </h1>
+            <p className="text-sm text-[hsl(0,0%,55%)]">
+              Só precisamos do nome da sua empresa para continuar a campanha.
+            </p>
+          </div>
+
+          <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-xl p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <Building2 className="w-5 h-5 text-[#27d803]" />
+              <div>
+                <h2 className="text-sm font-semibold text-white">Sua empresa</h2>
+                <p className="text-xs text-[hsl(0,0%,45%)]">Você pode completar os outros dados depois</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs text-[hsl(0,0%,55%)]">Nome / Marca *</Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => update("name", e.target.value)}
+                  placeholder="Ex: Burger King"
+                  autoFocus
+                  className="mt-1 bg-[hsl(0,0%,11%)] border-[hsl(0,0%,18%)] text-white"
+                  data-testid="input-checkout-onboarding-name"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-[hsl(0,0%,55%)]">CNPJ (opcional)</Label>
+                <Input
+                  value={form.cnpj}
+                  onChange={(e) => update("cnpj", e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                  className="mt-1 bg-[hsl(0,0%,11%)] border-[hsl(0,0%,18%)] text-white"
+                  data-testid="input-checkout-onboarding-cnpj"
+                />
+              </div>
+            </div>
+
+            <Button
+              onClick={handleCheckoutFinish}
+              disabled={completeMutation.isPending || !form.name.trim()}
+              className="w-full mt-6 bg-[#27d803] hover:bg-[#22c003] text-black font-medium"
+              data-testid="button-checkout-onboarding-continue"
+            >
+              {completeMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Salvando...</>
+              ) : (
+                <>Continuar para sua campanha <ChevronRight className="w-4 h-4 ml-1" /></>
+              )}
+            </Button>
+
+            <button
+              type="button"
+              onClick={() => {
+                try { localStorage.removeItem("mesa-checkout-pending"); } catch {}
+                setFromCheckout(false);
+              }}
+              className="w-full mt-3 text-[11px] text-[hsl(0,0%,40%)] hover:text-[hsl(0,0%,60%)] transition-colors"
+            >
+              Preencher cadastro completo agora
+            </button>
+          </div>
+
+          <p className="text-center mt-6 text-[11px]" style={{ color: "hsl(0 0% 30%)" }}>
+            mesa.ads &copy; {new Date().getFullYear()} &mdash; Plataforma de gestão
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "hsl(0 0% 4%)" }}>

@@ -51,7 +51,10 @@ export function StepHero({ role }: Props) {
   function handleAdvance() {
     if (!productId) return;
     if (!isAuthenticated) {
-      setLocation("/?mode=signup&redirect=/montar-campanha");
+      try {
+        localStorage.setItem("mesa-checkout-pending", "1");
+      } catch {}
+      setLocation("/?mode=signup&redirect=/montar-campanha%3Fstep%3Dvenues");
       return;
     }
     next();
