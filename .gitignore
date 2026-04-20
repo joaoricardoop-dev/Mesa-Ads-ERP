@@ -24,6 +24,11 @@ build/
 # OS generated files
 .DS_Store
 .DS_Store?
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
 ._*
 .Spotlight-V100
 .Trashes
