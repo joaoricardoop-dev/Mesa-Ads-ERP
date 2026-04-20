@@ -37,7 +37,7 @@ import ServiceOrders from "./pages/ServiceOrders";
 import BatchManagement from "./pages/BatchManagement";
 import FinancialDashboard from "./pages/financial/FinancialDashboard";
 import Invoicing from "./pages/financial/Invoicing";
-import SuppliersHubPage from "./pages/financial/SuppliersHubPage";
+import VipProvidersPage from "./pages/financial/VipProvidersPage";
 import OperationalCosts from "./pages/financial/OperationalCosts";
 import FinancialReport from "./pages/financial/FinancialReport";
 import PartnerCommissionReport from "./pages/financial/PartnerCommissionReport";
@@ -125,17 +125,17 @@ function Router() {
       <Route path="/financeiro" component={FinancialDashboard} />
       <Route path="/financeiro/faturamento" component={Invoicing} />
       <Route path="/financeiro/contas-pagar" component={AccountsPayablePage} />
-      <Route path="/financeiro/fornecedores" component={SuppliersHubPage} />
       <Route path="/financeiro/relatorios" component={FinancialReport} />
       <Route path="/financeiro/conciliacao" component={BankReconciliation} />
       <Route path="/financeiro/glossario" component={FinancialGlossary} />
       <Route path="/financeiro/comissao-parceiros" component={PartnerCommissionReport} />
       <Route path="/financeiro/auditoria" component={FinancialAuditLog} />
+      <Route path="/configuracoes/provedores-sala-vip" component={VipProvidersPage} />
       {/* Redirects (rotas antigas → novas) */}
       <Route path="/financeiro/pagamentos">{() => <Redirect to="/financeiro/contas-pagar?tab=restaurant_commission" />}</Route>
       <Route path="/financeiro/custos">{() => <Redirect to="/financeiro/contas-pagar?tab=supplier_cost" />}</Route>
-      <Route path="/configuracoes/provedores-sala-vip">{() => <Redirect to="/financeiro/fornecedores?tab=vip" />}</Route>
-      <Route path="/financeiro/provedores-vip">{() => <Redirect to="/financeiro/fornecedores?tab=vip" />}</Route>
+      <Route path="/financeiro/fornecedores">{() => <Redirect to="/producao?tab=suppliers" />}</Route>
+      <Route path="/financeiro/provedores-vip">{() => <Redirect to="/configuracoes/provedores-sala-vip" />}</Route>
       <Route path="/campanhas/:id/batch/:phaseId" component={CampaignDetail} />
       {/* Rota antiga mantida como alias pra não quebrar links existentes */}
       <Route path="/campanhas/:id/fase/:phaseId" component={CampaignDetail} />
