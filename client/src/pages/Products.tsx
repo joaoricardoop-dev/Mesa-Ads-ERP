@@ -1072,6 +1072,9 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
                 </div>
               )}
             </div>
+            <div className="mt-4">
+              <LocationsSection productId={p.id} />
+            </div>
             {p.description && (
               <p className="text-xs text-muted-foreground mt-3">{p.description}</p>
             )}
@@ -1079,6 +1082,332 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
         </TableRow>
       )}
     </>
+  );
+}
+
+interface LocationRow {
+  id: number;
+  productId: number;
+  restaurantId: number;
+  maxShares: number;
+  cycleWeeks: number;
+  restaurantName: string;
+  neighborhood: string | null;
+  city: string | null;
+  sharesOccupiedNow: number;
+}
+
+function LocationsSection({ productId }: { productId: number }) {
+  const utils = trpc.useUtils();
+  const { data: locations = [] as LocationRow[], isLoading } = trpc.product.listLocations.useQuery({ productId });
+  const [addOpen, setAddOpen] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState<LocationRow | null>(null);
+
+  const updateMutation = trpc.product.updateLocation.useMutation({
+    onSuccess: () => {
+      utils.product.listLocations.invalidate({ productId });
+      toast.success("Vínculo atualizado");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const removeMutation = trpc.product.removeLocation.useMutation({
+    onSuccess: () => {
+      utils.product.listLocations.invalidate({ productId });
+      utils.product.getLocations.invalidate({ productId });
+      setRemoveConfirm(null);
+      toast.success("Local removido do produto");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <MapPin className="h-3.5 w-3.5 text-emerald-500" />
+          <h3 className="text-sm font-semibold">Locais ({locations.length})</h3>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
+          <Plus className="h-3 w-3 mr-1" /> Adicionar Local
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Carregando locais...</p>
+      ) : locations.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhum local vinculado a este produto.</p>
+      ) : (
+        <div className="border rounded-md overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Local</TableHead>
+                <TableHead>Bairro</TableHead>
+                <TableHead className="w-28">Max Shares</TableHead>
+                <TableHead className="w-32">Ciclo (semanas)</TableHead>
+                <TableHead className="w-32">Shares Ocupados Agora</TableHead>
+                <TableHead className="w-16 text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(locations as LocationRow[]).map((loc) => (
+                <LocationRowEditable
+                  key={loc.id}
+                  loc={loc}
+                  onSave={(patch) => updateMutation.mutate({ id: loc.id, ...patch })}
+                  onRemove={() => setRemoveConfirm(loc)}
+                  saving={updateMutation.isPending}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <AddLocationDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        productId={productId}
+        existingRestaurantIds={(locations as LocationRow[]).map(l => l.restaurantId)}
+        onAdded={() => {
+          utils.product.listLocations.invalidate({ productId });
+          utils.product.getLocations.invalidate({ productId });
+          setAddOpen(false);
+        }}
+      />
+
+      <Dialog open={removeConfirm !== null} onOpenChange={(v) => !v && setRemoveConfirm(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Remover local do produto</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {removeConfirm
+              ? `Remover "${removeConfirm.restaurantName}" da lista de locais deste produto? A remoção falhará se houver campanhas ativas usando este vínculo.`
+              : ""}
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRemoveConfirm(null)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => removeConfirm && removeMutation.mutate({ id: removeConfirm.id })}
+              disabled={removeMutation.isPending}
+            >
+              Remover
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function LocationRowEditable({ loc, onSave, onRemove, saving }: {
+  loc: LocationRow;
+  onSave: (patch: { maxShares?: number; cycleWeeks?: number }) => void;
+  onRemove: () => void;
+  saving: boolean;
+}) {
+  const [maxShares, setMaxShares] = useState(String(loc.maxShares));
+  const [cycleWeeks, setCycleWeeks] = useState(String(loc.cycleWeeks));
+
+  useEffect(() => { setMaxShares(String(loc.maxShares)); }, [loc.maxShares]);
+  useEffect(() => { setCycleWeeks(String(loc.cycleWeeks)); }, [loc.cycleWeeks]);
+
+  function commitMaxShares() {
+    const n = parseInt(maxShares);
+    if (!Number.isFinite(n) || n < 1) {
+      setMaxShares(String(loc.maxShares));
+      toast.error("Max Shares deve ser ≥ 1");
+      return;
+    }
+    if (n !== loc.maxShares) onSave({ maxShares: n });
+  }
+
+  function commitCycleWeeks() {
+    const n = parseInt(cycleWeeks);
+    if (!Number.isFinite(n) || n < 1) {
+      setCycleWeeks(String(loc.cycleWeeks));
+      toast.error("Ciclo deve ser ≥ 1 semana");
+      return;
+    }
+    if (n !== loc.cycleWeeks) onSave({ cycleWeeks: n });
+  }
+
+  const overCapacity = loc.sharesOccupiedNow > loc.maxShares;
+
+  return (
+    <TableRow>
+      <TableCell className="font-medium">{loc.restaurantName}</TableCell>
+      <TableCell className="text-muted-foreground text-sm">
+        {loc.neighborhood || "—"}{loc.city ? ` · ${loc.city}` : ""}
+      </TableCell>
+      <TableCell>
+        <Input
+          type="number"
+          min="1"
+          className="h-8 w-20 text-xs"
+          value={maxShares}
+          onChange={(e) => setMaxShares(e.target.value)}
+          onBlur={commitMaxShares}
+          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+          disabled={saving}
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          type="number"
+          min="1"
+          className="h-8 w-20 text-xs"
+          value={cycleWeeks}
+          onChange={(e) => setCycleWeeks(e.target.value)}
+          onBlur={commitCycleWeeks}
+          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+          disabled={saving}
+        />
+      </TableCell>
+      <TableCell>
+        <Badge
+          variant="outline"
+          className={cn(
+            "text-[10px] h-5",
+            overCapacity
+              ? "bg-red-500/10 text-red-400 border-red-500/30"
+              : loc.sharesOccupiedNow > 0
+                ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+          )}
+        >
+          {loc.sharesOccupiedNow} / {loc.maxShares}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-right">
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={onRemove}>
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function AddLocationDialog({ open, onOpenChange, productId, existingRestaurantIds, onAdded }: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  productId: number;
+  existingRestaurantIds: number[];
+  onAdded: () => void;
+}) {
+  const { data: restaurants = [], isLoading } = trpc.activeRestaurant.list.useQuery(undefined, { enabled: open });
+  type RestaurantOption = (typeof restaurants)[number];
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [maxShares, setMaxShares] = useState("1");
+  const [cycleWeeks, setCycleWeeks] = useState("4");
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      setSelectedId(null);
+      setMaxShares("1");
+      setCycleWeeks("4");
+    }
+  }, [open]);
+
+  const addMutation = trpc.product.addLocation.useMutation({
+    onSuccess: () => {
+      toast.success("Local adicionado ao produto");
+      onAdded();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const filtered: RestaurantOption[] = restaurants
+    .filter((r) => !existingRestaurantIds.includes(r.id))
+    .filter((r) =>
+      r.name.toLowerCase().includes(search.toLowerCase()) ||
+      (r.neighborhood ?? "").toLowerCase().includes(search.toLowerCase())
+    );
+
+  function handleSave() {
+    if (!selectedId) {
+      toast.error("Selecione um local");
+      return;
+    }
+    const ms = parseInt(maxShares);
+    const cw = parseInt(cycleWeeks);
+    if (!Number.isFinite(ms) || ms < 1) { toast.error("Max Shares deve ser ≥ 1"); return; }
+    if (!Number.isFinite(cw) || cw < 1) { toast.error("Ciclo deve ser ≥ 1 semana"); return; }
+    addMutation.mutate({ productId, restaurantId: selectedId, maxShares: ms, cycleWeeks: cw });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Adicionar Local</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Buscar restaurante</Label>
+            <Input
+              placeholder="Nome ou bairro..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 text-sm mt-1"
+            />
+            <div className="border rounded-md max-h-48 overflow-y-auto mt-2">
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground p-3">Carregando...</p>
+              ) : filtered.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-3">Nenhum local disponível</p>
+              ) : (
+                <div className="divide-y">
+                  {filtered.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setSelectedId(r.id)}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-accent/30 transition-colors",
+                        selectedId === r.id && "bg-primary/10"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
+                        selectedId === r.id ? "bg-primary border-primary" : "border-border"
+                      )}>
+                        {selectedId === r.id && <span className="text-primary-foreground text-[10px] font-bold">✓</span>}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{r.name}</p>
+                        {r.neighborhood && <p className="text-xs text-muted-foreground truncate">{r.neighborhood}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Max Shares</Label>
+              <Input type="number" min="1" value={maxShares} onChange={(e) => setMaxShares(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label>Ciclo (semanas)</Label>
+              <Input type="number" min="1" value={cycleWeeks} onChange={(e) => setCycleWeeks(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={addMutation.isPending || !selectedId}>
+            {addMutation.isPending ? "Adicionando..." : "Adicionar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -1,14 +1,45 @@
 import { protectedProcedure, adminProcedure, internalProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { products, productPricingTiers, productDiscountPriceTiers, productLocations } from "../drizzle/schema";
-import { eq, asc } from "drizzle-orm";
+import { products, productPricingTiers, productDiscountPriceTiers, productLocations, activeRestaurants, campaignItems, campaignPhases, campaigns } from "../drizzle/schema";
+import { eq, asc, and, gte, inArray, notInArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 async function getDatabase() {
   const d = await getDb();
   if (!d) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
   return d;
+}
+
+// Status de campanhas considerados "encerrados" — não bloqueiam remoção
+// de vínculo produto×local. Compartilhado por removeLocation e pela
+// sincronização diff em product.update para garantir mesma regra.
+const FINISHED_CAMPAIGN_STATUSES = ["draft", "quotation", "completed", "archived", "inativa"] as const;
+
+async function findBlockingCampaignNames(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  productId: number,
+  restaurantIds: number[],
+): Promise<string[]> {
+  if (restaurantIds.length === 0) return [];
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = await db
+    .select({ campaignId: campaigns.id, campaignName: campaigns.name })
+    .from(campaignItems)
+    .innerJoin(campaignPhases, eq(campaignItems.campaignPhaseId, campaignPhases.id))
+    .innerJoin(campaigns, eq(campaignPhases.campaignId, campaigns.id))
+    .where(
+      and(
+        eq(campaignItems.productId, productId),
+        inArray(campaignItems.restaurantId, restaurantIds),
+        notInArray(campaigns.status, [...FINISHED_CAMPAIGN_STATUSES]),
+        gte(campaignPhases.periodEnd, sql`${today}::date`),
+      )
+    )
+    .limit(10);
+  const names = new Set<string>();
+  for (const r of rows) if (r.campaignName) names.add(r.campaignName);
+  return Array.from(names);
 }
 
 const TIPO_ENUM = ["coaster", "display", "cardapio", "totem", "adesivo", "porta_guardanapo", "outro", "impressos", "eletronicos", "telas", "janelas_digitais"] as const;
@@ -125,19 +156,59 @@ export const productRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDatabase();
       const { id, locationIds, ...data } = input;
-      const rows = await db.update(products).set({ ...data, updatedAt: new Date() }).where(eq(products.id, id)).returning();
-      if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado" });
+
+      // Pré-validação fora da transação: produto existe? E, se vamos
+      // remover vínculos via diff, há campanhas ativas que bloqueiam?
+      // Falhamos cedo para nunca persistir parcialmente os campos do produto.
+      const [current] = await db.select().from(products).where(eq(products.id, id)).limit(1);
+      if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado" });
+
+      let plan: { toAdd: number[]; toRemoveIds: number[] } | null = null;
       if (locationIds !== undefined) {
-        const updatedDistributionType = data.distributionType ?? rows[0].distributionType;
+        const updatedDistributionType = data.distributionType ?? current.distributionType;
         const effectiveLocationIds = updatedDistributionType === "local_especifico" ? locationIds : [];
-        await db.delete(productLocations).where(eq(productLocations.productId, id));
-        if (effectiveLocationIds.length > 0) {
-          await db.insert(productLocations).values(
-            effectiveLocationIds.map(restaurantId => ({ productId: id, restaurantId }))
+        const existing = await db
+          .select({ id: productLocations.id, restaurantId: productLocations.restaurantId })
+          .from(productLocations)
+          .where(eq(productLocations.productId, id));
+        const existingSet = new Set(existing.map(e => e.restaurantId));
+        const desiredSet = new Set(effectiveLocationIds);
+        const toAdd = effectiveLocationIds.filter(rid => !existingSet.has(rid));
+        const toRemoveLinks = existing.filter(e => !desiredSet.has(e.restaurantId));
+        if (toRemoveLinks.length > 0) {
+          const blockedNames = await findBlockingCampaignNames(
+            db,
+            id,
+            toRemoveLinks.map(l => l.restaurantId),
           );
+          if (blockedNames.length > 0) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: `Não é possível remover locais com campanhas ativas vinculadas (${blockedNames.join(", ")}). Use a aba "Locais" ou encerre/arquive as campanhas antes de retirar a seleção.`,
+            });
+          }
         }
+        plan = { toAdd, toRemoveIds: toRemoveLinks.map(l => l.id) };
       }
-      return rows[0];
+
+      // Tudo validado: aplica produto + diff de locais atomicamente.
+      // Diff-based sync preserva maxShares/cycleWeeks dos vínculos existentes
+      // (configurados na aba "Locais").
+      return await db.transaction(async (tx) => {
+        const rows = await tx.update(products).set({ ...data, updatedAt: new Date() }).where(eq(products.id, id)).returning();
+        if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado" });
+        if (plan) {
+          if (plan.toRemoveIds.length > 0) {
+            await tx.delete(productLocations).where(inArray(productLocations.id, plan.toRemoveIds));
+          }
+          if (plan.toAdd.length > 0) {
+            await tx.insert(productLocations).values(
+              plan.toAdd.map(restaurantId => ({ productId: id, restaurantId }))
+            );
+          }
+        }
+        return rows[0];
+      });
     }),
 
   getLocations: protectedProcedure
@@ -148,6 +219,136 @@ export const productRouter = router({
         .select({ restaurantId: productLocations.restaurantId })
         .from(productLocations)
         .where(eq(productLocations.productId, input.productId));
+    }),
+
+  // ── Product Locations CRUD (Marketplace v2) ─────────────────────────────────
+  // Statuses considerados "ativos" — bloqueiam a remoção do vínculo
+  // produto×local e contam para "shares ocupados agora".
+  // Excluímos: draft, quotation, completed, archived, inativa.
+
+  listLocations: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const today = new Date().toISOString().slice(0, 10);
+
+      const rows = await db
+        .select({
+          id: productLocations.id,
+          productId: productLocations.productId,
+          restaurantId: productLocations.restaurantId,
+          maxShares: productLocations.maxShares,
+          cycleWeeks: productLocations.cycleWeeks,
+          createdAt: productLocations.createdAt,
+          restaurantName: activeRestaurants.name,
+          neighborhood: activeRestaurants.neighborhood,
+          city: activeRestaurants.city,
+        })
+        .from(productLocations)
+        .innerJoin(activeRestaurants, eq(productLocations.restaurantId, activeRestaurants.id))
+        .where(eq(productLocations.productId, input.productId))
+        .orderBy(asc(activeRestaurants.name));
+
+      if (rows.length === 0) return [];
+
+      const occRows = await db
+        .select({
+          restaurantId: campaignItems.restaurantId,
+          shares: sql<number>`COUNT(DISTINCT ${campaignItems.shareIndex})`.as("shares"),
+        })
+        .from(campaignItems)
+        .innerJoin(campaignPhases, eq(campaignItems.campaignPhaseId, campaignPhases.id))
+        .innerJoin(campaigns, eq(campaignPhases.campaignId, campaigns.id))
+        .where(
+          and(
+            eq(campaignItems.productId, input.productId),
+            inArray(campaignItems.restaurantId, rows.map(r => r.restaurantId)),
+            sql`${campaignPhases.periodStart} <= ${today}::date`,
+            sql`${campaignPhases.periodEnd} >= ${today}::date`,
+            notInArray(campaigns.status, ["draft", "quotation", "completed", "archived", "inativa"]),
+            sql`${campaignItems.shareIndex} IS NOT NULL`,
+          )
+        )
+        .groupBy(campaignItems.restaurantId);
+
+      const occMap = new Map<number, number>();
+      for (const o of occRows) {
+        if (o.restaurantId != null) occMap.set(o.restaurantId, Number(o.shares) || 0);
+      }
+
+      return rows.map(r => ({
+        ...r,
+        sharesOccupiedNow: occMap.get(r.restaurantId) ?? 0,
+      }));
+    }),
+
+  addLocation: adminProcedure
+    .input(z.object({
+      productId: z.number().int(),
+      restaurantId: z.number().int(),
+      maxShares: z.number().int().min(1).default(1),
+      cycleWeeks: z.number().int().min(1).default(4),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+
+      const productExists = await db.select({ id: products.id }).from(products).where(eq(products.id, input.productId)).limit(1);
+      if (!productExists.length) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado." });
+      const restExists = await db.select({ id: activeRestaurants.id }).from(activeRestaurants).where(eq(activeRestaurants.id, input.restaurantId)).limit(1);
+      if (!restExists.length) throw new TRPCError({ code: "NOT_FOUND", message: "Local não encontrado." });
+
+      const existing = await db
+        .select()
+        .from(productLocations)
+        .where(and(eq(productLocations.productId, input.productId), eq(productLocations.restaurantId, input.restaurantId)))
+        .limit(1);
+      if (existing.length) throw new TRPCError({ code: "CONFLICT", message: "Este local já está vinculado ao produto." });
+
+      const [row] = await db.insert(productLocations).values({
+        productId: input.productId,
+        restaurantId: input.restaurantId,
+        maxShares: input.maxShares,
+        cycleWeeks: input.cycleWeeks,
+      }).returning();
+      return row;
+    }),
+
+  updateLocation: adminProcedure
+    .input(z.object({
+      id: z.number().int(),
+      maxShares: z.number().int().min(1).optional(),
+      cycleWeeks: z.number().int().min(1).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const patch: Record<string, unknown> = {};
+      if (input.maxShares !== undefined) patch.maxShares = input.maxShares;
+      if (input.cycleWeeks !== undefined) patch.cycleWeeks = input.cycleWeeks;
+      if (Object.keys(patch).length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhum campo para atualizar." });
+      }
+      const rows = await db.update(productLocations).set(patch).where(eq(productLocations.id, input.id)).returning();
+      if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Vínculo não encontrado." });
+      return rows[0];
+    }),
+
+  removeLocation: adminProcedure
+    .input(z.object({ id: z.number().int() }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const [link] = await db.select().from(productLocations).where(eq(productLocations.id, input.id)).limit(1);
+      if (!link) throw new TRPCError({ code: "NOT_FOUND", message: "Vínculo não encontrado." });
+
+      const blockedNames = await findBlockingCampaignNames(db, link.productId, [link.restaurantId]);
+      if (blockedNames.length > 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `Não é possível remover: existem campanhas ativas usando este local (${blockedNames.join(", ")}). Encerre ou arquive as campanhas antes de remover o vínculo.`,
+        });
+      }
+
+      await db.delete(productLocations).where(eq(productLocations.id, input.id));
+      return { success: true };
     }),
 
   delete: adminProcedure
