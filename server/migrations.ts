@@ -670,6 +670,55 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ALTER COLUMN "expiresAt" SET NOT NULL;
     `,
   },
+  {
+    // Refatoração financeira fase 1 — Glossário.
+    // Mapeia cada coluna ao termo de negócio definido em
+    // docs/financeiro-glossario.md. Idempotente (COMMENT é sempre seguro).
+    name: "finrefac_01_glossary_comments",
+    sql: `
+      COMMENT ON TABLE "invoices" IS 'Fatura emitida ao anunciante (recebível). Glossário: docs/financeiro-glossario.md §5';
+      COMMENT ON COLUMN "invoices"."amount" IS 'Receita Bruta — valor total da fatura antes de deduções.';
+      COMMENT ON COLUMN "invoices"."billingType" IS 'Modo de faturamento: bruto (valor cheio) | liquido (já descontado o repasse).';
+      COMMENT ON COLUMN "invoices"."withheldTax" IS 'Imposto Retido (cash) — valor em R$ retido pelo cliente.';
+      COMMENT ON COLUMN "invoices"."issRate" IS 'Alíquota ISS (% sobre o serviço).';
+      COMMENT ON COLUMN "invoices"."issRetained" IS 'true: ISS retido pelo tomador (sai do líquido); false: empresa recolhe depois.';
+      COMMENT ON COLUMN "invoices"."issueDate" IS 'Data de emissão da fatura (base para DRE Competência).';
+      COMMENT ON COLUMN "invoices"."dueDate" IS 'Vencimento da fatura.';
+      COMMENT ON COLUMN "invoices"."paymentDate" IS 'Recebimento — data em que o cliente efetivamente pagou (base para DRE Caixa).';
+      COMMENT ON COLUMN "invoices"."status" IS 'emitida | enviada | paga | vencida | cancelada. Apenas emitida é editável.';
+
+      COMMENT ON TABLE "restaurant_payments" IS 'Repasse Restaurante — gerado quando há Comissão Restaurante (produtos físicos).';
+      COMMENT ON COLUMN "restaurant_payments"."amount" IS 'Repasse Restaurante — valor em R$ devido ao restaurante.';
+      COMMENT ON COLUMN "restaurant_payments"."paymentDate" IS 'Data do pagamento efetivo ao restaurante.';
+      COMMENT ON COLUMN "restaurant_payments"."status" IS 'pending | paid.';
+
+      COMMENT ON TABLE "operational_costs" IS 'Custo Operacional — agregado por campanha (produção + frete).';
+      COMMENT ON COLUMN "operational_costs"."productionCost" IS 'Custo de Produção — fabricação do material físico (bolachas). Não se aplica a produtos digitais.';
+      COMMENT ON COLUMN "operational_costs"."freightCost" IS 'Custo de Frete — gráfica → restaurantes. Não se aplica a produtos digitais.';
+
+      COMMENT ON TABLE "partners" IS 'Parceiros indicadores/agências que recebem Comissão Parceiro.';
+      COMMENT ON COLUMN "partners"."commissionPercent" IS 'Comissão Parceiro — % sobre a base definida em billingMode.';
+      COMMENT ON COLUMN "partners"."billingMode" IS 'Base de cálculo da comissão: bruto (sobre receita bruta) | liquido (após impostos).';
+
+      COMMENT ON TABLE "vip_providers" IS 'Provedores de Sala VIP — recebem Repasse Sala VIP (produtos digitais em tela/janela).';
+      COMMENT ON COLUMN "vip_providers"."commissionPercent" IS 'Repasse Sala VIP — % devido ao provedor sobre a base definida em billingMode.';
+      COMMENT ON COLUMN "vip_providers"."billingMode" IS 'Base do repasse: bruto | liquido.';
+
+      COMMENT ON TABLE "accounts_payable" IS 'Ledger único de Contas a Pagar (produção, frete, comissões, repasses VIP). Glossário §4.';
+      COMMENT ON COLUMN "accounts_payable"."type" IS 'producao | frete | comissao | repasse_vip | outro.';
+      COMMENT ON COLUMN "accounts_payable"."amount" IS 'Valor em R$ a pagar.';
+      COMMENT ON COLUMN "accounts_payable"."dueDate" IS 'Vencimento do título.';
+      COMMENT ON COLUMN "accounts_payable"."paymentDate" IS 'Data do pagamento efetivo.';
+      COMMENT ON COLUMN "accounts_payable"."status" IS 'pendente | pago | cancelado.';
+      COMMENT ON COLUMN "accounts_payable"."recipientType" IS 'fornecedor | parceiro | vip_provider | restaurante.';
+
+      COMMENT ON COLUMN "campaigns"."restaurantCommission" IS 'Comissão Restaurante (%) — pulada para produtos digitais.';
+      COMMENT ON COLUMN "campaigns"."sellerCommission" IS 'Comissão Vendedor (%).';
+      COMMENT ON COLUMN "campaigns"."taxRate" IS 'Imposto sobre Receita (%) — alíquota geral da campanha.';
+      COMMENT ON COLUMN "campaigns"."productionCost" IS 'Snapshot do Custo de Produção (R$) na criação da campanha.';
+      COMMENT ON COLUMN "campaigns"."freightCost" IS 'Snapshot do Custo de Frete (R$) na criação da campanha.';
+    `,
+  },
 ];
 
 export async function runMigrations() {
