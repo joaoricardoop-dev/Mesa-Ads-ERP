@@ -79,7 +79,10 @@ export function audited<P extends { use: (mw: never) => unknown }, TInput = unkn
       const skipEmpty = config.skipWhenEmpty !== false;
       const isEmpty = after === null || after === undefined;
       const hasBefore = before !== null && before !== undefined;
-      const shouldRecord = skipEmpty ? !isEmpty : (hasBefore || !isEmpty);
+      // Para deletes (skipWhenEmpty:false), só registramos se a entidade
+      // existia antes — evita falso "delete" quando o id não existe e a
+      // mutação retornou {success:true} sem afetar linhas.
+      const shouldRecord = skipEmpty ? !isEmpty : hasBefore;
 
       if (shouldRecord) {
         const inputObj = rawInput as Record<string, unknown> | null;

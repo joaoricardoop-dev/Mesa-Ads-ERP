@@ -23,6 +23,7 @@ import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { materializePayablesForInvoice, type DbClient } from "./finance/payables";
 import { recordAudit } from "./finance/audit";
+import { audited } from "./finance/auditMiddleware";
 import { financialAuditLog } from "../drizzle/schema";
 
 function requireFinancialAccess(role: string | null) {
@@ -2044,7 +2045,14 @@ export const financialRouter = router({
       return rows.map(r => ({ ...r.ap, campaignName: r.campaignName, supplierName: r.supplierName }));
     }),
 
-  createAccountPayable: protectedProcedure
+  // Auditoria automática via middleware audited(): elimina recordAudit
+  // inline e garante cobertura uniforme. requireFinancialAccess permanece
+  // como guard de role (executado antes do insert; o middleware só grava
+  // após o sucesso da mutation).
+  createAccountPayable: audited(protectedProcedure, {
+    entityType: "accounts_payable",
+    action: "create",
+  })
     .input(z.object({
       campaignId: z.number(),
       campaignPhaseId: z.number().optional(),
@@ -2075,14 +2083,17 @@ export const financialRouter = router({
         notes: input.notes ?? null,
         status: "pendente",
       }).returning();
-      await recordAudit(db, ctx, {
-        entityType: "accounts_payable", entityId: row.id, action: "create",
-        before: null, after: row,
-      });
       return row;
     }),
 
-  updateAccountPayable: protectedProcedure
+  updateAccountPayable: audited(protectedProcedure, {
+    entityType: "accounts_payable",
+    action: "update",
+    loadBefore: async (input: { id: number }, db) => {
+      const [row] = await db.select().from(accountsPayable).where(eq(accountsPayable.id, input.id));
+      return row ?? null;
+    },
+  })
     .input(z.object({
       id: z.number(),
       dueDate: z.string().optional(),
@@ -2095,7 +2106,6 @@ export const financialRouter = router({
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
       const { id, ...fields } = input;
-      const [before] = await db.select().from(accountsPayable).where(eq(accountsPayable.id, id));
       const updateData: Record<string, unknown> = { updatedAt: new Date() };
       if (fields.dueDate !== undefined) updateData.dueDate = fields.dueDate;
       if (fields.amount !== undefined) updateData.amount = fields.amount;
@@ -2103,16 +2113,17 @@ export const financialRouter = router({
       if (fields.notes !== undefined) updateData.notes = fields.notes;
       if (fields.status !== undefined) updateData.status = fields.status;
       const [updated] = await db.update(accountsPayable).set(updateData).where(eq(accountsPayable.id, id)).returning();
-      if (updated) {
-        await recordAudit(db, ctx, {
-          entityType: "accounts_payable", entityId: id, action: "update",
-          before, after: updated,
-        });
-      }
       return updated;
     }),
 
-  markAccountPayablePaid: protectedProcedure
+  markAccountPayablePaid: audited(protectedProcedure, {
+    entityType: "accounts_payable",
+    action: "mark_paid",
+    loadBefore: async (input: { id: number }, db) => {
+      const [row] = await db.select().from(accountsPayable).where(eq(accountsPayable.id, input.id));
+      return row ?? null;
+    },
+  })
     .input(z.object({
       id: z.number(),
       paymentDate: z.string(),
@@ -2121,33 +2132,74 @@ export const financialRouter = router({
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
-      const [before] = await db.select().from(accountsPayable).where(eq(accountsPayable.id, input.id));
       const [updated] = await db
         .update(accountsPayable)
         .set({ status: "pago", paymentDate: input.paymentDate, proofUrl: input.proofUrl ?? null, updatedAt: new Date() })
         .where(eq(accountsPayable.id, input.id))
         .returning();
-      if (updated) {
-        await recordAudit(db, ctx, {
-          entityType: "accounts_payable", entityId: input.id, action: "mark_paid",
-          before, after: updated,
-        });
-      }
       return updated;
     }),
 
-  deleteAccountPayable: protectedProcedure
+  deleteAccountPayable: audited(protectedProcedure, {
+    entityType: "accounts_payable",
+    action: "delete",
+    loadBefore: async (input: { id: number }, db) => {
+      const [row] = await db.select().from(accountsPayable).where(eq(accountsPayable.id, input.id));
+      return row ?? null;
+    },
+    skipWhenEmpty: false,
+  })
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
-      const [before] = await db.select().from(accountsPayable).where(eq(accountsPayable.id, input.id));
-      if (!before) return { ok: true };
       await db.delete(accountsPayable).where(eq(accountsPayable.id, input.id));
-      await recordAudit(db, ctx, {
-        entityType: "accounts_payable", entityId: input.id, action: "delete",
-        before, after: null,
-      });
+      return { ok: true };
+    }),
+
+  // Hard delete de fatura — admin/financeiro apenas, somente quando ainda
+  // está em "rascunho" (cancelInvoice é o caminho normal para emitidas).
+  deleteInvoice: audited(protectedProcedure, {
+    entityType: "invoice",
+    action: "delete",
+    loadBefore: async (input: { id: number }, db) => {
+      const [row] = await db.select().from(invoices).where(eq(invoices.id, input.id));
+      return row ?? null;
+    },
+    skipWhenEmpty: false,
+  })
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      const [existing] = await db.select().from(invoices).where(eq(invoices.id, input.id));
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Fatura não encontrada" });
+      if (existing.status !== "cancelada") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Apenas faturas canceladas podem ser excluídas. Cancele a fatura primeiro.",
+        });
+      }
+      await db.delete(accountsPayable).where(eq(accountsPayable.invoiceId, input.id));
+      await db.delete(invoices).where(eq(invoices.id, input.id));
+      return { ok: true };
+    }),
+
+  // Hard delete de custo operacional — admin/financeiro apenas.
+  deleteOperationalCost: audited(protectedProcedure, {
+    entityType: "operational_cost",
+    action: "delete",
+    loadBefore: async (input: { id: number }, db) => {
+      const [row] = await db.select().from(operationalCosts).where(eq(operationalCosts.id, input.id));
+      return row ?? null;
+    },
+    skipWhenEmpty: false,
+  })
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      await db.delete(operationalCosts).where(eq(operationalCosts.id, input.id));
       return { ok: true };
     }),
 
