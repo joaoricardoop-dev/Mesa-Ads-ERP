@@ -1097,6 +1097,31 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON "accounts_payable" USING gin (("sourceRef"->'invoiceIds'));
     `,
   },
+  {
+    name: "finrefac_05_financial_audit_log",
+    sql: `
+      CREATE TABLE IF NOT EXISTS "financial_audit_log" (
+        "id" serial PRIMARY KEY,
+        "entityType" varchar(64) NOT NULL,
+        "entityId" integer,
+        "action" varchar(64) NOT NULL,
+        "actorUserId" varchar,
+        "actorRole" varchar(32),
+        "before" jsonb,
+        "after" jsonb,
+        "metadata" jsonb,
+        "createdAt" timestamp NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "idx_fin_audit_entity"
+        ON "financial_audit_log" ("entityType", "entityId");
+      CREATE INDEX IF NOT EXISTS "idx_fin_audit_actor"
+        ON "financial_audit_log" ("actorUserId");
+      CREATE INDEX IF NOT EXISTS "idx_fin_audit_created_at"
+        ON "financial_audit_log" ("createdAt");
+      CREATE INDEX IF NOT EXISTS "idx_fin_audit_action"
+        ON "financial_audit_log" ("action");
+    `,
+  },
 ];
 
 export async function runMigrations() {

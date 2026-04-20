@@ -1318,4 +1318,30 @@ export const accountsPayable = pgTable("accounts_payable", {
 export type AccountPayable = typeof accountsPayable.$inferSelect;
 export type InsertAccountPayable = typeof accountsPayable.$inferInsert;
 
+// ── Trilha de auditoria financeira (finrefac fase 5) ─────────────────────
+// Registra TODA mutação relevante no módulo financeiro: invoices,
+// accounts_payable, operational_costs, vip_providers, partners.
+// `before`/`after` armazenam o snapshot completo da entidade em JSON.
+// Quando `before` é NULL → criação. Quando `after` é NULL → exclusão.
+export const financialAuditLog = pgTable("financial_audit_log", {
+  id: serial("id").primaryKey(),
+  entityType: varchar("entityType", { length: 64 }).notNull(),
+  entityId: integer("entityId"),
+  action: varchar("action", { length: 64 }).notNull(),
+  actorUserId: varchar("actorUserId"),
+  actorRole: varchar("actorRole", { length: 32 }),
+  before: jsonb("before").$type<Record<string, unknown> | null>(),
+  after: jsonb("after").$type<Record<string, unknown> | null>(),
+  metadata: jsonb("metadata").$type<Record<string, unknown> | null>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_fin_audit_entity").on(t.entityType, t.entityId),
+  index("idx_fin_audit_actor").on(t.actorUserId),
+  index("idx_fin_audit_created_at").on(t.createdAt),
+  index("idx_fin_audit_action").on(t.action),
+]);
+
+export type FinancialAuditLog = typeof financialAuditLog.$inferSelect;
+export type InsertFinancialAuditLog = typeof financialAuditLog.$inferInsert;
+
 export * from "../shared/models/auth";

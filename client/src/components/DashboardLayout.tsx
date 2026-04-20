@@ -82,6 +82,7 @@ import {
   Zap,
   BookOpen,
   Crown,
+  History,
   type LucideIcon,
 } from "lucide-react";
 import { NotificationBell } from "./NotificationPanel";
@@ -154,6 +155,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: Calculator, label: "Custos", path: "/financeiro/custos" },
       { icon: FileBarChart, label: "Relatórios", path: "/financeiro/relatorios" },
       { icon: BookOpen, label: "Glossário", path: "/financeiro/glossario" },
+      { icon: History, label: "Auditoria", path: "/financeiro/auditoria", adminOnly: true },
     ],
   },
   {

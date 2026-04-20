@@ -1,4 +1,4 @@
-import { financeiroProcedure, protectedProcedure, router } from "./_core/trpc";
+import { adminProcedure, financeiroProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, updateRestaurantPayment as updateRestaurantPaymentDb } from "./db";
 import {
@@ -22,6 +22,8 @@ import { VIP_PRODUCT_TIPOS } from "./productRouter";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { materializePayablesForInvoice, type DbClient } from "./finance/payables";
+import { recordAudit } from "./finance/audit";
+import { financialAuditLog } from "../drizzle/schema";
 
 function requireFinancialAccess(role: string | null) {
   if (role !== "admin" && role !== "financeiro" && role !== "manager") {
@@ -844,6 +846,10 @@ export const financialRouter = router({
         return row;
       });
 
+      await recordAudit(db, ctx, {
+        entityType: "invoice", entityId: created.id, action: "create",
+        before: null, after: created,
+      });
       return created;
     }),
 
@@ -864,6 +870,7 @@ export const financialRouter = router({
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
       const { id, ...fields } = input;
+      const [before] = await db.select().from(invoices).where(eq(invoices.id, id));
       const updateData: Record<string, unknown> = { updatedAt: new Date() };
       if (fields.amount !== undefined) updateData.amount = fields.amount;
       if (fields.dueDate !== undefined) updateData.dueDate = fields.dueDate;
@@ -896,6 +903,12 @@ export const financialRouter = router({
         }
         return row;
       });
+      if (updated) {
+        await recordAudit(db, ctx, {
+          entityType: "invoice", entityId: id, action: "update",
+          before, after: updated,
+        });
+      }
       return updated;
     }),
 
@@ -908,6 +921,7 @@ export const financialRouter = router({
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
+      const [before] = await db.select().from(invoices).where(eq(invoices.id, input.id));
       // Finrefac fase 3: pagamento + materialização atômicos.
       const updated = await db.transaction(async (tx: DbClient) => {
         const [row] = await tx
@@ -921,6 +935,12 @@ export const financialRouter = router({
         return row;
       });
 
+      if (updated) {
+        await recordAudit(db, ctx, {
+          entityType: "invoice", entityId: input.id, action: "mark_paid",
+          before, after: updated,
+        });
+      }
       return updated;
     }),
 
@@ -929,9 +949,10 @@ export const financialRouter = router({
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
+      const [before] = await db.select().from(invoices).where(eq(invoices.id, input.id));
 
       try {
-        return await db.transaction(async (tx: DbClient) => {
+        const result = await db.transaction(async (tx: DbClient) => {
           // Bloqueia se algum derivado de pagamento já está pago.
           await materializePayablesForInvoice(tx, input.id, "reverter_pagamento");
           const [row] = await tx
@@ -941,6 +962,13 @@ export const financialRouter = router({
             .returning();
           return row;
         });
+        if (result) {
+          await recordAudit(db, ctx, {
+            entityType: "invoice", entityId: input.id, action: "revert_payment",
+            before, after: result,
+          });
+        }
+        return result;
       } catch (err: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: err?.message || "Falha ao reverter pagamento" });
       }
@@ -951,9 +979,10 @@ export const financialRouter = router({
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
+      const [before] = await db.select().from(invoices).where(eq(invoices.id, input.id));
 
       try {
-        return await db.transaction(async (tx: DbClient) => {
+        const result = await db.transaction(async (tx: DbClient) => {
           // Cancela todos os derivados não pagos; bloqueia se algum já está pago.
           await materializePayablesForInvoice(tx, input.id, "cancelada");
           const [row] = await tx
@@ -963,6 +992,13 @@ export const financialRouter = router({
             .returning();
           return row;
         });
+        if (result) {
+          await recordAudit(db, ctx, {
+            entityType: "invoice", entityId: input.id, action: "cancel",
+            before, after: result,
+          });
+        }
+        return result;
       } catch (err: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: err?.message || "Falha ao cancelar fatura" });
       }
@@ -1023,6 +1059,8 @@ export const financialRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      const [before] = await db.select().from(restaurantPayments).where(eq(restaurantPayments.id, input.id));
       // Roteia pelo helper de dual-write para que o ledger
       // (accounts_payable) seja sincronizado automaticamente. Atualizar
       // direto na tabela legada deixaria o ledger stale e quebraria os
@@ -1032,6 +1070,12 @@ export const financialRouter = router({
         paymentDate: input.paymentDate,
         proofUrl: input.proofUrl,
       });
+      if (before && updated[0]) {
+        await recordAudit(db, ctx, {
+          entityType: "restaurant_payment", entityId: input.id, action: "mark_paid",
+          before, after: updated[0],
+        });
+      }
       return updated[0];
     }),
 
@@ -1242,6 +1286,8 @@ export const financialRouter = router({
       const existing = await db.select().from(operationalCosts).where(eq(operationalCosts.campaignId, input.campaignId));
 
       let row;
+      let action: "create" | "update" = "create";
+      const before = existing[0] ?? null;
       if (existing.length > 0) {
         const [updated] = await db
           .update(operationalCosts)
@@ -1249,6 +1295,7 @@ export const financialRouter = router({
           .where(eq(operationalCosts.campaignId, input.campaignId))
           .returning();
         row = updated;
+        action = "update";
       } else {
         const [created] = await db
           .insert(operationalCosts)
@@ -1256,7 +1303,6 @@ export const financialRouter = router({
           .returning();
         row = created;
       }
-
       // Sincroniza contas a pagar correspondentes (produção e frete, por parcela)
       let syncResult: Array<{ type: string; created: number; removed: number }> = [];
       try {
@@ -1266,6 +1312,26 @@ export const financialRouter = router({
         });
       } catch (err) {
         console.warn("[upsertCost] syncCampaignCostPayables failed:", err);
+      }
+
+      await recordAudit(db, ctx, {
+        entityType: "operational_cost", entityId: row?.id ?? null, action,
+        before, after: row,
+        metadata: {
+          campaignId: input.campaignId,
+          payablesSync: syncResult,
+        },
+      });
+      if (syncResult && syncResult.some(r => r.created > 0 || r.removed > 0)) {
+        await recordAudit(db, ctx, {
+          entityType: "accounts_payable", entityId: null, action: "generate",
+          before: null, after: null,
+          metadata: {
+            source: "upsertCost",
+            campaignId: input.campaignId,
+            sync: syncResult,
+          },
+        });
       }
 
       return { ...row, syncResult };
@@ -2009,6 +2075,10 @@ export const financialRouter = router({
         notes: input.notes ?? null,
         status: "pendente",
       }).returning();
+      await recordAudit(db, ctx, {
+        entityType: "accounts_payable", entityId: row.id, action: "create",
+        before: null, after: row,
+      });
       return row;
     }),
 
@@ -2025,6 +2095,7 @@ export const financialRouter = router({
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
       const { id, ...fields } = input;
+      const [before] = await db.select().from(accountsPayable).where(eq(accountsPayable.id, id));
       const updateData: Record<string, unknown> = { updatedAt: new Date() };
       if (fields.dueDate !== undefined) updateData.dueDate = fields.dueDate;
       if (fields.amount !== undefined) updateData.amount = fields.amount;
@@ -2032,6 +2103,12 @@ export const financialRouter = router({
       if (fields.notes !== undefined) updateData.notes = fields.notes;
       if (fields.status !== undefined) updateData.status = fields.status;
       const [updated] = await db.update(accountsPayable).set(updateData).where(eq(accountsPayable.id, id)).returning();
+      if (updated) {
+        await recordAudit(db, ctx, {
+          entityType: "accounts_payable", entityId: id, action: "update",
+          before, after: updated,
+        });
+      }
       return updated;
     }),
 
@@ -2044,11 +2121,18 @@ export const financialRouter = router({
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
+      const [before] = await db.select().from(accountsPayable).where(eq(accountsPayable.id, input.id));
       const [updated] = await db
         .update(accountsPayable)
         .set({ status: "pago", paymentDate: input.paymentDate, proofUrl: input.proofUrl ?? null, updatedAt: new Date() })
         .where(eq(accountsPayable.id, input.id))
         .returning();
+      if (updated) {
+        await recordAudit(db, ctx, {
+          entityType: "accounts_payable", entityId: input.id, action: "mark_paid",
+          before, after: updated,
+        });
+      }
       return updated;
     }),
 
@@ -2057,7 +2141,13 @@ export const financialRouter = router({
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
+      const [before] = await db.select().from(accountsPayable).where(eq(accountsPayable.id, input.id));
+      if (!before) return { ok: true };
       await db.delete(accountsPayable).where(eq(accountsPayable.id, input.id));
+      await recordAudit(db, ctx, {
+        entityType: "accounts_payable", entityId: input.id, action: "delete",
+        before, after: null,
+      });
       return { ok: true };
     }),
 
@@ -2109,6 +2199,11 @@ export const financialRouter = router({
       if (toInsert.length > 0) {
         await db.insert(accountsPayable).values(toInsert);
       }
+      await recordAudit(db, ctx, {
+        entityType: "accounts_payable", entityId: null, action: "generate",
+        before: null, after: null,
+        metadata: { campaignId: input.campaignId, generated: toInsert.length, items: toInsert },
+      });
       return { generated: toInsert.length };
     }),
 
@@ -2138,7 +2233,7 @@ export const financialRouter = router({
       const commAmount = invoiceAmt * (restCommRate / 100);
 
       if (commAmount > 0) {
-        await db.insert(accountsPayable).values({
+        const [row] = await db.insert(accountsPayable).values({
           campaignId: input.campaignId,
           invoiceId: input.invoiceId,
           type: "comissao",
@@ -2146,9 +2241,62 @@ export const financialRouter = router({
           amount: commAmount.toFixed(2),
           recipientType: "restaurante",
           status: "pendente",
+        }).returning();
+        await recordAudit(db, ctx, {
+          entityType: "accounts_payable", entityId: row.id, action: "generate",
+          before: null, after: row,
+          metadata: { campaignId: input.campaignId, invoiceId: input.invoiceId, kind: "comissao" },
         });
         return { generated: 1 };
       }
       return { generated: 0 };
     }),
+
+  // ── Auditoria financeira (finrefac fase 5) ─────────────────────────────
+  // Lista entradas do financial_audit_log com filtros. Restrito a admin.
+  auditLog: adminProcedure
+    .input(z.object({
+      entityType: z.string().optional(),
+      entityId: z.number().optional(),
+      action: z.string().optional(),
+      actorUserId: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      limit: z.number().int().min(1).max(500).default(100),
+      offset: z.number().int().min(0).default(0),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const f: {
+        entityType?: string; entityId?: number; action?: string; actorUserId?: string;
+        startDate?: string; endDate?: string; limit: number; offset: number;
+      } = input ?? { limit: 100, offset: 0 };
+      const conditions = [];
+      if (f.entityType) conditions.push(eq(financialAuditLog.entityType, f.entityType));
+      if (f.entityId != null) conditions.push(eq(financialAuditLog.entityId, f.entityId));
+      if (f.action) conditions.push(eq(financialAuditLog.action, f.action));
+      if (f.actorUserId) conditions.push(eq(financialAuditLog.actorUserId, f.actorUserId));
+      if (f.startDate) conditions.push(gte(financialAuditLog.createdAt, new Date(f.startDate)));
+      if (f.endDate) conditions.push(lte(financialAuditLog.createdAt, new Date(`${f.endDate}T23:59:59.999Z`)));
+
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+      const limit = f.limit ?? 100;
+      const offset = f.offset ?? 0;
+
+      const [rows, totalRows] = await Promise.all([
+        db.select().from(financialAuditLog).where(where).orderBy(desc(financialAuditLog.createdAt)).limit(limit).offset(offset),
+        db.select({ c: sql<number>`COUNT(*)::int` }).from(financialAuditLog).where(where),
+      ]);
+
+      return { rows, total: totalRows[0]?.c ?? 0, limit, offset };
+    }),
+
+  auditLogActors: adminProcedure.query(async () => {
+    const db = await getDatabase();
+    const rows = await db
+      .select({ actorUserId: financialAuditLog.actorUserId, actorRole: financialAuditLog.actorRole })
+      .from(financialAuditLog)
+      .groupBy(financialAuditLog.actorUserId, financialAuditLog.actorRole);
+    return rows.filter((r) => r.actorUserId);
+  }),
 });

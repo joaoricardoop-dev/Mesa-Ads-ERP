@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { partners, leads, quotations, campaigns, clients } from "../drizzle/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { recordAudit } from "./finance/audit";
 
 async function getDatabase() {
   const d = await getDb();
@@ -74,9 +75,13 @@ export const partnerRouter = router({
       status: z.enum(["active", "inactive"]).default("active"),
       notes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDatabase();
       const [created] = await db.insert(partners).values(input).returning();
+      await recordAudit(db, ctx, {
+        entityType: "partner", entityId: created.id, action: "create",
+        before: null, after: created,
+      });
       return created;
     }),
 
@@ -94,23 +99,33 @@ export const partnerRouter = router({
       status: z.enum(["active", "inactive"]).optional(),
       notes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDatabase();
       const { id, ...data } = input;
+      const [before] = await db.select().from(partners).where(eq(partners.id, id));
       const [updated] = await db
         .update(partners)
         .set({ ...data, updatedAt: new Date() })
         .where(eq(partners.id, id))
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Parceiro não encontrado" });
+      await recordAudit(db, ctx, {
+        entityType: "partner", entityId: id, action: "update",
+        before, after: updated,
+      });
       return updated;
     }),
 
   delete: comercialProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDatabase();
+      const [before] = await db.select().from(partners).where(eq(partners.id, input.id));
       await db.delete(partners).where(eq(partners.id, input.id));
+      await recordAudit(db, ctx, {
+        entityType: "partner", entityId: input.id, action: "delete",
+        before, after: null,
+      });
       return { success: true };
     }),
 

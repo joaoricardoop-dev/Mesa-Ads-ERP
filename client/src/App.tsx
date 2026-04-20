@@ -43,6 +43,7 @@ import PartnerCommissionReport from "./pages/financial/PartnerCommissionReport";
 import AccountsPayablePage from "./pages/financial/AccountsPayablePage";
 import VipProvidersPage from "./pages/financial/VipProvidersPage";
 import FinancialGlossary from "./pages/financial/FinancialGlossary";
+import FinancialAuditLog from "./pages/financial/FinancialAuditLog";
 import PriceTable from "./pages/PriceTable";
 import AnunciantePortal from "./pages/AnunciantePortal";
 import RestaurantePortal from "./pages/RestaurantePortal";
@@ -127,6 +128,7 @@ function Router() {
       <Route path="/financeiro/glossario" component={FinancialGlossary} />
       <Route path="/financeiro/comissao-parceiros" component={PartnerCommissionReport} />
       <Route path="/financeiro/contas-pagar" component={AccountsPayablePage} />
+      <Route path="/financeiro/auditoria" component={FinancialAuditLog} />
       <Route path="/configuracoes/provedores-sala-vip" component={VipProvidersPage} />
       {/* Rota antiga mantida como alias pra não quebrar links existentes */}
       <Route path="/financeiro/provedores-vip" component={VipProvidersPage} />

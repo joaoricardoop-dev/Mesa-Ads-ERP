@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { vipProviders, products, accountsPayable } from "../drizzle/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { recordAudit } from "./finance/audit";
 
 async function getDatabase() {
   const d = await getDb();
@@ -109,11 +110,15 @@ export const vipProviderRouter = router({
       status: z.enum(["active", "inactive"]).default("active"),
       notes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDatabase();
       const normalized = normalizeRepasseInput(input);
       const values = { ...normalized, repassePercent: normalized.repassePercent ?? "10.00" };
       const [created] = await db.insert(vipProviders).values(values).returning();
+      await recordAudit(db, ctx, {
+        entityType: "vip_provider", entityId: created.id, action: "create",
+        before: null, after: created,
+      });
       return withLegacyCommissionAlias(created);
     }),
 
@@ -133,22 +138,27 @@ export const vipProviderRouter = router({
       status: z.enum(["active", "inactive"]).optional(),
       notes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDatabase();
       const { id, ...rest } = input;
       const data = normalizeRepasseInput(rest);
+      const [before] = await db.select().from(vipProviders).where(eq(vipProviders.id, id));
       const [updated] = await db
         .update(vipProviders)
         .set({ ...data, updatedAt: new Date() })
         .where(eq(vipProviders.id, id))
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Provedor Sala VIP não encontrado" });
+      await recordAudit(db, ctx, {
+        entityType: "vip_provider", entityId: id, action: "update",
+        before, after: updated,
+      });
       return withLegacyCommissionAlias(updated);
     }),
 
   delete: comercialProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDatabase();
       // Checar se há produtos vinculados antes de deletar
       const [linked] = await db
@@ -161,7 +171,12 @@ export const vipProviderRouter = router({
           message: "Não é possível excluir: existem produtos vinculados a este provedor. Desvincule-os primeiro.",
         });
       }
+      const [before] = await db.select().from(vipProviders).where(eq(vipProviders.id, input.id));
       await db.delete(vipProviders).where(eq(vipProviders.id, input.id));
+      await recordAudit(db, ctx, {
+        entityType: "vip_provider", entityId: input.id, action: "delete",
+        before, after: null,
+      });
       return { success: true };
     }),
 
