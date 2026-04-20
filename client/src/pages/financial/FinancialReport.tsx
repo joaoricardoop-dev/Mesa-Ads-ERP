@@ -55,6 +55,8 @@ function dreRowsForExport(dre: DreData | undefined) {
     ["(-) Custos de Produção",          fmtNum(-L.productionCosts),     pct(L.productionCosts)],
     ["(-) Frete e Distribuição",        fmtNum(-L.freightCosts),        pct(L.freightCosts)],
     ["(-) Comissão Parceiros",          fmtNum(-L.partnerCommissions),  pct(L.partnerCommissions)],
+    ["(-) BV de Agência",               fmtNum(-(L.agencyBv || 0)),     pct(L.agencyBv || 0)],
+    ["(-) Comissão Comercial",          fmtNum(-(L.sellerCommission || 0)), pct(L.sellerCommission || 0)],
     ["(-) Outros",                      fmtNum(-L.otherCosts),          pct(L.otherCosts)],
     ["Total Custos",                    fmtNum(-L.totalCosts),          pct(L.totalCosts)],
     ["(=) Lucro Bruto",                 fmtNum(L.grossProfit),          `${(L.grossMarginPct * 100).toFixed(1)}%`],

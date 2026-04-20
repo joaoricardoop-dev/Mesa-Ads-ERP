@@ -2531,6 +2531,33 @@ export const financialRouter = router({
 
       const [rev] = await buildGrossInvoiceQuery(db).where(and(...invConditions));
 
+      // ── BV de Agência + Comissão Comercial ──────────────────────────────
+      // BV de Agência: para campanhas SEM partnerId. Quando há partnerId, o
+      // BV já é capturado em accounts_payable.sourceType='partner_commission'
+      // (ver server/finance/payables.ts → upsertPartnerCommissionForInvoice).
+      // Esta SQL preenche o gap das campanhas sem parceiro associado, evitando
+      // double-counting com partnerCommissions agregado abaixo.
+      // Comissão Comercial: aplicada a todas as campanhas (interno).
+      // Bonificadas não geram comissões (mesma regra dos outros repasses).
+      const [agencyAndSellerRow] = await db
+        .select({
+          agencyBv: sql<string>`COALESCE(SUM(
+            CASE WHEN COALESCE(${campaigns.isBonificada}, false) THEN 0
+                 WHEN COALESCE(${campaigns.hasAgencyBv}, false) = false THEN 0
+                 WHEN ${campaigns.partnerId} IS NOT NULL THEN 0
+                 ELSE ${invoices.amount}::numeric * (COALESCE(${campaigns.agencyBvPercent}, 0)::numeric / 100)
+            END
+          ), 0)`,
+          sellerCommission: sql<string>`COALESCE(SUM(
+            CASE WHEN COALESCE(${campaigns.isBonificada}, false) THEN 0
+                 ELSE ${invoices.amount}::numeric * (COALESCE(${campaigns.sellerCommission}, 0)::numeric / 100)
+            END
+          ), 0)`,
+        })
+        .from(invoices)
+        .leftJoin(campaigns, eq(campaigns.id, invoices.campaignId))
+        .where(and(...invConditions));
+
       // ── Custos via accountsPayable ──────────────────────────────────────
       // Competência: usa COALESCE(competenceMonth, to_char(dueDate,'YYYY-MM'))
       // como mês de competência. Status sem filtro (pendente + pago contam,
@@ -2570,13 +2597,15 @@ export const financialRouter = router({
       }
 
       const grossRevenue = parseFloat(rev?.total || "0");
+      const agencyBv = parseFloat(agencyAndSellerRow?.agencyBv || "0");
+      const sellerCommission = parseFloat(agencyAndSellerRow?.sellerCommission || "0");
 
       // Deduções de receita: comissão restaurante + repasse VIP + ISS retido
       // (estes três derivados da AP — fonte única de verdade do ledger).
       const revenueDeductions = restaurantCommissions + vipRepasses + taxes;
       const netRevenue = grossRevenue - revenueDeductions;
 
-      const totalCosts = production + freight + partnerCommission + othersAp;
+      const totalCosts = production + freight + partnerCommission + othersAp + agencyBv + sellerCommission;
       const grossProfit = netRevenue - totalCosts;
       const irpj = grossRevenue * 0.06;
       const netProfit = grossProfit - irpj;
@@ -2595,6 +2624,8 @@ export const financialRouter = router({
           productionCosts: production,
           freightCosts: freight,
           partnerCommissions: partnerCommission,
+          agencyBv,
+          sellerCommission,
           otherCosts: othersAp,
           totalCosts,
           grossProfit,

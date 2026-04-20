@@ -554,6 +554,8 @@ export default function FinancialDashboard() {
                   <DreRow label="(-) Custos de Produção" value={-(L?.productionCosts || 0)} pct={pct(L?.productionCosts || 0)} indent negative />
                   <DreRow label="(-) Frete e Distribuição" value={-(L?.freightCosts || 0)} pct={pct(L?.freightCosts || 0)} indent negative />
                   <DreRow label="(-) Comissão Parceiros" value={-(L?.partnerCommissions || 0)} pct={pct(L?.partnerCommissions || 0)} indent negative />
+                  <DreRow label="(-) BV de Agência" value={-(L?.agencyBv || 0)} pct={pct(L?.agencyBv || 0)} indent negative />
+                  <DreRow label="(-) Comissão Comercial" value={-(L?.sellerCommission || 0)} pct={pct(L?.sellerCommission || 0)} indent negative />
                   {(L?.otherCosts || 0) > 0 && (
                     <DreRow label="(-) Outros" value={-(L?.otherCosts || 0)} pct={pct(L?.otherCosts || 0)} indent negative />
                   )}
