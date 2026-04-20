@@ -701,7 +701,6 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       COMMENT ON COLUMN "partners"."billingMode" IS 'Base de cálculo da comissão: bruto (sobre receita bruta) | liquido (após impostos).';
 
       COMMENT ON TABLE "vip_providers" IS 'Provedores de Sala VIP — recebem Repasse Sala VIP (produtos digitais em tela/janela).';
-      COMMENT ON COLUMN "vip_providers"."commissionPercent" IS 'Repasse Sala VIP — % devido ao provedor sobre a base definida em billingMode.';
       COMMENT ON COLUMN "vip_providers"."billingMode" IS 'Base do repasse: bruto | liquido.';
 
       COMMENT ON TABLE "accounts_payable" IS 'Ledger único de Contas a Pagar (produção, frete, comissões, repasses VIP). Glossário §4.';
@@ -717,6 +716,29 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       COMMENT ON COLUMN "campaigns"."taxRate" IS 'Imposto sobre Receita (%) — alíquota geral da campanha.';
       COMMENT ON COLUMN "campaigns"."productionCost" IS 'Snapshot do Custo de Produção (R$) na criação da campanha.';
       COMMENT ON COLUMN "campaigns"."freightCost" IS 'Snapshot do Custo de Frete (R$) na criação da campanha.';
+    `,
+  },
+  {
+    // Refatoração financeira fase 1 — Rename físico de coluna.
+    // vip_providers.commissionPercent → repassePercent (termo correto do
+    // glossário: "Repasse Sala VIP", não "comissão"). Idempotente: só
+    // renomeia se a coluna antiga existir e a nova ainda não existir.
+    // Reversível: trocar os nomes no DO block para reverter.
+    name: "finrefac_01_rename_vip_provider_commission_to_repasse",
+    sql: `
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'vip_providers' AND column_name = 'commissionPercent'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'vip_providers' AND column_name = 'repassePercent'
+        ) THEN
+          ALTER TABLE "vip_providers" RENAME COLUMN "commissionPercent" TO "repassePercent";
+        END IF;
+      END $$;
+      COMMENT ON COLUMN "vip_providers"."repassePercent" IS 'Repasse Sala VIP — % devido ao provedor sobre a base definida em billingMode. (renomeado de commissionPercent na fase 1)';
     `,
   },
 ];

@@ -11,6 +11,26 @@ async function getDatabase() {
   return d;
 }
 
+// Compat alias (finrefac fase 1): aceita tanto `commissionPercent` quanto
+// `repassePercent` como input. Internamente normaliza pra `repassePercent`
+// (nome correto do glossário). Remover em fase 4 quando todos os clientes
+// estiverem migrados.
+function normalizeRepasseInput<T extends { commissionPercent?: string; repassePercent?: string }>(
+  data: T,
+): Omit<T, "commissionPercent"> & { repassePercent?: string } {
+  const { commissionPercent, repassePercent, ...rest } = data as any;
+  const value = repassePercent ?? commissionPercent;
+  if (value !== undefined && commissionPercent !== undefined && repassePercent === undefined) {
+    console.warn("[vipProvider] input usando alias legado `commissionPercent` — migrar para `repassePercent`.");
+  }
+  return value !== undefined ? { ...rest, repassePercent: value } : rest;
+}
+
+// Adiciona o alias legado `commissionPercent` no output para clientes antigos.
+function withLegacyCommissionAlias<T extends { repassePercent: string }>(row: T) {
+  return { ...row, commissionPercent: row.repassePercent };
+}
+
 export const vipProviderRouter = router({
   list: comercialProcedure
     .input(z.object({
@@ -42,11 +62,11 @@ export const vipProviderRouter = router({
             eq(accountsPayable.status, "pago"),
           ));
 
-        return {
+        return withLegacyCommissionAlias({
           ...p,
           productsCount: Number(productsCount[0]?.count || 0),
           totalPaid: paidSum[0]?.total ?? "0",
-        };
+        });
       }));
 
       return result;
@@ -62,7 +82,7 @@ export const vipProviderRouter = router({
         .where(eq(vipProviders.id, input.id))
         .limit(1);
       if (!provider) throw new TRPCError({ code: "NOT_FOUND", message: "Provedor Sala VIP não encontrado" });
-      return provider;
+      return withLegacyCommissionAlias(provider);
     }),
 
   create: comercialProcedure
@@ -74,15 +94,19 @@ export const vipProviderRouter = router({
       contactPhone: z.string().optional(),
       contactEmail: z.string().optional(),
       location: z.string().optional(),
-      commissionPercent: z.string().default("10.00"),
+      // alias legado aceito por compatibilidade — preferir `repassePercent`
+      commissionPercent: z.string().optional(),
+      repassePercent: z.string().optional(),
       billingMode: z.enum(["bruto", "liquido"]).default("bruto"),
       status: z.enum(["active", "inactive"]).default("active"),
       notes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
-      const [created] = await db.insert(vipProviders).values(input).returning();
-      return created;
+      const normalized = normalizeRepasseInput(input);
+      const values = { ...normalized, repassePercent: normalized.repassePercent ?? "10.00" };
+      const [created] = await db.insert(vipProviders).values(values).returning();
+      return withLegacyCommissionAlias(created);
     }),
 
   update: comercialProcedure
@@ -96,20 +120,22 @@ export const vipProviderRouter = router({
       contactEmail: z.string().optional(),
       location: z.string().optional(),
       commissionPercent: z.string().optional(),
+      repassePercent: z.string().optional(),
       billingMode: z.enum(["bruto", "liquido"]).optional(),
       status: z.enum(["active", "inactive"]).optional(),
       notes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
-      const { id, ...data } = input;
+      const { id, ...rest } = input;
+      const data = normalizeRepasseInput(rest);
       const [updated] = await db
         .update(vipProviders)
         .set({ ...data, updatedAt: new Date() })
         .where(eq(vipProviders.id, id))
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Provedor Sala VIP não encontrado" });
-      return updated;
+      return withLegacyCommissionAlias(updated);
     }),
 
   delete: comercialProcedure

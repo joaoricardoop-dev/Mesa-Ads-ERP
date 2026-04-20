@@ -580,7 +580,9 @@ export const vipProviders = pgTable("vip_providers", {
   contactPhone: varchar("contactPhone", { length: 50 }),
   contactEmail: varchar("contactEmail", { length: 320 }),
   location: varchar("location", { length: 255 }),
-  commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("10.00").notNull(),
+  // Renomeado em finrefac fase 1: era `commissionPercent`. Termo de negócio
+  // correto é "Repasse Sala VIP" (cf. docs/financeiro-glossario.md §2).
+  repassePercent: decimal("repassePercent", { precision: 5, scale: 2 }).default("10.00").notNull(),
   billingMode: billingModeEnum("billingMode").default("bruto").notNull(),
   status: statusEnum("status").default("active").notNull(),
   notes: text("notes"),

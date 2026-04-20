@@ -32,7 +32,7 @@ interface FormState {
   contactPhone: string;
   contactEmail: string;
   location: string;
-  commissionPercent: string;
+  repassePercent: string;
   billingMode: "bruto" | "liquido";
   status: "active" | "inactive";
   notes: string;
@@ -46,7 +46,7 @@ const emptyForm: FormState = {
   contactPhone: "",
   contactEmail: "",
   location: "",
-  commissionPercent: "10.00",
+  repassePercent: "10.00",
   billingMode: "bruto",
   status: "active",
   notes: "",
@@ -107,7 +107,7 @@ export default function VipProvidersPage() {
       contactPhone: p.contactPhone ?? "",
       contactEmail: p.contactEmail ?? "",
       location: p.location ?? "",
-      commissionPercent: p.commissionPercent || "10.00",
+      repassePercent: (p as any).repassePercent || (p as any).commissionPercent || "10.00",
       billingMode: (p.billingMode as "bruto" | "liquido") || "bruto",
       status: (p.status as "active" | "inactive") || "active",
       notes: p.notes ?? "",
@@ -128,7 +128,7 @@ export default function VipProvidersPage() {
       contactPhone: form.contactPhone.trim() || undefined,
       contactEmail: form.contactEmail.trim() || undefined,
       location: form.location.trim() || undefined,
-      commissionPercent: form.commissionPercent || "10.00",
+      repassePercent: form.repassePercent || "10.00",
       billingMode: form.billingMode,
       status: form.status,
       notes: form.notes.trim() || undefined,
@@ -208,12 +208,12 @@ export default function VipProvidersPage() {
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <Label>% Repasse padrão *</Label>
+                  <Label>% Repasse Sala VIP *</Label>
                   <Input
                     type="number"
                     step="0.01"
-                    value={form.commissionPercent}
-                    onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })}
+                    value={form.repassePercent}
+                    onChange={(e) => setForm({ ...form, repassePercent: e.target.value })}
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">Pode ser sobrescrito por produto.</p>
                 </div>
@@ -294,7 +294,7 @@ export default function VipProvidersPage() {
                 </div>
                 <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
                   {p.location && <span>📍 {p.location}</span>}
-                  <span>💰 {p.commissionPercent}% sobre {p.billingMode === "bruto" ? "valor bruto" : "valor líquido"}</span>
+                  <span>💰 Repasse {(p as any).repassePercent ?? (p as any).commissionPercent}% sobre {p.billingMode === "bruto" ? "valor bruto" : "valor líquido"}</span>
                   <span className="flex items-center gap-1">
                     <Package className="w-3 h-3" />
                     {p.productsCount} {p.productsCount === 1 ? "produto" : "produtos"}

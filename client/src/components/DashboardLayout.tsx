@@ -153,6 +153,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: Receipt, label: "Faturamento", path: "/financeiro/faturamento" },
       { icon: Calculator, label: "Custos", path: "/financeiro/custos" },
       { icon: FileBarChart, label: "Relatórios", path: "/financeiro/relatorios" },
+      { icon: BookOpen, label: "Glossário", path: "/financeiro/glossario" },
     ],
   },
   {

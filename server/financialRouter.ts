@@ -52,7 +52,7 @@ const NET_AMOUNT_SQL = sql<string>`
         CASE
           WHEN ${products.tipo} IN ('telas', 'janelas_digitais') AND ${products.vipProviderId} IS NOT NULL
           THEN ${invoices.amount}::numeric * (
-            COALESCE(${products.vipProviderCommissionPercent}::numeric, ${vipProviders.commissionPercent}::numeric, 0) / 100
+            COALESCE(${products.vipProviderCommissionPercent}::numeric, ${vipProviders.repassePercent}::numeric, 0) / 100
           )
           ELSE 0
         END
@@ -121,7 +121,7 @@ const DEDUCTION_AMOUNT_SQL = sql<string>`
         CASE
           WHEN ${products.tipo} IN ('telas', 'janelas_digitais') AND ${products.vipProviderId} IS NOT NULL
           THEN ${invoices.amount}::numeric * (
-            COALESCE(${products.vipProviderCommissionPercent}::numeric, ${vipProviders.commissionPercent}::numeric, 0) / 100
+            COALESCE(${products.vipProviderCommissionPercent}::numeric, ${vipProviders.repassePercent}::numeric, 0) / 100
           )
           ELSE 0
         END
@@ -725,7 +725,7 @@ export const financialRouter = router({
               WHEN COALESCE(${campaigns.isBonificada}, false) THEN 0
               WHEN ${products.tipo} IN ('telas', 'janelas_digitais') AND ${products.vipProviderId} IS NOT NULL
               THEN ${invoices.amount}::numeric * (
-                COALESCE(${products.vipProviderCommissionPercent}::numeric, ${vipProviders.commissionPercent}::numeric, 0) / 100
+                COALESCE(${products.vipProviderCommissionPercent}::numeric, ${vipProviders.repassePercent}::numeric, 0) / 100
               )
               ELSE 0
             END
@@ -948,7 +948,7 @@ export const financialRouter = router({
                   const invoiceAmt = Number(updated.amount);
                   // % específico do produto tem prioridade; fallback no % do provedor
                   const rate = Number(
-                    product.vipProviderCommissionPercent ?? provider.commissionPercent ?? 0,
+                    product.vipProviderCommissionPercent ?? provider.repassePercent ?? 0,
                   );
                   const amount = invoiceAmt * (rate / 100);
                   if (amount > 0) {
