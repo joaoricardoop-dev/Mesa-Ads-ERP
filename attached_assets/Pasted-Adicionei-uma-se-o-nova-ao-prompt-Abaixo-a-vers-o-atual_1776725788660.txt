@@ -1,0 +1,226 @@
+Adicionei uma seção nova ao prompt. Abaixo a versão atualizada — item novo em **"Regra de faturamento por batch"** e ajustes no critério de aceite e modal de emissão.
+
+---
+
+# Prompt para Replit — Refatorar Página de Campanha: separar Batches de Consolidado
+
+## Problema
+
+Ao abrir uma campanha de telas com múltiplos batches (ex: 6 batches), a página atual ([client/src/pages/CampaignDetail.tsx](client/src/pages/CampaignDetail.tsx) + [client/src/components/CampaignPhases.tsx](client/src/components/CampaignPhases.tsx)) mistura dois níveis de informação em cada card de batch:
+
+1. **Informações operacionais do batch** (período, status, volume, itens, tracking) — correto
+2. **Economics e ações financeiras da campanha inteira** (receita prevista, custo previsto, margem prevista, botões de faturamento) — **se repete em todos os 6 cards**, gerando dados duplicados e inconsistência visível quando valores divergem
+
+## Objetivo da refatoração
+
+Separar duas responsabilidades:
+
+- **Card de Batch** — só dados do próprio batch (operacional, micro)
+- **Consolidado da Campanha** — único lugar com economics + barra de progresso + ações de faturamento (macro)
+
+## ⚠️ Regra de faturamento por batch (NOVA — essencial)
+
+Modelo de negócio: **1 batch = 1 mês de veiculação = 1 fatura**.
+
+Exemplo real: campanha de tela com 6 meses de duração e 6 batches → **6 faturas**, uma por mês. O cliente quer exatamente esse parcelamento.
+
+### Implicações no schema
+- `campaignPhases` já tem `periodStart` e `periodEnd` — assumir que cada phase corresponde a um mês (ou ao intervalo configurado no wizard)
+- `invoices.campaignPhaseId` já existe (FK) — usar obrigatoriamente em campanhas parceladas
+- Quando uma campanha for criada com múltiplos batches, o sistema deve preparar **1 "fatura prevista" por batch** (status `prevista` / `draft`), não emitir ainda, mas já deixar o slot pronto no consolidado
+
+### Implicações no backend
+- Novo endpoint `campaign.generateScheduledInvoices(campaignId)` — cria um registro `invoices` em status `prevista` por batch, com:
+  - `campaignId` e `campaignPhaseId` preenchidos
+  - `amount` = soma da receita prevista daquele batch
+  - `issueDate` = `periodStart` do batch (emissão no início do mês veiculado)
+  - `dueDate` = configurável (ex: `periodStart + 15 dias` — respeitar política comercial do cliente)
+  - `status` = `prevista`
+- Ao chamar `campaign.create()` com `autoScheduleInvoices: true` (default true para campanhas com >1 batch), rodar `generateScheduledInvoices` atomicamente na mesma transação
+- Endpoint `invoice.confirmEmission(id)` — transforma `prevista` → `emitida`, grava `invoiceNumber`, `issueDate` real, permite anexar NF (`documentUrl`)
+
+### Implicações no front — Consolidado
+- Mostrar **cronograma de faturamento**: lista/timeline das 6 faturas com status visual (prevista / emitida / paga / vencida)
+- Indicador: "2 de 6 faturas emitidas · R$ 40k de R$ 120k faturados"
+- Cada linha tem ação rápida: "Confirmar emissão" (se prevista) ou "Marcar como paga" (se emitida)
+- Botão "Emitir próxima fatura" com destaque quando há fatura `prevista` com `issueDate` no mês corrente
+
+### Implicações no card de batch
+- Adicionar micro-indicador de status de faturamento do batch (1 badge pequeno, não os economics): `💰 Faturada` / `📄 Prevista` / `⚠ Vencida` / `—`
+- Sem botões, sem valores — só o status visual
+
+## O que cada área deve conter
+
+### 1. Seção "Consolidado da Campanha" (topo da página, acima dos batches)
+
+**Barra de progresso global**
+- % de batches em cada estágio: planejada → ativa → em produção → em veiculação → concluída
+- Dias decorridos / dias totais da campanha
+- Indicador: "4 de 6 batches concluídos"
+
+**Cronograma de Faturamento** (novo — central nesta refatoração)
+- Timeline horizontal com 6 slots (um por batch), ex:
+  ```
+  Jan ●paga   Fev ●paga   Mar ○emitida   Abr ○prevista   Mai ○prevista   Jun ○prevista
+  ```
+- Totais: "R$ 40.000 recebidos · R$ 20.000 a vencer · R$ 60.000 previstos"
+
+**Economics agregados**
+- Receita prevista total (soma dos 6 batches)
+- Receita realizada (faturas `emitida` + `paga`)
+- Receita recebida (faturas `paga`)
+- Custo previsto total (produção + frete + comissões + repasses)
+- Custo realizado
+- Margem prevista / margem realizada
+- % executado
+
+**Ações de faturamento e operação** (somente aqui):
+- Botão "Emitir próxima fatura" (destaque se há uma no mês corrente)
+- Botão "Emitir fatura específica" (abre modal com lista dos 6 batches → escolher qual)
+- Botão "Regenerar cronograma" (se usuário editar datas dos batches e quiser refazer as faturas previstas que ainda não foram emitidas)
+- Botão "Gerar conta a pagar" (produção/frete/comissão)
+- Botão "Ver todas faturas desta campanha"
+- Botão "Gerar relatório PDF consolidado"
+- Botão "Exportar CSV da campanha"
+
+**Indicadores de saúde:**
+- Inadimplência (faturas vencidas desta campanha)
+- Alertas (batch em risco de atraso, arte não aprovada, proof de entrega pendente, fatura prevista do mês ainda não emitida)
+
+### 2. Card de Batch (abaixo do consolidado, um por fase)
+
+**Só dados operacionais do próprio batch:**
+- Número do batch + label ("Batch 1 · Jan/26")
+- Período (data início → fim) + nº de semanas
+- Status do batch (planejada / ativa / concluida / cancelada)
+- Estágio atual no workflow (briefing / design / aprovação / produção / distribuição / veiculação)
+- Mini progress bar do batch
+- Volume do batch (ex: "500 telas")
+- **Badge de status da fatura do mês** (💰 Paga / 📄 Emitida / ○ Prevista / ⚠ Vencida) — sem valores
+- Restaurantes alocados + tracking/OS se em trânsito
+- Botão único: "Abrir batch" → `/campanhas/:id/batch/:phaseId`
+
+**O que REMOVER do card de batch:**
+- ❌ Custo previsto, margem prevista
+- ❌ Valores de receita explícitos (deixar só no consolidado)
+- ❌ Qualquer botão de faturamento, emissão, cobrança, marcar pago
+- ❌ Totalizações que só fazem sentido somando todos os batches
+
+## Modal "Emitir fatura específica"
+
+Abre do consolidado. Conteúdo:
+
+```
+┌─────────────────────────────────────────┐
+│ Emitir Fatura · Campanha XYZ             │
+├─────────────────────────────────────────┤
+│ Escolha o batch a faturar:               │
+│                                          │
+│ ○ Batch 1 · Jan/26  · R$ 20.000 · PAGA   │
+│ ○ Batch 2 · Fev/26  · R$ 20.000 · PAGA   │
+│ ● Batch 3 · Mar/26  · R$ 20.000 · EMITIR │ ← default sugerido (mês corrente)
+│ ○ Batch 4 · Abr/26  · R$ 20.000 · prev.  │
+│ ○ Batch 5 · Mai/26  · R$ 20.000 · prev.  │
+│ ○ Batch 6 · Jun/26  · R$ 20.000 · prev.  │
+│                                          │
+│ Número NF: [___________]                 │
+│ Data emissão: [DD/MM/AAAA]               │
+│ Vencimento: [DD/MM/AAAA] (+15 dias)      │
+│ Upload NF: [escolher arquivo]            │
+│                                          │
+│ [Cancelar]            [Confirmar emissão]│
+└─────────────────────────────────────────┘
+```
+
+Ao confirmar, chama `invoice.confirmEmission(id)`, atualiza cronograma no consolidado, atualiza badge do card do batch.
+
+## Arquivos a modificar
+
+1. **[client/src/pages/CampaignOverview.tsx](client/src/pages/CampaignOverview.tsx)** — adicionar bloco "Consolidado" acima dos cards, incluindo cronograma de faturamento. Remover "Resumo geral" raso atual.
+
+2. **[client/src/components/CampaignPhases.tsx](client/src/components/CampaignPhases.tsx)** — remover linhas ~289-299 e ~552-580 (blocos "Receita / Custo / Margem prevista" por batch). Adicionar apenas badge de status de fatura.
+
+3. **[client/src/pages/CampaignDetail.tsx](client/src/pages/CampaignDetail.tsx)** — header só com dados do batch atual. Remover KPIs de campanha inteira. Adicionar breadcrumb "Campanha X › Batch N".
+
+4. **Criar `client/src/components/campaign/CampaignConsolidated.tsx`** — seção consolidada reutilizável.
+
+5. **Criar `client/src/components/campaign/InvoiceSchedule.tsx`** — timeline horizontal das faturas por batch.
+
+6. **Criar `client/src/components/campaign/EmitInvoiceModal.tsx`** — modal de emissão.
+
+7. **Backend:**
+   - `server/campaignPhaseRouter.ts` — adicionar endpoint `campaign.consolidated(id)` retornando em uma query: soma de receitas/custos/margens, cronograma de faturas com status, alertas
+   - `server/financialRouter.ts` — adicionar `generateScheduledInvoices(campaignId)` e `invoice.confirmEmission(id)`
+   - Modificar `campaign.create()` em `server/routers.ts` para chamar `generateScheduledInvoices` atomicamente quando houver >1 batch
+
+8. **Schema:**
+   - Adicionar valor `prevista` ao enum de `invoices.status` (se não existir) junto de `emitida|paga|vencida|cancelada`
+   - Migration: para campanhas existentes com múltiplos batches sem faturas agendadas, rodar script opt-in de "Agendar faturas retroativamente"
+
+## Regras de cálculo (para evitar inconsistência atual)
+
+- **Toda métrica consolidada vem de `campaign.consolidated`** — nunca calculada no front a partir de dados parciais
+- **Card de batch usa apenas `phase.items` e `phase.invoice` do próprio batch** — nunca soma campanha inteira
+- Soma dos 6 batches = total do consolidado. Se divergir, backend loga warning e front mostra ícone de alerta
+- Cada `campaignPhase` tem no máximo **1 fatura ativa** (não `cancelada`). Se precisar refaturar, cancelar a anterior e criar nova — não criar 2 emitidas pro mesmo batch
+
+## Layout final (com cronograma de faturamento)
+
+```
+┌─────────────────────────────────────────────────┐
+│ ← Campanha XYZ · SKN · 6 meses · Jan→Jun 2026  │
+├─────────────────────────────────────────────────┤
+│ CONSOLIDADO                                      │
+│ ▓▓▓▓▓▓▓▓▓░░░░░░ 62% · 4/6 batches ativos       │
+│                                                  │
+│ Receita Prev   Faturado   Recebido    Margem    │
+│ R$ 120k        R$ 60k     R$ 40k      62%       │
+│                                                  │
+│ CRONOGRAMA DE FATURAMENTO                        │
+│ ●───●───○───○───○───○                           │
+│ Jan Fev Mar Abr Mai Jun                         │
+│ paga paga emit prev prev prev                   │
+│                                                  │
+│ [Emitir próxima (Mar)] [Emitir outra] [Relat.]  │
+│ ⚠ 1 fatura vencida                              │
+├─────────────────────────────────────────────────┤
+│ BATCHES (6)                           [+ Novo]  │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐          │
+│ │ B1·Jan   │ │ B2·Fev   │ │ B3·Mar   │          │
+│ │ ✓ conc.  │ │ ✓ conc.  │ │ veicula. │          │
+│ │ 💰 paga  │ │ 💰 paga  │ │ 📄 emit. │          │
+│ └──────────┘ └──────────┘ └──────────┘          │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐          │
+│ │ B4·Abr   │ │ B5·Mai   │ │ B6·Jun   │          │
+│ │ produção │ │ planej.  │ │ planej.  │          │
+│ │ ○ prev.  │ │ ○ prev.  │ │ ○ prev.  │          │
+│ └──────────┘ └──────────┘ └──────────┘          │
+└─────────────────────────────────────────────────┘
+```
+
+## Critério de aceite
+
+- [ ] Criar campanha de 6 meses com 6 batches → sistema cria automaticamente **6 faturas previstas** (status `prevista`), uma por batch, com `issueDate` = início do mês do batch
+- [ ] Cronograma de faturamento do consolidado mostra os 6 slots corretamente, cada um com status visual
+- [ ] Botão "Emitir próxima fatura" emite a fatura do mês corrente (ou próxima mais antiga `prevista`) em 1 clique
+- [ ] Modal "Emitir fatura específica" lista os 6 batches com status individual, pré-seleciona a do mês corrente
+- [ ] Card de batch mostra badge de fatura mas **zero** valores monetários e **zero** botões de faturamento
+- [ ] Economics aparecem em **exatamente 1 lugar** na tela (consolidado)
+- [ ] Soma das 6 faturas previstas = receita prevista da campanha (testar com campanha real da SKN)
+- [ ] Editar quantidade/preço de item em um batch atualiza apenas a fatura prevista daquele batch (não mexe nas já emitidas)
+- [ ] Editar datas de um batch e clicar "Regenerar cronograma" atualiza só as faturas `prevista` — jamais mexe em `emitida` ou `paga`
+- [ ] Performance: `campaign.consolidated` responde em < 300ms com 20 batches
+- [ ] Test e2e `e2e/campaign-invoice-schedule.spec.ts`: criar campanha 6 meses/6 batches → validar 6 faturas previstas criadas → emitir a 1ª → validar status Mudou para `emitida` → marcar paga → validar cronograma atualiza
+
+## Restrições
+
+- Não quebrar portal anunciante / parceiro / restaurante (eles leem campanha, mas não o consolidado admin)
+- `campaign.consolidated` respeita `allowedRoles: admin, comercial, financeiro, manager`
+- Anunciante no seu portal **pode** ver o cronograma de faturas (só leitura, sem botões de emissão)
+- Manter rota `/campanhas/:id/batch/:phaseId` funcionando
+- Campanhas antigas (pré-refatoração) com 1 fatura única pra toda a campanha continuam válidas — não forçar conversão
+- Se o cliente quiser **fatura única** (não parcelada), wizard deve ter toggle "Parcelar em N faturas (1 por batch)" / "Fatura única no final" — default: parcelar
+
+---
+
+Agora o prompt cobre a regra 1 batch = 1 mês = 1 fatura explicitamente, com schema, endpoints, UI (cronograma + modal) e critérios de aceite específicos pro caso da SKN. Quer ajustar mais alguma coisa — por exemplo, política de vencimento (15/30 dias) ou permitir faturar vários batches juntos numa NF só?

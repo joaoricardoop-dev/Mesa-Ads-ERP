@@ -368,6 +368,7 @@ export const campaignPhaseRouter = router({
               productTipo: products.tipo,
               productVipProviderId: products.vipProviderId,
               productVipProviderCommissionPercent: products.vipProviderCommissionPercent,
+              productIrpj: products.irpj,
               vipProviderRepassePercent: vipProviders.repassePercent,
             })
             .from(campaignItems)
@@ -399,8 +400,28 @@ export const campaignPhaseRouter = router({
         i.item.totalPrice != null
           ? parseFloat(i.item.totalPrice)
           : i.item.quantity * parseFloat(i.item.unitPrice);
-      const itemVipRepasse = (i: typeof items[number]): number =>
-        itemRevenue(i) * vipRepasseRateForItem(i);
+      // Repasse VIP é cobrado SOBRE a receita líquida de impostos e comissão
+      // comercial — espelha calcVipRepasse / DRE da campanha.
+      const PIS_COFINS_RATE = 0.0365;
+      const IRPJ_DEFAULT_RATE = 0.06;
+      const sellerRate = (() => {
+        const v = parseFloat(String(campaign.sellerCommission ?? "0"));
+        return Number.isFinite(v) ? v / 100 : 0;
+      })();
+      const itemTaxes = (i: typeof items[number]): number => {
+        const irpj = i.productIrpj != null && i.productIrpj !== ""
+          ? parseFloat(String(i.productIrpj)) / 100
+          : IRPJ_DEFAULT_RATE;
+        return itemRevenue(i) * (irpj + PIS_COFINS_RATE);
+      };
+      const itemSellerComm = (i: typeof items[number]): number =>
+        itemRevenue(i) * sellerRate;
+      const itemVipRepasse = (i: typeof items[number]): number => {
+        const rate = vipRepasseRateForItem(i);
+        if (rate <= 0) return 0;
+        const base = itemRevenue(i) - itemTaxes(i) - itemSellerComm(i);
+        return base > 0 ? base * rate : 0;
+      };
       // Regra "tela vs bolacha": digitais pulam produção/frete; físicos pulam VIP.
       const itemProductionCost = (i: typeof items[number]): number =>
         isDigitalItem(i) ? 0 : parseFloat(i.item.productionCost);

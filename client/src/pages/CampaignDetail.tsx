@@ -1156,7 +1156,10 @@ export default function CampaignDetail() {
     const base = parseFloat(String(campaign.vipProviderRepassePercent ?? "0"));
     return Number.isFinite(base) ? base / 100 : 0;
   })();
-  const vipRepasseMonthly = p.monthlyRevenue * vipRepassePct;
+  // Repasse VIP é cobrado SOBRE o que sobra depois de pagar IR/impostos e
+  // comissão comercial — não sobre a receita bruta.
+  const vipRepasseBaseMonthly = Math.max(0, p.monthlyRevenue - p.totalTax - p.totalSellerComm);
+  const vipRepasseMonthly = vipRepasseBaseMonthly * vipRepassePct;
 
   const dreCalc = (() => {
     const liquido = p.monthlyRevenue - p.totalTax - bvMonthly - p.totalSellerComm - p.totalRestComm - vipRepasseMonthly;

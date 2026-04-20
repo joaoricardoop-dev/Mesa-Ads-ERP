@@ -27,6 +27,7 @@ export interface CampaignLike {
   id: number;
   isBonificada: boolean | null;
   restaurantCommission: string | number;
+  sellerCommission?: string | number | null;
   productId: number | null;
   partnerId?: number | null;
   hasAgencyBv?: boolean | null;
@@ -154,8 +155,12 @@ export function calcRestaurantCommission(
 //   - Bonificada → 0
 //   - Não-digital → 0
 //   - Provider inativo/inexistente → 0
-//   - Caso contrário: gross × (product.vipProviderCommissionPercent
-//                              || vipProvider.repassePercent || 0)
+//   - Caso contrário:
+//       base = gross − impostos − comissão comercial   (regra de negócio)
+//       repasse = base × (product.vipProviderCommissionPercent
+//                         || vipProvider.repassePercent || 0)
+//     Ou seja, primeiro paga IR/PIS/COFINS/ISS e a comissão do vendedor;
+//     o repasse é calculado sobre o que sobra.
 // ─────────────────────────────────────────────────────────────────────────────
 export function calcVipRepasse(
   invoice: InvoiceLike,
@@ -167,8 +172,13 @@ export function calcVipRepasse(
   if (!product || !isDigitalProduct(product)) return 0;
   if (!vipProvider || vipProvider.status !== "active") return 0;
   const gross = num(invoice.amount);
+  const taxesTotal = calcTaxes(invoice, product).reduce((s, t) => s + t.amount, 0);
+  const sellerRate = num(campaign.sellerCommission) / 100;
+  const sellerComm = gross * sellerRate;
+  const base = gross - taxesTotal - sellerComm;
+  if (base <= 0) return 0;
   const rate = num(product.vipProviderCommissionPercent ?? vipProvider.repassePercent) / 100;
-  return roundCents(gross * rate);
+  return roundCents(base * rate);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
