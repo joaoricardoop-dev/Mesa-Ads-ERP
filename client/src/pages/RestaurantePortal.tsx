@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import DOMPurify from "dompurify";
 import RestaurantAvatar from "@/components/RestaurantAvatar";
 import { generateTermPdf } from "@/lib/generate-term-pdf";
+import { generateCommissionStatementPdf, buildCommissionStatementData, type CommissionStatementRestaurant } from "@/lib/generate-commission-statement-pdf";
 import { Textarea } from "@/components/ui/textarea";
 import {
   UtensilsCrossed,
@@ -175,6 +176,8 @@ export default function RestaurantePortal() {
     cpf: "",
     accepted: false,
   });
+
+  const [statementPeriod, setStatementPeriod] = useState<{ start: string; end: string }>({ start: "", end: "" });
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -592,6 +595,82 @@ export default function RestaurantePortal() {
           </TabsContent>
 
           <TabsContent value="commissions" className="mt-4 space-y-4">
+            <Card>
+              <CardContent className="pt-6 flex flex-col md:flex-row md:items-end gap-4 justify-between">
+                <div className="flex flex-col sm:flex-row gap-3 flex-1">
+                  <div className="flex-1 min-w-0">
+                    <Label htmlFor="statement-start" className="text-xs text-muted-foreground">De (mês)</Label>
+                    <Input
+                      id="statement-start"
+                      type="month"
+                      value={statementPeriod.start}
+                      onChange={(e) => setStatementPeriod(p => ({ ...p, start: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Label htmlFor="statement-end" className="text-xs text-muted-foreground">Até (mês)</Label>
+                    <Input
+                      id="statement-end"
+                      type="month"
+                      value={statementPeriod.end}
+                      onChange={(e) => setStatementPeriod(p => ({ ...p, end: e.target.value }))}
+                    />
+                  </div>
+                  {(statementPeriod.start || statementPeriod.end) && (
+                    <div className="flex items-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setStatementPeriod({ start: "", end: "" })}
+                      >
+                        Limpar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <Button
+                  className="gap-2"
+                  disabled={!commissions}
+                  onClick={() => {
+                    if (!commissions || !restaurant) return;
+                    if (statementPeriod.start && statementPeriod.end && statementPeriod.start > statementPeriod.end) {
+                      toast.error("O mês inicial deve ser anterior ou igual ao mês final");
+                      return;
+                    }
+                    const restaurantForPdf: CommissionStatementRestaurant = {
+                      name: restaurant.name,
+                      razaoSocial: restaurant.razaoSocial,
+                      cnpj: restaurant.cnpj,
+                      address: restaurant.address,
+                      neighborhood: restaurant.neighborhood,
+                      city: restaurant.city,
+                      state: restaurant.state,
+                      cep: restaurant.cep,
+                      contactName: restaurant.contactName,
+                      email: restaurant.email,
+                      whatsapp: restaurant.whatsapp,
+                    };
+                    const statementData = buildCommissionStatementData(
+                      commissions,
+                      restaurantForPdf,
+                      statementPeriod,
+                      formatRefMonth,
+                    );
+                    if (!statementData) {
+                      toast.error(statementPeriod.start || statementPeriod.end
+                        ? "Nenhuma comissão no período selecionado"
+                        : "Nenhuma comissão registrada para gerar o extrato");
+                      return;
+                    }
+                    generateCommissionStatementPdf(statementData);
+                  }}
+                >
+                  <Download className="w-4 h-4" />
+                  Baixar extrato
+                </Button>
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card>
                 <CardContent className="pt-6">
