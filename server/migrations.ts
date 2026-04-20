@@ -1082,6 +1082,17 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
           AND "status" <> 'cancelada'
           AND ("sourceRef" ? 'restaurantPaymentId');
 
+      -- Quando comissão de restaurante vem da invoice (fluxo trigger),
+      -- a chave natural é a invoice. Garante unicidade entre múltiplas
+      -- chamadas concorrentes de markInvoicePaid para a mesma invoice.
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_ap_restaurant_commission_invoice"
+        ON "accounts_payable" (
+          ("sourceRef"->>'invoiceId')
+        )
+        WHERE "sourceType" = 'restaurant_commission'
+          AND "status" <> 'cancelada'
+          AND ("sourceRef" ? 'invoiceId');
+
       CREATE INDEX IF NOT EXISTS "idx_ap_invoice_ids_gin"
         ON "accounts_payable" USING gin (("sourceRef"->'invoiceIds'));
     `,

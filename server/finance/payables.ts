@@ -223,7 +223,9 @@ async function materializeRestaurantCommission(
         sql`${accountsPayable.sourceRef}->>'invoiceId' = ${String(invoice.id)}`,
       ),
     );
-  if (existing.length > 0) return EMPTY;
+  // Ignora linhas canceladas: permitir re-materialização após
+  // cancelamento/reverter_pagamento (caso a invoice volte a 'paga').
+  if (existing.some((r) => r.status !== "cancelada")) return EMPTY;
 
   const compMonth = competenceMonthFor(invoice.paymentDate || invoice.issueDate);
   const restRate = num(campaign.restaurantCommission);
@@ -269,7 +271,8 @@ async function materializeVipRepasse(
         sql`${accountsPayable.sourceRef}->>'invoiceId' = ${String(invoice.id)}`,
       ),
     );
-  if (existing.length > 0) return EMPTY;
+  // Ignora linhas canceladas: permitir re-materialização após reversão.
+  if (existing.some((r) => r.status !== "cancelada")) return EMPTY;
 
   const compMonth = competenceMonthFor(invoice.paymentDate || invoice.issueDate);
   const rate = num(product.vipProviderCommissionPercent ?? provider.repassePercent);
