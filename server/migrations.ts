@@ -1037,6 +1037,55 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       EXCEPTION WHEN duplicate_object THEN NULL; END $$;
     `,
   },
+  {
+    // Finrefac fase 3: idempotência ao nível do BD para o ledger de
+    // accounts_payable. Cada tipo de obrigação derivada tem uma chave
+    // natural única que impede duplicatas sob concorrência.
+    //   * tax            -> (sourceRef.invoiceId, sourceRef.kind)
+    //   * vip_repasse    -> sourceRef.invoiceId
+    //   * partner_commission -> (sourceRef.partnerId, competenceMonth)
+    //     [excluindo linhas suplementares — sourceRef.supplementOf IS NOT NULL]
+    // Restaurant_commission é gerada via outro caminho (espelho de
+    // restaurant_payments) e mantém sua própria unicidade por
+    // (sourceRef.restaurantPaymentId).
+    name: "finrefac_03_accounts_payable_natural_key_indexes",
+    sql: `
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_ap_tax_invoice_kind"
+        ON "accounts_payable" (
+          ("sourceRef"->>'invoiceId'),
+          ("sourceRef"->>'kind')
+        )
+        WHERE "sourceType" = 'tax'
+          AND "status" <> 'cancelada';
+
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_ap_vip_repasse_invoice"
+        ON "accounts_payable" (
+          ("sourceRef"->>'invoiceId')
+        )
+        WHERE "sourceType" = 'vip_repasse'
+          AND "status" <> 'cancelada';
+
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_ap_partner_commission_partner_month"
+        ON "accounts_payable" (
+          ("sourceRef"->>'partnerId'),
+          "competenceMonth"
+        )
+        WHERE "sourceType" = 'partner_commission'
+          AND "status" <> 'cancelada'
+          AND ("sourceRef" ? 'supplementOf') = false;
+
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_ap_restaurant_commission_payment"
+        ON "accounts_payable" (
+          ("sourceRef"->>'restaurantPaymentId')
+        )
+        WHERE "sourceType" = 'restaurant_commission'
+          AND "status" <> 'cancelada'
+          AND ("sourceRef" ? 'restaurantPaymentId');
+
+      CREATE INDEX IF NOT EXISTS "idx_ap_invoice_ids_gin"
+        ON "accounts_payable" USING gin (("sourceRef"->'invoiceIds'));
+    `,
+  },
 ];
 
 export async function runMigrations() {

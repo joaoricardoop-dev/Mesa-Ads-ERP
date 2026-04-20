@@ -1299,7 +1299,7 @@ export const accountsPayable = pgTable("accounts_payable", {
   // competenceMonth: mês de competência YYYY-MM para DRE.
   // createdBySystem: true quando linha foi gerada por trigger/sync, não por humano.
   sourceType: accountsPayableSourceTypeEnum("sourceType").notNull().default("manual"),
-  sourceRef: jsonb("sourceRef").$type<Record<string, number | string | null>>(),
+  sourceRef: jsonb("sourceRef").$type<Record<string, number | string | null | number[]>>(),
   competenceMonth: varchar("competenceMonth", { length: 7 }),
   createdBySystem: boolean("createdBySystem").notNull().default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

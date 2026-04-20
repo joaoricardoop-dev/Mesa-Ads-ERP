@@ -48,7 +48,15 @@ import {
 // Aceita tanto a conexão direta (`getDb()`) quanto um transaction handle
 // passado por `db.transaction(async tx => ...)` — ambos compartilham o mesmo
 // shape funcional em Drizzle.
-type Db = any;
+import type { NeonDatabase, NeonQueryResultHKT } from "drizzle-orm/neon-serverless";
+import type { PgTransaction } from "drizzle-orm/pg-core";
+import type { ExtractTablesWithRelations } from "drizzle-orm";
+type Schema = Record<string, unknown>;
+export type DbClient =
+  | NeonDatabase<Schema>
+  | PgTransaction<NeonQueryResultHKT, Schema, ExtractTablesWithRelations<Schema>>;
+type Db = DbClient;
+type SourceRef = Record<string, number | string | null | number[]>;
 
 export type InvoiceEvent = "emitida" | "paga" | "cancelada" | "reverter_pagamento";
 
@@ -150,7 +158,7 @@ async function materializeTaxes(
         sourceRef: { invoiceId: invoice.id, kind: tax.kind },
         competenceMonth: compMonth,
         createdBySystem: true,
-      });
+      }).onConflictDoNothing();
       created++;
     } else {
       const ap = existing[0];
@@ -183,7 +191,7 @@ async function materializeTaxes(
       ),
     );
   for (const ap of allTaxesForInvoice) {
-    const kind = (ap.sourceRef as any)?.kind as TaxKind | undefined;
+    const kind = ap.sourceRef?.kind as TaxKind | undefined;
     if (kind && !validKinds.has(kind) && ap.status !== "pago" && ap.status !== "cancelada") {
       await db
         .update(accountsPayable)
@@ -232,7 +240,7 @@ async function materializeRestaurantCommission(
     sourceRef: { invoiceId: invoice.id, campaignId: invoice.campaignId },
     competenceMonth: compMonth,
     createdBySystem: true,
-  });
+  }).onConflictDoNothing();
   return { created: 1, updated: 0, cancelled: 0 };
 }
 
@@ -279,7 +287,7 @@ async function materializeVipRepasse(
     sourceRef: { invoiceId: invoice.id, vipProviderId: provider.id },
     competenceMonth: compMonth,
     createdBySystem: true,
-  });
+  }).onConflictDoNothing();
   return { created: 1, updated: 0, cancelled: 0 };
 }
 
@@ -338,11 +346,12 @@ async function materializePartnerCommission(
     );
 
   // Caso o agregado deste mês já esteja pago, criamos linha suplementar.
-  const openExisting = existing.find((e: any) => e.status !== "pago");
-  const paidExisting = existing.find((e: any) => e.status === "pago");
+  const openExisting = existing.find((e) => e.status !== "pago");
+  const paidExisting = existing.find((e) => e.status === "pago");
 
   if (openExisting) {
-    const ids: number[] = ((openExisting.sourceRef as any)?.invoiceIds as number[]) ?? [];
+    const openIds = openExisting.sourceRef?.invoiceIds;
+    const ids: number[] = Array.isArray(openIds) ? (openIds as number[]) : [];
     if (ids.includes(invoice.id)) return EMPTY; // idempotente
     const newAmount = num(openExisting.amount) + result.amount;
     await db
@@ -354,7 +363,7 @@ async function materializePartnerCommission(
           partnerId: partner.id,
           competenceMonth: compMonth,
           invoiceIds: [...ids, invoice.id],
-        } as any,
+        } satisfies SourceRef,
         description: `Comissão Parceiro - ${partner.name} (${compMonth}) - ${ids.length + 1} NFs`,
         updatedAt: new Date(),
       })
@@ -363,7 +372,8 @@ async function materializePartnerCommission(
   }
 
   if (paidExisting) {
-    const paidIds: number[] = ((paidExisting.sourceRef as any)?.invoiceIds as number[]) ?? [];
+    const paidRefIds = paidExisting.sourceRef?.invoiceIds;
+    const paidIds: number[] = Array.isArray(paidRefIds) ? (paidRefIds as number[]) : [];
     if (paidIds.includes(invoice.id)) return EMPTY; // idempotente
   }
 
@@ -385,10 +395,10 @@ async function materializePartnerCommission(
           invoiceIds: [invoice.id],
           supplementOf: paidExisting.id,
         }
-      : { partnerId: partner.id, competenceMonth: compMonth, invoiceIds: [invoice.id] }) as any,
+      : { partnerId: partner.id, competenceMonth: compMonth, invoiceIds: [invoice.id] }) satisfies SourceRef,
     competenceMonth: compMonth,
     createdBySystem: true,
-  });
+  }).onConflictDoNothing();
   return { created: 1, updated: 0, cancelled: 0 };
 }
 
@@ -404,10 +414,13 @@ async function cancelDerivedPayables(
     .from(accountsPayable)
     .where(
       sql`(${accountsPayable.sourceRef}->>'invoiceId') = ${String(invoiceId)}
-        OR (${accountsPayable.sourceRef}->'invoiceIds') @> ${JSON.stringify(invoiceId)}::jsonb`,
+        OR EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${accountsPayable.sourceRef}->'invoiceIds') AS e
+          WHERE (e)::text::int = ${invoiceId}
+        )`,
     );
 
-  const inScope = all.filter((ap: any) =>
+  const inScope = all.filter((ap) =>
     scope === "all" ? true : (PAYMENT_DERIVED_SOURCE_TYPES as readonly string[]).includes(ap.sourceType),
   );
 
@@ -416,7 +429,8 @@ async function cancelDerivedPayables(
   for (const ap of inScope) {
     if (ap.status !== "pago") continue;
     if (ap.sourceType === "partner_commission") {
-      const ids: number[] = ((ap.sourceRef as any)?.invoiceIds as number[]) ?? [];
+      const refIds = ap.sourceRef?.invoiceIds;
+      const ids: number[] = Array.isArray(refIds) ? (refIds as number[]) : [];
       if (ids.includes(invoiceId)) {
         throw new Error(
           `Não é possível cancelar/reverter: comissão de parceiro do mês ${ap.competenceMonth} já foi paga.`,
@@ -436,7 +450,8 @@ async function cancelDerivedPayables(
 
     if (ap.sourceType === "partner_commission") {
       // Remove só a contribuição desta invoice do agregado e recalcula.
-      const ids: number[] = ((ap.sourceRef as any)?.invoiceIds as number[]) ?? [];
+      const refIds = ap.sourceRef?.invoiceIds;
+      const ids: number[] = Array.isArray(refIds) ? (refIds as number[]) : [];
       const remaining = ids.filter((id) => id !== invoiceId);
       if (remaining.length === 0) {
         await db
@@ -451,9 +466,9 @@ async function cancelDerivedPayables(
           .set({
             amount: newAmount.toFixed(2),
             sourceRef: {
-              ...((ap.sourceRef as Record<string, unknown>) ?? {}),
+              ...((ap.sourceRef as SourceRef) ?? {}),
               invoiceIds: remaining,
-            } as any,
+            } satisfies SourceRef,
             description: `Comissão Parceiro - recalculada - ${remaining.length} NFs`,
             updatedAt: new Date(),
           })

@@ -83,25 +83,23 @@ async function autoCreateInvoice(db: any, campaign: { id: number; clientId: numb
   const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   // Finrefac fase 3: emissão + materialização de impostos atômicos.
-  try {
-    const { materializePayablesForInvoice } = await import("./finance/payables");
-    await db.transaction(async (tx: any) => {
-      const [created] = await tx.insert(invoices).values({
-        campaignId: campaign.id,
-        clientId: campaign.clientId,
-        invoiceNumber,
-        amount,
-        issueDate: today,
-        dueDate,
-        status: "emitida",
-      }).returning();
-      if (created) {
-        await materializePayablesForInvoice(tx, created.id, "emitida");
-      }
-    });
-  } catch (err) {
-    console.warn("[autoCreateInvoice] transaction falhou:", err);
-  }
+  // Erros propagam ao caller — invoice + payables ou nada (rollback).
+  const { materializePayablesForInvoice } = await import("./finance/payables");
+  type DbClient = import("./finance/payables").DbClient;
+  await db.transaction(async (tx: DbClient) => {
+    const [created] = await tx.insert(invoices).values({
+      campaignId: campaign.id,
+      clientId: campaign.clientId,
+      invoiceNumber,
+      amount,
+      issueDate: today,
+      dueDate,
+      status: "emitida",
+    }).returning();
+    if (created) {
+      await materializePayablesForInvoice(tx, created.id, "emitida");
+    }
+  });
 }
 
 async function generateOSNumber(db: any) {

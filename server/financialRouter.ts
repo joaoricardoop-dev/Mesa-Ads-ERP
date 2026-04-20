@@ -21,7 +21,7 @@ import {
 import { VIP_PRODUCT_TIPOS } from "./productRouter";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { materializePayablesForInvoice } from "./finance/payables";
+import { materializePayablesForInvoice, type DbClient } from "./finance/payables";
 
 function requireFinancialAccess(role: string | null) {
   if (role !== "admin" && role !== "financeiro" && role !== "manager") {
@@ -824,7 +824,7 @@ export const financialRouter = router({
       }
 
       // Finrefac fase 3: emissão + materialização de impostos atômica.
-      const created = await db.transaction(async (tx: any) => {
+      const created = await db.transaction(async (tx: DbClient) => {
         const [row] = await tx.insert(invoices).values({
           campaignId: input.campaignId,
           campaignPhaseId: input.campaignPhaseId ?? null,
@@ -880,7 +880,7 @@ export const financialRouter = router({
       }
       // Finrefac fase 3: update + re-materialize taxes atomicamente quando
       // amount/iss muda em fatura "emitida".
-      const updated = await db.transaction(async (tx: any) => {
+      const updated = await db.transaction(async (tx: DbClient) => {
         const [row] = await tx.update(invoices).set(updateData).where(eq(invoices.id, id)).returning();
         if (
           row &&
@@ -904,7 +904,7 @@ export const financialRouter = router({
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
       // Finrefac fase 3: pagamento + materialização atômicos.
-      const updated = await db.transaction(async (tx: any) => {
+      const updated = await db.transaction(async (tx: DbClient) => {
         const [row] = await tx
           .update(invoices)
           .set({ status: "paga", paymentDate: input.paymentDate, paymentMethod: input.paymentMethod, updatedAt: new Date() })
@@ -926,7 +926,7 @@ export const financialRouter = router({
       const db = await getDatabase();
 
       try {
-        return await db.transaction(async (tx: any) => {
+        return await db.transaction(async (tx: DbClient) => {
           // Bloqueia se algum derivado de pagamento já está pago.
           await materializePayablesForInvoice(tx, input.id, "reverter_pagamento");
           const [row] = await tx
@@ -948,7 +948,7 @@ export const financialRouter = router({
       const db = await getDatabase();
 
       try {
-        return await db.transaction(async (tx: any) => {
+        return await db.transaction(async (tx: DbClient) => {
           // Cancela todos os derivados não pagos; bloqueia se algum já está pago.
           await materializePayablesForInvoice(tx, input.id, "cancelada");
           const [row] = await tx
