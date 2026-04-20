@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { trpc } from "@/lib/trpc";
+import { trpc, type RouterOutputs } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,51 @@ interface CartItem {
   weeks: number;
   unitPrice: number;
   totalPrice: number;
+  seasonalMultiplier?: number;
+  seasonalLabel?: string;
+  basePriceBeforeSeasonal?: number;
+}
+
+type SeasonalRow = RouterOutputs["seasonalMultiplier"]["forBuilder"][number];
+
+function computeItemPeriod(startDate: string, weeks: number): { ps: Date; pe: Date } | null {
+  if (!startDate) return null;
+  const ps = new Date(startDate + "T00:00:00");
+  if (isNaN(ps.getTime())) return null;
+  const pe = new Date(ps);
+  pe.setDate(pe.getDate() + weeks * 7);
+  return { ps, pe };
+}
+
+function pickSeasonalForItem(
+  productId: number,
+  startDate: string,
+  weeks: number,
+  seasonals: SeasonalRow[],
+  venueIds: number[] = [],
+): { multiplier: number; label: string } | null {
+  const period = computeItemPeriod(startDate, weeks);
+  if (!period) return null;
+  const venueSet = new Set(venueIds);
+  const matches = seasonals.filter(s => {
+    if (s.productId !== productId) return false;
+    if (s.restaurantId != null && !venueSet.has(s.restaurantId)) return false;
+    const ss = new Date(s.startDate + "T00:00:00");
+    const se = new Date(s.endDate + "T00:00:00");
+    return ss <= period.pe && period.ps <= se;
+  });
+  if (!matches.length) return null;
+  // Precedência: específicos por restaurante vencem globais.
+  const specific = matches.filter(m => m.restaurantId != null);
+  const pool = specific.length > 0 ? specific : matches;
+  let best: { multiplier: number; label: string } | null = null;
+  for (const m of pool) {
+    const v = parseFloat(m.multiplier);
+    if (isFinite(v) && v > 0 && (!best || v > best.multiplier)) {
+      best = { multiplier: v, label: m.seasonLabel };
+    }
+  }
+  return best;
 }
 
 interface CampaignBuilderProps {
@@ -106,6 +151,34 @@ export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onC
 
   const source = isPartner ? "self_service_parceiro" : "self_service_anunciante";
 
+  const productIds = useMemo(() => cart.map(i => i.product.id), [cart]);
+  const seasonalQuery = trpc.seasonalMultiplier.forBuilder.useQuery(
+    { productIds },
+    { enabled: productIds.length > 0 },
+  );
+  const seasonals: SeasonalRow[] = seasonalQuery.data ?? [];
+
+  const enrichedCart: CartItem[] = useMemo(() => {
+    return cart.map(item => {
+      const seasonal = startDate ? pickSeasonalForItem(item.product.id, startDate, item.weeks, seasonals) : null;
+      if (!seasonal) {
+        return { ...item, seasonalMultiplier: undefined, seasonalLabel: undefined, basePriceBeforeSeasonal: undefined };
+      }
+      const adjustedTotal = item.totalPrice * seasonal.multiplier;
+      // Mantém a base per-4-semanas usada em calcItemPrice (totalPrice / (volume * nPer))
+      const nPer = item.weeks / 4;
+      const adjustedUnit = item.volume > 0 && nPer > 0 ? adjustedTotal / (item.volume * nPer) : 0;
+      return {
+        ...item,
+        basePriceBeforeSeasonal: item.totalPrice,
+        totalPrice: adjustedTotal,
+        unitPrice: adjustedUnit,
+        seasonalMultiplier: seasonal.multiplier,
+        seasonalLabel: seasonal.label,
+      };
+    });
+  }, [cart, startDate, seasonals]);
+
   const createMutation = trpc.quotation.createFromBuilder.useMutation({
     onSuccess: () => {
       setSubmitted(true);
@@ -117,7 +190,7 @@ export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onC
     },
   });
 
-  const totalValue = useMemo(() => cart.reduce((s, i) => s + i.totalPrice, 0), [cart]);
+  const totalValue = useMemo(() => enrichedCart.reduce((s, i) => s + i.totalPrice, 0), [enrichedCart]);
 
   function addToCart(product: any) {
     setCart(prev => {
@@ -227,10 +300,12 @@ export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onC
         )}
         {step === 1 && (
           <StepConfigurar
-            cart={cart}
+            cart={enrichedCart}
             hasPartner={hasPartner}
             onUpdate={updateCartItem}
             onRemove={removeFromCart}
+            startDate={startDate}
+            onStartDate={setStartDate}
           />
         )}
         {step === 2 && (
@@ -245,7 +320,7 @@ export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onC
         )}
         {step === 3 && (
           <StepConfirmacao
-            cart={cart}
+            cart={enrichedCart}
             campaignName={campaignName}
             startDate={startDate}
             briefing={briefing}
@@ -421,17 +496,51 @@ function StepProdutos({ products, cart, hasPartner, onAdd, onRemove }: {
   );
 }
 
-function StepConfigurar({ cart, hasPartner, onUpdate, onRemove }: {
+function StepConfigurar({ cart, hasPartner, onUpdate, onRemove, startDate, onStartDate }: {
   cart: CartItem[]; hasPartner: boolean;
   onUpdate: (id: number, vol: number, weeks: number) => void;
   onRemove: (id: number) => void;
+  startDate: string;
+  onStartDate: (v: string) => void;
 }) {
+  const hasAnySeasonal = cart.some(i => i.seasonalMultiplier && i.seasonalMultiplier !== 1);
   return (
     <div className="p-6 space-y-5">
       <div>
         <h2 className="text-lg font-semibold mb-1">Configure os Volumes e Prazos</h2>
         <p className="text-sm text-muted-foreground">Ajuste o volume e a duração de cada produto no seu carrinho.</p>
       </div>
+
+      <div className="rounded-xl border border-border/30 bg-card px-5 py-4 space-y-2 max-w-md">
+        <Label htmlFor="builder-start-date" className="flex items-center gap-1.5 text-xs">
+          <Calendar className="w-3.5 h-3.5" />
+          Data de início (aproximada)
+        </Label>
+        <Input
+          id="builder-start-date"
+          type="date"
+          value={startDate}
+          onChange={e => onStartDate(e.target.value)}
+          className="text-sm"
+        />
+        <p className="text-[11px] text-muted-foreground">
+          {startDate
+            ? "Usada para identificar multiplicadores sazonais aplicáveis."
+            : "Defina para verificar se há multiplicadores sazonais no período."}
+        </p>
+      </div>
+
+      {hasAnySeasonal && (
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300">
+          <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold">Multiplicador sazonal aplicado</p>
+            <p className="text-amber-200/80">
+              Um ou mais produtos cruzam uma janela sazonal e tiveram o preço ajustado conforme tabela vigente.
+            </p>
+          </div>
+        </div>
+      )}
 
       {cart.map((item) => {
         const TipoIcon = TIPO_ICONS[item.product.tipo] ?? Package;
@@ -502,6 +611,17 @@ function StepConfigurar({ cart, hasPartner, onUpdate, onRemove }: {
                   ))}
                 </div>
               </div>
+
+              {item.seasonalMultiplier && item.basePriceBeforeSeasonal != null && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+                  <Sparkles className="w-3 h-3 shrink-0" />
+                  <span>
+                    {item.seasonalLabel} ×{item.seasonalMultiplier.toFixed(2)} aplicado
+                    {" "}
+                    <span className="text-muted-foreground line-through ml-1">{fmtBRL(item.basePriceBeforeSeasonal)}</span>
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between pt-2 border-t border-border/10">
                 <div>
@@ -633,6 +753,9 @@ function StepConfirmacao({ cart, campaignName, startDate, briefing, hasPartner, 
                 <div className="text-right shrink-0">
                   <p className="text-sm font-semibold">{fmtBRL(item.totalPrice)}</p>
                   <p className="text-[10px] text-muted-foreground">{fmtBRL4(item.unitPrice)}/un.</p>
+                  {item.seasonalMultiplier && item.seasonalLabel && (
+                    <p className="text-[10px] text-amber-400">{item.seasonalLabel} ×{item.seasonalMultiplier.toFixed(2)}</p>
+                  )}
                 </div>
               </div>
             );

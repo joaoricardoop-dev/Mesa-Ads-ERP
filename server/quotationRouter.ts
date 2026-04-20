@@ -1,7 +1,7 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices } from "../drizzle/schema";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices, seasonalMultipliers } from "../drizzle/schema";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -1119,6 +1119,37 @@ export const quotationRouter = router({
         .from(productDiscountPriceTiers)
         .where(inArray(productDiscountPriceTiers.productId, productIds));
 
+      const seasonalRows = await db.select()
+        .from(seasonalMultipliers)
+        .where(inArray(seasonalMultipliers.productId, productIds));
+
+      const venueIdSet = new Set<number>(input.venueIds ?? []);
+
+      function pickSeasonalMultiplier(productId: number, periodStart: string | null, periodEnd: string | null): { mult: number; label: string | null } {
+        if (!periodStart || !periodEnd) return { mult: 1, label: null };
+        const ps = new Date(periodStart);
+        const pe = new Date(periodEnd);
+        if (isNaN(ps.getTime()) || isNaN(pe.getTime())) return { mult: 1, label: null };
+        const matches = seasonalRows.filter((s) => {
+          if (s.productId !== productId) return false;
+          if (s.restaurantId != null && !venueIdSet.has(s.restaurantId)) return false;
+          const ss = new Date(s.startDate);
+          const se = new Date(s.endDate);
+          return ss <= pe && ps <= se;
+        });
+        if (!matches.length) return { mult: 1, label: null };
+        // Precedência: específicos por restaurante vencem globais.
+        const specific = matches.filter((m) => m.restaurantId != null);
+        const pool = specific.length > 0 ? specific : matches;
+        let bestMult = 0;
+        let bestLabel: string | null = null;
+        for (const m of pool) {
+          const v = parseFloat(m.multiplier);
+          if (isFinite(v) && v > bestMult) { bestMult = v; bestLabel = m.seasonLabel; }
+        }
+        return { mult: bestMult > 0 ? bestMult : 1, label: bestLabel };
+      }
+
       const BV_AGENCIA = 0.20;
       const DESCONTOS_PRAZO: Record<number, number> = { 4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11 };
       const hasPartner = !!client?.partnerId || isPartnerFlow;
@@ -1157,6 +1188,8 @@ export const quotationRouter = router({
 
       const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; unitPrice: number; totalPrice: number }> = [];
 
+      const appliedSeasonals: Array<{ productName: string; label: string; multiplier: number }> = [];
+
       for (const item of input.items) {
         const prod = productMap.get(item.productId)!;
         const tiers = pricingTiersRows
@@ -1175,7 +1208,24 @@ export const quotationRouter = router({
         const baseTotal = unitPrice * item.volume;
         const discountedTotal = applyDiscountTier(baseTotal, dTiersForProduct);
         const prazoDiscount = (DESCONTOS_PRAZO[item.weeks] ?? 0) / 100;
-        const finalTotal = discountedTotal * (1 - prazoDiscount);
+        let finalTotal = discountedTotal * (1 - prazoDiscount);
+
+        // Aplica multiplicador sazonal quando o período do item cruza a janela
+        let itemPeriodEnd: string | null = null;
+        if (input.startDate) {
+          const start = new Date(input.startDate);
+          if (!isNaN(start.getTime())) {
+            const end = new Date(start);
+            end.setDate(end.getDate() + item.weeks * 7);
+            itemPeriodEnd = end.toISOString().slice(0, 10);
+          }
+        }
+        const seasonal = pickSeasonalMultiplier(item.productId, input.startDate ?? null, itemPeriodEnd);
+        if (seasonal.mult !== 1 && seasonal.label) {
+          finalTotal = finalTotal * seasonal.mult;
+          appliedSeasonals.push({ productName: prod.name, label: seasonal.label, multiplier: seasonal.mult });
+        }
+
         const finalUnitPrice = item.volume > 0 ? finalTotal / item.volume : 0;
 
         computedItems.push({ productId: item.productId, productName: prod.name, volume: item.volume, weeks: item.weeks, unitPrice: finalUnitPrice, totalPrice: finalTotal });
@@ -1193,6 +1243,12 @@ export const quotationRouter = router({
       if (input.venueIds?.length) briefingParts.push(`Locais selecionados (IDs): ${input.venueIds.join(", ")}`);
       if (input.estimatedImpressions != null) briefingParts.push(`Impressões estimadas: ${input.estimatedImpressions.toLocaleString("pt-BR")}`);
       if (input.estimatedTotal != null) briefingParts.push(`Total estimado (cliente): R$ ${input.estimatedTotal.toFixed(2)}`);
+      if (appliedSeasonals.length) {
+        briefingParts.push(
+          "Multiplicadores sazonais aplicados:\n" +
+          appliedSeasonals.map(s => `• ${s.productName}: ${s.label} ×${s.multiplier.toFixed(2)}`).join("\n")
+        );
+      }
       const notesText = briefingParts.length ? briefingParts.join("\n\n") : null;
 
       const insertValues: any = {

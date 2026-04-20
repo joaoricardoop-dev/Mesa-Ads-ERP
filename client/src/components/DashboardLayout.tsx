@@ -83,6 +83,7 @@ import {
   BookOpen,
   Crown,
   History,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { NotificationBell } from "./NotificationPanel";
@@ -172,6 +173,7 @@ const NAV_ENTRIES: NavEntry[] = [
     label: "Configurações",
     items: [
       { icon: Package, label: "Produtos & Preços", path: "/produtos", adminOnly: true },
+      { icon: Sparkles, label: "Multiplicadores Sazonais", path: "/configuracoes/multiplicadores-sazonais", adminOnly: true },
       { icon: Calculator, label: "Simulador de Preços", path: "/comercial/tabela-precos", adminOnly: true },
       { icon: DollarSign, label: "Economics", path: "/economics" },
       { icon: Factory, label: "Produção", path: "/producao" },

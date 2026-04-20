@@ -57,6 +57,7 @@ import IntegrationSettings from "./pages/IntegrationSettings";
 import MediaKitSettings from "./pages/MediaKitSettings";
 import QuotationSign from "./pages/QuotationSign";
 import Products from "./pages/Products";
+import SeasonalMultipliers from "./pages/SeasonalMultipliers";
 import Partners from "./pages/Partners";
 import PartnerDetail from "./pages/PartnerDetail";
 import RestaurantsMap from "./pages/RestaurantsMap";
@@ -147,6 +148,7 @@ function Router() {
       <Route path="/configuracoes/integracoes" component={IntegrationSettings} />
       <Route path="/configuracoes/media-kit" component={MediaKitSettings} />
       <Route path="/produtos" component={Products} />
+      <Route path="/configuracoes/multiplicadores-sazonais" component={SeasonalMultipliers} />
       <Route path="/biblioteca" component={Library} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
