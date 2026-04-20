@@ -53,8 +53,20 @@ const emptyForm: FormState = {
 };
 
 export default function VipProvidersPage() {
+  return (
+    <PageContainer
+      title="Provedores de Sala VIP"
+      description="Parceiros que recebem repasse automático pela veiculação em telas e janelas digitais."
+    >
+      <VipProvidersBody />
+    </PageContainer>
+  );
+}
+
+export function VipProvidersBody({ embedded = false }: { embedded?: boolean }) {
   const utils = trpc.useUtils();
   const { data: providers = [], isLoading } = trpc.vipProvider.list.useQuery();
+  void embedded;
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -141,10 +153,8 @@ export default function VipProvidersPage() {
   }
 
   return (
-    <PageContainer
-      title="Provedores de Sala VIP"
-      description="Parceiros que recebem repasse automático pela veiculação em telas e janelas digitais."
-      actions={
+    <div className="space-y-4">
+      <div className="flex items-center justify-end">
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={openCreateDialog}>
@@ -256,8 +266,7 @@ export default function VipProvidersPage() {
             </div>
           </DialogContent>
         </Dialog>
-      }
-    >
+      </div>
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Carregando…</p>
       ) : providers.length === 0 ? (
@@ -340,6 +349,6 @@ export default function VipProvidersPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </PageContainer>
+    </div>
   );
 }

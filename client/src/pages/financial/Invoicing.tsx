@@ -49,6 +49,8 @@ export default function Invoicing() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payDialogId, setPayDialogId] = useState<number | null>(null);
   const [payDate, setPayDate] = useState("");
+  const [receivedDateInput, setReceivedDateInput] = useState("");
+  const [reconcileNow, setReconcileNow] = useState(true);
 
   // View/Edit dialog state
   const [viewInvoiceId, setViewInvoiceId] = useState<number | null>(null);
@@ -554,6 +556,7 @@ export default function Invoicing() {
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground">Valor</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Emissão</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Vencimento</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Recebido em</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground">Ações</th>
                 </tr>
@@ -603,6 +606,11 @@ export default function Invoicing() {
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{formatDate(inv.issueDate)}</td>
                       <td className="px-4 py-3 text-muted-foreground">{formatDate(inv.dueDate)}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {inv.receivedDate ? (
+                          <span className="text-emerald-400">{formatDate(inv.receivedDate)}</span>
+                        ) : "—"}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span
@@ -766,6 +774,12 @@ export default function Invoicing() {
                       <div>
                         <p className="text-xs text-muted-foreground">Data do pagamento</p>
                         <p className="text-emerald-400">{formatDate(inv.paymentDate)}</p>
+                      </div>
+                    )}
+                    {inv.receivedDate && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Recebido em</p>
+                        <p className="text-emerald-400">{formatDate(inv.receivedDate)}</p>
                       </div>
                     )}
                     <div>
@@ -966,25 +980,68 @@ export default function Invoicing() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={payDialogId !== null} onOpenChange={(open) => !open && setPayDialogId(null)}>
+      <Dialog open={payDialogId !== null} onOpenChange={(open) => {
+        if (!open) {
+          setPayDialogId(null);
+          setReceivedDateInput("");
+          setReconcileNow(true);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Marcar como Paga</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
-              <Label>Data de Pagamento</Label>
+              <Label>Data de Pagamento (extrato bancário)</Label>
               <Input
                 type="date"
                 value={payDate}
                 onChange={(e) => setPayDate(e.target.value)}
               />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Data em que o valor saiu da conta do cliente.
+              </p>
             </div>
+            <div>
+              <Label>Recebido em (data de crédito na nossa conta)</Label>
+              <Input
+                type="date"
+                value={receivedDateInput}
+                onChange={(e) => setReceivedDateInput(e.target.value)}
+                placeholder="Opcional"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Use quando há diferença entre data do pagamento e data do crédito (ex.: boleto, TED entre bancos).
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={reconcileNow}
+                onChange={(e) => setReconcileNow(e.target.checked)}
+                className="rounded"
+              />
+              Conciliar com extrato bancário agora (abrir tela de conciliação após confirmar)
+            </label>
             <Button
               className="w-full"
               onClick={() => {
                 if (payDialogId && payDate) {
-                  markPaidMutation.mutate({ id: payDialogId, paymentDate: payDate });
+                  markPaidMutation.mutate(
+                    {
+                      id: payDialogId,
+                      paymentDate: payDate,
+                      receivedDate: receivedDateInput || undefined,
+                    },
+                    {
+                      onSuccess: () => {
+                        if (reconcileNow) {
+                          window.location.href = "/financeiro/conciliacao";
+                        }
+                      },
+                    },
+                  );
                 }
               }}
               disabled={markPaidMutation.isPending}

@@ -204,7 +204,7 @@ export default function PartnerCommissionReport() {
   };
 
   return (
-    <PageContainer title="Relatório de Comissão" description="Comissão de parceiros por campanha">
+    <PageContainer title="Conferência de Comissão de Parceiros" description="Tela somente-leitura para conferência da comissão por campanha. As contas a pagar são geradas automaticamente pelo ledger.">
       <div className="space-y-6">
 
         <div className="rounded-2xl border border-border/20 bg-card p-6">

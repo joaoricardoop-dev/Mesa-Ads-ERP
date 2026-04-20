@@ -1130,6 +1130,13 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_restaurant_id_to_crm_notifications",
     sql: `ALTER TABLE "crm_notifications" ADD COLUMN IF NOT EXISTS "restaurantId" integer; CREATE INDEX IF NOT EXISTS "idx_crm_notifications_restaurant_id" ON "crm_notifications" ("restaurantId");`,
   },
+  {
+    // Finrefac #4 — coluna "Recebido em" separada de paymentDate.
+    // paymentDate = quando a fatura foi marcada como paga (registro contábil).
+    // receivedDate = quando o dinheiro efetivamente entrou em conta (conciliação).
+    name: "add_received_date_to_invoices",
+    sql: `ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "receivedDate" date;`,
+  },
 ];
 
 export async function runMigrations() {

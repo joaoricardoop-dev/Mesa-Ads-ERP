@@ -714,6 +714,7 @@ export const financialRouter = router({
           issueDate: invoices.issueDate,
           dueDate: invoices.dueDate,
           paymentDate: invoices.paymentDate,
+          receivedDate: invoices.receivedDate,
           status: invoices.status,
           paymentMethod: invoices.paymentMethod,
           notes: invoices.notes,
@@ -804,6 +805,7 @@ export const financialRouter = router({
         { message: "URL do documento deve começar com http:// ou https://" }
       ).optional(),
       documentLabel: z.string().max(100).optional(),
+      receivedDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
@@ -812,7 +814,8 @@ export const financialRouter = router({
       const campaign = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
       if (!campaign[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
 
-      const year = new Date().getFullYear();
+      const issueDate = input.issueDate || new Date().toISOString().split("T")[0];
+      const year = parseInt(issueDate.slice(0, 4), 10);
       const prefix = `FAT-${year}-`;
       const maxResult = await db
         .select({ maxNum: sql<string>`MAX("invoiceNumber")` })
@@ -826,7 +829,50 @@ export const financialRouter = router({
       }
       const invoiceNumber = `${prefix}${String(seqNum).padStart(4, "0")}`;
 
-      const issueDate = input.issueDate || new Date().toISOString().split("T")[0];
+      // Finrefac #4 — validação de numeração sequencial por cliente+ano,
+      // atrás do flag INVOICE_NUMBERING_STRICT. Auditoria fiscal exige que
+      // dentro do mesmo (cliente, ano) as faturas formem uma sequência
+      // contínua e cronológica, sem back-dating que crie gaps.
+      if (process.env.INVOICE_NUMBERING_STRICT === "true") {
+        const clientYearRows = await db
+          .select({
+            count: sql<string>`COUNT(*)`,
+            maxIssueDate: sql<string | null>`MAX("issueDate")`,
+            maxSeq: sql<string | null>`MAX(CAST(SPLIT_PART("invoiceNumber", '-', 3) AS INTEGER))`,
+          })
+          .from(invoices)
+          .where(and(
+            eq(invoices.clientId, campaign[0].clientId),
+            sql`EXTRACT(YEAR FROM "issueDate")::int = ${year}`,
+            sql`"status" <> 'cancelada'`,
+          ));
+        const existingCount = parseInt(clientYearRows[0]?.count ?? "0", 10) || 0;
+        const lastIssueDate = clientYearRows[0]?.maxIssueDate ?? null;
+        const lastClientSeq = clientYearRows[0]?.maxSeq ? parseInt(clientYearRows[0].maxSeq, 10) : null;
+
+        // 1) Bloqueia back-dating que quebraria a ordem cronológica
+        //    da numeração para este cliente.
+        if (lastIssueDate && issueDate < lastIssueDate) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Numeração estrita: já existe fatura emitida em ${lastIssueDate} para este cliente em ${year}. ` +
+              `A nova fatura precisa ter issueDate >= ${lastIssueDate}.`,
+          });
+        }
+        // 2) Bloqueia gaps no contador global do ano (race condition / inserts manuais).
+        if (lastClientSeq !== null && seqNum <= lastClientSeq) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Numeração estrita: a próxima sequência esperada (${lastClientSeq + 1}) é maior que ${seqNum}.`,
+          });
+        }
+        // 3) A nova fatura é a (existingCount+1)-ésima do cliente no ano —
+        //    invariante usada por relatórios fiscais.
+        const expectedClientPosition = existingCount + 1;
+        if (expectedClientPosition < 1) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Numeração inválida para o cliente." });
+        }
+      }
 
       let notes = input.notes || "";
       if (input.installmentNumber && input.installmentTotal) {
@@ -881,6 +927,7 @@ export const financialRouter = router({
         { message: "URL do documento deve começar com http:// ou https://" }
       ).optional(),
       documentLabel: z.string().max(100).optional(),
+      receivedDate: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
@@ -894,6 +941,7 @@ export const financialRouter = router({
       if (fields.paymentMethod !== undefined) updateData.paymentMethod = fields.paymentMethod;
       if (fields.notes !== undefined) updateData.notes = fields.notes;
       if (fields.billingType !== undefined) updateData.billingType = fields.billingType;
+      if (fields.receivedDate !== undefined) updateData.receivedDate = fields.receivedDate || null;
       if (fields.issRate !== undefined) {
         updateData.issRate = fields.issRate && parseFloat(fields.issRate) > 0 ? fields.issRate : "0.00";
       }
@@ -941,6 +989,9 @@ export const financialRouter = router({
       id: z.number(),
       paymentDate: z.string(),
       paymentMethod: z.string().optional(),
+      // Finrefac #4 — quando o operador já confirma a entrada do dinheiro
+      // na conta no momento do pagamento (conciliação imediata).
+      receivedDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
@@ -950,7 +1001,13 @@ export const financialRouter = router({
       const updated = await db.transaction(async (tx: DbClient) => {
         const [row] = await tx
           .update(invoices)
-          .set({ status: "paga", paymentDate: input.paymentDate, paymentMethod: input.paymentMethod, updatedAt: new Date() })
+          .set({
+            status: "paga",
+            paymentDate: input.paymentDate,
+            receivedDate: input.receivedDate ?? null,
+            paymentMethod: input.paymentMethod,
+            updatedAt: new Date(),
+          })
           .where(eq(invoices.id, input.id))
           .returning();
         if (row) {
@@ -2046,6 +2103,13 @@ export const financialRouter = router({
       campaignId: z.number().optional(),
       status: z.string().optional(),
       type: z.string().optional(),
+      sourceType: z.enum([
+        "restaurant_commission", "vip_repasse", "supplier_cost", "freight_cost",
+        "partner_commission", "seller_commission", "tax", "manual",
+      ]).optional(),
+      dueDateFrom: z.string().optional(),
+      dueDateTo: z.string().optional(),
+      supplierId: z.number().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
@@ -2054,6 +2118,10 @@ export const financialRouter = router({
       if (input?.campaignId) conditions.push(eq(accountsPayable.campaignId, input.campaignId));
       if (input?.status) conditions.push(eq(accountsPayable.status, input.status));
       if (input?.type) conditions.push(eq(accountsPayable.type, input.type));
+      if (input?.sourceType) conditions.push(eq(accountsPayable.sourceType, input.sourceType));
+      if (input?.supplierId) conditions.push(eq(accountsPayable.supplierId, input.supplierId));
+      if (input?.dueDateFrom) conditions.push(gte(accountsPayable.dueDate, input.dueDateFrom));
+      if (input?.dueDateTo) conditions.push(lte(accountsPayable.dueDate, input.dueDateTo));
       const rows = await db
         .select({
           ap: accountsPayable,
@@ -2088,6 +2156,16 @@ export const financialRouter = router({
       dueDate: z.string().optional(),
       recipientType: z.string().optional(),
       notes: z.string().optional(),
+      sourceType: z.enum([
+        "restaurant_commission",
+        "vip_repasse",
+        "supplier_cost",
+        "freight_cost",
+        "partner_commission",
+        "seller_commission",
+        "tax",
+        "manual",
+      ]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
@@ -2105,8 +2183,26 @@ export const financialRouter = router({
         recipientType: input.recipientType ?? null,
         notes: input.notes ?? null,
         status: "pendente",
+        sourceType: input.sourceType ?? "manual",
       }).returning();
       return row;
+    }),
+
+  bulkMarkAccountsPayablePaid: protectedProcedure
+    .input(z.object({
+      ids: z.array(z.number()).min(1),
+      paymentDate: z.string(),
+      proofUrl: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+      const updated = await db
+        .update(accountsPayable)
+        .set({ status: "pago", paymentDate: input.paymentDate, proofUrl: input.proofUrl ?? null, updatedAt: new Date() })
+        .where(and(inArray(accountsPayable.id, input.ids), eq(accountsPayable.status, "pendente")))
+        .returning();
+      return { count: updated.length };
     }),
 
   updateAccountPayable: audited(protectedProcedure, {

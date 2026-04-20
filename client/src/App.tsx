@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
@@ -36,12 +36,11 @@ import ServiceOrders from "./pages/ServiceOrders";
 import BatchManagement from "./pages/BatchManagement";
 import FinancialDashboard from "./pages/financial/FinancialDashboard";
 import Invoicing from "./pages/financial/Invoicing";
-import RestaurantPaymentsPage from "./pages/financial/RestaurantPaymentsPage";
+import SuppliersHubPage from "./pages/financial/SuppliersHubPage";
 import OperationalCosts from "./pages/financial/OperationalCosts";
 import FinancialReport from "./pages/financial/FinancialReport";
 import PartnerCommissionReport from "./pages/financial/PartnerCommissionReport";
 import AccountsPayablePage from "./pages/financial/AccountsPayablePage";
-import VipProvidersPage from "./pages/financial/VipProvidersPage";
 import FinancialGlossary from "./pages/financial/FinancialGlossary";
 import FinancialAuditLog from "./pages/financial/FinancialAuditLog";
 import PriceTable from "./pages/PriceTable";
@@ -123,16 +122,23 @@ function Router() {
       <Route path="/cotacao/preview" component={QuotationPreview} />
       <Route path="/financeiro" component={FinancialDashboard} />
       <Route path="/financeiro/faturamento" component={Invoicing} />
-      <Route path="/financeiro/pagamentos" component={RestaurantPaymentsPage} />
-      <Route path="/financeiro/custos" component={OperationalCosts} />
+      <Route path="/financeiro/contas-pagar" component={AccountsPayablePage} />
+      <Route path="/financeiro/fornecedores" component={SuppliersHubPage} />
       <Route path="/financeiro/relatorios" component={FinancialReport} />
+      <Route path="/financeiro/conciliacao">{() => (
+        <div className="p-8 text-center text-muted-foreground">
+          <h2 className="text-lg font-semibold mb-2">Conciliação Bancária</h2>
+          <p>Em desenvolvimento.</p>
+        </div>
+      )}</Route>
       <Route path="/financeiro/glossario" component={FinancialGlossary} />
       <Route path="/financeiro/comissao-parceiros" component={PartnerCommissionReport} />
-      <Route path="/financeiro/contas-pagar" component={AccountsPayablePage} />
       <Route path="/financeiro/auditoria" component={FinancialAuditLog} />
-      <Route path="/configuracoes/provedores-sala-vip" component={VipProvidersPage} />
-      {/* Rota antiga mantida como alias pra não quebrar links existentes */}
-      <Route path="/financeiro/provedores-vip" component={VipProvidersPage} />
+      {/* Redirects (rotas antigas → novas) */}
+      <Route path="/financeiro/pagamentos">{() => <Redirect to="/financeiro/contas-pagar?tab=restaurant_commission" />}</Route>
+      <Route path="/financeiro/custos">{() => <Redirect to="/financeiro/contas-pagar?tab=supplier_cost" />}</Route>
+      <Route path="/configuracoes/provedores-sala-vip">{() => <Redirect to="/financeiro/fornecedores?tab=vip" />}</Route>
+      <Route path="/financeiro/provedores-vip">{() => <Redirect to="/financeiro/fornecedores?tab=vip" />}</Route>
       <Route path="/campanhas/:id/batch/:phaseId" component={CampaignDetail} />
       {/* Rota antiga mantida como alias pra não quebrar links existentes */}
       <Route path="/campanhas/:id/fase/:phaseId" component={CampaignDetail} />

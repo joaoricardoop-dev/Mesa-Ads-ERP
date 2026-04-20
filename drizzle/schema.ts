@@ -451,6 +451,9 @@ export const invoices = pgTable("invoices", {
   issueDate: date("issueDate").notNull(),
   dueDate: date("dueDate").notNull(),
   paymentDate: date("paymentDate"),
+  // Finrefac #4 — quando o dinheiro entrou efetivamente (conciliação bancária).
+  // paymentDate = registro contábil; receivedDate = caixa real.
+  receivedDate: date("receivedDate"),
   status: invoiceStatusEnum("status").default("emitida").notNull(),
   paymentMethod: varchar("paymentMethod", { length: 50 }),
   notes: text("notes"),
