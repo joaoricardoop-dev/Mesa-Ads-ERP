@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   Building2,
@@ -952,6 +953,27 @@ const NAV_TABS: { key: NavSection; label: string; icon: typeof CircleDot }[] = [
   { key: "perfil",     label: "Meu Perfil",        icon: Building2 },
 ];
 
+const SEGMENTS = [
+  "Alimentação",
+  "Bebidas",
+  "Tecnologia",
+  "Saúde",
+  "Educação",
+  "Entretenimento",
+  "Serviços",
+  "Varejo",
+  "Automotivo",
+  "Imobiliário",
+  "Outros",
+];
+
+const STATES = [
+  "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG",
+  "PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO",
+];
+
+const COMPLETE_PROFILE_DISMISS_KEY = "mesa-anunciante-complete-profile-dismissed";
+
 type HomeSectionCard = {
   key: NavSection;
   label: string;
@@ -987,11 +1009,67 @@ export default function AnunciantePortal() {
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
 
+  const { data: completion } = trpc.portal.profileCompletionStatus.useQuery();
+  const [completeOpen, setCompleteOpen] = useState(false);
+  const [completeForm, setCompleteForm] = useState({
+    contactName: "", contactRole: "", contactEmail: "", contactPhone: "",
+    instagram: "", segment: "",
+    address: "", addressNumber: "", neighborhood: "", city: "", state: "", cep: "",
+  });
+
+  useEffect(() => {
+    if (!completion || !profile) return;
+    if (completion.isComplete) return;
+    let dismissed = false;
+    try { dismissed = sessionStorage.getItem(COMPLETE_PROFILE_DISMISS_KEY) === "1"; } catch {}
+    if (dismissed) return;
+    setCompleteForm({
+      contactName: completion.primaryContact?.name || "",
+      contactRole: completion.primaryContact?.role || "",
+      contactEmail: profile.contactEmail || completion.primaryContact?.email || "",
+      contactPhone: profile.contactPhone || completion.primaryContact?.phone || "",
+      instagram: profile.instagram || "",
+      segment: profile.segment || "",
+      address: profile.address || "",
+      addressNumber: profile.addressNumber || "",
+      neighborhood: profile.neighborhood || "",
+      city: profile.city || "",
+      state: profile.state || "",
+      cep: profile.cep || "",
+    });
+    setCompleteOpen(true);
+  }, [completion, profile]);
+
   const utils = trpc.useUtils();
   const updateProfileMutation = trpc.portal.updateProfile.useMutation({
     onSuccess: () => { utils.portal.myProfile.invalidate(); setEditOpen(false); toast.success("Perfil atualizado"); },
     onError: (e) => toast.error(e.message),
   });
+
+  const completeProfileMutation = trpc.portal.updateProfile.useMutation({
+    onSuccess: () => {
+      utils.portal.myProfile.invalidate();
+      utils.portal.profileCompletionStatus.invalidate();
+      try { sessionStorage.removeItem(COMPLETE_PROFILE_DISMISS_KEY); } catch {}
+      setCompleteOpen(false);
+      toast.success("Cadastro completo! Obrigado.");
+    },
+    onError: (e) => toast.error(e.message || "Erro ao salvar cadastro"),
+  });
+
+  const dismissComplete = () => {
+    try { sessionStorage.setItem(COMPLETE_PROFILE_DISMISS_KEY, "1"); } catch {}
+    setCompleteOpen(false);
+  };
+
+  const submitComplete = () => {
+    const payload: Partial<typeof completeForm> = {};
+    (Object.keys(completeForm) as Array<keyof typeof completeForm>).forEach((k) => {
+      const v = completeForm[k];
+      if (v.trim()) payload[k] = v.trim();
+    });
+    completeProfileMutation.mutate(payload);
+  };
 
   const openEdit = () => {
     if (profile) setEditForm({
@@ -1952,6 +2030,165 @@ export default function AnunciantePortal() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={completeOpen} onOpenChange={(open) => { if (!open) dismissComplete(); else setCompleteOpen(true); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              Complete seu cadastro
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Para agilizar o atendimento, faturamento e a entrega das suas campanhas, precisamos de algumas informações que ainda faltam no seu cadastro. Leva menos de 1 minuto.
+            </p>
+          </DialogHeader>
+
+          <div className="grid gap-5 py-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <UserCircle className="w-3.5 h-3.5" /> Contato principal
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Nome *</Label>
+                  <Input
+                    value={completeForm.contactName}
+                    onChange={(e) => setCompleteForm({ ...completeForm, contactName: e.target.value })}
+                    placeholder="Nome completo"
+                    data-testid="input-complete-contact-name"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Cargo</Label>
+                  <Input
+                    value={completeForm.contactRole}
+                    onChange={(e) => setCompleteForm({ ...completeForm, contactRole: e.target.value })}
+                    placeholder="Ex: Gerente de Marketing"
+                    data-testid="input-complete-contact-role"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">E-mail *</Label>
+                  <Input
+                    type="email"
+                    value={completeForm.contactEmail}
+                    onChange={(e) => setCompleteForm({ ...completeForm, contactEmail: e.target.value })}
+                    placeholder="contato@empresa.com"
+                    data-testid="input-complete-contact-email"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Telefone *</Label>
+                  <Input
+                    value={completeForm.contactPhone}
+                    onChange={(e) => setCompleteForm({ ...completeForm, contactPhone: e.target.value })}
+                    placeholder="(11) 99999-9999"
+                    data-testid="input-complete-contact-phone"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" /> Endereço
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="sm:col-span-3 space-y-1.5">
+                  <Label className="text-xs">Logradouro</Label>
+                  <Input
+                    value={completeForm.address}
+                    onChange={(e) => setCompleteForm({ ...completeForm, address: e.target.value })}
+                    placeholder="Rua, Av..."
+                    data-testid="input-complete-address"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Número</Label>
+                  <Input
+                    value={completeForm.addressNumber}
+                    onChange={(e) => setCompleteForm({ ...completeForm, addressNumber: e.target.value })}
+                    placeholder="123"
+                    data-testid="input-complete-address-number"
+                  />
+                </div>
+                <div className="sm:col-span-2 space-y-1.5">
+                  <Label className="text-xs">Bairro</Label>
+                  <Input
+                    value={completeForm.neighborhood}
+                    onChange={(e) => setCompleteForm({ ...completeForm, neighborhood: e.target.value })}
+                    placeholder="Bairro"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Cidade *</Label>
+                  <Input
+                    value={completeForm.city}
+                    onChange={(e) => setCompleteForm({ ...completeForm, city: e.target.value })}
+                    placeholder="Cidade"
+                    data-testid="input-complete-city"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">UF *</Label>
+                  <Select value={completeForm.state} onValueChange={(v) => setCompleteForm({ ...completeForm, state: v })}>
+                    <SelectTrigger data-testid="select-complete-state"><SelectValue placeholder="UF" /></SelectTrigger>
+                    <SelectContent>
+                      {STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="sm:col-span-2 space-y-1.5">
+                  <Label className="text-xs">CEP</Label>
+                  <Input
+                    value={completeForm.cep}
+                    onChange={(e) => setCompleteForm({ ...completeForm, cep: e.target.value })}
+                    placeholder="00000-000"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5" /> Sobre o negócio
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Segmento *</Label>
+                  <Select value={completeForm.segment} onValueChange={(v) => setCompleteForm({ ...completeForm, segment: v })}>
+                    <SelectTrigger data-testid="select-complete-segment"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {SEGMENTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Instagram</Label>
+                  <Input
+                    value={completeForm.instagram}
+                    onChange={(e) => setCompleteForm({ ...completeForm, instagram: e.target.value })}
+                    placeholder="@empresa"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
+            <Button variant="ghost" onClick={dismissComplete} className="text-muted-foreground" data-testid="button-complete-dismiss">
+              Lembrar depois
+            </Button>
+            <Button
+              onClick={submitComplete}
+              disabled={completeProfileMutation.isPending}
+              data-testid="button-complete-save"
+            >
+              {completeProfileMutation.isPending ? "Salvando..." : "Salvar cadastro"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={builderOpen} onOpenChange={setBuilderOpen}>
         <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-6 pt-5 pb-0 shrink-0">
@@ -1969,6 +2206,7 @@ export default function AnunciantePortal() {
               onClose={() => setBuilderOpen(false)}
               onSuccess={() => {
                 utils.portal.myQuotations.invalidate();
+                utils.portal.profileCompletionStatus.invalidate();
               }}
             />
           ) : (

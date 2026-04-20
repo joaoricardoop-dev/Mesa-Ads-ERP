@@ -2854,21 +2854,120 @@ export const appRouter = router({
 
     updateProfile: anuncianteProcedure
       .input(z.object({
+        company: z.string().optional(),
+        razaoSocial: z.string().optional(),
+        cnpj: z.string().optional(),
         contactEmail: z.string().optional(),
         contactPhone: z.string().optional(),
         instagram: z.string().optional(),
+        segment: z.string().optional(),
         address: z.string().optional(),
         addressNumber: z.string().optional(),
         neighborhood: z.string().optional(),
         city: z.string().optional(),
         state: z.string().optional(),
         cep: z.string().optional(),
+        contactName: z.string().optional(),
+        contactRole: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const user = ctx.user;
         if (!user || !user.clientId) throw new TRPCError({ code: "FORBIDDEN", message: "Sem perfil vinculado" });
-        return updateClient(user.clientId, input);
+
+        const { contactName, contactRole, ...clientFields } = input;
+        await updateClient(user.clientId, clientFields);
+
+        const trimmedName = (contactName || "").trim();
+        const trimmedRole = (contactRole || "").trim();
+        const trimmedEmail = (input.contactEmail || "").trim();
+        const trimmedPhone = (input.contactPhone || "").trim();
+
+        if (trimmedName || trimmedEmail || trimmedPhone || trimmedRole) {
+          const { getDb: getDatabase } = await import("./db");
+          const db = await getDatabase();
+          if (db) {
+            const { contacts } = await import("../drizzle/schema");
+            const { eq, and } = await import("drizzle-orm");
+
+            const existing = await db
+              .select({ id: contacts.id, name: contacts.name, role: contacts.role, email: contacts.email, phone: contacts.phone })
+              .from(contacts)
+              .where(and(eq(contacts.clientId, user.clientId), eq(contacts.isPrimary, true)))
+              .limit(1);
+
+            if (existing.length > 0) {
+              const updates: Partial<typeof contacts.$inferInsert> & { updatedAt: Date } = { updatedAt: new Date() };
+              if (trimmedName) updates.name = trimmedName;
+              if (trimmedRole) updates.role = trimmedRole;
+              if (trimmedEmail) updates.email = trimmedEmail;
+              if (trimmedPhone) updates.phone = trimmedPhone;
+              await db.update(contacts).set(updates).where(eq(contacts.id, existing[0].id));
+            } else if (trimmedName || trimmedEmail) {
+              await db.update(contacts).set({ isPrimary: false }).where(eq(contacts.clientId, user.clientId));
+              await db.insert(contacts).values({
+                clientId: user.clientId,
+                name: trimmedName || trimmedEmail || "Sem nome",
+                email: trimmedEmail || undefined,
+                phone: trimmedPhone || undefined,
+                role: trimmedRole || undefined,
+                isPrimary: true,
+              });
+            }
+          }
+        }
+
+        return { ok: true };
       }),
+
+    profileCompletionStatus: anuncianteProcedure.query(async ({ ctx }) => {
+      const user = ctx.user;
+      if (!user || !user.clientId) {
+        return { hasQuotation: false, isComplete: true, missing: { address: false, contact: false, contactPerson: false, segment: false }, primaryContact: null };
+      }
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) {
+        return { hasQuotation: false, isComplete: true, missing: { address: false, contact: false, contactPerson: false, segment: false }, primaryContact: null };
+      }
+      const { quotations, contacts, clients } = await import("../drizzle/schema");
+      const { eq, and, sql } = await import("drizzle-orm");
+
+      const [client] = await db.select().from(clients).where(eq(clients.id, user.clientId)).limit(1);
+      if (!client) {
+        return { hasQuotation: false, isComplete: true, missing: { address: false, contact: false, contactPerson: false, segment: false }, primaryContact: null };
+      }
+
+      const [{ count: quotationCount } = { count: 0 }] = await db
+        .select({ count: sql<number>`cast(count(*) as int)` })
+        .from(quotations)
+        .where(eq(quotations.clientId, user.clientId));
+
+      const [primary] = await db
+        .select({ name: contacts.name, role: contacts.role, email: contacts.email, phone: contacts.phone })
+        .from(contacts)
+        .where(and(eq(contacts.clientId, user.clientId), eq(contacts.isPrimary, true)))
+        .limit(1);
+
+      const hasAddress = !!(client.address && client.city && client.state);
+      const hasContact = !!(client.contactPhone || client.contactEmail || primary?.phone || primary?.email);
+      const hasContactPerson = !!(primary?.name && primary.name.trim().length > 0);
+      const hasSegment = !!(client.segment && client.segment.trim().length > 0);
+
+      const missing = {
+        address: !hasAddress,
+        contact: !hasContact,
+        contactPerson: !hasContactPerson,
+        segment: !hasSegment,
+      };
+      const isComplete = !missing.address && !missing.contact && !missing.contactPerson && !missing.segment;
+
+      return {
+        hasQuotation: Number(quotationCount) > 0,
+        isComplete,
+        missing,
+        primaryContact: primary ?? null,
+      };
+    }),
 
     getPriceTable: anuncianteProcedure
       .query(async ({ ctx }) => {
