@@ -1162,20 +1162,81 @@ export async function listRestaurantPayments(restaurantId: number) {
   return result;
 }
 
+// ─── Dual-write para o ledger único (finrefac fase 2) ──────────────────────
+// Cada restaurant_payments criado/atualizado/removido espelha em
+// accounts_payable como sourceType='restaurant_commission'. Triggers SQL
+// nativos virão em fase 3; até lá, mantemos a sincronia em código via upsert
+// parametrizado (DELETE + INSERT por simplicidade idempotente).
+async function mirrorRestaurantPaymentToLedger(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  rp: { id: number; restaurantId: number; campaignId: number | null; amount: string; referenceMonth: string; status: string; paymentDate: string | null; notes: string | null; proofUrl: string | null },
+) {
+  if (rp.campaignId == null) return;
+  const ledgerStatus = rp.status === "paid" ? "pago" : "pendente";
+  const dueDate = rp.paymentDate ?? new Date().toISOString().split("T")[0];
+
+  // Idempotência: remove o mirror antigo deste restaurantPayment, depois insere.
+  await db.execute(sql`
+    DELETE FROM "accounts_payable"
+    WHERE "sourceType" = 'restaurant_commission'
+      AND ("sourceRef"->>'restaurantPaymentId')::int = ${rp.id};
+  `);
+
+  await db.execute(sql`
+    INSERT INTO "accounts_payable" (
+      "campaignId", "type", "description", "amount",
+      "dueDate", "paymentDate", "status",
+      "recipientType", "notes", "proofUrl",
+      "sourceType", "sourceRef", "competenceMonth", "createdBySystem",
+      "createdAt", "updatedAt"
+    ) VALUES (
+      ${rp.campaignId},
+      'comissao_restaurante',
+      ${"Comissão Restaurante — ref " + rp.referenceMonth},
+      ${rp.amount}::numeric,
+      ${dueDate}::date,
+      ${rp.paymentDate}::date,
+      ${ledgerStatus},
+      'restaurante',
+      ${rp.notes},
+      ${rp.proofUrl},
+      'restaurant_commission'::accounts_payable_source_type,
+      jsonb_build_object(
+        'restaurantPaymentId', ${rp.id}::int,
+        'restaurantId', ${rp.restaurantId}::int,
+        'campaignId', ${rp.campaignId}::int
+      ),
+      ${rp.referenceMonth},
+      true,
+      NOW(), NOW()
+    );
+  `);
+}
+
 export async function addRestaurantPayment(data: InsertRestaurantPayment) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  return db.insert(restaurantPayments).values(data).returning();
+  const inserted = await db.insert(restaurantPayments).values(data).returning();
+  for (const row of inserted) await mirrorRestaurantPaymentToLedger(db, row);
+  return inserted;
 }
 
 export async function updateRestaurantPayment(id: number, data: Partial<InsertRestaurantPayment>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  return db.update(restaurantPayments).set(data).where(eq(restaurantPayments.id, id)).returning();
+  const updated = await db.update(restaurantPayments).set(data).where(eq(restaurantPayments.id, id)).returning();
+  for (const row of updated) await mirrorRestaurantPaymentToLedger(db, row);
+  return updated;
 }
 
 export async function deleteRestaurantPayment(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
+  // Remove ledger mirror primeiro (FK não existe; é via sourceRef).
+  await db.execute(sql.raw(`
+    DELETE FROM "accounts_payable"
+    WHERE "sourceType" = 'restaurant_commission'
+      AND ("sourceRef"->>'restaurantPaymentId')::int = ${id};
+  `));
   await db.delete(restaurantPayments).where(eq(restaurantPayments.id, id));
 }

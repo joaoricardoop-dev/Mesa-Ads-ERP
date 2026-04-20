@@ -281,11 +281,14 @@ export const financialRouter = router({
         lte(invoices.issueDate, monthEnd),
       ));
 
-    // ── Pending restaurant payments ─────────────────────────────────────────────
+    // ── Pending restaurant payments (lê do ledger único — finrefac fase 2) ──
     const pendingRpResult = await db
       .select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)`, count: sql<number>`COUNT(*)::int` })
-      .from(restaurantPayments)
-      .where(eq(restaurantPayments.status, "pending"));
+      .from(accountsPayable)
+      .where(and(
+        eq(accountsPayable.sourceType, "restaurant_commission"),
+        eq(accountsPayable.status, "pendente"),
+      ));
 
     // ── Active campaigns count ─────────────────────────────────────────────────
     const activeCampaignsResult = await db
@@ -301,10 +304,14 @@ export const financialRouter = router({
       })
       .from(operationalCosts);
 
+    // Total pago de comissão de restaurante (ledger único — finrefac fase 2).
     const rpPaidTotal = await db
       .select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` })
-      .from(restaurantPayments)
-      .where(eq(restaurantPayments.status, "paid"));
+      .from(accountsPayable)
+      .where(and(
+        eq(accountsPayable.sourceType, "restaurant_commission"),
+        eq(accountsPayable.status, "pago"),
+      ));
 
     // ── Monthly chart: last 6 months, invoiced vs received (BRUTOS) ─────────
     const monthlyData: { month: string; invoiced: number; received: number }[] = [];
@@ -448,14 +455,15 @@ export const financialRouter = router({
         production: sql<string>`COALESCE(SUM("productionCost"::numeric), 0)`,
         freight: sql<string>`COALESCE(SUM("freightCost"::numeric), 0)`,
       }).from(operationalCosts),
-      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(restaurantPayments)
-        .where(and(eq(restaurantPayments.status, "paid"), gte(restaurantPayments.createdAt, new Date(ytdStart)))),
+      // Restaurant commission costs lidos do ledger único (finrefac fase 2).
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(accountsPayable)
+        .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), gte(accountsPayable.createdAt, new Date(ytdStart)))),
       db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)`, count: sql<number>`COUNT(*)::int` })
-        .from(restaurantPayments).where(eq(restaurantPayments.status, "paid")),
-      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(restaurantPayments)
-        .where(and(eq(restaurantPayments.status, "paid"), gte(restaurantPayments.createdAt, new Date(currMonthStart)), lte(restaurantPayments.createdAt, new Date(currMonthEnd + "T23:59:59")))),
-      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(restaurantPayments)
-        .where(and(eq(restaurantPayments.status, "paid"), gte(restaurantPayments.createdAt, new Date(prevMonthStart)), lte(restaurantPayments.createdAt, new Date(prevMonthEnd + "T23:59:59")))),
+        .from(accountsPayable).where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"))),
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(accountsPayable)
+        .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), gte(accountsPayable.createdAt, new Date(currMonthStart)), lte(accountsPayable.createdAt, new Date(currMonthEnd + "T23:59:59")))),
+      db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(accountsPayable)
+        .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), gte(accountsPayable.createdAt, new Date(prevMonthStart)), lte(accountsPayable.createdAt, new Date(prevMonthEnd + "T23:59:59")))),
     ]);
 
     const totalProduction = parseFloat(totalCostRows[0]?.production || "0");
@@ -476,8 +484,9 @@ export const financialRouter = router({
           .where(and(sql`${invoices.status} NOT IN ('cancelada')`, gte(invoices.issueDate, mStart), lte(invoices.issueDate, mEnd))),
         buildGrossInvoiceQuery(db)
           .where(and(eq(invoices.status, "paga"), gte(invoices.paymentDate, mStart), lte(invoices.paymentDate, mEnd))),
-        db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(restaurantPayments)
-          .where(and(eq(restaurantPayments.status, "paid"), gte(restaurantPayments.createdAt, new Date(mStart)), lte(restaurantPayments.createdAt, new Date(mEnd + "T23:59:59")))),
+        // Restaurant commission costs do mês — ledger único (finrefac fase 2).
+        db.select({ total: sql<string>`COALESCE(SUM(amount::numeric), 0)` }).from(accountsPayable)
+          .where(and(eq(accountsPayable.sourceType, "restaurant_commission"), eq(accountsPayable.status, "pago"), gte(accountsPayable.createdAt, new Date(mStart)), lte(accountsPayable.createdAt, new Date(mEnd + "T23:59:59")))),
       ]);
       monthlySeries.push({
         month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
@@ -1081,13 +1090,15 @@ export const financialRouter = router({
         for (const p of prodRows) productTipoMap[p.id] = p.tipo;
       }
 
+      // Custos de comissão restaurante por campanha — ledger único (finrefac fase 2).
       const rpRows = await db
         .select({
-          campaignId: restaurantPayments.campaignId,
+          campaignId: accountsPayable.campaignId,
           total: sql<string>`COALESCE(SUM(amount::numeric), 0)`,
         })
-        .from(restaurantPayments)
-        .groupBy(restaurantPayments.campaignId);
+        .from(accountsPayable)
+        .where(eq(accountsPayable.sourceType, "restaurant_commission"))
+        .groupBy(accountsPayable.campaignId);
 
       const rpMap: Record<number, number> = {};
       for (const r of rpRows) {
@@ -1309,24 +1320,27 @@ export const financialRouter = router({
         costMap[c.campaignId] = { production: parseFloat(c.productionCost), freight: parseFloat(c.freightCost) };
       }
 
+      // Comissão restaurante agrupada — ledger único (finrefac fase 2).
+      // restaurantId vive em sourceRef.restaurantId.
       const rpRows = await db
         .select({
-          campaignId: restaurantPayments.campaignId,
-          restaurantId: restaurantPayments.restaurantId,
+          campaignId: accountsPayable.campaignId,
+          restaurantId: sql<number>`(("sourceRef"->>'restaurantId'))::int`,
           total: sql<string>`COALESCE(SUM(amount::numeric), 0)`,
         })
-        .from(restaurantPayments)
+        .from(accountsPayable)
         .where(and(
-          gte(restaurantPayments.createdAt, new Date(input.startDate)),
-          lte(restaurantPayments.createdAt, new Date(input.endDate))
+          eq(accountsPayable.sourceType, "restaurant_commission"),
+          gte(accountsPayable.createdAt, new Date(input.startDate)),
+          lte(accountsPayable.createdAt, new Date(input.endDate)),
         ))
-        .groupBy(restaurantPayments.campaignId, restaurantPayments.restaurantId);
+        .groupBy(accountsPayable.campaignId, sql`("sourceRef"->>'restaurantId')`);
 
       const rpByCampaign: Record<number, number> = {};
       const rpByRestaurant: Record<number, number> = {};
       for (const r of rpRows) {
         if (r.campaignId) rpByCampaign[r.campaignId] = (rpByCampaign[r.campaignId] || 0) + parseFloat(r.total);
-        rpByRestaurant[r.restaurantId] = (rpByRestaurant[r.restaurantId] || 0) + parseFloat(r.total);
+        if (r.restaurantId) rpByRestaurant[r.restaurantId] = (rpByRestaurant[r.restaurantId] || 0) + parseFloat(r.total);
       }
 
       const allInvoicesForLookup = [...paidInvoices, ...periodInvoices];

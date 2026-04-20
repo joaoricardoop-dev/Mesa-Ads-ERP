@@ -1275,6 +1275,15 @@ export const accountsPayable = pgTable("accounts_payable", {
   recipientType: varchar("recipientType", { length: 30 }),
   notes: text("notes"),
   proofUrl: text("proofUrl"),
+  // ── Ledger único (finrefac fase 2) ──────────────────────────────────────
+  // sourceType: origem semântica da obrigação (alinhada ao glossário §4).
+  // sourceRef: ids da entidade-origem (ex.: { restaurantPaymentId, invoiceId }).
+  // competenceMonth: mês de competência YYYY-MM para DRE.
+  // createdBySystem: true quando linha foi gerada por trigger/sync, não por humano.
+  sourceType: varchar("sourceType", { length: 30 }).notNull().default("manual"),
+  sourceRef: jsonb("sourceRef").$type<Record<string, number | string | null>>(),
+  competenceMonth: varchar("competenceMonth", { length: 7 }),
+  createdBySystem: boolean("createdBySystem").notNull().default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -1284,6 +1293,8 @@ export const accountsPayable = pgTable("accounts_payable", {
   index("idx_accounts_payable_vip_provider_id").on(t.vipProviderId),
   index("idx_accounts_payable_campaign_phase_id").on(t.campaignPhaseId),
   index("idx_accounts_payable_campaign_item_id").on(t.campaignItemId),
+  index("idx_accounts_payable_status_due").on(t.status, t.dueDate),
+  index("idx_accounts_payable_source_type_competence").on(t.sourceType, t.competenceMonth),
 ]);
 
 export type AccountPayable = typeof accountsPayable.$inferSelect;

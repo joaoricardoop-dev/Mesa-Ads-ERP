@@ -741,6 +741,196 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       COMMENT ON COLUMN "vip_providers"."repassePercent" IS 'Repasse Sala VIP — % devido ao provedor sobre a base definida em billingMode. (renomeado de commissionPercent na fase 1)';
     `,
   },
+  {
+    // Refatoração financeira fase 2 — Consolidar accounts_payable como
+    // ledger único de obrigações futuras (contas a pagar). Adiciona:
+    //   • sourceType (enum):  origem semântica do título.
+    //   • sourceRef (jsonb):  identificadores da entidade-origem
+    //                         (ex.: { restaurantPaymentId, invoiceId, campaignItemId }).
+    //   • competenceMonth (varchar 7 = "YYYY-MM"): mês de competência DRE.
+    //   • createdBySystem (bool): true quando título foi gerado por
+    //                             trigger/sync (não por operador humano).
+    // Backfilla as colunas a partir do `type` legado e dos dados existentes.
+    // Idempotente: usa IF NOT EXISTS em colunas/índices e DO blocks em
+    // constraints. Não destrutivo — `type` permanece para compat.
+    name: "finrefac_02_accounts_payable_ledger_columns",
+    sql: `
+      DO $$ BEGIN
+        CREATE TYPE accounts_payable_source_type AS ENUM (
+          'restaurant_commission',
+          'vip_repasse',
+          'supplier_cost',
+          'freight_cost',
+          'partner_commission',
+          'seller_commission',
+          'tax',
+          'manual'
+        );
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+      ALTER TABLE "accounts_payable"
+        ADD COLUMN IF NOT EXISTS "sourceType" accounts_payable_source_type;
+      ALTER TABLE "accounts_payable"
+        ADD COLUMN IF NOT EXISTS "sourceRef" jsonb;
+      ALTER TABLE "accounts_payable"
+        ADD COLUMN IF NOT EXISTS "competenceMonth" varchar(7);
+      ALTER TABLE "accounts_payable"
+        ADD COLUMN IF NOT EXISTS "createdBySystem" boolean NOT NULL DEFAULT false;
+
+      -- Backfill sourceType a partir do type legado.
+      UPDATE "accounts_payable" SET "sourceType" = CASE
+        WHEN "type" = 'producao'      THEN 'supplier_cost'::accounts_payable_source_type
+        WHEN "type" = 'frete'         THEN 'freight_cost'::accounts_payable_source_type
+        WHEN "type" = 'comissao'      THEN 'partner_commission'::accounts_payable_source_type
+        WHEN "type" = 'repasse_vip'   THEN 'vip_repasse'::accounts_payable_source_type
+        WHEN "type" = 'comissao_vendedor' THEN 'seller_commission'::accounts_payable_source_type
+        WHEN "type" = 'imposto'       THEN 'tax'::accounts_payable_source_type
+        ELSE 'manual'::accounts_payable_source_type
+      END
+      WHERE "sourceType" IS NULL;
+
+      -- Backfill competenceMonth: prefere dueDate, cai em createdAt.
+      UPDATE "accounts_payable"
+      SET "competenceMonth" = TO_CHAR(COALESCE("dueDate", "createdAt"::date), 'YYYY-MM')
+      WHERE "competenceMonth" IS NULL;
+
+      -- Linhas geradas em loops automáticos de sync (producao/frete) marcam
+      -- createdBySystem=true. Lançamentos manuais ficam em false.
+      UPDATE "accounts_payable" SET "createdBySystem" = true
+      WHERE "createdBySystem" = false
+        AND "sourceType" IN ('supplier_cost','freight_cost','vip_repasse','partner_commission','restaurant_commission');
+
+      -- Backfill sourceRef mínimo para títulos de invoice (quando linkados).
+      UPDATE "accounts_payable"
+      SET "sourceRef" = jsonb_build_object('invoiceId', "invoiceId")
+      WHERE "sourceRef" IS NULL AND "invoiceId" IS NOT NULL;
+
+      -- Após backfill, sourceType vira NOT NULL.
+      ALTER TABLE "accounts_payable"
+        ALTER COLUMN "sourceType" SET NOT NULL;
+
+      CREATE INDEX IF NOT EXISTS "idx_accounts_payable_status_due"
+        ON "accounts_payable" ("status", "dueDate");
+      CREATE INDEX IF NOT EXISTS "idx_accounts_payable_source_type_competence"
+        ON "accounts_payable" ("sourceType", "competenceMonth");
+      CREATE INDEX IF NOT EXISTS "idx_accounts_payable_source_ref_invoice"
+        ON "accounts_payable" ((("sourceRef"->>'invoiceId')));
+
+      DO $$ BEGIN
+        ALTER TABLE "accounts_payable"
+          ADD CONSTRAINT "chk_accounts_payable_amount_positive"
+          CHECK ("amount"::numeric > 0);
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+      -- Sanity: corrige rows legadas com dueDate < createdAt antes de criar
+      -- a constraint, para o backfill não bloqueá-la.
+      UPDATE "accounts_payable"
+      SET "dueDate" = "createdAt"::date
+      WHERE "createdBySystem" = true
+        AND "dueDate" IS NOT NULL
+        AND "dueDate" < "createdAt"::date;
+
+      DO $$ BEGIN
+        ALTER TABLE "accounts_payable"
+          ADD CONSTRAINT "chk_accounts_payable_due_after_created"
+          CHECK (
+            "createdBySystem" = false
+            OR "dueDate" IS NULL
+            OR "dueDate" >= "createdAt"::date
+          );
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+      COMMENT ON COLUMN "accounts_payable"."sourceType" IS 'Origem semântica: restaurant_commission | vip_repasse | supplier_cost | freight_cost | partner_commission | seller_commission | tax | manual. Glossário §4.';
+      COMMENT ON COLUMN "accounts_payable"."sourceRef" IS 'JSON com ids da entidade-origem (ex.: invoiceId, restaurantPaymentId, campaignItemId).';
+      COMMENT ON COLUMN "accounts_payable"."competenceMonth" IS 'Mês de competência (YYYY-MM) para DRE/relatórios.';
+      COMMENT ON COLUMN "accounts_payable"."createdBySystem" IS 'true = gerado por trigger/sync; false = lançamento manual.';
+    `,
+  },
+  {
+    // Refatoração financeira fase 2 — Backfill ledger a partir de
+    // restaurant_payments. Para cada pagamento de restaurante existente,
+    // garante uma linha equivalente em accounts_payable como ledger único.
+    // Idempotente via UNIQUE (sourceType, sourceRef->>'restaurantPaymentId').
+    name: "finrefac_02_accounts_payable_backfill_from_restaurant_payments",
+    sql: `
+      -- Índice único auxiliar pra evitar duplicatas no backfill.
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_ap_restaurant_payment_source"
+        ON "accounts_payable" ((("sourceRef"->>'restaurantPaymentId')))
+        WHERE "sourceType" = 'restaurant_commission'
+          AND "sourceRef" ? 'restaurantPaymentId';
+
+      INSERT INTO "accounts_payable" (
+        "campaignId", "type", "description", "amount",
+        "dueDate", "paymentDate", "status",
+        "recipientType", "notes", "proofUrl",
+        "sourceType", "sourceRef", "competenceMonth", "createdBySystem",
+        "createdAt", "updatedAt"
+      )
+      SELECT
+        COALESCE(rp."campaignId", (SELECT id FROM campaigns ORDER BY id LIMIT 1)),
+        'comissao_restaurante',
+        'Comissão Restaurante — ref ' || rp."referenceMonth",
+        rp."amount",
+        COALESCE(rp."paymentDate", rp."createdAt"::date),
+        rp."paymentDate",
+        CASE rp."status"
+          WHEN 'paid'    THEN 'pago'
+          WHEN 'pending' THEN 'pendente'
+          ELSE 'pendente'
+        END,
+        'restaurante',
+        rp."notes",
+        rp."proofUrl",
+        'restaurant_commission'::accounts_payable_source_type,
+        jsonb_build_object(
+          'restaurantPaymentId', rp."id",
+          'restaurantId', rp."restaurantId",
+          'campaignId', rp."campaignId"
+        ),
+        rp."referenceMonth",
+        true,
+        rp."createdAt",
+        rp."createdAt"
+      FROM "restaurant_payments" rp
+      WHERE rp."campaignId" IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM "accounts_payable" ap
+          WHERE ap."sourceType" = 'restaurant_commission'
+            AND (ap."sourceRef"->>'restaurantPaymentId')::int = rp."id"
+        );
+    `,
+  },
+  {
+    // Refatoração financeira fase 2 — View de compat para clientes que
+    // querem ler restaurant_payments via ledger sem mudar a query.
+    // Não substitui a tabela física `restaurant_payments` (mantida para
+    // o RestaurantePortal). Use restaurant_payments_v quando quiser ler
+    // SOMENTE a projeção do ledger.
+    name: "finrefac_02_create_restaurant_payments_view",
+    sql: `
+      CREATE OR REPLACE VIEW "restaurant_payments_v" AS
+      SELECT
+        ap."id",
+        ((ap."sourceRef"->>'restaurantId'))::int            AS "restaurantId",
+        ap."campaignId",
+        ap."amount",
+        ap."competenceMonth"                                AS "referenceMonth",
+        ap."paymentDate",
+        CASE ap."status"
+          WHEN 'pago'      THEN 'paid'
+          WHEN 'pendente'  THEN 'pending'
+          ELSE ap."status"
+        END                                                  AS "status",
+        NULL::varchar(255)                                   AS "pixKey",
+        ap."notes",
+        NULL::date                                           AS "periodStart",
+        NULL::date                                           AS "periodEnd",
+        ap."proofUrl",
+        ap."createdAt"
+      FROM "accounts_payable" ap
+      WHERE ap."sourceType" = 'restaurant_commission';
+    `,
+  },
 ];
 
 export async function runMigrations() {
