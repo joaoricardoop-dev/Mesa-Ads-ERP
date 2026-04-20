@@ -1,6 +1,6 @@
 import { financeiroProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
-import { getDb } from "./db";
+import { getDb, updateRestaurantPayment as updateRestaurantPaymentDb } from "./db";
 import {
   invoices,
   operationalCosts,
@@ -1053,13 +1053,16 @@ export const financialRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
-      const db = await getDatabase();
-      const [updated] = await db
-        .update(restaurantPayments)
-        .set({ status: "paid", paymentDate: input.paymentDate, proofUrl: input.proofUrl })
-        .where(eq(restaurantPayments.id, input.id))
-        .returning();
-      return updated;
+      // Roteia pelo helper de dual-write para que o ledger
+      // (accounts_payable) seja sincronizado automaticamente. Atualizar
+      // direto na tabela legada deixaria o ledger stale e quebraria os
+      // relatórios financeiros que agora lêem dele.
+      const updated = await updateRestaurantPaymentDb(input.id, {
+        status: "paid",
+        paymentDate: input.paymentDate,
+        proofUrl: input.proofUrl,
+      });
+      return updated[0];
     }),
 
   listCosts: protectedProcedure

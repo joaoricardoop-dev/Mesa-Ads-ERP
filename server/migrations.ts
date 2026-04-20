@@ -1003,6 +1003,24 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
        WHERE ap."sourceType" = 'restaurant_commission'
          AND (ap."sourceRef"->>'restaurantPaymentId')::int = rp."id"
          AND COALESCE(ap."competenceMonth", '') <> rp."referenceMonth";
+
+      -- Relaxa chk_accounts_payable_due_after_created para excluir
+      -- restaurant_commission. Comissões espelham o "referenceMonth" do
+      -- restaurant_payment (1º dia do mês de referência), que é
+      -- legitimamente passado em relação ao createdAt do espelho.
+      ALTER TABLE "accounts_payable"
+        DROP CONSTRAINT IF EXISTS "chk_accounts_payable_due_after_created";
+
+      DO $$ BEGIN
+        ALTER TABLE "accounts_payable"
+          ADD CONSTRAINT "chk_accounts_payable_due_after_created"
+          CHECK (
+            "createdBySystem" = false
+            OR "sourceType" = 'restaurant_commission'
+            OR "dueDate" IS NULL
+            OR "dueDate" >= "createdAt"::date
+          );
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$;
     `,
   },
 ];
