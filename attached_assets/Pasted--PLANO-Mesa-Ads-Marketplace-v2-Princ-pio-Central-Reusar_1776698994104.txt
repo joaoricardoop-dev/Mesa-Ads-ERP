@@ -1,0 +1,374 @@
+# PLANO: Mesa Ads Marketplace v2
+
+## Princípio Central
+**Reusar antes de criar.** Toda decisão de schema, rota ou componente começa pela pergunta: "já existe algo que serve?". Só criar novo quando não há alternativa.
+
+---
+
+## 1. CRUZAMENTO COMPLETO: O QUE EXISTE × O QUE PRECISAMOS
+
+### 1.1 SHARE OF VOICE — Modelo de Precificação
+
+| Necessidade | O que existe | Decisão |
+|---|---|---|
+| Capacidade por restaurante (clientes/mês) | `activeRestaurants.monthlyCustomers` (line 316) | **REUSAR** direto |
+| Rating-based pricing | `ratingScore`, `ratingTier`, `ratingMultiplier` (lines 344-347) | **REUSAR** direto |
+| Multiplicador sazonal | Não existe | **CRIAR** tabela `seasonalMultipliers` (restaurantId, productId, seasonLabel, startDate, endDate, multiplier) |
+| Máx shares simultâneos por produto/local | `products.defaultQtyPerLocation` (line 938) existe mas é default global | **ESTENDER** `productLocations`: adicionar coluna `maxShares integer` |
+| Preço fechado por share | `productPricingTiers` + lógica em `quotationRouter.ts:1099` | **REUSAR** lógica existente, adaptar para share-based |
+
+### 1.2 INVENTÁRIO / SLOTS
+
+| Necessidade | O que existe | Decisão |
+|---|---|---|
+| Produtos disponíveis por restaurante | `productLocations` (lines 968-980) | **REUSAR** direto — exato para isso |
+| Capacidade de slots por produto/local | `productLocations` existe mas sem campo de capacidade | **ESTENDER** `productLocations`: adicionar `maxShares integer`, `cycleWeeks integer default 4` |
+| Ocupação ao longo do tempo | `campaignRestaurants` + `campaignPhases` existe mas sem tracking de share | **ESTENDER** `campaignItems`: adicionar `restaurantId`, `shareIndex integer` para rastrear qual share do local está ocupado |
+| Exclusividade de categoria por slot | `activeRestaurants.excludedCategories` existe (nível restaurante) | **REUSAR** + lógica de conflito no backend (sem nova tabela — validar na criação da campanha) |
+
+### 1.3 FLUXO DE CAMPANHA — /montar-campanha (MUDANÇA PRINCIPAL)
+
+**Fluxo atual (CampaignBuilder.tsx):**
+`Produtos → Configurar → Campanha → Confirmação`
+
+**Fluxo novo:**
+`Locais (mapa/lista) → Produtos disponíveis por local → Shares/Duração → Carrinho → Checkout`
+
+| Necessidade | O que existe | Decisão |
+|---|---|---|
+| Step 1: Seleção de locais | `RestaurantsMap.tsx` (linhas 1-575, Google Maps + markers) | **REUSAR** componente de mapa — extrair para uso no builder |
+| Step 1: Lista de locais com filtros | `ActiveRestaurants.tsx` (listagem completa) | **REUSAR** lógica de listagem e filtros |
+| Step 2: Produtos por local | `productLocations` tabela já mapeia produto→local | **REUSAR** — nova query que filtra products pelo(s) local(is) selecionado(s) |
+| Step 2: Disponibilidade de shares | Não existe — nenhum tracking de ocupação atual | **CRIAR** query que cruza `campaignItems` + `campaignPhases` por período para calcular shares ocupados vs. disponíveis |
+| Step 3: Carrinho multi-local | `CampaignBuilder` tem `CartItem[]` (lines 40-45) | **ESTENDER** CartItem para incluir `restaurantId`, `restaurantName`, `shareIndex` |
+| Step 4: Checkout self-service | `quotation.createFromBuilder` (quotationRouter:1007) já aceita `source: "self_service_anunciante"` | **REUSAR** endpoint existente — apenas adaptar payload para incluir restaurantIds e shareIndex |
+| Persistência de carrinho | Não existe (só estado React) | **CRIAR** `campaignDrafts` table (clientId, cartJson, expiresAt) — simples, evita perda de dados |
+| Aprovação da campanha | `campaigns.status` com stage "aprovacao" já existe | **REUSAR** — fluxo de aprovação já implementado |
+
+### 1.4 FASES AUTOMÁTICAS (ciclos de 4 semanas)
+
+| Necessidade | O que existe | Decisão |
+|---|---|---|
+| Estrutura de fases | `campaignPhases` tabela completa | **REUSAR** |
+| Criação em lote | `campaignPhase.bulkCreate()` (campaignPhaseRouter:471) | **REUSAR** — chamar automaticamente com intervalos de 4 semanas ao criar campanha |
+| Ciclo de 4 semanas como padrão | `productLocations.cycleWeeks` (novo campo acima) | **ESTENDER** `productLocations` conforme item 1.2 |
+
+### 1.5 RELATÓRIOS SEMANAIS
+
+| Necessidade | O que existe | Decisão |
+|---|---|---|
+| Estrutura de relatório | `campaignReports` completo (lines 1116-1143): periodStart/End, reportType, coastersDistributed, numScreens, totalImpressions | **REUSAR** direto |
+| Fotos de verificação | `campaignReportPhotos` + `campaignProofs` + upload via GCS | **REUSAR** — infraestrutura de upload já existe |
+| Cálculo de impressões | `calcImpressions()` (campaignReportRouter) | **REUSAR** |
+| Publicação para anunciante | `campaignReport.publish` + notificação `report_published` | **REUSAR** |
+
+### 1.6 FINANCEIRO (SIMPLIFICADO — sistema externo)
+
+| Necessidade | O que existe | Decisão |
+|---|---|---|
+| Upload de documentos (NF, recibos, links) | `accountsPayable.proofUrl` existe; `invoices` não tem | **ESTENDER** `invoices`: adicionar `documentUrl text`, `documentLabel varchar(100)` — URL pode ser Google Drive |
+| Visualização de documentos pelo anunciante | Não existe no portal anunciante | **CRIAR** nova query `anunciantePortal.myDocuments` filtrando invoices por campaignId do cliente |
+| Comissão restaurante (híbrido) | `campaigns.commissionType`, `restaurantCommission`, `fixedCommission` (lines 142-144) | **REUSAR** direto |
+| Pagamentos de comissão | `restaurantPayments` completo | **REUSAR** |
+
+### 1.7 PORTAL DO ANUNCIANTE — Dashboard + Calendário
+
+| Necessidade | O que existe | Decisão |
+|---|---|---|
+| Dashboard com métricas (gastos, impressões, campanhas ativas) | `crmNotifications`, `campaignReports`, `invoices` — dados existem mas sem aggregation | **CRIAR** endpoint `anunciantePortal.dashboard` agregando dados existentes (sem nova tabela) |
+| Timeline de campanhas | `campaignPhases` com datas + `campaignRestaurants` | **REUSAR** — query existente já retorna fases com datas |
+| Histórico de campanhas | `campaigns` + `campaignHistory` | **REUSAR** |
+| Disponibilidade para compra | `productLocations` + cálculo de ocupação | **REUSAR** com nova query de disponibilidade |
+| Documentos financeiros | `invoices` estendido com documentUrl | **ESTENDER** conforme item 1.6 |
+| Notificações in-app | `crmNotifications` com eventTypes para anunciante | **REUSAR** — já existe `notification.listForAnunciante` |
+
+### 1.8 PORTAL DO RESTAURANTE — Evolução
+
+| Necessidade | O que existe | Decisão |
+|---|---|---|
+| Calendário de ocupação | `campaignRestaurants` + `campaignPhases` | **REUSAR** — nova query `restaurantePortal.myOccupancyCalendar` |
+| Comissões (consolidado + por campanha) | `restaurantPayments` + `campaigns.restaurantCommission` | **REUSAR** — nova query agrega dados existentes |
+| OS de material (aviso + confirmação) | `serviceOrders` + `serviceOrderTrackings` + confirmação já existe no portal | **REUSAR** — expandir tab existente |
+| Editar dados operacionais | `activeRestaurants`: monthlyCustomers, monthlyDrinksSold, tableCount, seatCount | **REUSAR** — adicionar campos ao `updateContact` existente |
+| Editar exclusões de categoria | `activeRestaurants.excludedCategories` | **REUSAR** — adicionar ao form de edição |
+| Notificações email + in-app | `crmNotifications` + envio de email | **REUSAR** notificações in-app; **INTEGRAR** serviço de email existente |
+
+### 1.9 GESTÃO INTERNA — Calendário Operacional
+
+| Necessidade | O que existe | Decisão |
+|---|---|---|
+| Timeline global (todos os locais) | `campaignPhases` + `campaignRestaurants` — dados existem | **CRIAR** endpoint `ops.globalCalendar` + view tipo Gantt no frontend |
+| Por local | `getCampaignRestaurants()` + fases | **REUSAR** com nova query de calendário por restaurante |
+| Por anunciante | `campaigns` + fases por clientId | **REUSAR** |
+| Por produto | `campaignItems` + productId | **REUSAR** |
+| Ações no calendário (reagendar, pausar, alterar duração) | `campaignPhase.update` + `campaign.update` (status) | **REUSAR** endpoints existentes |
+
+---
+
+## 2. SCHEMA: MUDANÇAS MÍNIMAS
+
+### Tabelas a ESTENDER (apenas novos campos):
+
+```sql
+-- productLocations: adicionar capacidade de shares e ciclo
+ALTER TABLE product_locations ADD COLUMN max_shares integer NOT NULL DEFAULT 1;
+ALTER TABLE product_locations ADD COLUMN cycle_weeks integer NOT NULL DEFAULT 4;
+
+-- campaignItems: rastrear share específico por restaurante
+ALTER TABLE campaign_items ADD COLUMN restaurant_id integer REFERENCES active_restaurants(id);
+ALTER TABLE campaign_items ADD COLUMN share_index integer; -- qual share (1 de 4, 2 de 4, etc.)
+
+-- invoices: documentos financeiros para anunciante
+ALTER TABLE invoices ADD COLUMN document_url text;
+ALTER TABLE invoices ADD COLUMN document_label varchar(100);
+```
+
+### Tabelas a CRIAR (mínimo necessário):
+
+```sql
+-- 1. Multiplicadores sazonais (pricing dinâmico)
+CREATE TABLE seasonal_multipliers (
+  id serial PRIMARY KEY,
+  product_id integer REFERENCES products(id),
+  restaurant_id integer REFERENCES active_restaurants(id), -- null = global
+  season_label varchar(100) NOT NULL,
+  start_date date NOT NULL,
+  end_date date NOT NULL,
+  multiplier decimal(4,2) NOT NULL DEFAULT 1.0,
+  created_at timestamp DEFAULT now()
+);
+
+-- 2. Rascunhos de campanha (persistir carrinho)
+CREATE TABLE campaign_drafts (
+  id serial PRIMARY KEY,
+  client_id integer REFERENCES clients(id),
+  cart_json jsonb NOT NULL,
+  expires_at timestamp NOT NULL,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now()
+);
+```
+
+**Total: 4 colunas novas em tabelas existentes + 2 novas tabelas.**
+
+---
+
+## 3. FLUXO DETALHADO: /montar-campanha (NOVA LÓGICA)
+
+### Step 1 — Explorar Locais
+- **Componente:** novo `StepLocais` (extraindo lógica do `RestaurantsMap.tsx` + `ActiveRestaurants.tsx`)
+- **Dados:** query `anunciantePortal.listAvailableLocations(productType?, neighborhood?, startDate?, endDate?)`
+  - Retorna: restaurantes com `productLocations` ativos, shares disponíveis calculados, rating, audiência
+- **UI:** Toggle mapa/lista. Filtros: bairro, tipo de público, produto disponível. Cards com: nome, bairro, audiência estimada, produtos disponíveis, shares livres.
+- **Ação:** selecionar 1..N locais → avançar
+
+### Step 2 — Produtos por Local
+- **Componente:** novo `StepProdutosPorLocal`
+- **Para cada local selecionado:** mostrar `productLocations` disponíveis com shares restantes
+- **Dados:** query `anunciantePortal.getProductsForLocations(restaurantIds[], startDate, endDate)`
+  - Cruza `productLocations` com `campaignItems` do período para calcular ocupação real
+- **UI:** Accordion por local → dentro de cada um, cards de produto com shares disponíveis e preço por share
+- **Ação:** para cada local, escolher produto e quantidade de shares
+
+### Step 3 — Configurar Duração e Ciclos
+- **Componente:** `StepConfigurar` (existente, adaptado)
+- **Lógica:** semanas → ciclos automáticos de 4 semanas → preço total
+- **Multiplicador sazonal:** se período cobre datas com `seasonal_multipliers`, mostrar aviso e preço ajustado
+- **Desconto por duração:** `DESCONTOS_PRAZO` existente (4w=0%, 8w=3%, 12w=5%...)
+
+### Step 4 — Revisar Carrinho
+- **Componente:** `StepConfirmacao` (existente, adaptado)
+- **Persistência:** salvar em `campaign_drafts` ao avançar cada step
+- **Agrupamento:** por local → por produto → shares × ciclos × preço
+
+### Step 5 — Submeter
+- **Dual-track:**
+  - Self-service: chama `quotation.createFromBuilder` (existe) com novos campos (restaurantIds, shareIndex, cycleWeeks)
+  - Vendedor interno: fluxo de cotação existente
+- **Pós-submit:** status "aprovacao" → notificação para equipe interna → aprovação → campanha criada com `bulkCreate` de fases
+
+---
+
+## 4. NOVOS ENDPOINTS (backend)
+
+Todos os novos endpoints reutilizam queries existentes — apenas novas combinações:
+
+```
+anunciantePortal.listAvailableLocations   → activeRestaurants + productLocations + share calc
+anunciantePortal.getProductsForLocations  → productLocations + campaignItems occupancy
+anunciantePortal.dashboard                → campaigns + campaignReports + invoices (aggregate)
+anunciantePortal.myDocuments              → invoices.documentUrl por clientId
+anunciantePortal.saveCartDraft            → campaign_drafts upsert
+anunciantePortal.loadCartDraft            → campaign_drafts por clientId
+
+restaurantePortal.myOccupancyCalendar     → campaignRestaurants + campaignPhases por restaurantId
+restaurantePortal.myCommissions           → restaurantPayments + campaigns por restaurantId
+restaurantePortal.updateProfile           → activeRestaurants (campos operacionais + excludedCategories)
+
+ops.globalCalendar                        → campaignPhases + campaignRestaurants (todos os locais)
+ops.locationCalendar                      → idem, filtrado por restaurantId
+
+product.listLocations                     → productLocations por productId (com maxShares, cycleWeeks)
+product.addLocation                       → insert productLocations (productId, restaurantId, maxShares, cycleWeeks)
+product.updateLocation                    → update productLocations (maxShares, cycleWeeks)
+product.removeLocation                    → delete productLocations
+```
+
+---
+
+## 5. FRONTEND: COMPONENTES NOVOS × REUTILIZADOS
+
+### Componentes a REUTILIZAR (sem modificação):
+- `RestaurantsMap.tsx` — extrair lógica de mapa para contexto do builder
+- `CampaignPhases.tsx` — exibir timeline de ciclos no portal
+- `SummaryCard` — dashboard do anunciante
+- `CostRow` / `ParamRow` — tabelas de pricing
+- Toast, badges, avatars — UI system completo
+- PDF generators — geração de documentos
+
+### Componentes a ESTENDER:
+- `CampaignBuilder.tsx` — restruturar steps (novo StepLocais + StepProdutosPorLocal, adaptar restantes)
+- `RestaurantePortal.tsx` — adicionar tabs: Calendário, Comissões, OS expandido; expandir form de perfil
+- `AnunciantePortal.tsx` — adicionar: dashboard de métricas, timeline, documentos financeiros
+
+### Componentes a CRIAR (mínimo):
+- `StepLocais` — seleção de locais com mapa/lista (compõe RestaurantsMap + filtros)
+- `StepProdutosPorLocal` — accordion por local com produtos disponíveis
+- `OccupancyCalendar` — Gantt simples para ops interno (1 componente, reutilizado em 4 visões)
+- `ShareAvailabilityBadge` — "X de Y shares disponíveis" (pequeno, reutilizável)
+- `ProductLocationsTab` — aba no cadastro de produto para gerenciar associações com locais
+
+### Cadastro de Produto — Nova Aba de Locais
+A página de cadastro/edição de produto (onde quer que esteja no admin) deve ganhar uma **aba "Locais"** com:
+- Lista de restaurantes onde o produto está ativo (busca `productLocations` por productId)
+- Botão "Adicionar local" → modal com busca de restaurante + campos `maxShares` (int) e `cycleWeeks` (default 4)
+- Editar `maxShares` e `cycleWeeks` de um local existente inline
+- Remover local (apenas se não houver campanhas ativas vinculadas)
+- Visual: tabela com colunas — Local, Bairro, Max Shares, Ciclo (semanas), Shares Ocupados Agora, Ações
+
+---
+
+## 6. INTEGRAÇÃO GOOGLE DRIVE (documentos financeiros)
+
+### Contexto
+O sistema já usa Google Cloud Storage (GCS) via `logoUploadRouter.ts`. O Google Drive é outro produto do mesmo ecossistema — integração natural e sem fricção para a equipe que já gerencia arquivos lá.
+
+### Abordagem: Google Drive Picker API (nível rico)
+
+**Por quê Picker e não só colar link:**
+- Equipe não precisa sair do sistema para buscar o arquivo no Drive
+- Picker garante que o arquivo é real (não um link quebrado)
+- Retorna metadados (nome, tipo, última modificação) além do link
+- Integração leve — 1 script JS, sem backend adicional
+
+**Fluxo no admin (equipe Mesa):**
+1. Ao editar uma invoice/fatura, há um botão "Vincular documento do Drive"
+2. Abre o Google Picker (overlay modal no navegador)
+3. Equipe navega nas pastas do Drive e seleciona o arquivo (PDF, NF, recibo)
+4. Sistema salva: `documentUrl` = link compartilhável do Drive, `documentLabel` = nome do arquivo
+5. Arquivo precisa estar compartilhado como "qualquer pessoa com o link pode ver" (ou usar Service Account)
+
+**O que o anunciante vê:**
+- No portal, lista de documentos com nome e botão "Abrir" → abre o arquivo no Google Drive
+- Nenhuma cópia é feita — o Drive é a única fonte
+
+**Requisitos técnicos:**
+- `GOOGLE_API_KEY` + `GOOGLE_CLIENT_ID` (OAuth) para o Picker — mesmas credenciais do ecossistema GCS se já configuradas
+- Script: `https://apis.google.com/js/api.js` carregado no frontend admin (não no portal do anunciante)
+- 1 componente `DriveFilePicker.tsx` — botão + callback com metadados do arquivo selecionado
+- Sem novo campo de schema além do `documentUrl` já previsto em `invoices`
+
+**Alternativa simples (fallback):**
+- Se OAuth/credenciais forem complicadas de configurar, manter campo `documentUrl` como input de texto livre — equipe cola o link do Drive manualmente. Mesmo resultado, zero integração.
+
+**Decisão de implementação:** começar com a alternativa simples (input de texto) e evoluir para o Picker se a equipe sentir fricção.
+
+---
+
+## 7. O QUE NÃO SERÁ FEITO NESTA FASE
+
+Para manter o escopo controlado, as seguintes decisões foram explicitamente diferidas:
+
+- **Cancelamento:** política a definir no futuro
+- **Integração com sistema financeiro externo:** apenas upload manual de links/PDFs
+- **Multi-usuário por anunciante:** 1 usuário por agora
+- **Portal do restaurante — fotos:** equipe Mesa controla, restaurante não edita
+- **Renovação automática:** lógica de prioridade a implementar após ciclo básico
+- **Email transacional:** infraestrutura a integrar (SendGrid/SES) — notificações in-app primeiro
+
+---
+
+## 8. DECISÕES CONSOLIDADAS (todas as 25 decisões do alinhamento)
+
+| # | Tema | Decisão |
+|---|---|---|
+| 1 | Fluxo | Locais → Produtos → Shares → Carrinho → Aprovação |
+| 2 | Share of voice | Híbrido: produto define máx, local pode reduzir |
+| 3 | Telas | Framework comum, configurável por local |
+| 4 | Telas parceiros | Sim, qualquer local |
+| 5 | Inventário | Manual por local (`productLocations`) |
+| 6 | Preço anunciante | Fechado por share/ciclo |
+| 7 | Checkout | Dual-track: self-service + vendedor |
+| 8 | Exclusividade | Alerta no checkout, equipe decide |
+| 9 | Fases | Auto-criação em ciclos de 4 semanas |
+| 10 | Relatórios | Semanais, dados específicos por formato |
+| 11 | Visibilidade anunciante | Perfil + audiência + mesas/clientes/bebidas |
+| 12 | Pagamento | Flexível (negociação) |
+| 13 | Migração | Novo pra frente, antigo read-only |
+| 14 | Dados audiência | Manual agora, preparado pra integração futura |
+| 15 | Produtos novos | Framework genérico via `productLocations` |
+| 16 | Gestão de locais | Painel Gantt via `OccupancyCalendar` |
+| 17 | Reserva de slot | First-come-first-served no checkout |
+| 18 | Renovação | Janela de prioridade (lógica futura) |
+| 19 | Arte | Ambos: anunciante sobe ou contrata Mesa |
+| 20 | Mínimo de compra | Configurável por produto |
+| 21 | Cancelamento | Diferido |
+| 22 | Sazonalidade | Multiplicador via `seasonal_multipliers` |
+| 23 | Multi-usuário | 1 usuário por anunciante |
+| 24 | Portal restaurante | Evoluir com calendário, comissões, OS, edição de perfil |
+| 25 | Documentos financeiros | Upload manual de links/PDFs pela equipe |
+
+---
+
+## 9. SEQUÊNCIA DE IMPLEMENTAÇÃO SUGERIDA
+
+0. **[PRÉ-REQUISITO] Validar GCS em produção** — Antes de qualquer feature que dependa de upload de arquivos, confirmar que o Google Cloud Storage está operacional no ambiente de produção:
+   - Testar upload de logo via `/api/restaurant-logo/upload` com arquivo real
+   - Confirmar que `PUBLIC_OBJECT_SEARCH_PATHS` e credenciais GCS estão configuradas nas variáveis de ambiente de produção
+   - Confirmar que arquivos enviados são acessíveis publicamente via URL gerada
+   - Se não estiver funcionando: resolver antes de implementar `DriveFilePicker`, upload de fotos de verificação e upload de arte do anunciante
+
+1. **Schema** — 4 ALTER TABLE + 2 CREATE TABLE
+2. **Backend: disponibilidade** — `listAvailableLocations` + `getProductsForLocations` (base de tudo)
+3. **Frontend: /montar-campanha** — StepLocais → StepProdutosPorLocal → adaptar restantes
+4. **Backend: draft** — `saveCartDraft` + `loadCartDraft`
+5. **Backend: checkout self-service** — adaptar `createFromBuilder` para novo payload
+6. **Portal Anunciante** — dashboard + timeline + documentos
+7. **Portal Restaurante** — calendário + comissões + perfil expandido
+8. **Ops interno** — OccupancyCalendar (4 visões)
+9. **Relatórios semanais** — já existem, apenas garantir publicação para portal anunciante
+10. **Sazonalidade** — seasonal_multipliers + UI de configuração
+
+---
+
+## 10. ARQUIVOS A CRIAR/MODIFICAR
+
+### Schema
+- `drizzle/schema.ts` — 4 colunas novas + 2 tabelas novas
+
+### Backend
+- `server/routers.ts` — novos endpoints em `anunciantePortal`, `restaurantePortal`, `ops`
+- `server/quotationRouter.ts` — adaptar `createFromBuilder` para share-based payload
+- `server/campaignPhaseRouter.ts` — auto-criação de ciclos de 4 semanas
+
+### Frontend
+- `client/src/components/CampaignBuilder.tsx` — reestruturar steps
+- `client/src/components/StepLocais.tsx` — NOVO
+- `client/src/components/StepProdutosPorLocal.tsx` — NOVO
+- `client/src/components/OccupancyCalendar.tsx` — NOVO (Gantt)
+- `client/src/components/ShareAvailabilityBadge.tsx` — NOVO (pequeno)
+- `client/src/pages/AnunciantePortal.tsx` — expandir
+- `client/src/pages/RestaurantePortal.tsx` — expandir
+- `client/src/pages/OpsCalendar.tsx` — NOVO (página ops)
+- `client/src/components/ProductLocationsTab.tsx` — NOVO (aba de locais no cadastro de produto)
+- `client/src/components/DriveFilePicker.tsx` — NOVO (seletor Google Drive para documentos financeiros)
