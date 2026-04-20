@@ -1175,9 +1175,13 @@ async function mirrorRestaurantPaymentToLedger(
   // O CHECK constraint chk_accounts_payable_campaign_required permite NULL
   // somente para sourceType='restaurant_commission'.
   const ledgerStatus = rp.status === "paid" ? "pago" : "pendente";
-  // dueDate determinístico: 1º dia do mês de referência (não usar NOW(),
-  // que reposicionaria a obrigação no tempo a cada update).
-  const dueDate = `${rp.referenceMonth}-01`;
+  // dueDate determinístico = 1º dia do mês de referência, mas nunca
+  // anterior a hoje (data de gravação do espelho). Isso satisfaz o
+  // CHECK chk_accounts_payable_due_after_created mesmo para lançamentos
+  // retroativos. O período real fica em competenceMonth.
+  const refMonthFirstDay = `${rp.referenceMonth}-01`;
+  const todayIso = new Date().toISOString().split("T")[0];
+  const dueDate = refMonthFirstDay >= todayIso ? refMonthFirstDay : todayIso;
   const description = `Comissão Restaurante — ref ${rp.referenceMonth}`;
 
   // UPDATE-or-INSERT: preserva createdAt original (e portanto o bucket
