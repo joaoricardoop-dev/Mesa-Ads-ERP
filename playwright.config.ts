@@ -6,7 +6,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   fullyParallel: false,
   retries: 0,
-  reporter: [["list"]],
+  reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5000",
     trace: "retain-on-failure",
