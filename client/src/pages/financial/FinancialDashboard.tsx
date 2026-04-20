@@ -7,7 +7,7 @@ import {
   TrendingUp, TrendingDown, AlertTriangle, Clock, CheckCircle2,
   HandCoins, ChevronRight, Receipt, BarChart3, DollarSign, Percent,
   Users, ArrowUpRight, ArrowDownRight, Minus, FileText,
-  Target, Zap, AlertCircle, Info, PieChart,
+  Target, Zap, AlertCircle, Info, PieChart, Filter, Hourglass,
 } from "lucide-react";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -72,8 +72,22 @@ type Tab = typeof TABS[number];
 export default function FinancialDashboard() {
   const { data, isLoading } = trpc.financial.dashboard.useQuery();
   const { data: exp, isLoading: expLoading } = trpc.financial.dashboardExpanded.useQuery();
+  const { data: aging } = trpc.financial.delinquency.useQuery();
+  const { data: dsoData } = trpc.financial.dso.useQuery();
+  const { data: funnel } = trpc.financial.funnel.useQuery();
+  const { data: prefs } = trpc.financial.getUserPreferences.useQuery(undefined, { staleTime: 0 });
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<Tab>("Executivo");
+  const [dreRegimeOverride, setDreRegimeOverride] = useState<"competencia" | "caixa" | null>(null);
+  const dreRegime: "competencia" | "caixa" = dreRegimeOverride ?? prefs?.dreRegime ?? "competencia";
+  const setDreRegime = (r: "competencia" | "caixa") => setDreRegimeOverride(r);
+
+  const utils = trpc.useUtils();
+  const setRegimeMut = trpc.financial.setDrePreference.useMutation({
+    onSuccess: () => utils.financial.getUserPreferences.invalidate(),
+  });
+
+  const { data: dreDual } = trpc.financial.dre.useQuery({ regime: dreRegime });
 
   const loading = isLoading || expLoading;
 
@@ -360,6 +374,117 @@ export default function FinancialDashboard() {
             </div>
           </div>
 
+          {/* ── KPIs Finrefac #7: DSO + Inadimplência (aging) + Funil ──── */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-border/20 bg-card p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Hourglass className="w-4 h-4 text-blue-400" />
+                <span className="text-sm font-semibold">DSO — Days Sales Outstanding</span>
+              </div>
+              <div className="flex items-baseline gap-3">
+                <span className="text-3xl font-bold tracking-tight">{(dsoData?.currentDso || 0).toFixed(1)}</span>
+                <span className="text-xs text-muted-foreground">dias</span>
+                {dsoData?.trend != null && (
+                  <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${dsoData.trend > 0.05 ? "text-red-400" : dsoData.trend < -0.05 ? "text-emerald-400" : "text-muted-foreground/60"}`}>
+                    {dsoData.trend > 0.05 ? <ArrowUpRight className="w-3 h-3" /> : dsoData.trend < -0.05 ? <ArrowDownRight className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                    {(dsoData.trend * 100).toFixed(1)}%
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground/60 mt-2">
+                Média emissão→recebimento (últimos 90d · {dsoData?.currentSampleSize || 0} faturas)
+              </p>
+              <p className="text-[10px] text-muted-foreground/40 mt-0.5">
+                Período anterior: {(dsoData?.previousDso || 0).toFixed(1)} dias
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border/20 bg-card p-6 lg:col-span-2">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+                <span className="text-sm font-semibold">Inadimplência por Aging</span>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Total: {formatCurrency(aging?.totalAmount || 0)} · {aging?.totalCount || 0} faturas
+                </span>
+              </div>
+              {(aging?.totalCount || 0) === 0 ? (
+                <div className="flex items-center justify-center h-20 gap-2 text-muted-foreground">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400/60" />
+                  <p className="text-xs">Nenhuma fatura vencida</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-3">
+                  {(["0-30", "30-60", "60-90", "90+"] as const).map((b, idx) => {
+                    const bucket = aging?.buckets?.[b] || { count: 0, total: 0 };
+                    const colors = ["bg-amber-400", "bg-orange-400", "bg-red-400", "bg-red-500"];
+                    const tcolor = ["text-amber-400", "text-orange-400", "text-red-400", "text-red-500"];
+                    return (
+                      <div key={b} className="rounded-xl bg-white/[0.02] border border-border/10 p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className={`w-2 h-2 rounded-full ${colors[idx]}`} />
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{b} dias</span>
+                        </div>
+                        <p className={`text-base font-bold font-mono ${tcolor[idx]}`}>{formatCurrency(bucket.total)}</p>
+                        <p className="text-[10px] text-muted-foreground/50 mt-0.5">{bucket.count} faturas</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border/20 bg-card p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Filter className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Funil — Cotação → Fatura → Recebido</span>
+              <span className="text-xs text-muted-foreground ml-auto">YTD</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground/60 mb-5">Conversão por etapa do pipeline financeiro</p>
+            {(() => {
+              const stages = [
+                { key: "sent",     label: "Cotações",        value: funnel?.sent.total || 0,     count: funnel?.sent.count || 0,     color: "bg-blue-400",    tcolor: "text-blue-400" },
+                { key: "won",      label: "Cotações Ganhas", value: funnel?.won.total || 0,      count: funnel?.won.count || 0,      color: "bg-violet-400",  tcolor: "text-violet-400" },
+                { key: "invoiced", label: "Faturas Emitidas",value: funnel?.invoiced.total || 0, count: funnel?.invoiced.count || 0, color: "bg-amber-400",   tcolor: "text-amber-400" },
+                { key: "received", label: "Faturas Pagas",   value: funnel?.received.total || 0, count: funnel?.received.count || 0, color: "bg-emerald-400", tcolor: "text-emerald-400" },
+              ];
+              const max = Math.max(...stages.map(s => s.value), 1);
+              const hasAny = stages.some(s => s.value > 0 || s.count > 0);
+              if (!hasAny) {
+                return <p className="text-sm text-muted-foreground py-4">Sem dados de pipeline ainda.</p>;
+              }
+              return (
+                <div className="space-y-3 max-w-2xl">
+                  {stages.map((s, i) => {
+                    const w = (s.value / max) * 100;
+                    const prev = i > 0 ? stages[i - 1].value : null;
+                    const conv = prev && prev > 0 ? (s.value / prev) * 100 : null;
+                    return (
+                      <div key={s.key}>
+                        <div className="flex items-center justify-between text-xs mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${s.color}`} />
+                            <span className="text-muted-foreground">{s.label}</span>
+                            {conv != null && (
+                              <span className="text-[10px] text-muted-foreground/50">→ {conv.toFixed(0)}% da etapa anterior</span>
+                            )}
+                          </div>
+                          <span className="font-mono">
+                            <span className={`font-semibold ${s.tcolor}`}>{formatCurrency(s.value)}</span>
+                            <span className="text-muted-foreground/50 ml-2">({s.count})</span>
+                          </span>
+                        </div>
+                        <div className="h-3 bg-white/[0.05] rounded-full overflow-hidden">
+                          <div className={`h-full ${s.color} rounded-full transition-all`} style={{ width: `${Math.max(w, 2)}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+
           <div className="rounded-2xl border border-border/20 bg-card p-6">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-4">Acumulado do Ano</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
@@ -386,38 +511,67 @@ export default function FinancialDashboard() {
       {activeTab === "DRE" && (
         <div className="space-y-6">
           <div className="rounded-2xl border border-border/20 bg-card p-6">
-            <div className="flex items-center gap-2 mb-1">
-              <FileText className="w-4 h-4 text-primary" />
-              <span className="text-sm font-semibold">DRE Gerencial — Acumulado do Ano</span>
+            <div className="flex items-center justify-between gap-4 mb-1 flex-wrap">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold">
+                  DRE — Acumulado do Ano ({dreRegime === "caixa" ? "Regime de Caixa" : "Regime de Competência"})
+                </span>
+              </div>
+              <div className="inline-flex rounded-lg border border-border/30 p-0.5 bg-white/[0.02]">
+                {(["competencia", "caixa"] as const).map(r => (
+                  <button
+                    key={r}
+                    onClick={() => {
+                      setDreRegime(r);
+                      setRegimeMut.mutate({ regime: r });
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${dreRegime === r ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {r === "competencia" ? "Competência" : "Caixa"}
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="text-[11px] text-muted-foreground/60 mb-6">Demonstração do Resultado do Exercício (baseado em faturamento emitido)</p>
+            <p className="text-[11px] text-muted-foreground/60 mb-6">
+              {dreRegime === "caixa"
+                ? "Receita = data de recebimento; custos = data de pagamento."
+                : "Receita = data de emissão; custos = mês de competência."}
+            </p>
 
-            <div className="space-y-0.5 max-w-2xl">
-              <DreRow label="Receita Bruta (faturamento emitido)" value={dre?.grossRevenue || 0} pct={100} bold />
-              <DreRow label="(-) IRPJ estimado (6%)" value={-(dre?.irpj || 0)} pct={dre?.grossRevenue ? (dre.irpj / dre.grossRevenue) * 100 : 0} indent negative />
-              <DreRow label="(=) Receita Líquida Estimada" value={(dre?.grossRevenue || 0) - (dre?.irpj || 0)} pct={dre?.grossRevenue ? (((dre.grossRevenue - dre.irpj) / dre.grossRevenue) * 100) : 0} bold separator positive />
-              <div className="my-3" />
-              <DreRow label="(-) Comissões Restaurantes (pagas)" value={-(dre?.restaurantCommissions || 0)} pct={dre?.grossRevenue ? (dre.restaurantCommissions / dre.grossRevenue) * 100 : 0} indent negative />
-              <DreRow label="(-) Custos de Produção" value={-(dre?.productionCosts || 0)} pct={dre?.grossRevenue ? (dre.productionCosts / dre.grossRevenue) * 100 : 0} indent negative />
-              <DreRow label="(-) Frete e Distribuição" value={-(dre?.freightCosts || 0)} pct={dre?.grossRevenue ? (dre.freightCosts / dre.grossRevenue) * 100 : 0} indent negative />
-              <DreRow label="Total Custos Diretos" value={-(dre?.totalDirectCosts || 0)} pct={dre?.grossRevenue ? (dre.totalDirectCosts / dre.grossRevenue) * 100 : 0} bold separator negative />
-              <div className="my-3" />
-              <DreRow
-                label="(=) Lucro Bruto"
-                value={dre?.grossProfit || 0}
-                pct={dre?.grossRevenue ? (dre.grossMarginPct * 100) : 0}
-                bold separator
-                positive={(dre?.grossProfit || 0) > 0}
-                negative={(dre?.grossProfit || 0) < 0}
-              />
-            </div>
+            {(() => {
+              const L = dreDual?.lines;
+              const gross = L?.grossRevenue || 0;
+              const pct = (v: number) => (gross > 0 ? (v / gross) * 100 : 0);
+              return (
+                <div className="space-y-0.5 max-w-2xl">
+                  <DreRow label="Receita Bruta" value={gross} pct={100} bold />
+                  <DreRow label="(-) Comissão Restaurantes" value={-(L?.restaurantCommissions || 0)} pct={pct(L?.restaurantCommissions || 0)} indent negative />
+                  <DreRow label="(-) Repasse VIP" value={-(L?.vipRepasses || 0)} pct={pct(L?.vipRepasses || 0)} indent negative />
+                  <DreRow label="(-) Impostos sobre Receita" value={-(L?.taxes || 0)} pct={pct(L?.taxes || 0)} indent negative />
+                  <DreRow label="(=) Receita Líquida (Nossa Parte)" value={L?.netRevenue || 0} pct={pct(L?.netRevenue || 0)} bold separator positive />
+                  <div className="my-3" />
+                  <DreRow label="(-) Custos de Produção" value={-(L?.productionCosts || 0)} pct={pct(L?.productionCosts || 0)} indent negative />
+                  <DreRow label="(-) Frete e Distribuição" value={-(L?.freightCosts || 0)} pct={pct(L?.freightCosts || 0)} indent negative />
+                  <DreRow label="(-) Comissão Parceiros" value={-(L?.partnerCommissions || 0)} pct={pct(L?.partnerCommissions || 0)} indent negative />
+                  {(L?.otherCosts || 0) > 0 && (
+                    <DreRow label="(-) Outros" value={-(L?.otherCosts || 0)} pct={pct(L?.otherCosts || 0)} indent negative />
+                  )}
+                  <DreRow label="Total Custos Operacionais" value={-(L?.totalCosts || 0)} pct={pct(L?.totalCosts || 0)} bold separator negative />
+                  <div className="my-3" />
+                  <DreRow label="(=) Lucro Bruto" value={L?.grossProfit || 0} pct={(L?.grossMarginPct || 0) * 100} bold separator positive={(L?.grossProfit || 0) > 0} negative={(L?.grossProfit || 0) < 0} />
+                  <DreRow label="(-) IRPJ estimado (6%)" value={-(L?.irpj || 0)} pct={pct(L?.irpj || 0)} indent negative />
+                  <DreRow label="(=) Lucro Líquido (estimado)" value={L?.netProfit || 0} pct={(L?.netMarginPct || 0) * 100} bold separator positive={(L?.netProfit || 0) > 0} negative={(L?.netProfit || 0) < 0} />
+                </div>
+              );
+            })()}
 
             <div className="border-t border-border/10 mt-6 pt-6">
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  { label: "Margem Bruta", value: fmtPct(dre?.grossMarginPct), color: (dre?.grossMarginPct || 0) >= 0.3 ? "text-emerald-400" : "text-amber-400" },
-                  { label: "IRPJ (estimado)", value: formatCurrency(dre?.irpj || 0), color: "text-muted-foreground" },
-                  { label: "Lucro Líquido (est.)", value: formatCurrency(dre?.netProfit || 0), color: (dre?.netProfit || 0) >= 0 ? "text-emerald-400" : "text-red-400" },
+                  { label: "Margem Bruta", value: fmtPct(dreDual?.lines.grossMarginPct), color: (dreDual?.lines.grossMarginPct || 0) >= 0.3 ? "text-emerald-400" : "text-amber-400" },
+                  { label: "IRPJ (estimado)", value: formatCurrency(dreDual?.lines.irpj || 0), color: "text-muted-foreground" },
+                  { label: "Lucro Líquido (est.)", value: formatCurrency(dreDual?.lines.netProfit || 0), color: (dreDual?.lines.netProfit || 0) >= 0 ? "text-emerald-400" : "text-red-400" },
                 ].map(item => (
                   <div key={item.label} className="rounded-xl bg-white/[0.03] p-4 text-center">
                     <p className={`text-xl font-bold font-mono ${item.color}`}>{item.value}</p>

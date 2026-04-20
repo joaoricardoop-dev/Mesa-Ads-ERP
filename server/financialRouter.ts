@@ -18,6 +18,7 @@ import {
   campaignPhases,
   campaignItems,
 } from "../drizzle/schema";
+import { users } from "@shared/models/auth";
 import { VIP_PRODUCT_TIPOS } from "./productRouter";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -2350,5 +2351,296 @@ export const financialRouter = router({
       .from(financialAuditLog)
       .groupBy(financialAuditLog.actorUserId, financialAuditLog.actorRole);
     return rows.filter((r) => r.actorUserId);
+  }),
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Finrefac #7 — Preferências do usuário (regime DRE persistido).
+  // ────────────────────────────────────────────────────────────────────────────
+  getUserPreferences: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDatabase();
+    const [u] = await db.select({ preferences: users.preferences }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
+    const prefs = (u?.preferences || {}) as Record<string, unknown>;
+    return {
+      dreRegime: (prefs.dreRegime === "caixa" ? "caixa" : "competencia") as "competencia" | "caixa",
+    };
+  }),
+
+  setDrePreference: protectedProcedure
+    .input(z.object({ regime: z.enum(["competencia", "caixa"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDatabase();
+      const [u] = await db.select({ preferences: users.preferences }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
+      const merged = { ...((u?.preferences || {}) as Record<string, unknown>), dreRegime: input.regime };
+      await db.update(users).set({ preferences: merged, updatedAt: new Date() }).where(eq(users.id, ctx.user.id));
+      return { regime: input.regime };
+    }),
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Finrefac #7 — DRE Dual (regime: competência | caixa).
+  //
+  // Competência: receita pelo issueDate; custo pelo competenceMonth (ou dueDate).
+  // Caixa:       receita pelo paymentDate; custo pelo paymentDate.
+  // Janela default: YTD (ano corrente até hoje).
+  // ────────────────────────────────────────────────────────────────────────────
+  dre: protectedProcedure
+    .input(z.object({
+      regime: z.enum(["competencia", "caixa"]).default("competencia"),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      requireFinancialAccess(ctx.user.role);
+      const db = await getDatabase();
+
+      const now = new Date();
+      const startDate = input?.startDate || `${now.getFullYear()}-01-01`;
+      const endDate = input?.endDate || now.toISOString().split("T")[0];
+      const regime = input?.regime || "competencia";
+
+      const startMonth = startDate.slice(0, 7);
+      const endMonth = endDate.slice(0, 7);
+
+      // ── Receita + deduções a partir das invoices ────────────────────────
+      const dateCol = regime === "caixa" ? invoices.paymentDate : invoices.issueDate;
+      const invConditions = regime === "caixa"
+        ? [eq(invoices.status, "paga"), gte(invoices.paymentDate, startDate), lte(invoices.paymentDate, endDate)]
+        : [sql`${invoices.status} NOT IN ('cancelada')`, gte(invoices.issueDate, startDate), lte(invoices.issueDate, endDate)];
+
+      const [rev] = await buildGrossInvoiceQuery(db).where(and(...invConditions));
+
+      // ── Custos via accountsPayable ──────────────────────────────────────
+      // Competência: usa COALESCE(competenceMonth, to_char(dueDate,'YYYY-MM'))
+      // como mês de competência. Status sem filtro (pendente + pago contam,
+      // exceto canceladas).
+      // Caixa: status = 'pago' e paymentDate na janela.
+      const apCompMonth = sql<string>`COALESCE(${accountsPayable.competenceMonth}, to_char(${accountsPayable.dueDate}, 'YYYY-MM'))`;
+      const apConditions = regime === "caixa"
+        ? [eq(accountsPayable.status, "pago"), gte(accountsPayable.paymentDate, startDate), lte(accountsPayable.paymentDate, endDate)]
+        : [gte(apCompMonth, startMonth), lte(apCompMonth, endMonth), sql`${accountsPayable.status} <> 'cancelada'`];
+
+      const apByCat = await db
+        .select({
+          sourceType: accountsPayable.sourceType,
+          type: accountsPayable.type,
+          total: sql<string>`COALESCE(SUM(${accountsPayable.amount}::numeric), 0)`,
+        })
+        .from(accountsPayable)
+        .where(and(...apConditions))
+        .groupBy(accountsPayable.sourceType, accountsPayable.type);
+
+      let production = 0;
+      let freight = 0;
+      let partnerCommission = 0;
+      let othersAp = 0;
+      let restaurantCommissions = 0;
+      let vipRepasses = 0;
+      let taxes = 0;
+      for (const r of apByCat) {
+        const v = parseFloat(r.total);
+        if (r.sourceType === "restaurant_commission") restaurantCommissions += v;
+        else if (r.sourceType === "vip_repasse") vipRepasses += v;
+        else if (r.sourceType === "partner_commission") partnerCommission += v;
+        else if (r.sourceType === "tax") taxes += v;
+        else if (r.type === "producao") production += v;
+        else if (r.type === "frete") freight += v;
+        else othersAp += v;
+      }
+
+      const grossRevenue = parseFloat(rev?.total || "0");
+
+      // Deduções de receita: comissão restaurante + repasse VIP + ISS retido
+      // (estes três derivados da AP — fonte única de verdade do ledger).
+      const revenueDeductions = restaurantCommissions + vipRepasses + taxes;
+      const netRevenue = grossRevenue - revenueDeductions;
+
+      const totalCosts = production + freight + partnerCommission + othersAp;
+      const grossProfit = netRevenue - totalCosts;
+      const irpj = grossRevenue * 0.06;
+      const netProfit = grossProfit - irpj;
+
+      return {
+        regime,
+        startDate,
+        endDate,
+        lines: {
+          grossRevenue,
+          restaurantCommissions,
+          vipRepasses,
+          taxes,
+          revenueDeductions,
+          netRevenue,
+          productionCosts: production,
+          freightCosts: freight,
+          partnerCommissions: partnerCommission,
+          otherCosts: othersAp,
+          totalCosts,
+          grossProfit,
+          irpj,
+          netProfit,
+          grossMarginPct: grossRevenue > 0 ? grossProfit / grossRevenue : 0,
+          netMarginPct: grossRevenue > 0 ? netProfit / grossRevenue : 0,
+        },
+      };
+    }),
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Finrefac #7 — Inadimplência com aging buckets (0-30, 30-60, 60-90, 90+).
+  // ────────────────────────────────────────────────────────────────────────────
+  delinquency: protectedProcedure.query(async ({ ctx }) => {
+    requireFinancialAccess(ctx.user.role);
+    const db = await getDatabase();
+    const today = new Date().toISOString().split("T")[0];
+
+    const rows = await db
+      .select({
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        amount: invoices.amount,
+        dueDate: invoices.dueDate,
+        clientId: invoices.clientId,
+        daysOverdue: sql<number>`(CURRENT_DATE - ${invoices.dueDate})::int`,
+      })
+      .from(invoices)
+      .where(and(eq(invoices.status, "emitida"), lte(invoices.dueDate, today)));
+
+    const buckets = {
+      "0-30": { count: 0, total: 0 },
+      "30-60": { count: 0, total: 0 },
+      "60-90": { count: 0, total: 0 },
+      "90+":   { count: 0, total: 0 },
+    };
+    let totalAmount = 0;
+    let totalCount = 0;
+
+    const cliIds = uniqueIds(rows.map((r) => r.clientId));
+    const cliMap: Record<number, string> = {};
+    if (cliIds.length > 0) {
+      const cs = await db.select({ id: clients.id, name: clients.name }).from(clients).where(inArray(clients.id, cliIds));
+      for (const c of cs) cliMap[c.id] = c.name;
+    }
+
+    const items: Array<{ id: number; invoiceNumber: string; clientName: string; amount: number; dueDate: string; daysOverdue: number; bucket: keyof typeof buckets }> = [];
+
+    for (const r of rows) {
+      const days = Math.max(0, Number(r.daysOverdue) || 0);
+      const amt = parseFloat(r.amount);
+      const bucket: keyof typeof buckets =
+        days <= 30 ? "0-30" : days <= 60 ? "30-60" : days <= 90 ? "60-90" : "90+";
+      buckets[bucket].count++;
+      buckets[bucket].total += amt;
+      totalAmount += amt;
+      totalCount++;
+      items.push({
+        id: r.id,
+        invoiceNumber: r.invoiceNumber,
+        clientName: cliMap[r.clientId] || `Cliente #${r.clientId}`,
+        amount: amt,
+        dueDate: r.dueDate,
+        daysOverdue: days,
+        bucket,
+      });
+    }
+
+    items.sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+    return { totalAmount, totalCount, buckets, items };
+  }),
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Finrefac #7 — DSO (Days Sales Outstanding):
+  //   média de dias entre issueDate e paymentDate de faturas pagas.
+  // Janela: últimos 90 dias; comparação com 90 dias anteriores para tendência.
+  // ────────────────────────────────────────────────────────────────────────────
+  dso: protectedProcedure.query(async ({ ctx }) => {
+    requireFinancialAccess(ctx.user.role);
+    const db = await getDatabase();
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
+    const d90 = new Date(now.getTime() - 90 * 86400000).toISOString().split("T")[0];
+    const d180 = new Date(now.getTime() - 180 * 86400000).toISOString().split("T")[0];
+
+    const calc = async (start: string, end: string) => {
+      const [r] = await db
+        .select({
+          avg: sql<string>`COALESCE(AVG((${invoices.paymentDate} - ${invoices.issueDate})::int), 0)`,
+          count: sql<number>`COUNT(*)::int`,
+        })
+        .from(invoices)
+        .where(and(
+          eq(invoices.status, "paga"),
+          gte(invoices.paymentDate, start),
+          lte(invoices.paymentDate, end),
+        ));
+      return { avg: parseFloat(r?.avg || "0"), count: r?.count || 0 };
+    };
+
+    const current = await calc(d90, today);
+    const previous = await calc(d180, d90);
+
+    const trend = previous.avg > 0 ? (current.avg - previous.avg) / previous.avg : null;
+
+    return {
+      currentDso: current.avg,
+      currentSampleSize: current.count,
+      previousDso: previous.avg,
+      previousSampleSize: previous.count,
+      trend, // positivo = piorou; negativo = melhorou
+    };
+  }),
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Finrefac #7 — Funil: Cotação → Fatura → Recebido (YTD).
+  // ────────────────────────────────────────────────────────────────────────────
+  funnel: protectedProcedure.query(async ({ ctx }) => {
+    requireFinancialAccess(ctx.user.role);
+    const db = await getDatabase();
+    const now = new Date();
+    const ytdStart = `${now.getFullYear()}-01-01`;
+    const today = now.toISOString().split("T")[0];
+
+    // Cotações enviadas no período (pipeline aberto + fechado)
+    const [sent] = await db
+      .select({
+        count: sql<number>`COUNT(*)::int`,
+        total: sql<string>`COALESCE(SUM(${quotations.totalValue}::numeric), 0)`,
+      })
+      .from(quotations)
+      .where(and(
+        sql`${quotations.status} <> 'rascunho'`,
+        gte(quotations.createdAt, new Date(ytdStart)),
+      ));
+
+    // Cotações ganhas (win + os_gerada — convertidas em OS)
+    const [won] = await db
+      .select({
+        count: sql<number>`COUNT(*)::int`,
+        total: sql<string>`COALESCE(SUM(${quotations.totalValue}::numeric), 0)`,
+      })
+      .from(quotations)
+      .where(and(
+        sql`${quotations.status} IN ('win', 'os_gerada')`,
+        gte(quotations.createdAt, new Date(ytdStart)),
+      ));
+
+    const [invoiced] = await buildGrossInvoiceCountQuery(db)
+      .where(and(
+        sql`${invoices.status} NOT IN ('cancelada')`,
+        gte(invoices.issueDate, ytdStart),
+        lte(invoices.issueDate, today),
+      ));
+
+    const [received] = await buildGrossInvoiceCountQuery(db)
+      .where(and(
+        eq(invoices.status, "paga"),
+        gte(invoices.paymentDate, ytdStart),
+        lte(invoices.paymentDate, today),
+      ));
+
+    return {
+      sent:     { count: sent?.count || 0,     total: parseFloat(sent?.total     || "0") },
+      won:      { count: won?.count || 0,      total: parseFloat(won?.total      || "0") },
+      invoiced: { count: invoiced?.count || 0, total: parseFloat(invoiced?.total || "0") },
+      received: { count: received?.count || 0, total: parseFloat(received?.total || "0") },
+    };
   }),
 });

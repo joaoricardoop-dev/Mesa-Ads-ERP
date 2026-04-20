@@ -1122,6 +1122,10 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON "financial_audit_log" ("action");
     `,
   },
+  {
+    name: "add_users_preferences_jsonb",
+    sql: `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "preferences" jsonb DEFAULT '{}'::jsonb;`,
+  },
 ];
 
 export async function runMigrations() {

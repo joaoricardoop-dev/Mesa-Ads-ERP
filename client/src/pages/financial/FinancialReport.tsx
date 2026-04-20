@@ -12,9 +12,13 @@ import {
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 type MetricsData = NonNullable<ReturnType<typeof trpc.financial.getMetrics.useQuery>["data"]>;
 type InvoiceItem = MetricsData["invoiceList"][number];
+type DreData = NonNullable<ReturnType<typeof trpc.financial.dre.useQuery>["data"]>;
+type Regime = "competencia" | "caixa";
 
 function fmtNum(v: number) {
   return v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -31,13 +35,47 @@ function fmtMonth(monthStr: string): string {
   return `${months[parseInt(m, 10) - 1]}/${y}`;
 }
 
-function exportCsv(startDate: string, endDate: string, data: MetricsData) {
+const REGIME_LABEL: Record<Regime, string> = {
+  competencia: "Competência (emissão / mês de competência)",
+  caixa: "Caixa (recebimento / pagamento)",
+};
+
+function dreRowsForExport(dre: DreData | undefined) {
+  if (!dre) return [] as string[][];
+  const L = dre.lines;
+  const gross = L.grossRevenue || 0;
+  const pct = (v: number) => (gross > 0 ? `${((v / gross) * 100).toFixed(1)}%` : "0%");
+  return [
+    ["Linha", "Valor (R$)", "% Receita Bruta"],
+    ["Receita Bruta",                   fmtNum(L.grossRevenue),         "100,0%"],
+    ["(-) Comissão Restaurantes",       fmtNum(-L.restaurantCommissions), pct(L.restaurantCommissions)],
+    ["(-) Repasse VIP",                 fmtNum(-L.vipRepasses),         pct(L.vipRepasses)],
+    ["(-) Impostos sobre Receita",      fmtNum(-L.taxes),               pct(L.taxes)],
+    ["(=) Receita Líquida",             fmtNum(L.netRevenue),           pct(L.netRevenue)],
+    ["(-) Custos de Produção",          fmtNum(-L.productionCosts),     pct(L.productionCosts)],
+    ["(-) Frete e Distribuição",        fmtNum(-L.freightCosts),        pct(L.freightCosts)],
+    ["(-) Comissão Parceiros",          fmtNum(-L.partnerCommissions),  pct(L.partnerCommissions)],
+    ["(-) Outros",                      fmtNum(-L.otherCosts),          pct(L.otherCosts)],
+    ["Total Custos",                    fmtNum(-L.totalCosts),          pct(L.totalCosts)],
+    ["(=) Lucro Bruto",                 fmtNum(L.grossProfit),          `${(L.grossMarginPct * 100).toFixed(1)}%`],
+    ["(-) IRPJ estimado (6%)",          fmtNum(-L.irpj),                pct(L.irpj)],
+    ["(=) Lucro Líquido (estimado)",    fmtNum(L.netProfit),            `${(L.netMarginPct * 100).toFixed(1)}%`],
+  ];
+}
+
+function exportCsv(startDate: string, endDate: string, data: MetricsData, regime: Regime, dre?: DreData) {
   const s = data.summary;
   const rows: string[][] = [];
   rows.push(["RELATÓRIO FINANCEIRO UNIFICADO (Nossa Parte)"]);
   rows.push(["Período:", `${startDate} a ${endDate}`]);
+  rows.push(["Regime:", REGIME_LABEL[regime]]);
   rows.push(["Fonte:", "getMetrics — Receita Líquida (NET_AMOUNT_SQL)"]);
   rows.push([]);
+  if (dre) {
+    rows.push(["DRE — " + REGIME_LABEL[regime]]);
+    rows.push(...dreRowsForExport(dre));
+    rows.push([]);
+  }
   rows.push(["RESUMO"]);
   rows.push(["Faturamento Bruto (clientes)", fmtNum(s.grossBilling)]);
   rows.push(["Deduções (com.restaurante + VIP + ISS)", fmtNum(s.deductions)]);
@@ -68,11 +106,110 @@ function exportCsv(startDate: string, endDate: string, data: MetricsData) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `relatorio-financeiro-${startDate}-${endDate}.csv`;
+  link.download = `relatorio-financeiro-${regime}-${startDate}-${endDate}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+function exportPdf(startDate: string, endDate: string, data: MetricsData, regime: Regime, dre?: DreData) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const s = data.summary;
+
+  doc.setFontSize(14);
+  doc.text("Relatório Financeiro", 40, 40);
+  doc.setFontSize(9);
+  doc.setTextColor(110);
+  doc.text(`Período: ${startDate} a ${endDate}`, 40, 56);
+  doc.text(`Regime: ${REGIME_LABEL[regime]}`, 40, 70);
+  doc.setTextColor(0);
+
+  let y = 90;
+
+  if (dre) {
+    doc.setFontSize(11);
+    doc.text(`DRE — ${REGIME_LABEL[regime]}`, 40, y);
+    const [head, ...body] = dreRowsForExport(dre);
+    autoTable(doc, {
+      startY: y + 8,
+      head: [head],
+      body,
+      theme: "striped",
+      headStyles: { fillColor: [40, 40, 40], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
+      margin: { left: 40, right: 40 },
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
+  }
+
+  doc.setFontSize(11);
+  doc.text("Resumo do Período", 40, y);
+  autoTable(doc, {
+    startY: y + 8,
+    head: [["Indicador", "Valor (R$)"]],
+    body: [
+      ["Faturamento Bruto",                  fmtNum(s.grossBilling)],
+      ["Deduções (com.rest + VIP + ISS)",    fmtNum(s.deductions)],
+      ["Nossa Parte (Receita Líquida)",      fmtNum(s.netBilling)],
+      ["Custos de Produção",                 fmtNum(s.productionCosts)],
+      ["Custos de Frete",                    fmtNum(s.freightCosts)],
+      ["Custos Totais",                      fmtNum(s.totalCosts)],
+      ["Resultado Bruto",                    fmtNum(s.grossResult)],
+      ["Margem %",                           `${(s.marginPct * 100).toFixed(1)}%`],
+    ],
+    theme: "striped",
+    headStyles: { fillColor: [40, 40, 40], fontSize: 9 },
+    bodyStyles: { fontSize: 8 },
+    columnStyles: { 1: { halign: "right" } },
+    margin: { left: 40, right: 40 },
+  });
+
+  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
+
+  if (data.byMonth.length > 0) {
+    if (y > 700) { doc.addPage(); y = 40; }
+    doc.setFontSize(11);
+    doc.text("Faturamento Mensal", 40, y);
+    autoTable(doc, {
+      startY: y + 8,
+      head: [["Mês", "Bruto", "Nossa Parte"]],
+      body: data.byMonth.map(m => [fmtMonth(m.month), fmtNum(m.grossBilling), fmtNum(m.netBilling)]),
+      theme: "striped",
+      headStyles: { fillColor: [40, 40, 40], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
+      margin: { left: 40, right: 40 },
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
+  }
+
+  if (data.invoiceList.length > 0) {
+    if (y > 700) { doc.addPage(); y = 40; }
+    doc.setFontSize(11);
+    doc.text("Faturas do Período", 40, y);
+    autoTable(doc, {
+      startY: y + 8,
+      head: [["Nº", "Anunciante", "Emissão", "Pgto", "Bruto", "Líquido", "Status"]],
+      body: data.invoiceList.map(inv => [
+        inv.invoiceNumber,
+        inv.clientName,
+        fmtDateBR(inv.issueDate),
+        fmtDateBR(inv.paymentDate),
+        fmtNum(inv.grossAmount),
+        fmtNum(inv.netAmount),
+        inv.status,
+      ]),
+      theme: "striped",
+      headStyles: { fillColor: [40, 40, 40], fontSize: 9 },
+      bodyStyles: { fontSize: 7 },
+      columnStyles: { 4: { halign: "right" }, 5: { halign: "right" } },
+      margin: { left: 40, right: 40 },
+    });
+  }
+
+  doc.save(`relatorio-financeiro-${regime}-${startDate}-${endDate}.pdf`);
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -161,6 +298,21 @@ export default function FinancialReport() {
     { enabled: !!startDate && !!endDate }
   );
 
+  const { data: prefs } = trpc.financial.getUserPreferences.useQuery(undefined, { staleTime: 0 });
+  const [regimeOverride, setRegimeOverride] = useState<Regime | null>(null);
+  const regime: Regime = regimeOverride ?? prefs?.dreRegime ?? "competencia";
+  const setRegime = (r: Regime) => setRegimeOverride(r);
+
+  const utils = trpc.useUtils();
+  const setRegimeMut = trpc.financial.setDrePreference.useMutation({
+    onSuccess: () => utils.financial.getUserPreferences.invalidate(),
+  });
+
+  const { data: dre } = trpc.financial.dre.useQuery(
+    { regime, startDate, endDate },
+    { enabled: !!startDate && !!endDate }
+  );
+
   const [drillTarget, setDrillTarget] = useState<DrillTarget | null>(null);
 
   return (
@@ -174,12 +326,33 @@ export default function FinancialReport() {
           <Label className="text-xs text-muted-foreground">Data Fim</Label>
           <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40" />
         </div>
+        <div>
+          <Label className="text-xs text-muted-foreground mb-1 block">Regime DRE</Label>
+          <div className="inline-flex rounded-md border border-border/30 p-0.5 bg-white/[0.02] h-9">
+            {(["competencia", "caixa"] as const).map(r => (
+              <button
+                key={r}
+                onClick={() => { setRegime(r); setRegimeMut.mutate({ regime: r }); }}
+                className={`px-3 text-xs font-medium rounded-sm transition-colors ${regime === r ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {r === "competencia" ? "Competência" : "Caixa"}
+              </button>
+            ))}
+          </div>
+        </div>
         <Button
           variant="outline" size="sm" className="gap-1.5"
           disabled={!data}
-          onClick={() => { if (data) exportCsv(startDate, endDate, data); }}
+          onClick={() => { if (data) exportCsv(startDate, endDate, data, regime, dre); }}
         >
           <Download className="w-3.5 h-3.5" /> CSV
+        </Button>
+        <Button
+          variant="outline" size="sm" className="gap-1.5"
+          disabled={!data}
+          onClick={() => { if (data) exportPdf(startDate, endDate, data, regime, dre); }}
+        >
+          <FileText className="w-3.5 h-3.5" /> PDF
         </Button>
       </div>
 

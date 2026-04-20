@@ -27,6 +27,7 @@ export const users = pgTable("users", {
   onboardingComplete: boolean("onboarding_complete").default(false),
   selfRegistered: boolean("self_registered").default(false),
   lastLoginAt: timestamp("last_login_at"),
+  preferences: jsonb("preferences").$type<Record<string, unknown>>().default({}),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
