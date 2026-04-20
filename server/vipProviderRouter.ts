@@ -15,19 +15,27 @@ async function getDatabase() {
 // `repassePercent` como input. Internamente normaliza pra `repassePercent`
 // (nome correto do glossário). Remover em fase 4 quando todos os clientes
 // estiverem migrados.
-function normalizeRepasseInput<T extends { commissionPercent?: string; repassePercent?: string }>(
+type RepasseAliasInput = {
+  commissionPercent?: string;
+  repassePercent?: string;
+};
+
+function normalizeRepasseInput<T extends RepasseAliasInput>(
   data: T,
-): Omit<T, "commissionPercent"> & { repassePercent?: string } {
-  const { commissionPercent, repassePercent, ...rest } = data as any;
+): Omit<T, "commissionPercent" | "repassePercent"> & { repassePercent?: string } {
+  const { commissionPercent, repassePercent, ...rest } = data;
   const value = repassePercent ?? commissionPercent;
   if (value !== undefined && commissionPercent !== undefined && repassePercent === undefined) {
     console.warn("[vipProvider] input usando alias legado `commissionPercent` — migrar para `repassePercent`.");
   }
-  return value !== undefined ? { ...rest, repassePercent: value } : rest;
+  const base = rest as Omit<T, "commissionPercent" | "repassePercent">;
+  return value !== undefined ? { ...base, repassePercent: value } : base;
 }
 
 // Adiciona o alias legado `commissionPercent` no output para clientes antigos.
-function withLegacyCommissionAlias<T extends { repassePercent: string }>(row: T) {
+function withLegacyCommissionAlias<T extends { repassePercent: string }>(
+  row: T,
+): T & { commissionPercent: string } {
   return { ...row, commissionPercent: row.repassePercent };
 }
 

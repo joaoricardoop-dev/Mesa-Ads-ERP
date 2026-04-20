@@ -107,7 +107,7 @@ export default function VipProvidersPage() {
       contactPhone: p.contactPhone ?? "",
       contactEmail: p.contactEmail ?? "",
       location: p.location ?? "",
-      repassePercent: (p as any).repassePercent || (p as any).commissionPercent || "10.00",
+      repassePercent: p.repassePercent || p.commissionPercent || "10.00",
       billingMode: (p.billingMode as "bruto" | "liquido") || "bruto",
       status: (p.status as "active" | "inactive") || "active",
       notes: p.notes ?? "",
@@ -294,7 +294,7 @@ export default function VipProvidersPage() {
                 </div>
                 <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
                   {p.location && <span>📍 {p.location}</span>}
-                  <span>💰 Repasse {(p as any).repassePercent ?? (p as any).commissionPercent}% sobre {p.billingMode === "bruto" ? "valor bruto" : "valor líquido"}</span>
+                  <span>💰 Repasse {p.repassePercent ?? p.commissionPercent}% sobre {p.billingMode === "bruto" ? "valor bruto" : "valor líquido"}</span>
                   <span className="flex items-center gap-1">
                     <Package className="w-3 h-3" />
                     {p.productsCount} {p.productsCount === 1 ? "produto" : "produtos"}
