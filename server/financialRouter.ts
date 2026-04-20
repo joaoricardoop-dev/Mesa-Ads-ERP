@@ -1575,14 +1575,19 @@ export const financialRouter = router({
     .input(z.object({
       startDate: z.string().optional(),
       endDate: z.string().optional(),
+      regime: z.enum(["competencia", "caixa"]).optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
 
-      const invConditions = [sql`${invoices.status} NOT IN ('cancelada')`];
-      if (input?.startDate) invConditions.push(gte(invoices.issueDate, input.startDate));
-      if (input?.endDate) invConditions.push(lte(invoices.issueDate, input.endDate));
+      const regime = input?.regime || "competencia";
+      const dateCol = regime === "caixa" ? invoices.paymentDate : invoices.issueDate;
+      const invConditions = regime === "caixa"
+        ? [eq(invoices.status, "paga")]
+        : [sql`${invoices.status} NOT IN ('cancelada')`];
+      if (input?.startDate) invConditions.push(gte(dateCol, input.startDate));
+      if (input?.endDate) invConditions.push(lte(dateCol, input.endDate));
 
       // Busca faturas com valor líquido (Nossa Parte) calculado via SQL
       const invoiceRows = await db

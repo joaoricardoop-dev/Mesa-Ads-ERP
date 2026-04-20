@@ -293,14 +293,14 @@ export default function FinancialReport() {
     new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
   );
 
-  const { data, isLoading } = trpc.financial.getMetrics.useQuery(
-    { startDate, endDate },
-    { enabled: !!startDate && !!endDate }
-  );
-
   const { data: prefs } = trpc.financial.getUserPreferences.useQuery(undefined, { staleTime: 0 });
   const [regimeOverride, setRegimeOverride] = useState<Regime | null>(null);
   const regime: Regime = regimeOverride ?? prefs?.dreRegime ?? "competencia";
+
+  const { data, isLoading } = trpc.financial.getMetrics.useQuery(
+    { startDate, endDate, regime },
+    { enabled: !!startDate && !!endDate }
+  );
   const setRegime = (r: Regime) => setRegimeOverride(r);
 
   const utils = trpc.useUtils();
