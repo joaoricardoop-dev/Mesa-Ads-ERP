@@ -54,27 +54,7 @@ import {
   Ban,
 } from "lucide-react";
 
-const EXCLUDED_CATEGORIES = [
-  "Concorrentes diretos",
-  "Bebidas alcoólicas",
-  "Bebidas não alcoólicas",
-  "Alimentação (marcas de comida, snacks, etc.)",
-  "Cafeterias e docerias",
-  "Sorveterias / açaí / sobremesas",
-  "Apps de delivery e marketplaces",
-  "Farmácia e saúde",
-  "Beleza e cosméticos",
-  "Moda e acessórios",
-  "Fitness e academia",
-  "Pet (ração, veterinária, petshop)",
-  "Seguros e planos de saúde",
-  "Bancos e cartões",
-  "Pagamentos (maquininha, carteiras digitais)",
-  "Cripto/investimentos de alto risco",
-  "Empréstimos agressivos",
-  "Contabilidade e serviços B2B",
-  "Telefonia / internet",
-];
+import { EXCLUDED_CATEGORIES } from "@shared/excluded-categories";
 
 function parseExcluded(raw: string | null | undefined): string[] {
   if (!raw) return [];

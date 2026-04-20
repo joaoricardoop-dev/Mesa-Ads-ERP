@@ -49,52 +49,10 @@ import {
   RATING_DIMENSION_LABELS,
 } from "@shared/rating-config";
 
+import { EXCLUDED_CATEGORIES } from "@shared/excluded-categories";
+
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const BUSY_HOURS_OPTIONS = ["06h–09h", "09h–12h", "12h–15h", "15h–18h", "18h–21h", "21h–00h", "00h–03h", "03h–06h"];
-
-const EXCLUDED_CATEGORIES = [
-  "Concorrentes diretos",
-  "Bebidas alcoólicas",
-  "Bebidas não alcoólicas",
-  "Alimentação (marcas de comida, snacks, etc.)",
-  "Cafeterias e docerias",
-  "Sorveterias / açaí / sobremesas",
-  "Apps de delivery e marketplaces",
-  "Farmácia e saúde",
-  "Beleza e cosméticos",
-  "Moda e acessórios",
-  "Fitness e academia",
-  "Pet (ração, veterinária, petshop)",
-  "Seguros e planos de saúde",
-  "Bancos e cartões",
-  "Pagamentos (maquininha, carteiras digitais)",
-  "Cripto/investimentos de alto risco",
-  "Empréstimos agressivos",
-  "Contabilidade e serviços B2B",
-  "Telefonia / internet",
-  "Eletrônicos e acessórios",
-  "Softwares e ferramentas (SaaS, ERP)",
-  "Transporte e mobilidade",
-  "Automotivo",
-  "Turismo e viagens",
-  "Eventos e entretenimento",
-  "Cultura e lazer",
-  "Educação",
-  "Casa e construção",
-  "Imobiliário",
-  "Serviços residenciais",
-  "Logística e serviços locais",
-  "Energia e utilidades",
-  "Sustentabilidade",
-  "Tecnologia/serviços profissionais",
-  "Saúde e bem-estar lifestyle",
-  "Esportes e hobbies",
-  "Gastronomia e experiências",
-  "Gaming/bets/Apostas",
-  "Política",
-  "Religião",
-  "Conteúdo adulto/sexual",
-];
 
 interface FormData {
   name: string;
