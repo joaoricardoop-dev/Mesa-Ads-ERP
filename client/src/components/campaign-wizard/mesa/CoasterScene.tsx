@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
-import { useRef, useMemo, Suspense } from "react";
+import { useRef, useMemo, Suspense, useEffect, useState } from "react";
 import * as THREE from "three";
 import { Coaster3D, type CoasterVariant } from "./Coaster3D";
 
@@ -110,8 +110,49 @@ function FloatingCoaster({ index, total, variant, pointer }: FloatingProps) {
   );
 }
 
-export function CoasterScene({ className }: { className?: string }) {
+function useIsSmallScreen() {
+  const [isSmall, setIsSmall] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 640px)").matches;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 640px)");
+    const handler = (e: MediaQueryListEvent) => setIsSmall(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isSmall;
+}
+
+interface CoasterSceneProps {
+  className?: string;
+  onContextLost?: () => void;
+}
+
+export function CoasterScene({ className, onContextLost }: CoasterSceneProps) {
   const pointer = useRef({ x: 0, y: 0 });
+  const isSmall = useIsSmallScreen();
+  const canvasElRef = useRef<HTMLCanvasElement | null>(null);
+  const ctxLostHandlerRef = useRef<((e: Event) => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      const el = canvasElRef.current;
+      const handler = ctxLostHandlerRef.current;
+      if (el && handler) {
+        el.removeEventListener("webglcontextlost", handler, false);
+      }
+      canvasElRef.current = null;
+      ctxLostHandlerRef.current = null;
+    };
+  }, []);
+
+  const variants = useMemo(
+    () => (isSmall ? VARIANTS.slice(0, 3) : VARIANTS),
+    [isSmall],
+  );
+  const dpr: [number, number] = isSmall ? [1, 1.5] : [1, 2];
 
   return (
     <div
@@ -127,22 +168,36 @@ export function CoasterScene({ className }: { className?: string }) {
       }}
     >
       <Canvas
-        dpr={[1, 2]}
+        dpr={dpr}
         camera={{ position: [0, 0.6, 6.2], fov: 38 }}
-        gl={{ antialias: true, alpha: true }}
+        gl={{ antialias: !isSmall, alpha: true, powerPreference: "high-performance" }}
         style={{ background: "transparent" }}
+        onCreated={({ gl }) => {
+          const canvas = gl.domElement;
+          const handler = (e: Event) => {
+            e.preventDefault();
+            onContextLost?.();
+          };
+          canvas.addEventListener("webglcontextlost", handler, false);
+          canvasElRef.current = canvas;
+          ctxLostHandlerRef.current = handler;
+        }}
       >
         <Suspense fallback={null}>
           <ambientLight intensity={0.35} />
-          <directionalLight position={[5, 8, 4]} intensity={1.1} castShadow />
+          <directionalLight position={[5, 8, 4]} intensity={1.1} castShadow={!isSmall} />
           <directionalLight position={[-5, 3, -2]} intensity={0.6} color="#00E640" />
-          <spotLight position={[0, 6, 6]} angle={0.6} intensity={0.4} color="#FF2E8A" />
+          {!isSmall && (
+            <spotLight position={[0, 6, 6]} angle={0.6} intensity={0.4} color="#FF2E8A" />
+          )}
           <Environment preset="city" />
-          {VARIANTS.map((v, i) => (
-            <FloatingCoaster key={i} index={i} total={VARIANTS.length} variant={v} pointer={pointer} />
+          {variants.map((v, i) => (
+            <FloatingCoaster key={i} index={i} total={variants.length} variant={v} pointer={pointer} />
           ))}
         </Suspense>
       </Canvas>
     </div>
   );
 }
+
+export default CoasterScene;

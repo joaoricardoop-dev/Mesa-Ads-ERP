@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { trpc, type RouterOutputs } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
 import { useWizardStore } from "./wizardStore";
-import { CoasterScene } from "./mesa/CoasterScene";
+import { CoasterStage } from "./mesa/CoasterStage";
 import { MesaButton, MesaChip } from "./mesa/MesaUI";
 import { MesaProgressRail } from "./mesa/MesaProgressRail";
 import { cn } from "@/lib/utils";
@@ -65,7 +65,7 @@ export function StepHero({ role }: Props) {
       <MesaProgressRail />
 
       {/* 3D coaster scene */}
-      <CoasterScene className="absolute inset-0 z-0 lg:left-[124px] top-[64px] lg:top-0 [touch-action:none]" />
+      <CoasterStage className="absolute inset-0 z-0 lg:left-[124px] top-[64px] lg:top-0 [touch-action:none]" />
 
       {/* Vignette overlay so text remains legible above the scene */}
       <div className="pointer-events-none absolute inset-0 z-[1] lg:left-[124px] top-[64px] lg:top-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(4,4,5,0.55)_55%,rgba(4,4,5,0.92)_100%)]" />
