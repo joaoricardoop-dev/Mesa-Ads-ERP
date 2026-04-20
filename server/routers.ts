@@ -16,6 +16,7 @@ import { notificationRouter } from "./notificationRouter";
 import { melhorEnvioRouter } from "./melhorEnvioRouter";
 import { campaignReportRouter } from "./campaignReportRouter";
 import { mediaKitRouter } from "./mediaKitRouter";
+import { anunciantePortalRouter } from "./anunciantePortalRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, anuncianteProcedure, restauranteProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -95,6 +96,7 @@ export const appRouter = router({
   melhorEnvio: melhorEnvioRouter,
   campaignReport: campaignReportRouter,
   mediaKit: mediaKitRouter,
+  anunciantePortal: anunciantePortalRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
 
