@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Building2, Search, UserX, Plus, Sparkles, X } from "lucide-react";
 import { trpc, type RouterOutputs } from "@/lib/trpc";
 import { Input } from "@/components/ui/input";
@@ -6,12 +6,11 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useWizardStore } from "./wizardStore";
 import { StepHero } from "./StepHero";
-import { StepVenues } from "./StepVenues";
-import { StepVolume } from "./StepVolume";
-import { StepDuration } from "./StepDuration";
-import { StepUpsell } from "./StepUpsell";
-import { StepCreative } from "./StepCreative";
-import { StepConfirm } from "./StepConfirm";
+import { StepLocais } from "./StepLocais";
+import { StepProdutosPorLocal } from "./StepProdutosPorLocal";
+import { StepConfigurar } from "./StepConfigurar";
+import { StepCarrinho } from "./StepCarrinho";
+import { StepCheckout } from "./StepCheckout";
 import { StepSuccess } from "./StepSuccess";
 import { MesaButton, MesaAdsLogo } from "./mesa/MesaUI";
 import { cn } from "@/lib/utils";
@@ -184,22 +183,23 @@ function ResolvedWizard({
   const clientLabel = clientId == null ? "Sem cliente específico" : c?.company || c?.name || null;
   const hasPartner = !!c?.partnerId || role === "parceiro";
 
+  // Persistência do carrinho no servidor para anunciantes (Marketplace v2).
+  useCartDraftSync(clientId, role);
+
   switch (step) {
     case "hero":
       return <StepHero role={role} clientLabel={clientLabel} hasPartner={hasPartner} />;
-    case "venues":
-      return <StepVenues clientLabel={clientLabel} hasPartner={hasPartner} />;
-    case "volume":
-      return <StepVolume clientLabel={clientLabel} hasPartner={hasPartner} />;
-    case "duration":
-      return <StepDuration clientLabel={clientLabel} hasPartner={hasPartner} />;
-    case "upsell":
-      return <StepUpsell clientLabel={clientLabel} hasPartner={hasPartner} />;
-    case "creative":
-      return <StepCreative clientLabel={clientLabel} hasPartner={hasPartner} />;
-    case "confirm":
+    case "locais":
+      return <StepLocais clientLabel={clientLabel} hasPartner={hasPartner} />;
+    case "produtos":
+      return <StepProdutosPorLocal clientLabel={clientLabel} hasPartner={hasPartner} />;
+    case "configurar":
+      return <StepConfigurar clientLabel={clientLabel} hasPartner={hasPartner} />;
+    case "carrinho":
+      return <StepCarrinho clientLabel={clientLabel} hasPartner={hasPartner} />;
+    case "checkout":
       return (
-        <StepConfirm
+        <StepCheckout
           clientId={clientId}
           clientLabel={clientLabel}
           hasPartner={hasPartner}
@@ -209,6 +209,58 @@ function ResolvedWizard({
     default:
       return null;
   }
+}
+
+// Hook que faz o save/load do carrinho no servidor a cada transição de step.
+function useCartDraftSync(clientId: number | null, role: ResolvedRole) {
+  const cart = useWizardStore((s) => s.cart);
+  const step = useWizardStore((s) => s.step);
+  const locaisIds = useWizardStore((s) => s.locaisIds);
+  const startDate = useWizardStore((s) => s.startDate);
+  const endDate = useWizardStore((s) => s.endDate);
+  const draftLoaded = useWizardStore((s) => s.draftLoaded);
+  const hydrate = useWizardStore((s) => s.hydrateFromDraft);
+
+  const enabled = role === "anunciante" && clientId != null;
+
+  const loadQuery = trpc.anunciantePortal.loadCartDraft.useQuery(
+    { clientId: clientId ?? 0 },
+    { enabled, staleTime: Infinity },
+  );
+
+  const saveMutation = trpc.anunciantePortal.saveCartDraft.useMutation();
+
+  // Hidrata estado a partir do draft remoto (apenas uma vez).
+  useEffect(() => {
+    if (!enabled || draftLoaded) return;
+    if (loadQuery.isLoading) return;
+    const remote = loadQuery.data;
+    if (remote && remote.cart && cart.length === 0) {
+      const c: any = remote.cart;
+      hydrate({
+        cart: Array.isArray(c.cart) ? c.cart : [],
+        locaisIds: Array.isArray(c.locaisIds) ? c.locaisIds : [],
+        startDate: c.startDate ?? startDate,
+        endDate: c.endDate ?? endDate,
+      });
+    } else {
+      hydrate({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, draftLoaded, loadQuery.isLoading, loadQuery.data]);
+
+  // Salva o snapshot do carrinho a cada mudança de step (debounce simples).
+  const lastSaveRef = useRef<string>("");
+  useEffect(() => {
+    if (!enabled) return;
+    const payload = { cart, locaisIds, startDate, endDate };
+    const serialized = JSON.stringify(payload);
+    if (serialized === lastSaveRef.current) return;
+    lastSaveRef.current = serialized;
+    if (cart.length === 0 && locaisIds.length === 0) return;
+    saveMutation.mutate({ clientId: clientId!, cart: payload });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, step]);
 }
 
 function RequireAuthGate() {

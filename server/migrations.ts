@@ -1098,6 +1098,16 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     `,
   },
   {
+    name: "marketplace_v2_quotation_items_share_columns",
+    sql: `
+      ALTER TABLE "quotation_items" ADD COLUMN IF NOT EXISTS "restaurantId" integer REFERENCES "active_restaurants"("id") ON DELETE SET NULL;
+      ALTER TABLE "quotation_items" ADD COLUMN IF NOT EXISTS "shareIndex" integer;
+      ALTER TABLE "quotation_items" ADD COLUMN IF NOT EXISTS "cycleWeeks" integer DEFAULT 4;
+      ALTER TABLE "quotation_items" ADD COLUMN IF NOT EXISTS "cycles" integer DEFAULT 1;
+      CREATE INDEX IF NOT EXISTS "idx_quotation_items_restaurant_id" ON "quotation_items" ("restaurantId");
+    `,
+  },
+  {
     name: "finrefac_05_financial_audit_log",
     sql: `
       CREATE TABLE IF NOT EXISTS "financial_audit_log" (

@@ -1,7 +1,7 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices, seasonalMultipliers } from "../drizzle/schema";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices, seasonalMultipliers, campaignPhases, campaignItems } from "../drizzle/schema";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -546,6 +546,72 @@ export const quotationRouter = router({
         details: `Campanha criada a partir da cotação ${quotation[0].quotationNumber}`,
       });
 
+      // Marketplace v2: auto-criação de fases em ciclos de 4 semanas a partir
+      // dos quotation_items que carregam restaurantId/shareIndex/cycleWeeks.
+      try {
+        const items = await db
+          .select()
+          .from(quotationItems)
+          .where(eq(quotationItems.quotationId, quotation[0].id));
+        const sharedItems = items.filter((it) => it.restaurantId != null);
+        if (sharedItems.length > 0) {
+          const baseStart = new Date(input.startDate + "T00:00:00Z");
+          const phasesByCycle = new Map<number, { start: string; end: string; items: typeof sharedItems }>();
+          for (const it of sharedItems) {
+            const cycles = it.cycles ?? 1;
+            const cycleWeeks = it.cycleWeeks ?? 4;
+            for (let c = 0; c < cycles; c++) {
+              const start = new Date(baseStart);
+              start.setUTCDate(start.getUTCDate() + c * cycleWeeks * 7);
+              const end = new Date(start);
+              end.setUTCDate(end.getUTCDate() + cycleWeeks * 7 - 1);
+              const key = c;
+              const slot = phasesByCycle.get(key) ?? {
+                start: start.toISOString().slice(0, 10),
+                end: end.toISOString().slice(0, 10),
+                items: [] as typeof sharedItems,
+              };
+              slot.items.push(it);
+              phasesByCycle.set(key, slot);
+            }
+          }
+          let seq = 1;
+          const sortedEntries = Array.from(phasesByCycle.entries()).sort(
+            ([a], [b]) => a - b,
+          );
+          for (const [, slot] of sortedEntries) {
+            const [phase] = await db
+              .insert(campaignPhases)
+              .values({
+                campaignId: campaign.id,
+                sequence: seq++,
+                label: `Ciclo ${seq - 1}`,
+                periodStart: slot.start,
+                periodEnd: slot.end,
+                // Marketplace v2 — fases criadas em estado "planejada" aguardando
+                // aprovação do briefing/peças antes de irem para produção.
+                status: "planejada",
+              })
+              .returning();
+            for (const it of slot.items) {
+              const unitPrice = it.unitPrice ?? "0";
+              const total = (parseFloat(unitPrice) * it.quantity).toFixed(2);
+              await db.insert(campaignItems).values({
+                campaignPhaseId: phase.id,
+                productId: it.productId,
+                quantity: it.quantity,
+                unitPrice,
+                totalPrice: total,
+                restaurantId: it.restaurantId,
+                shareIndex: it.shareIndex,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[markWin] auto phase creation skipped:", (err as Error)?.message);
+      }
+
       await autoCreateInvoice(db, { id: campaign.id, clientId: campaign.clientId }, { totalValue: quotation[0].totalValue, isBonificada: quotation[0].isBonificada });
 
       await db
@@ -1031,6 +1097,11 @@ export const quotationRouter = router({
         productName: z.string(),
         volume: z.number().int().min(1),
         weeks: z.number().int().min(1),
+        // Marketplace v2 — opcionais para back-compat com fluxo antigo (single product).
+        restaurantId: z.number().int().optional(),
+        shareIndex: z.number().int().min(1).optional(),
+        cycleWeeks: z.number().int().min(1).optional(),
+        cycles: z.number().int().min(1).optional(),
       })).min(1),
     }))
     .mutation(async ({ input, ctx }) => {
@@ -1186,7 +1257,7 @@ export const quotationRouter = router({
         return price * (1 - parseFloat(t.discountPercent) / 100);
       }
 
-      const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; unitPrice: number; totalPrice: number }> = [];
+      const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; unitPrice: number; totalPrice: number; restaurantId?: number; shareIndex?: number; cycleWeeks?: number; cycles?: number }> = [];
 
       const appliedSeasonals: Array<{ productName: string; label: string; multiplier: number }> = [];
 
@@ -1228,7 +1299,18 @@ export const quotationRouter = router({
 
         const finalUnitPrice = item.volume > 0 ? finalTotal / item.volume : 0;
 
-        computedItems.push({ productId: item.productId, productName: prod.name, volume: item.volume, weeks: item.weeks, unitPrice: finalUnitPrice, totalPrice: finalTotal });
+        computedItems.push({
+          productId: item.productId,
+          productName: prod.name,
+          volume: item.volume,
+          weeks: item.weeks,
+          unitPrice: finalUnitPrice,
+          totalPrice: finalTotal,
+          restaurantId: item.restaurantId,
+          shareIndex: item.shareIndex,
+          cycleWeeks: item.cycleWeeks,
+          cycles: item.cycles,
+        });
       }
 
       const entityName = client?.company || client?.name || "Sem cliente específico";
@@ -1270,6 +1352,12 @@ export const quotationRouter = router({
       const [created] = await db.insert(quotations).values(insertValues).returning();
 
       for (const item of computedItems) {
+        const ciclosDesc = item.cycles && item.cycleWeeks
+          ? ` · ${item.cycles} ciclo(s) de ${item.cycleWeeks}sem`
+          : "";
+        const localDesc = item.restaurantId
+          ? ` · local #${item.restaurantId}${item.shareIndex ? ` share ${item.shareIndex}` : ""}`
+          : "";
         await db.insert(quotationItems).values({
           quotationId: created.id,
           productId: item.productId,
@@ -1277,7 +1365,11 @@ export const quotationRouter = router({
           quantityPerLocation: item.volume,
           unitPrice: item.unitPrice.toFixed(4),
           totalPrice: item.totalPrice.toFixed(2),
-          notes: `${item.productName} — ${item.volume.toLocaleString("pt-BR")} un. × ${item.weeks} semanas`,
+          restaurantId: item.restaurantId ?? null,
+          shareIndex: item.shareIndex ?? null,
+          cycleWeeks: item.cycleWeeks ?? 4,
+          cycles: item.cycles ?? 1,
+          notes: `${item.productName} — ${item.volume.toLocaleString("pt-BR")} un. × ${item.weeks} semanas${ciclosDesc}${localDesc}`,
         });
       }
 

@@ -13,6 +13,7 @@ import {
   campaignItems,
   campaignPhases,
   campaigns,
+  campaignDrafts,
 } from "../drizzle/schema";
 import { and, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -384,5 +385,68 @@ export const anunciantePortalRouter = router({
           products: productList,
         };
       });
+    }),
+
+  // ── Cart Draft (Marketplace v2) ────────────────────────────────────────────
+  // Persiste o carrinho do fluxo /montar-campanha por cliente. Sobrescreve o
+  // draft anterior — só mantemos o snapshot mais recente. Expira em 30 dias.
+  saveCartDraft: anuncianteProcedure
+    .input(
+      z.object({
+        clientId: z.number().int(),
+        cart: z.any(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDatabase();
+      if (ctx.user.clientId !== input.clientId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cliente não pertence a este usuário." });
+      }
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const existing = await db
+        .select({ id: campaignDrafts.id })
+        .from(campaignDrafts)
+        .where(eq(campaignDrafts.clientId, input.clientId))
+        .limit(1);
+      if (existing[0]) {
+        await db
+          .update(campaignDrafts)
+          .set({ cartJson: input.cart, expiresAt, updatedAt: new Date() })
+          .where(eq(campaignDrafts.id, existing[0].id));
+        return { id: existing[0].id, savedAt: new Date().toISOString() };
+      }
+      const [created] = await db
+        .insert(campaignDrafts)
+        .values({ clientId: input.clientId, cartJson: input.cart, expiresAt })
+        .returning();
+      return { id: created.id, savedAt: created.createdAt.toISOString() };
+    }),
+
+  loadCartDraft: anuncianteProcedure
+    .input(z.object({ clientId: z.number().int() }))
+    .query(async ({ input, ctx }) => {
+      const db = await getDatabase();
+      if (ctx.user.clientId !== input.clientId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cliente não pertence a este usuário." });
+      }
+      const [row] = await db
+        .select()
+        .from(campaignDrafts)
+        .where(eq(campaignDrafts.clientId, input.clientId))
+        .limit(1);
+      if (!row) return null;
+      if (row.expiresAt && new Date(row.expiresAt) < new Date()) return null;
+      return { id: row.id, cart: row.cartJson, updatedAt: row.updatedAt };
+    }),
+
+  clearCartDraft: anuncianteProcedure
+    .input(z.object({ clientId: z.number().int() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDatabase();
+      if (ctx.user.clientId !== input.clientId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cliente não pertence a este usuário." });
+      }
+      await db.delete(campaignDrafts).where(eq(campaignDrafts.clientId, input.clientId));
+      return { ok: true };
     }),
 });

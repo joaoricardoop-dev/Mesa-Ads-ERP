@@ -108,7 +108,7 @@ export function WizardShell({
                     onClick={onNext ?? next}
                     disabled={nextDisabled || isLoading}
                     iconRight={
-                      step === "confirm" ? (
+                      step === "checkout" ? (
                         <Check className="w-5 h-5" />
                       ) : (
                         <ArrowRight className="w-5 h-5" />

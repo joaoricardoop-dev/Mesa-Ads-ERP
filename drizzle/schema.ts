@@ -1101,10 +1101,16 @@ export const quotationItems = pgTable("quotation_items", {
   unitPrice: decimal("unitPrice", { precision: 10, scale: 4 }),
   totalPrice: decimal("totalPrice", { precision: 12, scale: 2 }),
   notes: text("notes"),
+  // Marketplace v2: share/local específico reservado por este item.
+  restaurantId: integer("restaurantId").references(() => activeRestaurants.id, { onDelete: "set null" }),
+  shareIndex: integer("shareIndex"),
+  cycleWeeks: integer("cycleWeeks").default(4),
+  cycles: integer("cycles").default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
   index("idx_quotation_items_quotation_id").on(t.quotationId),
   index("idx_quotation_items_product_id").on(t.productId),
+  index("idx_quotation_items_restaurant_id").on(t.restaurantId),
 ]);
 
 export type QuotationItem = typeof quotationItems.$inferSelect;
