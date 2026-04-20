@@ -971,7 +971,13 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         'comissao_restaurante',
         'Comissão Restaurante — ref ' || rp."referenceMonth",
         rp."amount"::numeric,
-        (rp."referenceMonth" || '-01')::date,
+        -- dueDate sempre >= createdAt para satisfazer a invariante
+        -- chk_accounts_payable_due_after_created. O período real do
+        -- período vive em competenceMonth, não em dueDate.
+        GREATEST(
+          (rp."referenceMonth" || '-01')::date,
+          rp."createdAt"::date
+        ),
         rp."paymentDate"::date,
         CASE WHEN rp."status" = 'paid' THEN 'pago' ELSE 'pendente' END,
         'restaurante',
@@ -1004,10 +1010,19 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
          AND (ap."sourceRef"->>'restaurantPaymentId')::int = rp."id"
          AND COALESCE(ap."competenceMonth", '') <> rp."referenceMonth";
 
-      -- Relaxa chk_accounts_payable_due_after_created para excluir
-      -- restaurant_commission. Comissões espelham o "referenceMonth" do
-      -- restaurant_payment (1º dia do mês de referência), que é
-      -- legitimamente passado em relação ao createdAt do espelho.
+      -- Sanity: corrige espelhos de restaurant_commission cuja dueDate
+      -- ficou < createdAt (caso o referenceMonth seja anterior ao
+      -- createdAt do espelho). Período real vive em competenceMonth;
+      -- aqui ajustamos só pra satisfazer o invariante.
+      UPDATE "accounts_payable"
+         SET "dueDate" = "createdAt"::date
+       WHERE "createdBySystem" = true
+         AND "dueDate" IS NOT NULL
+         AND "dueDate" < "createdAt"::date;
+
+      -- Restaura a invariante estrita: dueDate >= createdAt para toda
+      -- linha createdBySystem=true, INCLUSIVE restaurant_commission.
+      -- Substitui qualquer versão relaxada anterior.
       ALTER TABLE "accounts_payable"
         DROP CONSTRAINT IF EXISTS "chk_accounts_payable_due_after_created";
 
@@ -1016,7 +1031,6 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
           ADD CONSTRAINT "chk_accounts_payable_due_after_created"
           CHECK (
             "createdBySystem" = false
-            OR "sourceType" = 'restaurant_commission'
             OR "dueDate" IS NULL
             OR "dueDate" >= "createdAt"::date
           );

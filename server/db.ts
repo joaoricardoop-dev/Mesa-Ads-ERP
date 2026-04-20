@@ -1258,10 +1258,12 @@ export async function deleteRestaurantPayment(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   // Remove ledger mirror primeiro (FK não existe; é via sourceRef).
-  await db.execute(sql.raw(`
+  // Usar sql`` parametrizado (não sql.raw) para manter o padrão seguro
+  // de bind de parâmetros usado no resto do arquivo.
+  await db.execute(sql`
     DELETE FROM "accounts_payable"
     WHERE "sourceType" = 'restaurant_commission'
       AND ("sourceRef"->>'restaurantPaymentId')::int = ${id};
-  `));
+  `);
   await db.delete(restaurantPayments).where(eq(restaurantPayments.id, id));
 }
