@@ -117,3 +117,7 @@ temp/
 # Claude Code local config
 CLAUDE.md
 .claude/
+
+# E2E / dev cookie artifacts
+cookies.txt
+*.cookies
