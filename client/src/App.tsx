@@ -43,6 +43,7 @@ import PartnerCommissionReport from "./pages/financial/PartnerCommissionReport";
 import AccountsPayablePage from "./pages/financial/AccountsPayablePage";
 import FinancialGlossary from "./pages/financial/FinancialGlossary";
 import FinancialAuditLog from "./pages/financial/FinancialAuditLog";
+import BankReconciliation from "./pages/financial/BankReconciliation";
 import PriceTable from "./pages/PriceTable";
 import AnunciantePortal from "./pages/AnunciantePortal";
 import RestaurantePortal from "./pages/RestaurantePortal";
@@ -125,12 +126,7 @@ function Router() {
       <Route path="/financeiro/contas-pagar" component={AccountsPayablePage} />
       <Route path="/financeiro/fornecedores" component={SuppliersHubPage} />
       <Route path="/financeiro/relatorios" component={FinancialReport} />
-      <Route path="/financeiro/conciliacao">{() => (
-        <div className="p-8 text-center text-muted-foreground">
-          <h2 className="text-lg font-semibold mb-2">Conciliação Bancária</h2>
-          <p>Em desenvolvimento.</p>
-        </div>
-      )}</Route>
+      <Route path="/financeiro/conciliacao" component={BankReconciliation} />
       <Route path="/financeiro/glossario" component={FinancialGlossary} />
       <Route path="/financeiro/comissao-parceiros" component={PartnerCommissionReport} />
       <Route path="/financeiro/auditoria" component={FinancialAuditLog} />

@@ -1349,4 +1349,55 @@ export const financialAuditLog = pgTable("financial_audit_log", {
 export type FinancialAuditLog = typeof financialAuditLog.$inferSelect;
 export type InsertFinancialAuditLog = typeof financialAuditLog.$inferInsert;
 
+// ── Conciliação Bancária (finrefac fase 6) ───────────────────────────────
+// bankAccounts: contas bancárias da empresa para reconciliação.
+// bankTransactions: linhas de extrato (OFX/CSV) importadas; quando reconciladas,
+// apontam para a fatura ou conta a pagar correspondente.
+export const bankAccounts = pgTable("bank_accounts", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  bank: varchar("bank", { length: 50 }).notNull(),
+  agency: varchar("agency", { length: 20 }),
+  account: varchar("account", { length: 30 }),
+  initialBalance: decimal("initialBalance", { precision: 14, scale: 2 }).notNull().default("0"),
+  currency: varchar("currency", { length: 8 }).notNull().default("BRL"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type BankAccount = typeof bankAccounts.$inferSelect;
+export type InsertBankAccount = typeof bankAccounts.$inferInsert;
+
+export const bankTransactions = pgTable("bank_transactions", {
+  id: serial("id").primaryKey(),
+  bankAccountId: integer("bankAccountId").notNull().references(() => bankAccounts.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  // 'credit' = entrada (recebimento), 'debit' = saída (pagamento).
+  type: varchar("type", { length: 10 }).notNull(),
+  description: text("description").notNull(),
+  // FITID do OFX ou hash linha do CSV — usado para deduplicar import.
+  externalId: varchar("externalId", { length: 100 }),
+  importBatchId: varchar("importBatchId", { length: 64 }),
+  reconciled: boolean("reconciled").notNull().default(false),
+  reconciledAt: timestamp("reconciledAt"),
+  reconciledBy: varchar("reconciledBy"),
+  // Em matches 1↔1: matchedEntityType + matchedEntityId. Em 1↔N: matches[].
+  matchedEntityType: varchar("matchedEntityType", { length: 32 }),
+  matchedEntityId: integer("matchedEntityId"),
+  matches: jsonb("matches").$type<Array<{ entityType: "invoice" | "accounts_payable"; entityId: number; amount: string }>>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_bank_tx_account").on(t.bankAccountId),
+  index("idx_bank_tx_date").on(t.date),
+  index("idx_bank_tx_reconciled").on(t.reconciled),
+  index("idx_bank_tx_match").on(t.matchedEntityType, t.matchedEntityId),
+  unique("uq_bank_tx_account_external").on(t.bankAccountId, t.externalId),
+]);
+
+export type BankTransaction = typeof bankTransactions.$inferSelect;
+export type InsertBankTransaction = typeof bankTransactions.$inferInsert;
+
 export * from "../shared/models/auth";

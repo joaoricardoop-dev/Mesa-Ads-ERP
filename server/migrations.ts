@@ -1137,6 +1137,56 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     name: "add_received_date_to_invoices",
     sql: `ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "receivedDate" date;`,
   },
+  {
+    // Finrefac #6 — Conciliação bancária OFX/CSV.
+    name: "finrefac_06_bank_reconciliation",
+    sql: `
+      CREATE TABLE IF NOT EXISTS "bank_accounts" (
+        "id" serial PRIMARY KEY,
+        "name" varchar(100) NOT NULL,
+        "bank" varchar(50) NOT NULL,
+        "agency" varchar(20),
+        "account" varchar(30),
+        "initialBalance" decimal(14,2) NOT NULL DEFAULT '0',
+        "currency" varchar(8) NOT NULL DEFAULT 'BRL',
+        "active" boolean NOT NULL DEFAULT true,
+        "createdAt" timestamp NOT NULL DEFAULT now(),
+        "updatedAt" timestamp NOT NULL DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS "bank_transactions" (
+        "id" serial PRIMARY KEY,
+        "bankAccountId" integer NOT NULL REFERENCES "bank_accounts"("id") ON DELETE CASCADE,
+        "date" date NOT NULL,
+        "amount" decimal(14,2) NOT NULL,
+        "type" varchar(10) NOT NULL,
+        "description" text NOT NULL,
+        "externalId" varchar(100),
+        "importBatchId" varchar(64),
+        "reconciled" boolean NOT NULL DEFAULT false,
+        "reconciledAt" timestamp,
+        "reconciledBy" varchar,
+        "matchedEntityType" varchar(32),
+        "matchedEntityId" integer,
+        "matches" jsonb,
+        "createdAt" timestamp NOT NULL DEFAULT now(),
+        "updatedAt" timestamp NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "idx_bank_tx_account" ON "bank_transactions" ("bankAccountId");
+      CREATE INDEX IF NOT EXISTS "idx_bank_tx_date" ON "bank_transactions" ("date");
+      CREATE INDEX IF NOT EXISTS "idx_bank_tx_reconciled" ON "bank_transactions" ("reconciled");
+      CREATE INDEX IF NOT EXISTS "idx_bank_tx_match" ON "bank_transactions" ("matchedEntityType","matchedEntityId");
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'uq_bank_tx_account_external'
+        ) THEN
+          ALTER TABLE "bank_transactions"
+            ADD CONSTRAINT "uq_bank_tx_account_external"
+            UNIQUE ("bankAccountId","externalId");
+        END IF;
+      END $$;
+    `,
+  },
 ];
 
 export async function runMigrations() {
