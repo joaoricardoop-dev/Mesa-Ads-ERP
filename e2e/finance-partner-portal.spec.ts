@@ -4,12 +4,10 @@ import {
   devLoginAs,
   devEnsureParceiro,
   devDeleteUser,
-  devFindCampaignForPartner,
   devSeedCampaignForPartner,
   trpcMutation,
   trpcQuery,
   todayIso,
-  FixtureMissingError,
 } from "./_finance-helpers";
 
 type Invoice = { id: number; invoiceNumber: string; status: string };
@@ -45,33 +43,18 @@ test.describe("finance — portal parceiro (comissão por competência)", () => 
   test("comissão de parceiro materializa após pagamento da invoice", async ({ request, context }) => {
     await devLoginAdmin(request);
 
-    let ensured: { user: { id: string }; partnerId: number };
-    try {
-      ensured = await devEnsureParceiro(request);
-    } catch (e) {
-      if (e instanceof FixtureMissingError) {
-        test.skip(true, e.message);
-        return;
-      }
-      throw e;
-    }
+    // dev-ensure-parceiro auto-cria o partner (com commissionPercent=10) se
+    // o BD estiver vazio — acceptance "CI sem skip" finrefac #9.
+    const ensured = await devEnsureParceiro(request);
     const e2eUserId = ensured.user.id;
     const partnerId = ensured.partnerId;
 
     try {
-      // Tenta achar uma campanha existente que resolva para esse parceiro;
-      // se não houver, cria deterministicamente um par client+campaign
-      // amarrado ao partnerId — assim o teste roda em CI sem skip.
-      let campaign: { id: number; clientId: number; name: string };
-      try {
-        campaign = await devFindCampaignForPartner(request, partnerId);
-      } catch (e) {
-        if (e instanceof FixtureMissingError) {
-          campaign = await devSeedCampaignForPartner(request, partnerId);
-        } else {
-          throw e;
-        }
-      }
+      // Sempre cria um par client+campaign novo amarrado ao partnerId.
+      // O seed trava agencyBvPercent=10/hasAgencyBv=true, garantindo que
+      // calcPartnerCommission produza AP > 0 (sem depender de configs
+      // pré-existentes no BD). Determinístico em CI sem skip.
+      const campaign = await devSeedCampaignForPartner(request, partnerId);
 
       // Snapshot do dashboard antes da ação para isolar o efeito da invoice.
       await context.clearCookies();
@@ -106,17 +89,14 @@ test.describe("finance — portal parceiro (comissão por competência)", () => 
       await devLoginAs(request, e2eUserId);
       const after = await trpcQuery<Dashboard>(request, "parceiroPortal.getDashboard");
 
-      // Causal: comissão total cresceu (sourceType=partner_commission).
-      // Se o produto/parceiro tem taxa zero, o materializer não cria AP —
-      // nesse caso, marcamos o teste como skipped.
+      // Causal: o seed trava agencyBvPercent=10 → calcPartnerCommission
+      // sempre produz delta > 0. Se chegou aqui zero, é regressão real
+      // no materializer — falhamos em vez de pular.
       const totalDelta = after.commissionTotal - before.commissionTotal;
-      if (totalDelta < 0.01) {
-        test.skip(
-          true,
-          `Parceiro ${partnerId} configurado sem taxa de comissão (totalDelta=${totalDelta})`,
-        );
-        return;
-      }
+      expect(
+        totalDelta,
+        `Comissão total deveria crescer >0 após pagar invoice (totalDelta=${totalDelta})`,
+      ).toBeGreaterThanOrEqual(0.01);
 
       const monthEntry = after.commissionByMonth.find(
         (m) => m.competenceMonth === competenceMonth,

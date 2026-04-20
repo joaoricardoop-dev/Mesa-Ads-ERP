@@ -1,11 +1,14 @@
 import { test, expect } from "@playwright/test";
 import {
+  devEnsureCampaign,
   devLoginAdmin,
   pickAnyCampaign,
   trpcMutation,
   trpcQuery,
   todayIso,
 } from "./_finance-helpers";
+
+type Campaign = { id: number; name: string };
 
 type Invoice = { id: number; invoiceNumber: string; amount: string; status: string };
 type Payable = {
@@ -33,8 +36,15 @@ test.describe("finance — ciclo de vida de fatura", () => {
 
   test("emitir fatura, gerar payables, marcar paga e refletir no DSO", async ({ request }) => {
     await devLoginAdmin(request);
-    const campaign = await pickAnyCampaign(request);
-    test.skip(!campaign, "Nenhuma campanha cadastrada — não dá para emitir fatura");
+    let campaign = await pickAnyCampaign(request);
+    if (!campaign) {
+      // Determinístico: garante que existe campanha (cria genérica se preciso).
+      // Acceptance criterion finrefac #9: CI sem skip.
+      const ensured = await devEnsureCampaign(request);
+      const campaignsAfter = await trpcQuery<Campaign[]>(request, "campaigns.list");
+      campaign = campaignsAfter.find((c) => c.id === ensured.id) ?? campaignsAfter[0];
+    }
+    expect(campaign, "devEnsureCampaign deve garantir ao menos uma campanha").toBeDefined();
     if (!campaign) return;
 
     const amount = "1234.56";

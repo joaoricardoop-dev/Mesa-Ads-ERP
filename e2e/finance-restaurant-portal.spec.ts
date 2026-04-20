@@ -39,16 +39,9 @@ test.describe("finance — portal restaurante", () => {
   test("admin marca pagamento → restaurante vê como paga via myCommissions", async ({ request, context }) => {
     await devLoginAdmin(request);
 
-    let ensured: { user: { id: string }; restaurantId: number };
-    try {
-      ensured = await devEnsureRestaurante(request);
-    } catch (e) {
-      if (e instanceof FixtureMissingError) {
-        test.skip(true, e.message);
-        return;
-      }
-      throw e;
-    }
+    // dev-ensure-restaurante agora cria restaurante se não existir
+    // (acceptance "CI sem skip" — finrefac #9). Qualquer falha é erro real.
+    const ensured = await devEnsureRestaurante(request);
     const e2eUserId = ensured.user.id;
 
     try {

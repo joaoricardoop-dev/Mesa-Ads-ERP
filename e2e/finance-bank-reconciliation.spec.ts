@@ -2,11 +2,14 @@ import { test, expect } from "@playwright/test";
 import {
   devLoginAdmin,
   devEnsureBankAccount,
+  devEnsureCampaign,
   pickAnyCampaign,
   trpcMutation,
   trpcQuery,
   todayIso,
 } from "./_finance-helpers";
+
+type Campaign = { id: number; name: string };
 
 type Invoice = { id: number; invoiceNumber: string; amount: string; status: string };
 type Payable = {
@@ -49,8 +52,13 @@ test.describe("finance — reconciliação bancária", () => {
   }) => {
     await devLoginAdmin(request);
 
-    const campaign = await pickAnyCampaign(request);
-    test.skip(!campaign, "Nenhuma campanha cadastrada — não dá pra emitir fatura");
+    let campaign = await pickAnyCampaign(request);
+    if (!campaign) {
+      const ensured = await devEnsureCampaign(request);
+      const list = await trpcQuery<Campaign[]>(request, "campaigns.list");
+      campaign = list.find((c) => c.id === ensured.id) ?? list[0];
+    }
+    expect(campaign, "devEnsureCampaign deve garantir ao menos uma campanha").toBeDefined();
     if (!campaign) return;
 
     const bank = await devEnsureBankAccount(request);

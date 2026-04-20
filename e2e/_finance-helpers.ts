@@ -104,6 +104,16 @@ export async function devSeedCampaignForPartner(
   return (await res.json()) as { id: number; clientId: number; name: string };
 }
 
+export async function devEnsureCampaign(
+  request: APIRequestContext,
+): Promise<{ id: number; created: boolean }> {
+  const res = await request.post("/api/dev-ensure-campaign", { data: {} });
+  if (!res.ok()) {
+    throw new Error(`dev-ensure-campaign failed: ${res.status()} ${await res.text()}`);
+  }
+  return (await res.json()) as { id: number; created: boolean };
+}
+
 export async function devEnsureBankAccount(
   request: APIRequestContext,
 ): Promise<{ id: number; created: boolean }> {

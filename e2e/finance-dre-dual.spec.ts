@@ -1,11 +1,14 @@
 import { test, expect } from "@playwright/test";
 import {
+  devEnsureCampaign,
   devLoginAdmin,
   pickAnyCampaign,
   trpcMutation,
   trpcQuery,
   todayIso,
 } from "./_finance-helpers";
+
+type Campaign = { id: number; name: string };
 
 type Invoice = { id: number; status: string };
 type Dre = {
@@ -26,8 +29,13 @@ test.describe("finance — DRE dual (competência vs caixa)", () => {
   test("competência reconhece pelo issueDate, caixa pelo paymentDate", async ({ request }) => {
     await devLoginAdmin(request);
 
-    const campaign = await pickAnyCampaign(request);
-    test.skip(!campaign, "Sem campanhas — pulando");
+    let campaign = await pickAnyCampaign(request);
+    if (!campaign) {
+      const ensured = await devEnsureCampaign(request);
+      const list = await trpcQuery<Campaign[]>(request, "campaigns.list");
+      campaign = list.find((c) => c.id === ensured.id) ?? list[0];
+    }
+    expect(campaign, "devEnsureCampaign deve garantir ao menos uma campanha").toBeDefined();
     if (!campaign) return;
 
     const issueDate = todayIso(-40);

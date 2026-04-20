@@ -196,7 +196,18 @@ async function startServer() {
           restaurantId = rows[0]?.id ?? null;
         }
         if (restaurantId == null) {
-          return res.status(412).json({ message: "Nenhum restaurante cadastrado." });
+          // Sem restaurante? cria um. Mantém o teste 100% determinístico
+          // (acceptance criterion "CI sem skip" — finrefac #9).
+          const [created] = await db
+            .insert(activeRestaurants)
+            .values({
+              name: `E2E Restaurante ${Date.now()}`,
+              status: "active",
+              city: "São Paulo",
+              state: "SP",
+            })
+            .returning({ id: activeRestaurants.id });
+          restaurantId = created.id;
         }
 
         const id = `e2e-restaurante-${Date.now()}`;
@@ -231,11 +242,21 @@ async function startServer() {
         const requestedId = Number(req.body?.partnerId);
         let partnerId: number | null = Number.isFinite(requestedId) ? requestedId : null;
         if (partnerId == null) {
-          const rows = await db.select({ id: partners.id }).from(partners).limit(1);
-          partnerId = rows[0]?.id ?? null;
-        }
-        if (partnerId == null) {
-          return res.status(412).json({ message: "Nenhum parceiro cadastrado." });
+          // SEMPRE cria um partner novo quando nenhum id é informado.
+          // Reusar partner pré-existente vaza estado: APs de partner_commission
+          // são agregadas por (partnerId, competenceMonth), então outros testes
+          // pré-existentes nesta competência aglutinariam os valores num único
+          // AP cujo campaignId é o do primeiro invoice — mascarando a campanha
+          // do nosso teste no dashboard. Determinismo > custo de 1 row extra.
+          const [created] = await db
+            .insert(partners)
+            .values({
+              name: `E2E Parceiro ${Date.now()}`,
+              status: "active",
+              commissionPercent: "10.00",
+            })
+            .returning({ id: partners.id });
+          partnerId = created.id;
         }
 
         const id = `e2e-parceiro-${Date.now()}`;
@@ -337,6 +358,51 @@ async function startServer() {
       }
     });
 
+    // Test fixture: garante que existe ao menos uma campanha cadastrada,
+    // criando client+campaign genéricos se preciso. Usado pelas specs que
+    // só precisam de "qualquer campanha" para emitir uma invoice (lifecycle,
+    // dre, audit, bank-reconciliation). Nunca devolve 412 — o teste roda
+    // determinístico em CI sem skip (acceptance finrefac #9).
+    app.post("/api/dev-ensure-campaign", async (_req, res) => {
+      try {
+        const { getDb } = await import("../db");
+        const { clients, campaigns } = await import("../../drizzle/schema");
+        const db = await getDb();
+        if (!db) return res.status(500).json({ message: "Database not available." });
+
+        const existing = await db.select({ id: campaigns.id }).from(campaigns).limit(1);
+        if (existing[0]) return res.json({ id: existing[0].id, created: false });
+
+        const tag = `e2e-${Date.now()}`;
+        const [client] = await db
+          .insert(clients)
+          .values({ name: `E2E Client ${tag}`, status: "active" })
+          .returning();
+
+        const today = new Date();
+        const startDate = today.toISOString().slice(0, 10);
+        const endDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .slice(0, 10);
+
+        const [campaign] = await db
+          .insert(campaigns)
+          .values({
+            clientId: client.id,
+            name: `E2E Campaign ${tag}`,
+            startDate,
+            endDate,
+            status: "draft",
+          })
+          .returning({ id: campaigns.id });
+
+        res.json({ id: campaign.id, created: true });
+      } catch (error) {
+        console.error("Dev ensure campaign error:", error);
+        res.status(500).json({ message: "Erro ao garantir campanha de teste." });
+      }
+    });
+
     // Test fixture: cria client + campaign vinculados ao parceiro informado
     // (via campaigns.partnerId), garantindo que finance-partner-portal.spec.ts
     // sempre tenha contra que emitir uma invoice.
@@ -373,6 +439,11 @@ async function startServer() {
             startDate,
             endDate,
             status: "draft",
+            // Trava taxa de BV explícita p/ que calcPartnerCommission
+            // sempre gere AP > 0 (sem depender de partner.commissionPercent
+            // pré-existente). Acceptance "CI sem skip" — finrefac #9.
+            hasAgencyBv: true,
+            agencyBvPercent: "10.00",
           })
           .returning();
 
