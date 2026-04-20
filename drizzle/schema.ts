@@ -243,12 +243,18 @@ export const campaignItems = pgTable("campaign_items", {
   // Custos previstos (serão sincronizados com accounts_payable)
   productionCost: decimal("productionCost", { precision: 12, scale: 2 }).default("0.00").notNull(),
   freightCost: decimal("freightCost", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  // Marketplace v2: vincula o item a um local específico (active_restaurants)
+  // e ao "share slot" reservado naquele local. Nullable para itens legados
+  // (rede inteira) e itens de produtos não-locais.
+  restaurantId: integer("restaurantId").references(() => activeRestaurants.id, { onDelete: "set null" }),
+  shareIndex: integer("shareIndex"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
   index("idx_campaign_items_phase_id").on(t.campaignPhaseId),
   index("idx_campaign_items_product_id").on(t.productId),
+  index("idx_campaign_items_restaurant_id").on(t.restaurantId),
 ]);
 
 export type CampaignItem = typeof campaignItems.$inferSelect;
@@ -448,6 +454,10 @@ export const invoices = pgTable("invoices", {
   status: invoiceStatusEnum("status").default("emitida").notNull(),
   paymentMethod: varchar("paymentMethod", { length: 50 }),
   notes: text("notes"),
+  // Marketplace v2: link público para o documento financeiro (NF/recibo)
+  // exibido no Portal do Anunciante, com label opcional p/ rotular o arquivo.
+  documentUrl: text("documentUrl"),
+  documentLabel: varchar("documentLabel", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -988,6 +998,8 @@ export const productLocations = pgTable("product_locations", {
   id: serial("id").primaryKey(),
   productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
   restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  maxShares: integer("maxShares").default(1).notNull(),
+  cycleWeeks: integer("cycleWeeks").default(4).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
   index("idx_product_locations_product_id").on(t.productId),
@@ -997,6 +1009,48 @@ export const productLocations = pgTable("product_locations", {
 
 export type ProductLocation = typeof productLocations.$inferSelect;
 export type InsertProductLocation = typeof productLocations.$inferInsert;
+
+// ─── Seasonal Multipliers (Marketplace v2) ───────────────────────────────────
+// Multiplicador sazonal de preço aplicado a um produto e (opcionalmente) a um
+// local específico, durante uma janela de datas. Ex: "Carnaval 2026" ×1.30
+// no produto Coaster, válido de 10/02 a 18/02.
+
+export const seasonalMultipliers = pgTable("seasonal_multipliers", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
+  restaurantId: integer("restaurantId").references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  seasonLabel: varchar("seasonLabel", { length: 100 }).notNull(),
+  startDate: date("startDate").notNull(),
+  endDate: date("endDate").notNull(),
+  multiplier: decimal("multiplier", { precision: 5, scale: 2 }).notNull().default("1.00"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_seasonal_multipliers_product_id").on(t.productId),
+  index("idx_seasonal_multipliers_restaurant_id").on(t.restaurantId),
+  index("idx_seasonal_multipliers_period").on(t.startDate, t.endDate),
+]);
+
+export type SeasonalMultiplier = typeof seasonalMultipliers.$inferSelect;
+export type InsertSeasonalMultiplier = typeof seasonalMultipliers.$inferInsert;
+
+// ─── Campaign Drafts (Marketplace v2) ────────────────────────────────────────
+// Persistência de carrinho do fluxo /montar-campanha por anunciante.
+// `cartJson` guarda o snapshot do carrinho (locais, shares, datas, totais).
+
+export const campaignDrafts = pgTable("campaign_drafts", {
+  id: serial("id").primaryKey(),
+  clientId: integer("clientId").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  cartJson: jsonb("cartJson").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_campaign_drafts_client_id").on(t.clientId),
+  index("idx_campaign_drafts_expires_at").on(t.expiresAt),
+]);
+
+export type CampaignDraft = typeof campaignDrafts.$inferSelect;
+export type InsertCampaignDraft = typeof campaignDrafts.$inferInsert;
 
 export const productPricingTiers = pgTable("product_pricing_tiers", {
   id: serial("id").primaryKey(),

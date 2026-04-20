@@ -598,6 +598,78 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       CREATE INDEX IF NOT EXISTS "idx_clients_utm_campaign" ON "clients" ("utm_campaign");
     `,
   },
+  {
+    // Marketplace v2 — schema base:
+    //  • product_locations.maxShares / cycleWeeks (capacidade de shares por local)
+    //  • campaign_items.restaurantId / shareIndex (rastreio de share por item)
+    //  • invoices.documentUrl / documentLabel (documentos financeiros)
+    //  • seasonal_multipliers (multiplicadores sazonais de preço)
+    //  • campaign_drafts (persistência de carrinho do /montar-campanha)
+    name: "marketplace_v2_schema_base",
+    sql: `
+      ALTER TABLE "product_locations"
+        ADD COLUMN IF NOT EXISTS "maxShares" integer NOT NULL DEFAULT 1,
+        ADD COLUMN IF NOT EXISTS "cycleWeeks" integer NOT NULL DEFAULT 4;
+
+      ALTER TABLE "campaign_items"
+        ADD COLUMN IF NOT EXISTS "restaurantId" integer
+          REFERENCES "active_restaurants"("id") ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS "shareIndex" integer;
+      CREATE INDEX IF NOT EXISTS "idx_campaign_items_restaurant_id"
+        ON "campaign_items" ("restaurantId");
+
+      ALTER TABLE "invoices"
+        ADD COLUMN IF NOT EXISTS "documentUrl" text,
+        ADD COLUMN IF NOT EXISTS "documentLabel" varchar(255);
+
+      CREATE TABLE IF NOT EXISTS "seasonal_multipliers" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "productId" integer NOT NULL REFERENCES "products"("id") ON DELETE CASCADE,
+        "restaurantId" integer REFERENCES "active_restaurants"("id") ON DELETE CASCADE,
+        "seasonLabel" varchar(100) NOT NULL,
+        "startDate" date NOT NULL,
+        "endDate" date NOT NULL,
+        "multiplier" numeric(5, 2) NOT NULL DEFAULT 1.00,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_seasonal_multipliers_product_id"
+        ON "seasonal_multipliers" ("productId");
+      CREATE INDEX IF NOT EXISTS "idx_seasonal_multipliers_restaurant_id"
+        ON "seasonal_multipliers" ("restaurantId");
+      CREATE INDEX IF NOT EXISTS "idx_seasonal_multipliers_period"
+        ON "seasonal_multipliers" ("startDate", "endDate");
+
+      CREATE TABLE IF NOT EXISTS "campaign_drafts" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "clientId" integer NOT NULL REFERENCES "clients"("id") ON DELETE CASCADE,
+        "cartJson" jsonb NOT NULL,
+        "expiresAt" timestamp,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_campaign_drafts_client_id"
+        ON "campaign_drafts" ("clientId");
+      CREATE INDEX IF NOT EXISTS "idx_campaign_drafts_expires_at"
+        ON "campaign_drafts" ("expiresAt");
+    `,
+  },
+  {
+    // Marketplace v2 — ajustes de contrato de schema:
+    //  • campaign_drafts.expiresAt: NOT NULL (semântica de expiração obrigatória).
+    //  • invoices.documentLabel: varchar(100) (label curta).
+    // Tabelas/colunas recém-criadas estão vazias, então aplicar com segurança.
+    name: "marketplace_v2_schema_adjustments",
+    sql: `
+      ALTER TABLE "invoices"
+        ALTER COLUMN "documentLabel" TYPE varchar(100);
+
+      UPDATE "campaign_drafts"
+        SET "expiresAt" = NOW() + INTERVAL '7 days'
+        WHERE "expiresAt" IS NULL;
+      ALTER TABLE "campaign_drafts"
+        ALTER COLUMN "expiresAt" SET NOT NULL;
+    `,
+  },
 ];
 
 export async function runMigrations() {
