@@ -179,6 +179,120 @@ async function startServer() {
       }
     });
 
+    // Test fixture: cria/garante usuário restaurante e2e vinculado a um
+    // active_restaurants existente. Sem restaurantes cadastrados retorna 412.
+    app.post("/api/dev-ensure-restaurante", async (req, res) => {
+      try {
+        const { authStorage } = await import("../replit_integrations/auth");
+        const { getDb } = await import("../db");
+        const { activeRestaurants } = await import("../../drizzle/schema");
+        const db = await getDb();
+        if (!db) return res.status(500).json({ message: "Database not available." });
+
+        const requestedId = Number(req.body?.restaurantId);
+        let restaurantId: number | null = Number.isFinite(requestedId) ? requestedId : null;
+        if (restaurantId == null) {
+          const rows = await db.select({ id: activeRestaurants.id }).from(activeRestaurants).limit(1);
+          restaurantId = rows[0]?.id ?? null;
+        }
+        if (restaurantId == null) {
+          return res.status(412).json({ message: "Nenhum restaurante cadastrado." });
+        }
+
+        const id = `e2e-restaurante-${Date.now()}`;
+        const user = await authStorage.upsertUser({
+          id,
+          email: `${id}@e2e.test`,
+          firstName: "E2E",
+          lastName: "Restaurante",
+          role: "restaurante",
+          restaurantId,
+          isActive: true,
+          onboardingComplete: true,
+        });
+        const { passwordHash: _, ...safe } = user;
+        res.json({ user: safe, restaurantId, created: true });
+      } catch (error) {
+        console.error("Dev ensure restaurante error:", error);
+        res.status(500).json({ message: "Erro ao garantir restaurante de teste." });
+      }
+    });
+
+    // Test fixture: cria/garante usuário parceiro e2e vinculado a um partner
+    // existente. Sem parceiros cadastrados retorna 412.
+    app.post("/api/dev-ensure-parceiro", async (req, res) => {
+      try {
+        const { authStorage } = await import("../replit_integrations/auth");
+        const { getDb } = await import("../db");
+        const { partners } = await import("../../drizzle/schema");
+        const db = await getDb();
+        if (!db) return res.status(500).json({ message: "Database not available." });
+
+        const requestedId = Number(req.body?.partnerId);
+        let partnerId: number | null = Number.isFinite(requestedId) ? requestedId : null;
+        if (partnerId == null) {
+          const rows = await db.select({ id: partners.id }).from(partners).limit(1);
+          partnerId = rows[0]?.id ?? null;
+        }
+        if (partnerId == null) {
+          return res.status(412).json({ message: "Nenhum parceiro cadastrado." });
+        }
+
+        const id = `e2e-parceiro-${Date.now()}`;
+        const user = await authStorage.upsertUser({
+          id,
+          email: `${id}@e2e.test`,
+          firstName: "E2E",
+          lastName: "Parceiro",
+          role: "parceiro",
+          partnerId,
+          isActive: true,
+          onboardingComplete: true,
+        });
+        const { passwordHash: _, ...safe } = user;
+        res.json({ user: safe, partnerId, created: true });
+      } catch (error) {
+        console.error("Dev ensure parceiro error:", error);
+        res.status(500).json({ message: "Erro ao garantir parceiro de teste." });
+      }
+    });
+
+    // Test fixture: encontra uma campanha cuja resolução de parceiro
+    // (via campaign.partnerId, quotation.partnerId ou client.partnerId)
+    // case com o partnerId informado. Espelha resolvePartnerForCampaign
+    // do materializer para garantir que a AP de partner_commission será
+    // atribuída a esse parceiro.
+    app.get("/api/dev-find-campaign-for-partner", async (req, res) => {
+      try {
+        const partnerId = Number(req.query.partnerId);
+        if (!Number.isFinite(partnerId)) {
+          return res.status(400).json({ message: "partnerId inválido." });
+        }
+        const { getDb } = await import("../db");
+        const db = await getDb();
+        if (!db) return res.status(500).json({ message: "Database not available." });
+        const { sql } = await import("drizzle-orm");
+        const rows = await db.execute(sql`
+          SELECT c.id, c."clientId", c.name
+          FROM campaigns c
+          LEFT JOIN quotations q ON q.id = c."quotationId"
+          LEFT JOIN clients cl ON cl.id = c."clientId"
+          WHERE c."partnerId" = ${partnerId}
+             OR q."partnerId" = ${partnerId}
+             OR cl."partnerId" = ${partnerId}
+          LIMIT 1;
+        `);
+        const row = (rows as { rows?: Array<{ id: number; clientId: number; name: string }> })
+          .rows?.[0]
+          ?? (Array.isArray(rows) ? (rows as Array<{ id: number; clientId: number; name: string }>)[0] : undefined);
+        if (!row) return res.status(412).json({ message: "Nenhuma campanha vinculada a esse parceiro." });
+        res.json(row);
+      } catch (error) {
+        console.error("Dev find-campaign-for-partner error:", error);
+        res.status(500).json({ message: "Erro ao buscar campanha do parceiro." });
+      }
+    });
+
     app.post("/api/dev-delete-user", async (req, res) => {
       try {
         const id = String(req.body?.userId ?? "");
