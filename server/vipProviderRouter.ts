@@ -4,7 +4,7 @@ import { getDb } from "./db";
 import { vipProviders, products, accountsPayable } from "../drizzle/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { recordAudit } from "./finance/audit";
+import { audited } from "./finance/auditMiddleware";
 
 async function getDatabase() {
   const d = await getDb();
@@ -94,7 +94,13 @@ export const vipProviderRouter = router({
       return withLegacyCommissionAlias(provider);
     }),
 
-  create: comercialProcedure
+  // Auditoria via middleware composto sobre comercialProcedure: o role-check
+  // comercial continua valendo, e o middleware audited() captura
+  // automaticamente o before/after e grava em financial_audit_log.
+  create: audited(comercialProcedure, {
+    entityType: "vip_provider",
+    action: "create",
+  })
     .input(z.object({
       name: z.string().min(1),
       company: z.string().optional(),
@@ -110,19 +116,22 @@ export const vipProviderRouter = router({
       status: z.enum(["active", "inactive"]).default("active"),
       notes: z.string().optional(),
     }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const db = await getDatabase();
       const normalized = normalizeRepasseInput(input);
       const values = { ...normalized, repassePercent: normalized.repassePercent ?? "10.00" };
       const [created] = await db.insert(vipProviders).values(values).returning();
-      await recordAudit(db, ctx, {
-        entityType: "vip_provider", entityId: created.id, action: "create",
-        before: null, after: created,
-      });
       return withLegacyCommissionAlias(created);
     }),
 
-  update: comercialProcedure
+  update: audited(comercialProcedure, {
+    entityType: "vip_provider",
+    action: "update",
+    loadBefore: async (input: { id: number }, db) => {
+      const [row] = await db.select().from(vipProviders).where(eq(vipProviders.id, input.id));
+      return row ?? null;
+    },
+  })
     .input(z.object({
       id: z.number(),
       name: z.string().min(1).optional(),
@@ -138,27 +147,30 @@ export const vipProviderRouter = router({
       status: z.enum(["active", "inactive"]).optional(),
       notes: z.string().optional(),
     }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const db = await getDatabase();
       const { id, ...rest } = input;
       const data = normalizeRepasseInput(rest);
-      const [before] = await db.select().from(vipProviders).where(eq(vipProviders.id, id));
       const [updated] = await db
         .update(vipProviders)
         .set({ ...data, updatedAt: new Date() })
         .where(eq(vipProviders.id, id))
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Provedor Sala VIP não encontrado" });
-      await recordAudit(db, ctx, {
-        entityType: "vip_provider", entityId: id, action: "update",
-        before, after: updated,
-      });
       return withLegacyCommissionAlias(updated);
     }),
 
-  delete: comercialProcedure
+  delete: audited(comercialProcedure, {
+    entityType: "vip_provider",
+    action: "delete",
+    loadBefore: async (input: { id: number }, db) => {
+      const [row] = await db.select().from(vipProviders).where(eq(vipProviders.id, input.id));
+      return row ?? null;
+    },
+    skipWhenEmpty: false,
+  })
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const db = await getDatabase();
       // Checar se há produtos vinculados antes de deletar
       const [linked] = await db
@@ -171,12 +183,7 @@ export const vipProviderRouter = router({
           message: "Não é possível excluir: existem produtos vinculados a este provedor. Desvincule-os primeiro.",
         });
       }
-      const [before] = await db.select().from(vipProviders).where(eq(vipProviders.id, input.id));
       await db.delete(vipProviders).where(eq(vipProviders.id, input.id));
-      await recordAudit(db, ctx, {
-        entityType: "vip_provider", entityId: input.id, action: "delete",
-        before, after: null,
-      });
       return { success: true };
     }),
 

@@ -10,7 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { trpc } from "@/lib/trpc";
+import { trpc, type RouterOutputs } from "@/lib/trpc";
+
+type AuditLogResponse = RouterOutputs["financial"]["auditLog"];
+type AuditRowData = AuditLogResponse["rows"][number];
+type AuditActor = RouterOutputs["financial"]["auditLogActors"][number];
 import { useAuth } from "@/hooks/use-auth";
 import {
   ChevronDown,
@@ -53,17 +57,24 @@ function formatDateTime(d: Date | string | null): string {
   });
 }
 
-type AnyObj = Record<string, unknown> | null | undefined;
+type JsonObject = Record<string, unknown> | null | undefined;
 
-function diffKeys(before: AnyObj, after: AnyObj): string[] {
+function asObject(v: unknown): Record<string, unknown> | null {
+  if (v && typeof v === "object" && !Array.isArray(v)) return v as Record<string, unknown>;
+  return null;
+}
+
+function diffKeys(before: JsonObject, after: JsonObject): string[] {
+  const beforeObj = asObject(before);
+  const afterObj = asObject(after);
   const keys = new Set<string>();
-  if (before && typeof before === "object") for (const k of Object.keys(before)) keys.add(k);
-  if (after && typeof after === "object") for (const k of Object.keys(after)) keys.add(k);
+  if (beforeObj) for (const k of Object.keys(beforeObj)) keys.add(k);
+  if (afterObj) for (const k of Object.keys(afterObj)) keys.add(k);
   const result: string[] = [];
   Array.from(keys).forEach((k) => {
     if (k === "updatedAt" || k === "createdAt") return;
-    const a = (before as any)?.[k];
-    const b = (after as any)?.[k];
+    const a = beforeObj?.[k];
+    const b = afterObj?.[k];
     if (JSON.stringify(a) !== JSON.stringify(b)) result.push(k);
   });
   return result.sort();
@@ -75,9 +86,9 @@ function fmtVal(v: unknown): string {
   return String(v);
 }
 
-function DiffRow({ k, before, after }: { k: string; before: AnyObj; after: AnyObj }) {
-  const a = (before as any)?.[k];
-  const b = (after as any)?.[k];
+function DiffRow({ k, before, after }: { k: string; before: JsonObject; after: JsonObject }) {
+  const a = asObject(before)?.[k];
+  const b = asObject(after)?.[k];
   return (
     <tr className="border-t border-[hsl(0,0%,14%)]">
       <td className="py-1.5 px-2 text-xs font-mono text-zinc-400">{k}</td>
@@ -87,12 +98,15 @@ function DiffRow({ k, before, after }: { k: string; before: AnyObj; after: AnyOb
   );
 }
 
-function AuditRow({ row }: { row: any }) {
+function AuditRow({ row }: { row: AuditRowData }) {
   const [open, setOpen] = useState(false);
   const action = ACTION_LABELS[row.action] || { label: row.action, color: "bg-zinc-500/10 text-zinc-400 border-zinc-500/30" };
   const entity = ENTITY_LABELS[row.entityType] || row.entityType;
-  const changedKeys = useMemo(() => diffKeys(row.before, row.after), [row.before, row.after]);
-  const hasDetails = row.before || row.after || row.metadata;
+  const before = row.before as JsonObject;
+  const after = row.after as JsonObject;
+  const metadata = row.metadata as JsonObject;
+  const changedKeys = useMemo(() => diffKeys(before, after), [before, after]);
+  const hasDetails = before || after || metadata;
 
   return (
     <>
@@ -135,32 +149,32 @@ function AuditRow({ row }: { row: any }) {
                   </thead>
                   <tbody>
                     {changedKeys.map((k) => (
-                      <DiffRow key={k} k={k} before={row.before} after={row.after} />
+                      <DiffRow key={k} k={k} before={before} after={after} />
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-            {row.metadata && (
+            {metadata && (
               <div className="mt-3">
                 <div className="text-[11px] uppercase text-zinc-500 mb-1.5">Metadados</div>
                 <pre className="text-[11px] font-mono text-zinc-300 bg-[hsl(0,0%,3%)] p-2 rounded overflow-auto max-h-64">
-                  {JSON.stringify(row.metadata, null, 2)}
+                  {JSON.stringify(metadata, null, 2)}
                 </pre>
               </div>
             )}
-            {!changedKeys.length && (row.before || row.after) && (
+            {!changedKeys.length && (before || after) && (
               <div className="mt-2 grid grid-cols-2 gap-3">
                 <div>
                   <div className="text-[11px] uppercase text-zinc-500 mb-1.5">Antes</div>
                   <pre className="text-[11px] font-mono text-zinc-300 bg-[hsl(0,0%,3%)] p-2 rounded overflow-auto max-h-64">
-                    {row.before ? JSON.stringify(row.before, null, 2) : "—"}
+                    {before ? JSON.stringify(before, null, 2) : "—"}
                   </pre>
                 </div>
                 <div>
                   <div className="text-[11px] uppercase text-zinc-500 mb-1.5">Depois</div>
                   <pre className="text-[11px] font-mono text-zinc-300 bg-[hsl(0,0%,3%)] p-2 rounded overflow-auto max-h-64">
-                    {row.after ? JSON.stringify(row.after, null, 2) : "—"}
+                    {after ? JSON.stringify(after, null, 2) : "—"}
                   </pre>
                 </div>
               </div>
@@ -266,9 +280,9 @@ export default function FinancialAuditLog() {
             <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              {(actors ?? []).map((a: any) => (
-                <SelectItem key={a.actorUserId} value={a.actorUserId}>
-                  {a.actorRole ? `[${a.actorRole}] ` : ""}{a.actorUserId}
+              {(actors ?? []).map((a: AuditActor) => (
+                <SelectItem key={a.actorUserId ?? "unknown"} value={a.actorUserId ?? "unknown"}>
+                  {a.actorRole ? `[${a.actorRole}] ` : ""}{a.actorUserId ?? "(sistema)"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -307,7 +321,7 @@ export default function FinancialAuditLog() {
                 <tr><td colSpan={7} className="py-12 text-center text-zinc-500 text-sm">Carregando…</td></tr>
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} className="py-12 text-center text-zinc-500 text-sm">Nenhuma entrada encontrada.</td></tr>
-              ) : rows.map((r: any) => <AuditRow key={r.id} row={r} />)}
+              ) : rows.map((r: AuditRowData) => <AuditRow key={r.id} row={r} />)}
             </tbody>
           </table>
         </div>
