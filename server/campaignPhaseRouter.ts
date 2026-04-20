@@ -8,6 +8,7 @@ import {
   products,
   invoices,
   accountsPayable,
+  vipProviders,
 } from "../drizzle/schema";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -365,11 +366,46 @@ export const campaignPhaseRouter = router({
               item: campaignItems,
               productName: products.name,
               productTipo: products.tipo,
+              productVipProviderId: products.vipProviderId,
+              productVipProviderCommissionPercent: products.vipProviderCommissionPercent,
+              vipProviderRepassePercent: vipProviders.repassePercent,
             })
             .from(campaignItems)
             .leftJoin(products, eq(products.id, campaignItems.productId))
+            .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId))
             .where(sql`${campaignItems.campaignPhaseId} IN (${sql.join(phaseIds.map((id) => sql`${id}`), sql`, `)})`)
         : [];
+
+      // Resolve % de repasse VIP (override do produto vence base do provedor).
+      // Só aplica em produtos digitais (telas/janelas) com provedor configurado.
+      // Bonificadas não geram repasse (consistente com financialRouter/calcVipRepasse).
+      const DIGITAL_TIPOS = new Set(["telas", "janelas_digitais"]);
+      const isBonificada = !!campaign.isBonificada;
+      const isDigitalItem = (i: typeof items[number]): boolean =>
+        !!i.productTipo && DIGITAL_TIPOS.has(i.productTipo);
+      const vipRepasseRateForItem = (i: typeof items[number]): number => {
+        if (isBonificada) return 0;
+        if (!isDigitalItem(i)) return 0;
+        if (!i.productVipProviderId) return 0;
+        const override = i.productVipProviderCommissionPercent;
+        if (override != null && override !== "") {
+          const v = parseFloat(String(override));
+          if (Number.isFinite(v)) return v / 100;
+        }
+        const base = parseFloat(String(i.vipProviderRepassePercent ?? "0"));
+        return Number.isFinite(base) ? base / 100 : 0;
+      };
+      const itemRevenue = (i: typeof items[number]): number =>
+        i.item.totalPrice != null
+          ? parseFloat(i.item.totalPrice)
+          : i.item.quantity * parseFloat(i.item.unitPrice);
+      const itemVipRepasse = (i: typeof items[number]): number =>
+        itemRevenue(i) * vipRepasseRateForItem(i);
+      // Regra "tela vs bolacha": digitais pulam produção/frete; físicos pulam VIP.
+      const itemProductionCost = (i: typeof items[number]): number =>
+        isDigitalItem(i) ? 0 : parseFloat(i.item.productionCost);
+      const itemFreightCost = (i: typeof items[number]): number =>
+        isDigitalItem(i) ? 0 : parseFloat(i.item.freightCost);
 
       // Faturas e contas a pagar da campanha (toda)
       const campaignInvoices = await db
@@ -385,13 +421,10 @@ export const campaignPhaseRouter = router({
       // Agregações por fase
       const phaseBreakdown = phases.map((p) => {
         const phaseItems = items.filter((i) => i.item.campaignPhaseId === p.id);
-        const expectedRevenue = phaseItems.reduce((s, i) => {
-          return s + (i.item.totalPrice != null
-            ? parseFloat(i.item.totalPrice)
-            : i.item.quantity * parseFloat(i.item.unitPrice));
-        }, 0);
+        const expectedRevenue = phaseItems.reduce((s, i) => s + itemRevenue(i), 0);
+        // Custos previstos = produção + frete (físicos) + repasse VIP (digitais).
         const expectedCosts = phaseItems.reduce(
-          (s, i) => s + parseFloat(i.item.productionCost) + parseFloat(i.item.freightCost),
+          (s, i) => s + itemProductionCost(i) + itemFreightCost(i) + itemVipRepasse(i),
           0,
         );
 
@@ -440,9 +473,11 @@ export const campaignPhaseRouter = router({
         totalRevenue: number;
         totalProductionCost: number;
         totalFreightCost: number;
+        totalVipRepasse: number;
         phaseCount: number;
       }> = {};
-      for (const { item, productName, productTipo } of items) {
+      for (const i of items) {
+        const { item, productName, productTipo } = i;
         const agg = productAgg[item.productId] ?? {
           productId: item.productId,
           productName: productName ?? "—",
@@ -451,14 +486,14 @@ export const campaignPhaseRouter = router({
           totalRevenue: 0,
           totalProductionCost: 0,
           totalFreightCost: 0,
+          totalVipRepasse: 0,
           phaseCount: 0,
         };
         agg.totalQuantity += item.quantity;
-        agg.totalRevenue += item.totalPrice != null
-          ? parseFloat(item.totalPrice)
-          : item.quantity * parseFloat(item.unitPrice);
-        agg.totalProductionCost += parseFloat(item.productionCost);
-        agg.totalFreightCost += parseFloat(item.freightCost);
+        agg.totalRevenue += itemRevenue(i);
+        agg.totalProductionCost += itemProductionCost(i);
+        agg.totalFreightCost += itemFreightCost(i);
+        agg.totalVipRepasse += itemVipRepasse(i);
         agg.phaseCount += 1;
         productAgg[item.productId] = agg;
       }

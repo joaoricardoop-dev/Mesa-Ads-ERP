@@ -1141,8 +1141,25 @@ export default function CampaignDetail() {
     return Number.isFinite(v) ? v / 100 : BV_PADRAO;
   })();
   const bvMonthly = hasAgencyBv ? p.monthlyRevenue * agencyBvPct : 0;
+
+  // Repasse Sala VIP — só para produtos digitais (telas/janelas) com provedor.
+  // Override por produto vence o % padrão do provedor (já resolvido em getCampaign).
+  const vipProviderName = campaign.vipProviderName ?? null;
+  const vipRepassePct = (() => {
+    if (!isDigitalProduct) return 0;
+    if (!campaign.productVipProviderId) return 0;
+    const override = campaign.productVipProviderCommissionPercent;
+    if (override != null && override !== "") {
+      const v = parseFloat(String(override));
+      if (Number.isFinite(v)) return v / 100;
+    }
+    const base = parseFloat(String(campaign.vipProviderRepassePercent ?? "0"));
+    return Number.isFinite(base) ? base / 100 : 0;
+  })();
+  const vipRepasseMonthly = p.monthlyRevenue * vipRepassePct;
+
   const dreCalc = (() => {
-    const liquido = p.monthlyRevenue - p.totalTax - bvMonthly - p.totalSellerComm - p.totalRestComm;
+    const liquido = p.monthlyRevenue - p.totalTax - bvMonthly - p.totalSellerComm - p.totalRestComm - vipRepasseMonthly;
     const custos = p.totalProductionCost + p.totalFreight;
     const resultado = liquido - custos;
     const dur = campaign.contractDuration || 1;
@@ -2822,6 +2839,15 @@ export default function CampaignDetail() {
                             monthly={p.totalRestComm}
                             pct={p.monthlyRevenue > 0 ? (p.totalRestComm / p.monthlyRevenue) * 100 : 0}
                             contract={p.totalRestComm * (campaign.contractDuration || 1)}
+                            sub warn
+                          />
+                        )}
+                        {isDigitalProduct && vipRepasseMonthly > 0 && (
+                          <DRECampRow
+                            label={`(-) Repasse Sala VIP${vipProviderName ? ` → ${vipProviderName}` : ""}`}
+                            monthly={vipRepasseMonthly}
+                            pct={vipRepassePct * 100}
+                            contract={vipRepasseMonthly * (campaign.contractDuration || 1)}
                             sub warn
                           />
                         )}

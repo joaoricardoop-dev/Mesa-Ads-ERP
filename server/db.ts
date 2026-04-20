@@ -20,6 +20,7 @@ import {
   quotations,
   partners,
   serviceOrders,
+  vipProviders,
   type InsertRestaurant,
   type InsertClient,
   type InsertCampaign,
@@ -347,6 +348,10 @@ export async function getCampaign(id: number) {
       productLoopDurationSeconds: products.loopDurationSeconds,
       productFrequenciaAparicoes: products.frequenciaAparicoes,
       productWorkflowTemplate: products.workflowTemplate,
+      productVipProviderId: products.vipProviderId,
+      productVipProviderCommissionPercent: products.vipProviderCommissionPercent,
+      vipProviderName: vipProviders.name,
+      vipProviderRepassePercent: vipProviders.repassePercent,
       quotationTotalValue: quotations.totalValue,
       quotationCoasterVolume: quotations.coasterVolume,
       quotationUnitPrice: quotations.unitPrice,
@@ -366,6 +371,7 @@ export async function getCampaign(id: number) {
     })
     .from(campaigns)
     .leftJoin(products, eq(campaigns.productId, products.id))
+    .leftJoin(vipProviders, eq(products.vipProviderId, vipProviders.id))
     .leftJoin(quotations, eq(campaigns.quotationId, quotations.id))
     .leftJoin(partners, eq(quotations.partnerId, partners.id))
     .where(eq(campaigns.id, id))
@@ -381,6 +387,10 @@ export async function getCampaign(id: number) {
     productLoopDurationSeconds: result[0].productLoopDurationSeconds,
     productFrequenciaAparicoes: result[0].productFrequenciaAparicoes,
     productWorkflowTemplate: result[0].productWorkflowTemplate,
+    productVipProviderId: result[0].productVipProviderId,
+    productVipProviderCommissionPercent: result[0].productVipProviderCommissionPercent,
+    vipProviderName: result[0].vipProviderName,
+    vipProviderRepassePercent: result[0].vipProviderRepassePercent,
     quotationTotalValue: result[0].quotationTotalValue,
     quotationCoasterVolume: result[0].quotationCoasterVolume,
     quotationUnitPrice: result[0].quotationUnitPrice,

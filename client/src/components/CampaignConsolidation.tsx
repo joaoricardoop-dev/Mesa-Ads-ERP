@@ -216,12 +216,14 @@ export default function CampaignConsolidation({ campaignId }: { campaignId: numb
                 <th className="text-right p-2 text-muted-foreground font-medium">Receita</th>
                 <th className="text-right p-2 text-muted-foreground font-medium">Produção</th>
                 <th className="text-right p-2 text-muted-foreground font-medium">Frete</th>
+                <th className="text-right p-2 text-muted-foreground font-medium">Repasse VIP</th>
                 <th className="text-right p-2 text-muted-foreground font-medium">Margem bruta</th>
               </tr>
             </thead>
             <tbody>
               {data.productBreakdown.map((pr) => {
-                const total = pr.totalRevenue - pr.totalProductionCost - pr.totalFreightCost;
+                const vipRepasse = pr.totalVipRepasse ?? 0;
+                const total = pr.totalRevenue - pr.totalProductionCost - pr.totalFreightCost - vipRepasse;
                 return (
                   <tr key={pr.productId} className="border-t border-border/20">
                     <td className="p-2">
@@ -238,6 +240,7 @@ export default function CampaignConsolidation({ campaignId }: { campaignId: numb
                     <td className="p-2 text-right font-mono text-emerald-400">{formatCurrency(pr.totalRevenue)}</td>
                     <td className="p-2 text-right font-mono text-red-400/80">{formatCurrency(pr.totalProductionCost)}</td>
                     <td className="p-2 text-right font-mono text-red-400/80">{formatCurrency(pr.totalFreightCost)}</td>
+                    <td className="p-2 text-right font-mono text-red-400/80">{vipRepasse > 0 ? formatCurrency(vipRepasse) : "—"}</td>
                     <td className={`p-2 text-right font-mono font-semibold ${total >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                       {formatCurrency(total)}
                     </td>
