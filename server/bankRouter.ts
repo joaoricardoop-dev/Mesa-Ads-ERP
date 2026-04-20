@@ -1,7 +1,7 @@
 import { protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getDb } from "./db";
 import {
@@ -331,7 +331,10 @@ export const bankRouter = router({
           })
           .from(invoices)
           .leftJoin(clients, eq(clients.id, invoices.clientId))
-          .where(eq(invoices.status, "emitida"))
+          .where(or(
+            eq(invoices.status, "emitida"),
+            and(eq(invoices.status, "paga"), isNull(invoices.receivedDate)),
+          ))
           .orderBy(asc(invoices.dueDate));
         return rows;
       }
@@ -390,7 +393,10 @@ export const bankRouter = router({
           })
           .from(invoices)
           .leftJoin(clients, eq(clients.id, invoices.clientId))
-          .where(eq(invoices.status, "emitida"));
+          .where(or(
+            eq(invoices.status, "emitida"),
+            and(eq(invoices.status, "paga"), isNull(invoices.receivedDate)),
+          ));
         for (const r of rows) {
           const score = scoreMatch(
             { amount: txn.amount, date: txn.date, description: txn.description },
@@ -497,22 +503,52 @@ export const bankRouter = router({
 
       // Carrega entidades do BD pra validar status + computar soma autoritativa.
       // NUNCA confiar em valores do cliente para mutações financeiras.
-      const resolved: Array<{ kind: "invoice" | "accounts_payable"; id: number; amount: string }> = [];
+      // Faturas: aceita "emitida" OU "paga sem receivedDate" (caso o usuário
+      // já tenha marcado como paga via tela de Faturamento e agora está
+      // conciliando o crédito bancário). Capturamos o estado anterior
+      // (prevStatus/prevReceivedDate/prevPaymentDate) pra que o undo
+      // restaure exatamente o que existia antes.
+      const resolved: Array<{
+        kind: "invoice" | "accounts_payable";
+        id: number;
+        amount: string;
+        prevStatus: string | null;
+        prevReceivedDate: string | null;
+        prevPaymentDate: string | null;
+      }> = [];
       for (const m of input.matches) {
         if (m.kind === "invoice") {
           const [row] = await db.select().from(invoices).where(eq(invoices.id, m.id));
           if (!row) throw new TRPCError({ code: "NOT_FOUND", message: `Fatura ${m.id} não encontrada` });
-          if (row.status !== "emitida") {
-            throw new TRPCError({ code: "BAD_REQUEST", message: `Fatura ${m.id} não está em aberto (status=${row.status})` });
+          const reconciliable = row.status === "emitida" || (row.status === "paga" && !row.receivedDate);
+          if (!reconciliable) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Fatura ${m.id} não pode ser conciliada (status=${row.status}${row.receivedDate ? ", já recebida" : ""})`,
+            });
           }
-          resolved.push({ kind: "invoice", id: m.id, amount: row.amount });
+          resolved.push({
+            kind: "invoice",
+            id: m.id,
+            amount: row.amount,
+            prevStatus: row.status,
+            prevReceivedDate: row.receivedDate ?? null,
+            prevPaymentDate: null,
+          });
         } else {
           const [row] = await db.select().from(accountsPayable).where(eq(accountsPayable.id, m.id));
           if (!row) throw new TRPCError({ code: "NOT_FOUND", message: `Conta a pagar ${m.id} não encontrada` });
           if (row.status !== "pendente") {
             throw new TRPCError({ code: "BAD_REQUEST", message: `Conta a pagar ${m.id} não está pendente (status=${row.status})` });
           }
-          resolved.push({ kind: "accounts_payable", id: m.id, amount: row.amount });
+          resolved.push({
+            kind: "accounts_payable",
+            id: m.id,
+            amount: row.amount,
+            prevStatus: row.status,
+            prevReceivedDate: null,
+            prevPaymentDate: row.paymentDate ?? null,
+          });
         }
       }
 
@@ -537,17 +573,25 @@ export const bankRouter = router({
             reconciledBy: ctx.user?.id ?? null,
             matchedEntityType: single?.kind ?? "multi",
             matchedEntityId: single?.id ?? null,
-            matches: resolved.map((m) => ({ entityType: m.kind, entityId: m.id, amount: m.amount })),
+            matches: resolved.map((m) => ({
+              entityType: m.kind,
+              entityId: m.id,
+              amount: m.amount,
+              prevStatus: m.prevStatus,
+              prevReceivedDate: m.prevReceivedDate,
+              prevPaymentDate: m.prevPaymentDate,
+            })),
             updatedAt: new Date(),
           })
           .where(eq(bankTransactions.id, txn.id));
 
-        // 2) Atualiza cada item conciliado.
+        // 2) Atualiza cada item conciliado: faturas viram "paga" + receivedDate;
+        // contas a pagar viram "pago" + paymentDate.
         for (const m of input.matches) {
           if (m.kind === "invoice") {
             await tx
               .update(invoices)
-              .set({ receivedDate: txn.date, updatedAt: new Date() })
+              .set({ status: "paga", receivedDate: txn.date, updatedAt: new Date() })
               .where(eq(invoices.id, m.id));
           } else {
             await tx
@@ -589,16 +633,28 @@ export const bankRouter = router({
       const matches = txn.matches ?? [];
 
       await db.transaction(async (tx: DbClient) => {
+        // Restaura cada item ao estado anterior à conciliação. Se o
+        // prevStatus não existir (matches antigos), usa o default sensato:
+        // fatura volta a "emitida" sem receivedDate; conta a pagar volta
+        // a "pendente" sem paymentDate.
         for (const m of matches) {
           if (m.entityType === "invoice") {
             await tx
               .update(invoices)
-              .set({ receivedDate: null, updatedAt: new Date() })
+              .set({
+                status: (m.prevStatus as "emitida" | "paga" | undefined) ?? "emitida",
+                receivedDate: m.prevReceivedDate ?? null,
+                updatedAt: new Date(),
+              })
               .where(eq(invoices.id, m.entityId));
           } else if (m.entityType === "accounts_payable") {
             await tx
               .update(accountsPayable)
-              .set({ status: "pendente", paymentDate: null, updatedAt: new Date() })
+              .set({
+                status: (m.prevStatus as "pendente" | "pago" | undefined) ?? "pendente",
+                paymentDate: m.prevPaymentDate ?? null,
+                updatedAt: new Date(),
+              })
               .where(eq(accountsPayable.id, m.entityId));
           }
         }

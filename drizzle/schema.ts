@@ -1386,7 +1386,7 @@ export const bankTransactions = pgTable("bank_transactions", {
   // Em matches 1↔1: matchedEntityType + matchedEntityId. Em 1↔N: matches[].
   matchedEntityType: varchar("matchedEntityType", { length: 32 }),
   matchedEntityId: integer("matchedEntityId"),
-  matches: jsonb("matches").$type<Array<{ entityType: "invoice" | "accounts_payable"; entityId: number; amount: string }>>(),
+  matches: jsonb("matches").$type<Array<{ entityType: "invoice" | "accounts_payable"; entityId: number; amount: string; prevStatus?: string | null; prevReceivedDate?: string | null; prevPaymentDate?: string | null }>>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
