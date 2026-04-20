@@ -41,7 +41,7 @@ test.describe("finance — ciclo de vida de fatura", () => {
       // Determinístico: garante que existe campanha (cria genérica se preciso).
       // Acceptance criterion finrefac #9: CI sem skip.
       const ensured = await devEnsureCampaign(request);
-      const campaignsAfter = await trpcQuery<Campaign[]>(request, "campaigns.list");
+      const campaignsAfter = await trpcQuery<Campaign[]>(request, "campaign.list");
       campaign = campaignsAfter.find((c) => c.id === ensured.id) ?? campaignsAfter[0];
     }
     expect(campaign, "devEnsureCampaign deve garantir ao menos uma campanha").toBeDefined();

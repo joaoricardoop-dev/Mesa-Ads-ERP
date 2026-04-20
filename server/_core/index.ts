@@ -334,10 +334,32 @@ async function startServer() {
         );
 
         // Precisa de uma campanha porque o mirror para accounts_payable
-        // dispara dual-write — a primeira disponível serve.
-        const [camp] = await db.select({ id: campaigns.id }).from(campaigns).limit(1);
+        // dispara dual-write — a primeira disponível serve. Se não houver,
+        // cria client+campaign genéricos in-line p/ que o seed seja
+        // auto-suficiente (acceptance "CI sem skip" finrefac #9).
+        const { clients } = await import("../../drizzle/schema");
+        let [camp] = await db.select({ id: campaigns.id }).from(campaigns).limit(1);
         if (!camp) {
-          return res.status(412).json({ message: "Nenhuma campanha cadastrada." });
+          const tag = `e2e-${Date.now()}`;
+          const [client] = await db
+            .insert(clients)
+            .values({ name: `E2E Client ${tag}`, status: "active" })
+            .returning();
+          const today = new Date();
+          const startDate = today.toISOString().slice(0, 10);
+          const endDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 10);
+          [camp] = await db
+            .insert(campaigns)
+            .values({
+              clientId: client.id,
+              name: `E2E Campaign ${tag}`,
+              startDate,
+              endDate,
+              status: "draft",
+            })
+            .returning({ id: campaigns.id });
         }
 
         // Usa o helper oficial (addRestaurantPayment) p/ que o ledger

@@ -32,7 +32,7 @@ test.describe("finance — DRE dual (competência vs caixa)", () => {
     let campaign = await pickAnyCampaign(request);
     if (!campaign) {
       const ensured = await devEnsureCampaign(request);
-      const list = await trpcQuery<Campaign[]>(request, "campaigns.list");
+      const list = await trpcQuery<Campaign[]>(request, "campaign.list");
       campaign = list.find((c) => c.id === ensured.id) ?? list[0];
     }
     expect(campaign, "devEnsureCampaign deve garantir ao menos uma campanha").toBeDefined();
