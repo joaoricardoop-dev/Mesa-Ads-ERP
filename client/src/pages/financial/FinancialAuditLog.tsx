@@ -20,7 +20,6 @@ import {
   ChevronDown,
   ChevronRight,
   ShieldX,
-  History,
   RefreshCw,
 } from "lucide-react";
 import { useMemo, useState } from "react";
