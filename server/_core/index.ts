@@ -123,6 +123,84 @@ async function startServer() {
         res.status(500).json({ message: "Erro ao listar usuários." });
       }
     });
+
+    // Test fixture endpoint: ensures an anunciante user exists with a clientId
+    // so e2e specs (e.g. checkout-wizard) can run reliably even on a fresh dev
+    // DB. The created user uses a stable `e2e-` prefix so /api/dev-delete-user
+    // can clean it up afterwards. Only available in development.
+    app.post("/api/dev-ensure-anunciante", async (req, res) => {
+      try {
+        const { authStorage } = await import("../replit_integrations/auth");
+        const { getDb } = await import("../db");
+        const { clients } = await import("../../drizzle/schema");
+        const allUsers = await authStorage.listUsers();
+        const existing = allUsers.find(
+          (u) => u.role === "anunciante" && u.clientId != null,
+        );
+        if (existing) {
+          const { passwordHash: _, ...safe } = existing;
+          return res.json({ user: safe, created: false });
+        }
+
+        const db = await getDb();
+        if (!db) {
+          return res.status(500).json({ message: "Database not available." });
+        }
+        const requestedClientId = Number(req.body?.clientId);
+        let clientId: number | null = Number.isFinite(requestedClientId)
+          ? requestedClientId
+          : null;
+        if (clientId == null) {
+          const rows = await db.select({ id: clients.id }).from(clients).limit(1);
+          clientId = rows[0]?.id ?? null;
+        }
+        if (clientId == null) {
+          return res
+            .status(412)
+            .json({ message: "Nenhum cliente cadastrado para vincular ao anunciante de teste." });
+        }
+
+        const id = `e2e-anunciante-${Date.now()}`;
+        const user = await authStorage.upsertUser({
+          id,
+          email: `${id}@e2e.test`,
+          firstName: "E2E",
+          lastName: "Anunciante",
+          role: "anunciante",
+          clientId,
+          isActive: true,
+          onboardingComplete: true,
+        });
+        const { passwordHash: _, ...safe } = user;
+        res.json({ user: safe, created: true });
+      } catch (error) {
+        console.error("Dev ensure anunciante error:", error);
+        res.status(500).json({ message: "Erro ao garantir anunciante de teste." });
+      }
+    });
+
+    app.post("/api/dev-delete-user", async (req, res) => {
+      try {
+        const id = String(req.body?.userId ?? "");
+        if (!id.startsWith("e2e-")) {
+          return res
+            .status(400)
+            .json({ message: "Apenas usuários de teste (prefixo 'e2e-') podem ser removidos." });
+        }
+        const { getDb } = await import("../db");
+        const { users } = await import("@shared/models/auth");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) {
+          return res.status(500).json({ message: "Database not available." });
+        }
+        await db.delete(users).where(eq(users.id, id));
+        res.json({ ok: true });
+      } catch (error) {
+        console.error("Dev delete user error:", error);
+        res.status(500).json({ message: "Erro ao remover usuário de teste." });
+      }
+    });
   }
 
   setupClerkAuth(app);

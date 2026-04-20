@@ -28,6 +28,26 @@ async function devLogout(request: APIRequestContext) {
   await request.post("/api/dev-logout");
 }
 
+async function ensureAnuncianteUser(request: APIRequestContext): Promise<{
+  user: DevUser;
+  created: boolean;
+}> {
+  const r = await request.post("/api/dev-ensure-anunciante", { data: {} });
+  expect(r.ok(), `dev-ensure-anunciante failed: ${r.status()}`).toBeTruthy();
+  const body = (await r.json()) as { user: DevUser; created: boolean };
+  return body;
+}
+
+async function deleteDevUser(request: APIRequestContext, userId: string) {
+  const res = await request.post("/api/dev-delete-user", { data: { userId } });
+  if (!res.ok()) {
+    console.warn(
+      `[checkout-wizard cleanup] failed to delete dev user ${userId}:`,
+      await res.text(),
+    );
+  }
+}
+
 async function deleteQuotationAsAdmin(
   request: APIRequestContext,
   adminUserId: string,
@@ -123,6 +143,7 @@ async function expectSuccessScreen(page: Page, quotationNumber: string) {
 test.describe("checkout wizard ponta-a-ponta", () => {
   let adminUserId: string | null = null;
   let anuncianteUser: DevUser | null = null;
+  let anuncianteCreated = false;
   let internalUser: DevUser | null = null;
   let venueAvailable = false;
   let firstClientName: string | null = null;
@@ -132,8 +153,16 @@ test.describe("checkout wizard ponta-a-ponta", () => {
     const admin = users.find((u) => u.role === "admin") ??
       users.find((u) => INTERNAL_ROLES.includes(u.role));
     adminUserId = admin?.id ?? null;
-    anuncianteUser = users.find((u) => u.role === "anunciante" && u.clientId != null) ?? null;
     internalUser = users.find((u) => INTERNAL_ROLES.includes(u.role)) ?? null;
+
+    // Make sure there is always an anunciante with clientId so the wizard
+    // scenario isn't silently skipped on a fresh dev DB. We fail loudly here
+    // (instead of falling back to "skip") so a regression in the fixture
+    // endpoint surfaces as a real CI failure rather than a hidden coverage gap.
+    const ensured = await ensureAnuncianteUser(request);
+    anuncianteUser = ensured.user;
+    anuncianteCreated = ensured.created;
+    expect(anuncianteUser?.clientId, "anunciante fixture must have a clientId").toBeTruthy();
 
     // Both probes below need an authenticated session (procedures are protected).
     if (adminUserId) {
@@ -166,6 +195,12 @@ test.describe("checkout wizard ponta-a-ponta", () => {
       }
 
       await devLogout(request);
+    }
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (anuncianteCreated && anuncianteUser) {
+      await deleteDevUser(request, anuncianteUser.id);
     }
   });
 
