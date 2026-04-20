@@ -1701,10 +1701,13 @@ export const financialRouter = router({
         byClientMap[inv.clientId].invList.push(inv);
       }
 
-      // Agrega por mês
+      // Agrega por mês — bucketing depende do regime:
+      //  • caixa       → mês do paymentDate (quando o dinheiro entrou)
+      //  • competência → mês do issueDate (quando a fatura foi emitida)
       const byMonthMap: Record<string, { grossBilling: number; netBilling: number }> = {};
       for (const inv of invoiceRows) {
-        const month = inv.issueDate ? inv.issueDate.substring(0, 7) : "unknown";
+        const bucketDate = regime === "caixa" ? inv.paymentDate : inv.issueDate;
+        const month = bucketDate ? bucketDate.substring(0, 7) : "unknown";
         if (!byMonthMap[month]) byMonthMap[month] = { grossBilling: 0, netBilling: 0 };
         byMonthMap[month].grossBilling += parseFloat(inv.amount);
         byMonthMap[month].netBilling += parseFloat(inv.netAmount as string);

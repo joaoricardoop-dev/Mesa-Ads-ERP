@@ -358,7 +358,7 @@ export default function CampaignOverview() {
                   {campaign.campaignNumber}
                 </Badge>
               )}
-              {(campaign as any)?.isBonificada && (
+              {campaign?.isBonificada && (
                 <Badge variant="outline" className="text-[10px] uppercase tracking-wide bg-amber-500/15 text-amber-400 border-amber-500/30">
                   <Gift className="w-3 h-3 mr-1" /> Bonificada
                 </Badge>
@@ -404,8 +404,8 @@ export default function CampaignOverview() {
           </div>
         </div>
 
-        {!loadingCamp && (campaign as any)?.quotationId && (
-          <QuotationSection quotationId={(campaign as any).quotationId} />
+        {!loadingCamp && campaign?.quotationId && (
+          <QuotationSection quotationId={campaign.quotationId} />
         )}
 
         {isLoading && (

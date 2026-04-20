@@ -371,7 +371,7 @@ export async function getCampaign(id: number) {
     .where(eq(campaigns.id, id))
     .limit(1);
   if (!result[0]) return undefined;
-  const out: Record<string, any> = {
+  const out = {
     ...result[0].campaign,
     productName: result[0].productName,
     productTipo: result[0].productTipo,
