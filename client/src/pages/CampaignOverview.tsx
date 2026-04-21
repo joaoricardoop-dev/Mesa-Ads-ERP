@@ -22,6 +22,7 @@ import {
 import { useState } from "react";
 import { CampaignConsolidated } from "@/components/campaign/CampaignConsolidated";
 import { getInvoiceBadgeMeta } from "@/components/campaign/InvoiceSchedule";
+import CampaignHealthDashboard from "@/components/campaign/CampaignHealthDashboard";
 
 function QuotationSection({ quotationId }: { quotationId: number }) {
   const [, setLocation] = useLocation();
@@ -463,15 +464,17 @@ export default function CampaignOverview() {
         )}
 
         {!loadingCamp && campaign && (
-          <CampaignEconomicsSection campaign={campaign as any} />
+          <CampaignHealthDashboard campaignId={campaignId} />
         )}
       </div>
     </div>
   );
 }
 
-// ── Economics & Infos Gerais (após batches) ─────────────────────────────────
-function CampaignEconomicsSection({ campaign }: { campaign: any }) {
+// ── Economics & Infos Gerais (LEGADO — substituído por CampaignHealthDashboard)
+// Mantido aqui por compatibilidade histórica; não é mais renderizado.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _CampaignEconomicsSectionLegacy({ campaign }: { campaign: any }) {
   const [open, setOpen] = useState(false);
 
   const fmtDate = (s?: string | null) => {

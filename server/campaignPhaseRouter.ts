@@ -1069,4 +1069,295 @@ export const campaignPhaseRouter = router({
       } catch {}
       return { regenerated: totalCreated, cancelled: cancelled.length };
     }),
+
+  // ── Economics Overview da Campanha ─────────────────────────────────────
+  // Agrega calcPhaseFinancials de todos os batches + KPIs gerenciais.
+  // Fonte única pro CampaignHealthDashboard renderizar sem N+1 queries.
+  campaignOverview: comercialProcedure
+    .input(z.object({ campaignId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
+
+      // Cliente + parceiro (metadados para header)
+      const [clientRow] = campaign.clientId
+        ? await db.select().from(clients).where(eq(clients.id, campaign.clientId)).limit(1)
+        : [];
+      const partnerRow = await resolvePartnerForCampaignBasic(db, campaign);
+
+      // Todas as fases
+      const phases = await db.select().from(campaignPhases)
+        .where(eq(campaignPhases.campaignId, input.campaignId))
+        .orderBy(asc(campaignPhases.sequence));
+
+      const phaseIds = phases.map((p) => p.id);
+      if (phaseIds.length === 0) {
+        return {
+          campaign: {
+            id: campaign.id, name: campaign.name, status: campaign.status,
+            startDate: campaign.startDate, endDate: campaign.endDate,
+            contractDuration: campaign.contractDuration,
+            isBonificada: campaign.isBonificada,
+            notes: campaign.notes,
+            clientId: campaign.clientId, clientName: clientRow?.name ?? null,
+            partnerId: campaign.partnerId, partnerName: partnerRow?.name ?? null,
+            productId: campaign.productId, productName: null as string | null,
+            assignedTo: campaign.assignedTo, assignedToName: campaign.assignedToName,
+          },
+          dre: null,
+          bv: null,
+          kpis: null,
+          timeline: [] as any[],
+          alerts: [] as any[],
+          empty: true,
+        };
+      }
+
+      // Items de TODAS as fases (1 query)
+      const allItems = await db
+        .select({
+          item: campaignItems,
+          productTipo: products.tipo,
+          productName: products.name,
+          productIrpj: products.irpj,
+          productVipProviderId: products.vipProviderId,
+          productVipProviderCommissionPercent: products.vipProviderCommissionPercent,
+          vipProviderRepassePercent: vipProviders.repassePercent,
+        })
+        .from(campaignItems)
+        .leftJoin(products, eq(products.id, campaignItems.productId))
+        .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId))
+        .where(sql`${campaignItems.campaignPhaseId} IN (${sql.join(phaseIds.map((id) => sql`${id}`), sql`, `)})`);
+
+      const itemsByPhase = new Map<number, typeof allItems>();
+      for (const r of allItems) {
+        const pid = r.item.campaignPhaseId;
+        if (!itemsByPhase.has(pid)) itemsByPhase.set(pid, []);
+        itemsByPhase.get(pid)!.push(r);
+      }
+
+      const campaignCtx = {
+        isBonificada: campaign.isBonificada,
+        restaurantCommission: campaign.restaurantCommission ?? 0,
+        sellerCommission: campaign.sellerCommission ?? 0,
+        agencyBvPercent: (campaign as any).agencyBvPercent ?? null,
+        hasAgencyBv: (campaign as any).hasAgencyBv ?? null,
+        partnerCommissionPercent: partnerRow?.commissionPercent ?? null,
+        partnerGrossUpRate: (partnerRow as any)?.grossUpRate ?? null,
+        globalBvGrossUpRate: null,
+      } as const;
+
+      // Invoices de toda a campanha
+      const invs = await db.select().from(invoices).where(eq(invoices.campaignId, input.campaignId));
+
+      // Produto principal (pra header)
+      const productName = (() => {
+        for (const r of allItems) if (r.productName) return r.productName;
+        return null;
+      })();
+
+      // Timeline: financials por batch + invoice + workflow
+      type TimelineEntry = {
+        phaseId: number; sequence: number; label: string | null;
+        status: string; periodStart: string; periodEnd: string;
+        receita: number; impostos: number; canalValor: number;
+        canalTipo: "restaurante" | "vip" | "none";
+        custoFrete: number; custoProducao: number;
+        sellerCommission: number; lucroLiquido: number; margemPct: number;
+        bvLiquido: number; bvGrossUp: number; bvTotal: number;
+        invoice: {
+          id: number; number: string | null; status: string; amount: number;
+          issueDate: string | null; dueDate: string | null; paymentDate: string | null;
+        } | null;
+        workflow: {
+          briefing: string | null; design: string | null; aprovacao: string | null;
+          producao: string | null; distribuicao: string | null; veiculacao: string | null;
+          concluida: string | null;
+        };
+      };
+
+      const timeline: TimelineEntry[] = phases.map((phase) => {
+        const rows = itemsByPhase.get(phase.id) ?? [];
+        const itemsForCalc: PhaseItemLike[] = rows.map((r) => ({
+          productTipo: r.productTipo ?? null,
+          quantity: r.item.quantity,
+          unitPrice: r.item.unitPrice,
+          totalPrice: r.item.totalPrice,
+          productionCost: r.item.productionCost ?? 0,
+          freightCost: r.item.freightCost ?? 0,
+          productIrpj: r.productIrpj ?? null,
+          vipProviderRepassePercent: r.vipProviderRepassePercent ?? null,
+          productVipProviderCommissionPercent: r.productVipProviderCommissionPercent ?? null,
+          vipProviderId: r.productVipProviderId ?? null,
+        }));
+        const overrides = extractOverridesFromPhase(phase);
+        const f = calcPhaseFinancials({ items: itemsForCalc, campaign: campaignCtx, overrides });
+
+        // Fatura ativa mais recente desta fase
+        const phaseInvs = invs.filter((i) => i.campaignPhaseId === phase.id && i.status !== "cancelada")
+          .sort((a, b) => b.id - a.id);
+        const inv = phaseInvs[0] ?? null;
+
+        return {
+          phaseId: phase.id, sequence: phase.sequence, label: phase.label,
+          status: phase.status, periodStart: phase.periodStart, periodEnd: phase.periodEnd,
+          receita: f.receita, impostos: f.impostos, canalValor: f.canalValor,
+          canalTipo: f.canalTipo,
+          custoFrete: f.freightCost, custoProducao: f.productionCost,
+          sellerCommission: f.sellerCommission, lucroLiquido: f.lucroLiquido, margemPct: f.margemPct,
+          bvLiquido: f.bvLiquido, bvGrossUp: f.bvGrossUp, bvTotal: f.bvTotal,
+          invoice: inv ? {
+            id: inv.id, number: inv.invoiceNumber, status: inv.status,
+            amount: Number(inv.amount),
+            issueDate: inv.issueDate, dueDate: inv.dueDate, paymentDate: inv.paymentDate,
+          } : null,
+          workflow: {
+            briefing: phase.briefingEnteredAt ? new Date(phase.briefingEnteredAt).toISOString() : null,
+            design: phase.designEnteredAt ? new Date(phase.designEnteredAt).toISOString() : null,
+            aprovacao: phase.aprovacaoEnteredAt ? new Date(phase.aprovacaoEnteredAt).toISOString() : null,
+            producao: phase.producaoEnteredAt ? new Date(phase.producaoEnteredAt).toISOString() : null,
+            distribuicao: phase.distribuicaoEnteredAt ? new Date(phase.distribuicaoEnteredAt).toISOString() : null,
+            veiculacao: phase.veiculacaoEnteredAt ? new Date(phase.veiculacaoEnteredAt).toISOString() : null,
+            concluida: phase.concluidaAt ? new Date(phase.concluidaAt).toISOString() : null,
+          },
+        };
+      });
+
+      // DRE consolidado (soma dos batches) — invariante: Σ batches = consolidado
+      const dreAgg = timeline.reduce(
+        (acc, t) => ({
+          receita: acc.receita + t.receita,
+          impostos: acc.impostos + t.impostos,
+          canalValor: acc.canalValor + t.canalValor,
+          custoFrete: acc.custoFrete + t.custoFrete,
+          custoProducao: acc.custoProducao + t.custoProducao,
+          sellerCommission: acc.sellerCommission + t.sellerCommission,
+          lucroLiquido: acc.lucroLiquido + t.lucroLiquido,
+          bvTotal: acc.bvTotal + t.bvTotal,
+          bvLiquido: acc.bvLiquido + t.bvLiquido,
+          bvGrossUp: acc.bvGrossUp + t.bvGrossUp,
+        }),
+        { receita: 0, impostos: 0, canalValor: 0, custoFrete: 0, custoProducao: 0, sellerCommission: 0, lucroLiquido: 0, bvTotal: 0, bvLiquido: 0, bvGrossUp: 0 },
+      );
+      const baseConsol = dreAgg.receita - dreAgg.impostos - dreAgg.canalValor;
+      const baseContribConsol = baseConsol - dreAgg.custoFrete - dreAgg.custoProducao;
+      const margemConsol = dreAgg.receita > 0 ? (dreAgg.lucroLiquido / dreAgg.receita) * 100 : 0;
+
+      // Canal predominante
+      const canalCounts = timeline.reduce((m, t) => {
+        m[t.canalTipo] = (m[t.canalTipo] ?? 0) + 1;
+        return m;
+      }, {} as Record<string, number>);
+      const canalPredominante: "restaurante" | "vip" | "none" =
+        (canalCounts.vip ?? 0) > (canalCounts.restaurante ?? 0) ? "vip"
+        : (canalCounts.restaurante ?? 0) > 0 ? "restaurante"
+        : "none";
+
+      // KPIs — progresso operacional
+      const totalPhases = phases.length;
+      const concluidas = phases.filter((p) => p.status === "concluida").length;
+      const canceladas = phases.filter((p) => p.status === "cancelada").length;
+      const ativas = phases.filter((p) => p.status === "ativa").length;
+      const planejadas = phases.filter((p) => p.status === "planejada").length;
+      const progressoOpPct = totalPhases > 0 ? (concluidas / totalPhases) * 100 : 0;
+
+      // KPIs — progresso financeiro
+      const invActive = invs.filter((i) => i.status !== "cancelada");
+      const faturado = invActive.filter((i) => i.status === "emitida" || i.status === "paga")
+        .reduce((s, i) => s + Number(i.amount), 0);
+      const recebido = invActive.filter((i) => i.status === "paga")
+        .reduce((s, i) => s + Number(i.amount), 0);
+      const previsto = invActive.reduce((s, i) => s + Number(i.amount), 0);
+      const aReceber = faturado - recebido;
+      const pctFaturado = previsto > 0 ? (faturado / previsto) * 100 : 0;
+      const pctRecebido = previsto > 0 ? (recebido / previsto) * 100 : 0;
+
+      // DSO médio (dias entre issueDate e paymentDate nas faturas pagas)
+      const paid = invActive.filter((i) => i.status === "paga" && i.issueDate && i.paymentDate);
+      const dsoMedio = paid.length > 0
+        ? paid.reduce((s, i) => {
+            const issue = new Date(i.issueDate!).getTime();
+            const pay = new Date(i.paymentDate!).getTime();
+            return s + Math.max(0, (pay - issue) / (1000 * 60 * 60 * 24));
+          }, 0) / paid.length
+        : null;
+
+      // Inadimplência: emitidas com dueDate vencido e não pagas
+      const hoje = new Date().toISOString().slice(0, 10);
+      const inadimplentes = invActive.filter((i) =>
+        i.status === "emitida" && i.dueDate && i.dueDate < hoje,
+      );
+      const inadimplenciaValor = inadimplentes.reduce((s, i) => s + Number(i.amount), 0);
+
+      // Alerts
+      const alerts: Array<{ severity: "info" | "warning" | "danger"; message: string; phaseId?: number }> = [];
+      if (inadimplentes.length > 0) {
+        alerts.push({ severity: "danger", message: `${inadimplentes.length} fatura(s) vencida(s) · ${formatBrlCents(inadimplenciaValor)}` });
+      }
+      if (margemConsol > 0 && margemConsol < 15) {
+        alerts.push({ severity: "warning", message: `Margem consolidada baixa: ${margemConsol.toFixed(1)}%` });
+      }
+      for (const t of timeline) {
+        if (t.status === "ativa" && t.invoice?.status === "prevista" && t.periodStart < hoje) {
+          alerts.push({ severity: "warning", message: `Batch ${t.sequence} iniciou e a fatura ainda está prevista`, phaseId: t.phaseId });
+        }
+      }
+
+      return {
+        campaign: {
+          id: campaign.id, name: campaign.name, status: campaign.status,
+          startDate: campaign.startDate, endDate: campaign.endDate,
+          contractDuration: campaign.contractDuration,
+          isBonificada: campaign.isBonificada,
+          notes: campaign.notes,
+          clientId: campaign.clientId, clientName: clientRow?.name ?? null,
+          partnerId: campaign.partnerId, partnerName: partnerRow?.name ?? null,
+          productId: campaign.productId, productName,
+          assignedTo: campaign.assignedTo, assignedToName: campaign.assignedToName,
+        },
+        dre: {
+          receita: dreAgg.receita,
+          impostos: dreAgg.impostos,
+          canalTipo: canalPredominante,
+          canalValor: dreAgg.canalValor,
+          base: baseConsol,
+          custoFrete: dreAgg.custoFrete,
+          custoProducao: dreAgg.custoProducao,
+          baseContribuicao: baseContribConsol,
+          sellerCommission: dreAgg.sellerCommission,
+          lucroLiquido: dreAgg.lucroLiquido,
+          margemPct: margemConsol,
+        },
+        bv: {
+          applicable: dreAgg.bvTotal > 0 || !!(campaign as any).hasAgencyBv,
+          parceiroNome: partnerRow?.name ?? null,
+          percent: Number((campaign as any).agencyBvPercent ?? 0),
+          valor: dreAgg.bvTotal,
+          valorLiquido: dreAgg.bvLiquido,
+          valorGrossUp: dreAgg.bvGrossUp,
+          totalCliente: dreAgg.receita + dreAgg.bvTotal,
+        },
+        kpis: {
+          progressoOperacional: {
+            concluidas, ativas, planejadas, canceladas, total: totalPhases, pct: progressoOpPct,
+          },
+          progressoFinanceiro: {
+            faturado, recebido, aReceber, previsto, pctFaturado, pctRecebido,
+          },
+          dsoMedio,
+          inadimplencia: {
+            quantidade: inadimplentes.length,
+            valor: inadimplenciaValor,
+          },
+        },
+        timeline,
+        alerts,
+        empty: false,
+      };
+    }),
 });
+
+function formatBrlCents(n: number): string {
+  return `R$ ${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
