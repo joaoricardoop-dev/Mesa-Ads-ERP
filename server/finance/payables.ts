@@ -151,6 +151,7 @@ async function materializeTaxes(
     if (!live) {
       await db.insert(accountsPayable).values({
         campaignId: invoice.campaignId,
+        campaignPhaseId: invoice.campaignPhaseId ?? null,
         invoiceId: invoice.id,
         type: "imposto",
         description,
@@ -235,6 +236,7 @@ async function materializeRestaurantCommission(
   const restRate = num(campaign.restaurantCommission);
   await db.insert(accountsPayable).values({
     campaignId: invoice.campaignId,
+    campaignPhaseId: invoice.campaignPhaseId ?? null,
     invoiceId: invoice.id,
     type: "comissao",
     description: `Comissão Restaurante (${restRate.toFixed(2)}%) - NF ${invoice.invoiceNumber || invoice.id}`,
@@ -282,6 +284,7 @@ async function materializeVipRepasse(
   const rate = num(product.vipProviderCommissionPercent ?? provider.repassePercent);
   await db.insert(accountsPayable).values({
     campaignId: invoice.campaignId,
+    campaignPhaseId: invoice.campaignPhaseId ?? null,
     invoiceId: invoice.id,
     vipProviderId: provider.id,
     type: "repasse_vip",
@@ -395,6 +398,7 @@ async function materializePartnerCommission(
 
   await db.insert(accountsPayable).values({
     campaignId: invoice.campaignId,
+    campaignPhaseId: invoice.campaignPhaseId ?? null,
     type: "bv_campanha",
     description: paidExisting
       ? `BV da Campanha - ${partner.name} (${compMonth} suplementar) - NF ${invoice.invoiceNumber || invoice.id}`

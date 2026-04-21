@@ -18,6 +18,7 @@ export interface InvoiceLike {
   id: number;
   invoiceNumber?: string | null;
   campaignId: number | null;
+  campaignPhaseId?: number | null;
   amount: string | number;
   issRate?: string | number | null;
   issRetained?: boolean | null;
