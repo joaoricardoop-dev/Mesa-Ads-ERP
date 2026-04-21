@@ -9,9 +9,68 @@ import {
   invoices,
   accountsPayable,
   vipProviders,
+  partners,
+  quotations,
+  clients,
 } from "../drizzle/schema";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { calcPhaseFinancials, type PhaseItemLike, type PhaseOverrides } from "./finance/calc";
+import { materializePayablesForInvoice } from "./finance/payables";
+import { recordAudit } from "./finance/audit";
+
+const PHASE_OVERRIDE_FIELDS = [
+  "unitPriceOverride",
+  "markupOverride",
+  "taxRateOverride",
+  "restaurantCommissionOverride",
+  "vipRepasseOverride",
+  "bvPercentOverride",
+  "grossUpRateOverride",
+  "freightCostOverride",
+  "batchCostOverride",
+] as const;
+type PhaseOverrideField = typeof PHASE_OVERRIDE_FIELDS[number];
+
+function extractOverridesFromPhase(phase: any): PhaseOverrides {
+  return {
+    unitPriceOverride: phase?.unitPriceOverride ?? null,
+    taxRateOverride: phase?.taxRateOverride ?? null,
+    restaurantCommissionOverride: phase?.restaurantCommissionOverride ?? null,
+    vipRepasseOverride: phase?.vipRepasseOverride ?? null,
+    bvPercentOverride: phase?.bvPercentOverride ?? null,
+    grossUpRateOverride: phase?.grossUpRateOverride ?? null,
+    freightCostOverride: phase?.freightCostOverride ?? null,
+    batchCostOverride: phase?.batchCostOverride ?? null,
+  };
+}
+
+// Mesma cadeia que server/finance/payables.ts:resolvePartnerForCampaign
+// (quotation → campaign.partnerId → client.partnerId) para evitar divergência
+// entre o DRE do batch e os APs materializados pelo ledger.
+async function resolvePartnerForCampaignBasic(db: any, campaign: any) {
+  if (campaign?.quotationId) {
+    const [q] = await db.select({ partnerId: quotations.partnerId })
+      .from(quotations).where(eq(quotations.id, campaign.quotationId)).limit(1);
+    if (q?.partnerId) {
+      const [p] = await db.select().from(partners).where(eq(partners.id, q.partnerId)).limit(1);
+      if (p) return p;
+    }
+  }
+  if (campaign?.partnerId) {
+    const [p] = await db.select().from(partners).where(eq(partners.id, campaign.partnerId)).limit(1);
+    if (p) return p;
+  }
+  if (campaign?.clientId) {
+    const [c] = await db.select({ partnerId: clients.partnerId })
+      .from(clients).where(eq(clients.id, campaign.clientId)).limit(1);
+    if (c?.partnerId) {
+      const [p] = await db.select().from(partners).where(eq(partners.id, c.partnerId)).limit(1);
+      if (p) return p;
+    }
+  }
+  return null;
+}
 
 async function getDatabase() {
   const d = await getDb();
@@ -745,5 +804,234 @@ export const campaignPhaseRouter = router({
 
         return { createdPhases, count: createdPhases.length, scheduledInvoices };
       });
+    }),
+
+  // ── Aba Financeiro do batch — fonte única ──────────────────────────────
+  // Retorna tudo que a UI do batch precisa: phase, items, campaign,
+  // financials (calcPhaseFinancials), invoice única, payables filtrados,
+  // overrides e dados do parceiro p/ exibir BV.
+  getFinancials: protectedProcedure
+    .input(z.object({ phaseId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const [phase] = await db.select().from(campaignPhases).where(eq(campaignPhases.id, input.phaseId));
+      if (!phase) throw new TRPCError({ code: "NOT_FOUND", message: "Batch não encontrado" });
+      const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, phase.campaignId));
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
+
+      const itemRows = await db
+        .select({
+          item: campaignItems,
+          productTipo: products.tipo,
+          productName: products.name,
+          productIrpj: products.irpj,
+          productVipProviderId: products.vipProviderId,
+          productVipProviderCommissionPercent: products.vipProviderCommissionPercent,
+          vipProviderRepassePercent: vipProviders.repassePercent,
+        })
+        .from(campaignItems)
+        .leftJoin(products, eq(products.id, campaignItems.productId))
+        .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId))
+        .where(eq(campaignItems.campaignPhaseId, input.phaseId));
+
+      const itemsForCalc: PhaseItemLike[] = itemRows.map((r) => ({
+        productTipo: r.productTipo ?? null,
+        quantity: r.item.quantity,
+        unitPrice: r.item.unitPrice,
+        totalPrice: r.item.totalPrice,
+        productionCost: r.item.productionCost ?? 0,
+        freightCost: r.item.freightCost ?? 0,
+        productIrpj: r.productIrpj ?? null,
+        vipProviderRepassePercent: r.vipProviderRepassePercent ?? null,
+        productVipProviderCommissionPercent: r.productVipProviderCommissionPercent ?? null,
+        vipProviderId: r.productVipProviderId ?? null,
+      }));
+
+      const partner = await resolvePartnerForCampaignBasic(db, campaign);
+
+      const overrides = extractOverridesFromPhase(phase);
+      const financials = calcPhaseFinancials({
+        items: itemsForCalc,
+        campaign: {
+          isBonificada: campaign.isBonificada,
+          restaurantCommission: campaign.restaurantCommission ?? 0,
+          sellerCommission: campaign.sellerCommission ?? 0,
+          agencyBvPercent: (campaign as any).agencyBvPercent ?? null,
+          hasAgencyBv: (campaign as any).hasAgencyBv ?? null,
+          partnerCommissionPercent: partner?.commissionPercent ?? null,
+          partnerGrossUpRate: (partner as any)?.grossUpRate ?? null,
+          globalBvGrossUpRate: null,
+        },
+        overrides,
+      });
+
+      // Fatura ativa: a mais recente que NÃO esteja cancelada (preferimos
+      // emitida/paga; cai em prevista). Evita pegar resíduos antigos.
+      const [invoice] = await db.select().from(invoices)
+        .where(and(
+          eq(invoices.campaignPhaseId, input.phaseId),
+          sql`${invoices.status} <> 'cancelada'`,
+        ))
+        .orderBy(desc(invoices.id))
+        .limit(1);
+
+      // Payables: união dos APs vinculados (a) à fatura por sourceRef.invoiceId,
+      // (b) a qualquer fatura listada em sourceRef.invoiceIds (agregados de BV),
+      // ou (c) ao próprio batch (campaignPhaseId direto).
+      const idStr = invoice ? String(invoice.id) : null;
+      const payables = await db.select().from(accountsPayable).where(
+        idStr
+          ? sql`(${accountsPayable.campaignPhaseId} = ${input.phaseId})
+                OR (${accountsPayable.sourceRef}->>'invoiceId') = ${idStr}
+                OR (${accountsPayable.sourceRef}->'invoiceIds') @> ${sql`${JSON.stringify([invoice!.id])}::jsonb`}`
+          : sql`${accountsPayable.campaignPhaseId} = ${input.phaseId}`,
+      );
+
+      return {
+        phase,
+        campaign,
+        items: itemRows,
+        financials,
+        invoice: invoice ?? null,
+        payables,
+        overrides,
+        partner: partner ? { id: partner.id, name: partner.name, commissionPercent: partner.commissionPercent } : null,
+      };
+    }),
+
+  setOverride: comercialProcedure
+    .input(z.object({
+      phaseId: z.number(),
+      field: z.enum(PHASE_OVERRIDE_FIELDS),
+      value: z.string().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDatabase();
+      const [phase] = await db.select().from(campaignPhases).where(eq(campaignPhases.id, input.phaseId));
+      if (!phase) throw new TRPCError({ code: "NOT_FOUND", message: "Batch não encontrado" });
+      const before = (phase as any)[input.field];
+      const updates: any = {
+        [input.field]: input.value,
+        overrideUpdatedAt: new Date(),
+        overrideUpdatedBy: ctx.user.id,
+        updatedAt: new Date(),
+      };
+      const [updated] = await db.update(campaignPhases).set(updates).where(eq(campaignPhases.id, input.phaseId)).returning();
+      try {
+        await recordAudit(db as any, { user: { id: ctx.user.id, role: (ctx.user as any).role ?? null } }, {
+          entityType: "campaign_phase",
+          entityId: input.phaseId,
+          action: "set_override",
+          before: { [input.field]: before },
+          after: { [input.field]: input.value },
+          metadata: { field: input.field },
+        });
+      } catch {}
+      return updated;
+    }),
+
+  clearOverride: comercialProcedure
+    .input(z.object({
+      phaseId: z.number(),
+      field: z.enum(PHASE_OVERRIDE_FIELDS),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDatabase();
+      const [phase] = await db.select().from(campaignPhases).where(eq(campaignPhases.id, input.phaseId));
+      if (!phase) throw new TRPCError({ code: "NOT_FOUND", message: "Batch não encontrado" });
+      const before = (phase as any)[input.field];
+      const updates: any = {
+        [input.field]: null,
+        overrideUpdatedAt: new Date(),
+        overrideUpdatedBy: ctx.user.id,
+        updatedAt: new Date(),
+      };
+      const [updated] = await db.update(campaignPhases).set(updates).where(eq(campaignPhases.id, input.phaseId)).returning();
+      try {
+        await recordAudit(db as any, { user: { id: ctx.user.id, role: (ctx.user as any).role ?? null } }, {
+          entityType: "campaign_phase",
+          entityId: input.phaseId,
+          action: "clear_override",
+          before: { [input.field]: before },
+          after: { [input.field]: null },
+          metadata: { field: input.field },
+        });
+      } catch {}
+      return updated;
+    }),
+
+  // Geração idempotente: dispara o materializer da fatura do batch.
+  // Se ela está 'emitida', cria APs de imposto. Se 'paga', cria também
+  // restaurante/VIP/BV. Sem efeito se nenhuma fatura existe.
+  generatePayables: comercialProcedure
+    .input(z.object({ phaseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDatabase();
+      const [phase] = await db.select().from(campaignPhases).where(eq(campaignPhases.id, input.phaseId));
+      if (!phase) throw new TRPCError({ code: "NOT_FOUND", message: "Batch não encontrado" });
+      const [invoice] = await db.select().from(invoices)
+        .where(and(eq(invoices.campaignPhaseId, input.phaseId), sql`${invoices.status} <> 'cancelada'`))
+        .orderBy(desc(invoices.id)).limit(1);
+      if (!invoice) return { created: 0, updated: 0, message: "Sem fatura para este batch — agende em Consolidado." };
+
+      let totalCreated = 0;
+      let totalUpdated = 0;
+      if (invoice.status === "emitida" || invoice.status === "paga") {
+        const r1 = await materializePayablesForInvoice(db as any, invoice.id, "emitida");
+        totalCreated += r1.created; totalUpdated += r1.updated;
+      }
+      if (invoice.status === "paga") {
+        const r2 = await materializePayablesForInvoice(db as any, invoice.id, "paga");
+        totalCreated += r2.created; totalUpdated += r2.updated;
+      }
+      try {
+        await recordAudit(db as any, { user: { id: ctx.user.id, role: (ctx.user as any).role ?? null } }, {
+          entityType: "campaign_phase",
+          entityId: input.phaseId,
+          action: "generate",
+          metadata: { invoiceId: invoice.id, created: totalCreated, updated: totalUpdated },
+        });
+      } catch {}
+      return { created: totalCreated, updated: totalUpdated };
+    }),
+
+  regeneratePayables: comercialProcedure
+    .input(z.object({ phaseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDatabase();
+      const [phase] = await db.select().from(campaignPhases).where(eq(campaignPhases.id, input.phaseId));
+      if (!phase) throw new TRPCError({ code: "NOT_FOUND", message: "Batch não encontrado" });
+      const [invoice] = await db.select().from(invoices)
+        .where(and(eq(invoices.campaignPhaseId, input.phaseId), sql`${invoices.status} <> 'cancelada'`))
+        .orderBy(desc(invoices.id)).limit(1);
+      if (!invoice) return { regenerated: 0, cancelled: 0 };
+
+      // Cancela só os 'pendente' criados pelo sistema (preserva pago/cancelado).
+      const cancelled = await db.update(accountsPayable).set({
+        status: "cancelada", updatedAt: new Date(),
+      }).where(and(
+        sql`(${accountsPayable.sourceRef}->>'invoiceId') = ${String(invoice.id)}`,
+        eq(accountsPayable.status, "pendente"),
+        eq(accountsPayable.createdBySystem, true),
+      )).returning();
+
+      let totalCreated = 0;
+      if (invoice.status === "emitida" || invoice.status === "paga") {
+        const r1 = await materializePayablesForInvoice(db as any, invoice.id, "emitida");
+        totalCreated += r1.created;
+      }
+      if (invoice.status === "paga") {
+        const r2 = await materializePayablesForInvoice(db as any, invoice.id, "paga");
+        totalCreated += r2.created;
+      }
+      try {
+        await recordAudit(db as any, { user: { id: ctx.user.id, role: (ctx.user as any).role ?? null } }, {
+          entityType: "campaign_phase",
+          entityId: input.phaseId,
+          action: "regenerate_payables",
+          metadata: { invoiceId: invoice.id, cancelled: cancelled.length, created: totalCreated },
+        });
+      } catch {}
+      return { regenerated: totalCreated, cancelled: cancelled.length };
     }),
 });

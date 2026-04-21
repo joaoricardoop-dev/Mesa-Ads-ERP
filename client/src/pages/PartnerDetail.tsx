@@ -226,7 +226,7 @@ function PartnerCommissionsTab({ partnerId, partnerName }: { partnerId: number; 
               <tr class="row-subtotal"><td>= Base após Comissões</td><td>${formatCurrency(r.afterRestaurant)}</td></tr>
               <tr class="row-deduction"><td>(-) Custo Produção (${r.contractDuration}m)</td><td>${formatCurrency(r.productionCost)}</td></tr>
               ${r.freightCost > 0 ? `<tr class="row-deduction"><td>(-) Custo Frete (${r.contractDuration}m)</td><td>${formatCurrency(r.freightCost)}</td></tr>` : ""}
-              <tr class="row-base"><td>= Base Comissão Parceiro</td><td>${formatCurrency(r.commissionBase)}</td></tr>
+              <tr class="row-base"><td>= Base BV Parceiro</td><td>${formatCurrency(r.commissionBase)}</td></tr>
               <tr class="row-commission"><td>Comissão ${r.partnerName} (${fmtPct(r.partnerCommissionPercent)} da base)</td><td style="color:#7c3aed; font-weight:600">${formatCurrency(r.commissionValue)}</td></tr>
               <tr class="row-total"><td>TOTAL A REPASSAR AO PARCEIRO</td><td>${formatCurrency(r.totalToPartner)}</td></tr>
             </tbody>
@@ -368,7 +368,7 @@ function PartnerCommissionsTab({ partnerId, partnerName }: { partnerId: number; 
                           </tr>
                         )}
                         <tr className="border-b border-border/10 bg-blue-500/5">
-                          <td className="py-2 font-bold text-blue-400">= Base Comissão Parceiro</td>
+                          <td className="py-2 font-bold text-blue-400">= Base BV Parceiro</td>
                           <td className="py-2 text-right px-3 font-mono font-bold text-blue-400">{formatCurrency(report.commissionBase)}</td>
                         </tr>
                         <tr className="border-b border-border/10">

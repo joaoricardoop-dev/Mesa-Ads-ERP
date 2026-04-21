@@ -351,7 +351,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
       y = drawInfoRow(doc, "Comissão Restaurante:", `${data.customRestaurantCommission.toFixed(1)}%`, y, margin);
     }
     if (data.customPartnerCommission !== undefined && data.customPartnerCommission > 0) {
-      y = drawInfoRow(doc, "Comissão Parceiro/Agência:", `${data.customPartnerCommission.toFixed(1)}%`, y, margin);
+      y = drawInfoRow(doc, "BV Parceiro/Agência:", `${data.customPartnerCommission.toFixed(1)}%`, y, margin);
     }
     if (data.customSellerCommission !== undefined && data.customSellerCommission > 0) {
       y = drawInfoRow(doc, "Comissão Vendedor:", `${data.customSellerCommission.toFixed(1)}%`, y, margin);

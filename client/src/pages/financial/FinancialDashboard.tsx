@@ -357,7 +357,7 @@ export default function FinancialDashboard() {
                   { label: "Pagamentos", desc: "Comissões restaurantes", icon: HandCoins, accent: "text-orange-400", bg: "bg-orange-500/10", path: "/financeiro/pagamentos", badge: data?.pendingRestaurantCount },
                   { label: "Custos", desc: "Produção e frete", icon: TrendingDown, accent: "text-blue-400", bg: "bg-blue-500/10", path: "/financeiro/custos", badge: null },
                   { label: "Relatórios", desc: "Análise por período", icon: BarChart3, accent: "text-emerald-400", bg: "bg-emerald-500/10", path: "/financeiro/relatorios", badge: null },
-                  { label: "Comissão Parceiros", desc: "Relatório de comissão", icon: Users, accent: "text-purple-400", bg: "bg-purple-500/10", path: "/financeiro/comissao-parceiros", badge: null },
+                  { label: "BV Parceiros", desc: "Relatório de comissão", icon: Users, accent: "text-purple-400", bg: "bg-purple-500/10", path: "/financeiro/comissao-parceiros", badge: null },
                 ].map(item => (
                   <button key={item.label} onClick={() => navigate(item.path)} className="relative flex flex-col gap-3 p-4 rounded-xl border border-border/10 hover:bg-white/[0.03] hover:border-border/30 transition-all text-left group">
                     {item.badge ? <span className="absolute top-3 right-3 bg-primary text-primary-foreground text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{item.badge}</span> : null}
@@ -553,7 +553,7 @@ export default function FinancialDashboard() {
                   <div className="my-3" />
                   <DreRow label="(-) Custos de Produção" value={-(L?.productionCosts || 0)} pct={pct(L?.productionCosts || 0)} indent negative />
                   <DreRow label="(-) Frete e Distribuição" value={-(L?.freightCosts || 0)} pct={pct(L?.freightCosts || 0)} indent negative />
-                  <DreRow label="(-) Comissão Parceiros" value={-(L?.partnerCommissions || 0)} pct={pct(L?.partnerCommissions || 0)} indent negative />
+                  <DreRow label="(-) BV Parceiros" value={-(L?.partnerCommissions || 0)} pct={pct(L?.partnerCommissions || 0)} indent negative />
                   <DreRow label="(-) BV de Agência" value={-(L?.agencyBv || 0)} pct={pct(L?.agencyBv || 0)} indent negative />
                   <DreRow label="(-) Comissão Comercial" value={-(L?.sellerCommission || 0)} pct={pct(L?.sellerCommission || 0)} indent negative />
                   {(L?.otherCosts || 0) > 0 && (

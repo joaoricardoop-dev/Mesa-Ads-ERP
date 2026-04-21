@@ -183,7 +183,7 @@ export default function ParceiroPortal() {
   const currentMonth = now.toLocaleString("pt-BR", { month: "long", year: "numeric" });
   const commissionPercent = dashboard?.partner?.commissionPercent ?? 0;
 
-  // BV agora vem do ledger (accounts_payable, sourceType='partner_commission')
+  // BV agora vem do ledger (accounts_payable, sourceType='bv_campanha')
   // agregado por competenceMonth pelo backend. Substitui o cálculo live sobre
   // quotations.status='win' que ignorava recebimento real.
   type CommissionItem = {

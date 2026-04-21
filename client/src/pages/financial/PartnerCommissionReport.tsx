@@ -150,7 +150,7 @@ export default function PartnerCommissionReport() {
                 <td>${formatCurrency(r.freightCost)}</td>
               </tr>` : ""}
               <tr class="row-base">
-                <td>= Base Comissão Parceiro</td>
+                <td>= Base BV Parceiro</td>
                 <td>${formatCurrency(r.commissionBase)}</td>
               </tr>
               <tr class="row-commission">
@@ -335,7 +335,7 @@ export default function PartnerCommissionReport() {
                     </tr>
                   )}
                   <tr className="bg-blue-500/5 border-t border-border/20">
-                    <td className="py-2.5 px-3 text-sm font-bold text-blue-400">= Base Comissão Parceiro</td>
+                    <td className="py-2.5 px-3 text-sm font-bold text-blue-400">= Base BV Parceiro</td>
                     <td className="py-2.5 px-3 text-sm text-right font-mono font-bold text-blue-400">{formatCurrency(report.commissionBase)}</td>
                   </tr>
 

@@ -225,16 +225,24 @@ export function safeDueDate(target?: string | null): string {
 // Task #148 — calcPhaseFinancials: fonte única de DRE por batch.
 //
 // Estrutura contábil do DRE do batch:
-//   Receita
+//   Receita (Faturamento Bruto)
 //     − Impostos (IRPJ + PIS/COFINS + ISS quando aplicável)
 //     − Canal (Restaurante OU VIP, mutuamente exclusivos pelo tipo do produto)
 //   = Base
 //     − Frete (físico)
 //     − Produção (físico)
 //   = Base de Contribuição
-//     − BV da Campanha (com gross-up tributário visível)
 //     − Comissão Vendedor (rateada por receita)
 //   = Lucro Líquido
+//
+// IMPORTANTE — BV da Campanha NÃO é dedução do DRE:
+//   BV é uma camada comercial cobrada do cliente em cima do faturamento
+//   (acréscimo). Não afeta receita nem custo da empresa: o repasse ao
+//   parceiro é um lançamento equilibrado (entrada do cliente + saída ao
+//   parceiro de mesmo valor) que zera no DRE. Os campos `bvLiquido`,
+//   `bvGrossUp` e `bvTotal` permanecem retornados como informação
+//   comercial para a UI exibir em linha INFORMATIVA, fora do cálculo
+//   do lucro.
 //
 // Invariante: Σ batches.lucroLiquido === Consolidado.lucroLiquido (até R$ 0,01).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -262,6 +270,7 @@ export interface PhaseOverrides {
   bvPercentOverride?: string | number | null;
   grossUpRateOverride?: string | number | null;
   freightCostOverride?: string | number | null;
+  batchCostOverride?: string | number | null;
 }
 
 export interface PhaseCampaignContext {
@@ -320,6 +329,7 @@ export interface PhaseFinancials {
     bvPercent: EffectiveParam<number>;        // %
     grossUpRate: EffectiveParam<number>;      // % (sobre 1)
     freightCost: EffectiveParam<number>;      // R$
+    productionCost: EffectiveParam<number>;   // R$
     sellerCommission: EffectiveParam<number>; // %
   };
   // Breakdown opcional p/ debug/UI clicável
@@ -416,9 +426,11 @@ export function calcPhaseFinancials(input: {
   const base = roundCents(receita - impostos - canalValor);
 
   // ── Custos físicos ──────────────────────────────────────────────────────
-  const productionCost = canalTipo === "vip" || isBonificada
+  const prodFromItems = canalTipo === "vip" || isBonificada
     ? 0
-    : roundCents(items.reduce((s, it) => s + num(it.productionCost ?? 0), 0));
+    : items.reduce((s, it) => s + num(it.productionCost ?? 0), 0);
+  const prodEff = effNumeric(overrides.batchCostOverride, prodFromItems);
+  const productionCost = canalTipo === "vip" || isBonificada ? 0 : roundCents(prodEff.value);
   const freightFromItems = canalTipo === "vip" || isBonificada
     ? 0
     : items.reduce((s, it) => s + num(it.freightCost ?? 0), 0);
@@ -463,7 +475,8 @@ export function calcPhaseFinancials(input: {
     ? roundCents((receita / totalRevForRatio) * sellerCommissionTotal)
     : 0;
 
-  const lucroLiquido = roundCents(baseContribuicao - bvTotal - sellerCommission);
+  // BV NÃO entra no lucro — é repasse comercial em cima do faturamento.
+  const lucroLiquido = roundCents(baseContribuicao - sellerCommission);
   const margemPct = receita > 0 ? lucroLiquido / receita : 0;
 
   return {
@@ -488,6 +501,7 @@ export function calcPhaseFinancials(input: {
       bvPercent: bvEff,
       grossUpRate: grossUpEff,
       freightCost: freightEff,
+      productionCost: prodEff,
       sellerCommission: sellerEff,
     },
     details: {

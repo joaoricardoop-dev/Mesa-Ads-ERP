@@ -574,7 +574,7 @@ export default function QuotationDetail() {
                     )}
                     {(quotation as any).customPartnerCommission && Number((quotation as any).customPartnerCommission) > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Comissão Parceiro/Agência</span>
+                        <span className="text-muted-foreground">BV Parceiro/Agência</span>
                         <span className="font-mono">{Number((quotation as any).customPartnerCommission).toFixed(1)}%</span>
                       </div>
                     )}
