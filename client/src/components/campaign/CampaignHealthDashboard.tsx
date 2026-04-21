@@ -21,8 +21,6 @@ import {
   AlertTriangle,
   Activity,
   Wallet,
-  Clock,
-  Target,
   Gauge,
   Building2,
   Users,
@@ -33,6 +31,14 @@ import {
   CheckCircle2,
   CircleSlash,
   Info,
+  FileText,
+  Factory,
+  Truck,
+  Receipt,
+  TrendingUpIcon,
+  Crown,
+  Utensils,
+  Target,
 } from "lucide-react";
 
 type Props = { campaignId: number };
@@ -70,13 +76,6 @@ function marginHealth(pct: number): { color: string; label: string } {
   if (pct >= 15) return { color: "text-amber-400", label: "Atenção" };
   if (pct > 0) return { color: "text-orange-400", label: "Baixa" };
   return { color: "text-red-400", label: "Crítica" };
-}
-
-function dsoHealth(dso: number | null): { color: string; label: string } {
-  if (dso === null) return { color: "text-muted-foreground", label: "s/ dados" };
-  if (dso <= 15) return { color: "text-emerald-400", label: "Excelente" };
-  if (dso <= 30) return { color: "text-amber-400", label: "Normal" };
-  return { color: "text-red-400", label: "Alto" };
 }
 
 export default function CampaignHealthDashboard({ campaignId }: Props) {
@@ -119,17 +118,6 @@ export default function CampaignHealthDashboard({ campaignId }: Props) {
     });
   }, [data]);
 
-  const cashflowChart = useMemo(() => {
-    if (!data?.timeline) return [];
-    return data.timeline.map((t) => ({
-      label: `B${t.sequence}`,
-      periodo: fmtMonth(t.periodStart),
-      Previsto: t.invoice?.amount ?? t.receita,
-      Faturado: t.invoice && (t.invoice.status === "emitida" || t.invoice.status === "paga") ? t.invoice.amount : 0,
-      Recebido: t.invoice && t.invoice.status === "paga" ? t.invoice.amount : 0,
-    }));
-  }, [data]);
-
   if (isLoading) {
     return (
       <section className="bg-card border border-border/30 rounded-xl p-6">
@@ -163,9 +151,28 @@ export default function CampaignHealthDashboard({ campaignId }: Props) {
     );
   }
 
-  const { campaign, dre, bv, kpis, timeline, alerts } = data;
+  const { campaign, dre, bv, kpis, timeline } = data;
+  const alerts = data.alerts ?? [];
   const mh = dre ? marginHealth(dre.margemPct) : null;
-  const dh = kpis ? dsoHealth(kpis.dsoMedio) : null;
+
+  // Duração efetiva = nº de batches não-cancelados (cada batch = 1 mês)
+  const batchesAtivos = timeline.filter((t) => t.status !== "cancelada").length;
+  const duracao = Math.max(1, batchesAtivos || campaign.contractDuration || timeline.length);
+
+  // Per-mês (médio sobre os batches ativos)
+  const receitaMensal = dre ? dre.receita / duracao : 0;
+  const lucroMensal = dre ? dre.lucroLiquido / duracao : 0;
+  const impostosMensal = dre ? dre.impostos / duracao : 0;
+  const canalMensal = dre ? dre.canalValor / duracao : 0;
+  const producaoMensal = dre ? dre.custoProducao / duracao : 0;
+  const freteMensal = dre ? dre.custoFrete / duracao : 0;
+  const sellerMensal = dre ? dre.sellerCommission / duracao : 0;
+
+  // Labels do canal
+  const canalLabel = dre?.canalTipo === "vip" ? "Repasse Sala VIP"
+    : dre?.canalTipo === "restaurante" ? "Com. Restaurante"
+    : "Canal";
+  const canalIcon = dre?.canalTipo === "vip" ? Crown : Utensils;
 
   return (
     <section className="space-y-4">
@@ -183,6 +190,27 @@ export default function CampaignHealthDashboard({ campaignId }: Props) {
             </span>
           </p>
         </div>
+
+        {/* Progresso operacional — barra compacta no header */}
+        {kpis && (
+          <div className="min-w-[280px]">
+            <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+              <span className="flex items-center gap-1"><Target className="w-3 h-3" /> Progresso Operacional</span>
+              <span className="font-semibold text-foreground">
+                {kpis.progressoOperacional.concluidas}/{kpis.progressoOperacional.total} batches
+              </span>
+            </div>
+            <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-emerald-400 rounded-full transition-all"
+                style={{ width: `${Math.max(0, Math.min(100, kpis.progressoOperacional.pct))}%` }}
+              />
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-0.5 text-right">
+              {kpis.progressoOperacional.pct.toFixed(0)}% concluído
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Alertas */}
@@ -204,57 +232,108 @@ export default function CampaignHealthDashboard({ campaignId }: Props) {
         </div>
       )}
 
-      {/* KPIs principais */}
-      {kpis && dre && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KpiCard
-            icon={Target}
-            label="Progresso Operacional"
-            primary={`${kpis.progressoOperacional.pct.toFixed(0)}%`}
-            secondary={`${kpis.progressoOperacional.concluidas}/${kpis.progressoOperacional.total} batches`}
-            progress={kpis.progressoOperacional.pct}
-            progressColor="bg-emerald-400"
-          />
-          <KpiCard
-            icon={Wallet}
-            label="Faturado"
-            primary={formatCurrency(kpis.progressoFinanceiro.faturado)}
-            secondary={`${kpis.progressoFinanceiro.pctFaturado.toFixed(0)}% do previsto`}
-            progress={kpis.progressoFinanceiro.pctFaturado}
-            progressColor="bg-blue-400"
-          />
-          <KpiCard
-            icon={CircleDollarSign}
-            label="Recebido"
-            primary={formatCurrency(kpis.progressoFinanceiro.recebido)}
-            secondary={`${kpis.progressoFinanceiro.pctRecebido.toFixed(0)}% do previsto`}
-            progress={kpis.progressoFinanceiro.pctRecebido}
-            progressColor="bg-emerald-400"
-          />
-          <KpiCard
-            icon={Gauge}
-            label="Margem Consolidada"
-            primary={`${dre.margemPct.toFixed(1)}%`}
-            secondary={formatCurrency(dre.lucroLiquido)}
-            primaryClass={mh?.color}
-            badge={mh?.label}
-          />
-          <KpiCard
-            icon={Clock}
-            label="DSO Médio"
-            primary={kpis.dsoMedio !== null ? `${kpis.dsoMedio.toFixed(0)} dias` : "—"}
-            secondary="Emissão → recebimento"
-            primaryClass={dh?.color}
-            badge={dh?.label}
-          />
-          <KpiCard
-            icon={AlertTriangle}
-            label="Inadimplência"
-            primary={formatCurrency(kpis.inadimplencia.valor)}
-            secondary={`${kpis.inadimplencia.quantidade} fatura(s) vencida(s)`}
-            primaryClass={kpis.inadimplencia.quantidade > 0 ? "text-red-400" : "text-emerald-400"}
-          />
-        </div>
+      {/* ── LINHA 1 — Visão do deal ───────────────────────────────────────── */}
+      {dre && kpis && (
+        <>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-1">
+            Visão do Contrato
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <KpiCard
+              icon={FileText}
+              label="Valor do Contrato"
+              primary={formatCurrency(dre.receita)}
+              secondary={`${duracao} ${duracao === 1 ? "mês" : "meses"}`}
+              accent="text-blue-400"
+            />
+            <KpiCard
+              icon={Calendar}
+              label="Valor / mês"
+              primary={formatCurrency(receitaMensal)}
+              secondary="Receita média mensal"
+            />
+            <KpiCard
+              icon={TrendingUpIcon}
+              label="Lucro / mês"
+              primary={formatCurrency(lucroMensal)}
+              secondary="Resultado médio mensal"
+              accent={lucroMensal >= 0 ? "text-emerald-400" : "text-red-400"}
+            />
+            <KpiCard
+              icon={Gauge}
+              label="Margem"
+              primary={`${dre.margemPct.toFixed(1)}%`}
+              secondary={formatCurrency(dre.lucroLiquido) + " total"}
+              accent={mh?.color}
+              badge={mh?.label}
+            />
+            <KpiCard
+              icon={Wallet}
+              label="Faturado"
+              primary={formatCurrency(kpis.progressoFinanceiro.faturado)}
+              secondary={`${kpis.progressoFinanceiro.pctFaturado.toFixed(0)}% do contrato`}
+              progress={kpis.progressoFinanceiro.pctFaturado}
+              progressColor="bg-blue-400"
+            />
+            <KpiCard
+              icon={CircleDollarSign}
+              label="Recebido"
+              primary={formatCurrency(kpis.progressoFinanceiro.recebido)}
+              secondary={`${kpis.progressoFinanceiro.pctRecebido.toFixed(0)}% do contrato`}
+              progress={kpis.progressoFinanceiro.pctRecebido}
+              progressColor="bg-emerald-400"
+            />
+          </div>
+
+          {/* ── LINHA 2 — Deduções e repasses ──────────────────────────────── */}
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-1 pt-2">
+            Deduções e Repasses
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <KpiCard
+              icon={Receipt}
+              label="Impostos"
+              primary={formatCurrency(dre.impostos)}
+              secondary={`${formatCurrency(impostosMensal)}/mês`}
+              accent="text-red-400"
+            />
+            <KpiCard
+              icon={canalIcon}
+              label={canalLabel}
+              primary={formatCurrency(dre.canalValor)}
+              secondary={`${formatCurrency(canalMensal)}/mês`}
+              accent={dre.canalTipo === "vip" ? "text-violet-400" : "text-orange-400"}
+            />
+            <KpiCard
+              icon={Factory}
+              label="Custo Produção"
+              primary={formatCurrency(dre.custoProducao)}
+              secondary={`${formatCurrency(producaoMensal)}/mês`}
+              accent="text-emerald-400"
+            />
+            <KpiCard
+              icon={Truck}
+              label="Custo Frete"
+              primary={formatCurrency(dre.custoFrete)}
+              secondary={`${formatCurrency(freteMensal)}/mês`}
+              accent="text-cyan-400"
+            />
+            <KpiCard
+              icon={UserRound}
+              label="Com. Vendedor"
+              primary={formatCurrency(dre.sellerCommission)}
+              secondary={`${formatCurrency(sellerMensal)}/mês`}
+              accent="text-slate-400"
+            />
+            <KpiCard
+              icon={AlertTriangle}
+              label="Inadimplência"
+              primary={formatCurrency(kpis.inadimplencia.valor)}
+              secondary={`${kpis.inadimplencia.quantidade} fatura(s) vencida(s)`}
+              accent={kpis.inadimplencia.quantidade > 0 ? "text-red-400" : "text-emerald-400"}
+            />
+          </div>
+        </>
       )}
 
       {/* Gráficos */}
@@ -299,7 +378,7 @@ export default function CampaignHealthDashboard({ campaignId }: Props) {
           </div>
         )}
 
-        {/* Receita × Custo × Lucro por batch */}
+        {/* Performance por Batch */}
         <div className="bg-card border border-border/30 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -329,59 +408,62 @@ export default function CampaignHealthDashboard({ campaignId }: Props) {
             </ComposedChart>
           </ResponsiveContainer>
         </div>
+      </div>
 
-        {/* Cashflow por batch (previsto × faturado × recebido) */}
-        <div className="bg-card border border-border/30 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-primary" /> Cashflow por Batch
-            </h3>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">previsto · faturado · recebido</span>
-          </div>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={cashflowChart} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94a3b8" }} />
-              <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }}
-                tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))} />
-              <RechartsTooltip
-                contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, fontSize: 11 }}
-                formatter={(v: number) => formatCurrency(v)}
-              />
-              <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Bar dataKey="Previsto" fill="#64748b" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="Faturado" fill="#3b82f6" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="Recebido" fill="#10b981" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Status dos batches — full width agora que removemos cashflow */}
+      <div className="bg-card border border-border/30 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-primary" /> Status dos Batches
+          </h3>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            progresso operacional + financeiro por batch
+          </span>
         </div>
-
-        {/* Status dos batches */}
-        <div className="bg-card border border-border/30 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-primary" /> Status dos Batches
-            </h3>
-          </div>
-          <div className="space-y-1.5">
-            {timeline.map((t) => {
-              const color = STATUS_COLORS[t.status] ?? "#64748b";
-              const invStatus = t.invoice?.status;
-              const invLabel = invStatus ? INVOICE_STATUS_LABEL[invStatus] ?? invStatus : "sem fatura";
-              return (
-                <div key={t.phaseId} className="flex items-center gap-3 text-xs px-2 py-1.5 rounded hover:bg-muted/20">
-                  <div className="w-2 h-2 rounded-full" style={{ background: color }} />
-                  <div className="min-w-[60px] font-semibold tabular-nums">B{t.sequence}</div>
-                  <div className="min-w-[80px] text-muted-foreground">{fmtMonth(t.periodStart)}</div>
-                  <div className="flex-1 truncate capitalize">{t.status}</div>
-                  <div className="tabular-nums text-muted-foreground">{formatCurrency(t.receita)}</div>
-                  <Badge variant="outline" className="text-[9px] capitalize">
-                    {invLabel}
-                  </Badge>
-                </div>
-              );
-            })}
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border/20 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <th className="text-left py-2 pr-3 font-semibold">Batch</th>
+                <th className="text-left py-2 pr-3 font-semibold">Período</th>
+                <th className="text-left py-2 pr-3 font-semibold">Status</th>
+                <th className="text-right py-2 pr-3 font-semibold">Receita</th>
+                <th className="text-right py-2 pr-3 font-semibold">Lucro</th>
+                <th className="text-right py-2 pr-3 font-semibold">Margem</th>
+                <th className="text-center py-2 pr-3 font-semibold">Fatura</th>
+              </tr>
+            </thead>
+            <tbody>
+              {timeline.map((t) => {
+                const color = STATUS_COLORS[t.status] ?? "#64748b";
+                const invStatus = t.invoice?.status;
+                const invLabel = invStatus ? INVOICE_STATUS_LABEL[invStatus] ?? invStatus : "sem fatura";
+                const mhRow = marginHealth(t.margemPct);
+                return (
+                  <tr key={t.phaseId} className="border-b border-border/10 hover:bg-muted/20">
+                    <td className="py-2 pr-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+                        <span className="font-semibold tabular-nums">B{t.sequence}</span>
+                      </div>
+                    </td>
+                    <td className="py-2 pr-3 text-muted-foreground">{fmtMonth(t.periodStart)}</td>
+                    <td className="py-2 pr-3 capitalize">{t.status}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{formatCurrency(t.receita)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums font-medium">
+                      {formatCurrency(t.lucroLiquido)}
+                    </td>
+                    <td className={`py-2 pr-3 text-right tabular-nums ${mhRow.color}`}>
+                      {t.margemPct.toFixed(1)}%
+                    </td>
+                    <td className="py-2 pr-3 text-center">
+                      <Badge variant="outline" className="text-[9px] capitalize">{invLabel}</Badge>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -390,7 +472,12 @@ export default function CampaignHealthDashboard({ campaignId }: Props) {
         <div className="bg-card border border-dashed border-pink-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <Users className="w-4 h-4 text-pink-400" />
-            <h3 className="text-sm font-semibold text-pink-400">BV da Campanha <span className="text-[10px] font-normal text-muted-foreground ml-1">(informativo — não deduz)</span></h3>
+            <h3 className="text-sm font-semibold text-pink-400">
+              BV da Campanha{" "}
+              <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                (informativo — não deduz)
+              </span>
+            </h3>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
             <InfoCell label="Parceiro" value={bv.parceiroNome ?? "—"} />
@@ -427,20 +514,33 @@ export default function CampaignHealthDashboard({ campaignId }: Props) {
 }
 
 function KpiCard({
-  icon: Icon, label, primary, secondary, progress, progressColor, primaryClass, badge,
+  icon: Icon, label, primary, secondary, progress, progressColor, accent, badge,
 }: {
-  icon: any; label: string; primary: string; secondary?: string;
-  progress?: number; progressColor?: string; primaryClass?: string; badge?: string;
+  icon: any;
+  label: string;
+  primary: string;
+  secondary?: string;
+  progress?: number;
+  progressColor?: string;
+  accent?: string;
+  badge?: string;
 }) {
   return (
-    <div className="bg-card border border-border/30 rounded-lg p-3">
+    <div className="bg-card border border-border/30 rounded-lg p-3 min-w-0">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-        <Icon className="w-3 h-3" /> {label}
+        <Icon className="w-3 h-3 shrink-0" />
+        <span className="truncate">{label}</span>
       </div>
-      <div className={`text-lg font-bold tabular-nums mt-1 ${primaryClass ?? ""}`}>{primary}</div>
-      {secondary && <div className="text-[10px] text-muted-foreground truncate">{secondary}</div>}
+      <div className={`text-base sm:text-lg font-bold tabular-nums mt-1 truncate ${accent ?? ""}`}>
+        {primary}
+      </div>
+      {secondary && (
+        <div className="text-[10px] text-muted-foreground truncate" title={secondary}>
+          {secondary}
+        </div>
+      )}
       {badge && (
-        <div className={`text-[9px] uppercase tracking-wider font-semibold mt-1 ${primaryClass ?? ""}`}>
+        <div className={`text-[9px] uppercase tracking-wider font-semibold mt-1 ${accent ?? ""}`}>
           {badge}
         </div>
       )}
