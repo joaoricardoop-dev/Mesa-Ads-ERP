@@ -1,7 +1,6 @@
 import PageContainer from "@/components/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -26,12 +25,14 @@ import {
   Pencil,
   Factory,
   Truck,
-  HandCoins,
   CircleDollarSign,
   Crown,
   X,
   Utensils,
   Receipt as ReceiptIcon,
+  Landmark,
+  UserRound,
+  Handshake,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
@@ -64,41 +65,77 @@ type SourceType =
   | "vip_repasse"
   | "supplier_cost"
   | "freight_cost"
+  | "bv_campanha"
+  | "seller_commission"
+  | "tax"
   | "manual";
 
-const TAB_CONFIG: Record<SourceType, { label: string; icon: LucideIcon; description: string }> = {
+type SourceMeta = {
+  label: string;
+  shortLabel: string;
+  icon: LucideIcon;
+  badgeClass: string;
+};
+
+const SOURCE_META: Record<SourceType, SourceMeta> = {
   restaurant_commission: {
-    label: "Comissões Restaurantes",
+    label: "Comissão Restaurante",
+    shortLabel: "Com. Rest.",
     icon: Utensils,
-    description: "Pagamentos a restaurantes pela veiculação de campanhas (substitui a antiga tela de Pagamentos a Restaurantes).",
+    badgeClass: "bg-orange-500/10 text-orange-400 border-orange-500/30",
   },
   vip_repasse: {
     label: "Repasse Sala VIP",
+    shortLabel: "Repasse VIP",
     icon: Crown,
-    description: "Repasses para provedores de Sala VIP por veiculação em telas e janelas.",
+    badgeClass: "bg-violet-500/10 text-violet-400 border-violet-500/30",
   },
   supplier_cost: {
-    label: "Fornecedores",
+    label: "Fornecedor / Produção",
+    shortLabel: "Fornecedor",
     icon: Factory,
-    description: "Custos de produção e demais valores devidos a fornecedores.",
+    badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
   },
   freight_cost: {
     label: "Frete",
+    shortLabel: "Frete",
     icon: Truck,
-    description: "Despesas com frete e logística.",
+    badgeClass: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+  },
+  bv_campanha: {
+    label: "BV da Campanha",
+    shortLabel: "BV",
+    icon: Handshake,
+    badgeClass: "bg-pink-500/10 text-pink-400 border-pink-500/30",
+  },
+  seller_commission: {
+    label: "Comissão Vendedor",
+    shortLabel: "Com. Vend.",
+    icon: UserRound,
+    badgeClass: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
+  },
+  tax: {
+    label: "Imposto",
+    shortLabel: "Imposto",
+    icon: Landmark,
+    badgeClass: "bg-red-500/10 text-red-400 border-red-500/30",
   },
   manual: {
-    label: "Manuais & Outros",
+    label: "Manual / Outros",
+    shortLabel: "Manual",
     icon: ReceiptIcon,
-    description: "Contas avulsas, impostos, comissões de parceiros/vendedores e demais lançamentos manuais.",
+    badgeClass: "bg-slate-500/10 text-slate-300 border-slate-500/30",
   },
 };
 
-const TABS: SourceType[] = [
+const SOURCE_ORDER: SourceType[] = [
   "restaurant_commission",
   "vip_repasse",
   "supplier_cost",
   "freight_cost",
+  "bv_campanha",
+  "seller_commission",
+  "tax",
   "manual",
 ];
 
@@ -108,59 +145,63 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   cancelado: { label: "Cancelado", color: "bg-red-500/10 text-red-400 border-red-500/30" },
 };
 
-function mapSourceForManualBucket(s: string | null | undefined): SourceType {
-  if (!s) return "manual";
-  if (TABS.includes(s as SourceType)) return s as SourceType;
-  return "manual";
+function getSourceMeta(src: string | null | undefined): SourceMeta {
+  if (src && src in SOURCE_META) return SOURCE_META[src as SourceType];
+  return SOURCE_META.manual;
+}
+
+function currentMonthYYYYMM(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
 }
 
 export default function AccountsPayablePage() {
-  // Wouter's useLocation strips the query string, so we read/write window.location.search directly.
-  // useLocation is kept only to get a stable navigate ref and trigger re-renders on path changes.
   const [, navigate] = useLocation();
   const initialParams = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search)
     : new URLSearchParams("");
 
-  const initialTab = (initialParams.get("tab") || "restaurant_commission") as SourceType;
-  const [activeTab, setActiveTabState] = useState<SourceType>(
-    TABS.includes(initialTab) ? initialTab : "restaurant_commission",
-  );
-
+  // Filtros
+  const [sourceTypeFilter, setSourceTypeFilter] = useState<string>(initialParams.get("sourceType") || "");
+  const [statusFilter, setStatusFilter] = useState<string>(initialParams.get("status") || "");
+  const [supplierFilter, setSupplierFilter] = useState<string>(initialParams.get("supplierId") || "");
+  const [competenceMonth, setCompetenceMonth] = useState<string>(initialParams.get("competenceMonth") || "");
+  const [dueFrom, setDueFrom] = useState<string>(initialParams.get("dueFrom") || "");
+  const [dueTo, setDueTo] = useState<string>(initialParams.get("dueTo") || "");
   const [campaignIdFilter, setCampaignIdFilter] = useState<number | null>(() => {
     const v = initialParams.get("campaignId");
     const n = v ? parseInt(v) : NaN;
     return Number.isFinite(n) ? n : null;
   });
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [supplierFilter, setSupplierFilter] = useState<string>("");
-  const [dueFrom, setDueFrom] = useState<string>("");
-  const [dueTo, setDueTo] = useState<string>("");
 
-  function setActiveTab(next: string) {
-    if (!TABS.includes(next as SourceType)) return;
-    setActiveTabState(next as SourceType);
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.set("tab", next);
-      window.history.replaceState({}, "", url.toString());
-    }
-  }
-
+  // Persistir filtros na URL (shareable)
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
-    if (campaignIdFilter) url.searchParams.set("campaignId", String(campaignIdFilter));
-    else url.searchParams.delete("campaignId");
+    const setOrDelete = (key: string, val: string | number | null) => {
+      if (val === null || val === "" || val === undefined) url.searchParams.delete(key);
+      else url.searchParams.set(key, String(val));
+    };
+    setOrDelete("sourceType", sourceTypeFilter);
+    setOrDelete("status", statusFilter);
+    setOrDelete("supplierId", supplierFilter);
+    setOrDelete("competenceMonth", competenceMonth);
+    setOrDelete("dueFrom", dueFrom);
+    setOrDelete("dueTo", dueTo);
+    setOrDelete("campaignId", campaignIdFilter);
     window.history.replaceState({}, "", url.toString());
-  }, [campaignIdFilter]);
+  }, [sourceTypeFilter, statusFilter, supplierFilter, competenceMonth, dueFrom, dueTo, campaignIdFilter]);
 
+  // Dialogs / estado de linha
   const [payDialogId, setPayDialogId] = useState<number | null>(null);
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
   const [proofUrl, setProofUrl] = useState("");
   const [editDialog, setEditDialog] = useState<EditPayableForm | null>(null);
   const [createDialog, setCreateDialog] = useState(false);
   const [createForm, setCreateForm] = useState({
-    sourceType: activeTab as SourceType,
+    sourceType: "manual" as SourceType,
     campaignId: "",
     supplierId: "",
     type: "outro",
@@ -175,12 +216,14 @@ export default function AccountsPayablePage() {
   const [bulkPayDate, setBulkPayDate] = useState(new Date().toISOString().split("T")[0]);
 
   const utils = trpc.useUtils();
-  const filters: ListPayableInput = { sourceType: activeTab };
+  const filters: ListPayableInput = {};
+  if (sourceTypeFilter) filters.sourceType = sourceTypeFilter as SourceType;
   if (statusFilter) filters.status = statusFilter;
   if (campaignIdFilter) filters.campaignId = campaignIdFilter;
   if (supplierFilter) filters.supplierId = parseInt(supplierFilter);
   if (dueFrom) filters.dueDateFrom = dueFrom;
   if (dueTo) filters.dueDateTo = dueTo;
+  if (competenceMonth) filters.competenceMonth = competenceMonth;
 
   const { data: payables, isLoading } = trpc.financial.listAccountsPayable.useQuery(filters);
   const { data: suppliersList = [] } = trpc.supplier.list.useQuery();
@@ -189,41 +232,12 @@ export default function AccountsPayablePage() {
     ? (campaignsData as CampaignSummary[])
     : ((campaignsData as { items?: CampaignSummary[] } | undefined)?.items ?? []);
 
-  // For "manual" tab, server filter only matches sourceType=manual; we extend it to also include
-  // tax / bv_campanha / seller_commission via separate queries merged in memory.
-  const { data: taxRows = [] } = trpc.financial.listAccountsPayable.useQuery(
-    { ...filters, sourceType: "tax" },
-    { enabled: activeTab === "manual" },
-  );
-  const { data: partnerRows = [] } = trpc.financial.listAccountsPayable.useQuery(
-    { ...filters, sourceType: "bv_campanha" },
-    { enabled: activeTab === "manual" },
-  );
-  const { data: sellerRows = [] } = trpc.financial.listAccountsPayable.useQuery(
-    { ...filters, sourceType: "seller_commission" },
-    { enabled: activeTab === "manual" },
-  );
+  const visibleRows = useMemo<Payable[]>(() => payables ?? [], [payables]);
 
-  const visibleRows = useMemo<Payable[]>(() => {
-    const base: Payable[] = payables || [];
-    if (activeTab !== "manual") return base;
-    const merged: Payable[] = [...base, ...taxRows, ...partnerRows, ...sellerRows];
-    return merged.sort((a, b) => {
-      const ac = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bc = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return bc - ac;
-    });
-  }, [payables, taxRows, partnerRows, sellerRows, activeTab]);
-
-  // Reset selection when tab changes
+  // Reset selection quando filtros mudam
   useEffect(() => {
     setSelectedIds([]);
-  }, [activeTab, statusFilter, supplierFilter, dueFrom, dueTo, campaignIdFilter]);
-
-  // Update default sourceType for create form when tab changes
-  useEffect(() => {
-    setCreateForm((f) => ({ ...f, sourceType: activeTab }));
-  }, [activeTab]);
+  }, [sourceTypeFilter, statusFilter, supplierFilter, competenceMonth, dueFrom, dueTo, campaignIdFilter]);
 
   const markPaidMutation = trpc.financial.markAccountPayablePaid.useMutation({
     onSuccess: () => {
@@ -263,7 +277,7 @@ export default function AccountsPayablePage() {
       utils.financial.listAccountsPayable.invalidate();
       setCreateDialog(false);
       setCreateForm({
-        sourceType: activeTab,
+        sourceType: "manual",
         campaignId: "",
         supplierId: "",
         type: "outro",
@@ -279,6 +293,7 @@ export default function AccountsPayablePage() {
 
   const totalPendente = visibleRows.filter((p) => p.status === "pendente").reduce((s, p) => s + Number(p.amount), 0);
   const totalPago = visibleRows.filter((p) => p.status === "pago").reduce((s, p) => s + Number(p.amount), 0);
+  const totalGeral = visibleRows.reduce((s, p) => s + Number(p.amount), 0);
   const totalSel = selectedIds.reduce((acc, id) => {
     const row = visibleRows.find((r) => r.id === id);
     return acc + (row ? Number(row.amount) : 0);
@@ -296,198 +311,296 @@ export default function AccountsPayablePage() {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  function clearFilters() {
+    setSourceTypeFilter("");
+    setStatusFilter("");
+    setSupplierFilter("");
+    setCompetenceMonth("");
+    setDueFrom("");
+    setDueTo("");
+    setCampaignIdFilter(null);
+  }
+
+  const hasAnyFilter = !!(sourceTypeFilter || statusFilter || supplierFilter || competenceMonth || dueFrom || dueTo || campaignIdFilter);
+
   return (
     <PageContainer
       title="Contas a Pagar"
-      description="Ledger único de obrigações: comissões a restaurantes, repasses Sala VIP, fornecedores, frete e lançamentos manuais."
+      description="Ledger único de todas as obrigações: comissões, repasses, impostos, fornecedores, frete, BV e lançamentos manuais. Filtre por tipo, mês de competência, vencimento, status ou campanha."
     >
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="flex flex-wrap h-auto">
-          {TABS.map((key) => {
-            const cfg = TAB_CONFIG[key];
-            const Icon = cfg.icon;
-            return (
-              <TabsTrigger key={key} value={key} className="gap-1.5">
-                <Icon className="w-3.5 h-3.5" />
-                {cfg.label}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
+      <div className="space-y-4">
+        {/* KPIs */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="bg-card border border-border/30 rounded-lg p-4">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Pendente</p>
+            <p className="text-xl font-bold text-amber-400 mt-1">{formatCurrency(totalPendente)}</p>
+          </div>
+          <div className="bg-card border border-border/30 rounded-lg p-4">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Pago</p>
+            <p className="text-xl font-bold text-emerald-400 mt-1">{formatCurrency(totalPago)}</p>
+          </div>
+          <div className="bg-card border border-border/30 rounded-lg p-4">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Total filtrado</p>
+            <p className="text-xl font-bold mt-1">{formatCurrency(totalGeral)}</p>
+            <p className="text-[10px] text-muted-foreground">{visibleRows.length} conta(s)</p>
+          </div>
+          <div className="bg-card border border-border/30 rounded-lg p-4">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Selecionado</p>
+            <p className="text-xl font-bold text-primary mt-1">{formatCurrency(totalSel)}</p>
+            <p className="text-[10px] text-muted-foreground">{selectedIds.length} conta(s)</p>
+          </div>
+        </div>
 
-        {TABS.map((key) => (
-          <TabsContent key={key} value={key} className="mt-0 space-y-4">
-            <p className="text-xs text-muted-foreground">{TAB_CONFIG[key].description}</p>
+        {/* Filtros */}
+        <div className="bg-card border border-border/30 rounded-lg p-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={sourceTypeFilter || "all"} onValueChange={(v) => setSourceTypeFilter(v === "all" ? "" : v)}>
+              <SelectTrigger className="w-[200px] h-9 text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os tipos</SelectItem>
+                {SOURCE_ORDER.map((s) => {
+                  const meta = SOURCE_META[s];
+                  const Icon = meta.icon;
+                  return (
+                    <SelectItem key={s} value={s}>
+                      <span className="inline-flex items-center gap-2">
+                        <Icon className="w-3.5 h-3.5" />
+                        {meta.label}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-card border border-border/30 rounded-lg p-4">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Pendente</p>
-                <p className="text-xl font-bold text-amber-400 mt-1">{formatCurrency(totalPendente)}</p>
-              </div>
-              <div className="bg-card border border-border/30 rounded-lg p-4">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Pago</p>
-                <p className="text-xl font-bold text-emerald-400 mt-1">{formatCurrency(totalPago)}</p>
-              </div>
-              <div className="bg-card border border-border/30 rounded-lg p-4">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Selecionado</p>
-                <p className="text-xl font-bold text-primary mt-1">{formatCurrency(totalSel)}</p>
-              </div>
-            </div>
+            <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
+              <SelectTrigger className="w-[140px] h-9 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos status</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
+                <SelectItem value="cancelado">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
-                <SelectTrigger className="w-[140px] h-9 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos status</SelectItem>
-                  <SelectItem value="pendente">Pendente</SelectItem>
-                  <SelectItem value="pago">Pago</SelectItem>
-                  <SelectItem value="cancelado">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={supplierFilter || "all"} onValueChange={(v) => setSupplierFilter(v === "all" ? "" : v)}>
-                <SelectTrigger className="w-[180px] h-9 text-xs"><SelectValue placeholder="Fornecedor" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos fornecedores</SelectItem>
-                  {suppliersList.map((s: Supplier) => (
-                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <div className="flex items-center gap-1 text-xs">
-                <Label className="text-[10px] text-muted-foreground">De</Label>
-                <Input type="date" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} className="h-9 w-[140px] text-xs" />
-                <Label className="text-[10px] text-muted-foreground ml-1">Até</Label>
-                <Input type="date" value={dueTo} onChange={(e) => setDueTo(e.target.value)} className="h-9 w-[140px] text-xs" />
-              </div>
-
-              {campaignIdFilter && (
-                <Badge variant="outline" className="h-9 px-3 gap-2 text-xs bg-primary/10 text-primary border-primary/30">
-                  Campanha #{campaignIdFilter}
-                  <button onClick={() => setCampaignIdFilter(null)} className="hover:text-foreground">
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              )}
-
-              {(statusFilter || supplierFilter || dueFrom || dueTo || campaignIdFilter) && (
-                <Button variant="ghost" size="sm" className="h-9 text-xs gap-1"
-                  onClick={() => { setStatusFilter(""); setSupplierFilter(""); setDueFrom(""); setDueTo(""); setCampaignIdFilter(null); }}>
-                  <X className="w-3 h-3" /> Limpar filtros
+            <div className="flex items-center gap-1">
+              <Label className="text-[10px] text-muted-foreground">Mês (competência)</Label>
+              <Input
+                type="month"
+                value={competenceMonth}
+                onChange={(e) => setCompetenceMonth(e.target.value)}
+                className="h-9 w-[150px] text-xs"
+              />
+              {!competenceMonth && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-[10px] text-muted-foreground"
+                  onClick={() => setCompetenceMonth(currentMonthYYYYMM())}
+                  title="Filtrar pelo mês atual"
+                >
+                  mês atual
                 </Button>
               )}
-
-              <div className="ml-auto flex items-center gap-2">
-                {selectedIds.length > 0 && (
-                  <Button size="sm" className="gap-1.5" onClick={() => { setBulkPayDate(new Date().toISOString().split("T")[0]); setBulkPayOpen(true); }}>
-                    <Check className="w-4 h-4" /> Marcar {selectedIds.length} como pago
-                  </Button>
-                )}
-                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setCreateDialog(true)}>
-                  <Plus className="w-4 h-4" /> Nova Conta
-                </Button>
-              </div>
             </div>
 
-            {isLoading ? (
-              <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-            ) : visibleRows.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <CircleDollarSign className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p>Nenhuma conta encontrada nesta categoria</p>
-              </div>
-            ) : (
-              <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border/30 bg-muted/20">
-                        <th className="text-left py-3 px-3 w-8">
-                          <input type="checkbox" checked={allPendingSelected} onChange={toggleSelectAll} aria-label="Selecionar pendentes" />
-                        </th>
-                        <th className="text-left py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Descrição</th>
-                        <th className="text-left py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hidden md:table-cell">Campanha</th>
-                        <th className="text-left py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hidden lg:table-cell">Beneficiário</th>
-                        <th className="text-right py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Valor</th>
-                        <th className="text-center py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hidden md:table-cell">Vencimento</th>
-                        <th className="text-center py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hidden md:table-cell">Pagamento</th>
-                        <th className="text-center py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Status</th>
-                        <th className="text-right py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleRows.map((p) => {
-                        const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.pendente;
-                        const isOverdue = p.status === "pendente" && p.dueDate && p.dueDate < new Date().toISOString().split("T")[0];
-                        const checked = selectedIds.includes(p.id);
-                        return (
-                          <tr key={p.id} className="border-b border-border/10 hover:bg-muted/10 transition-colors">
-                            <td className="py-3 px-3">
-                              {p.status === "pendente" && (
-                                <input type="checkbox" checked={checked} onChange={() => toggleSelect(p.id)} aria-label={`Selecionar conta ${p.id}`} />
-                              )}
-                            </td>
-                            <td className="py-3 px-4">
-                              <p className="font-medium text-xs">{p.description}</p>
-                              {p.notes && <p className="text-[10px] text-muted-foreground mt-0.5">{p.notes}</p>}
-                              {activeTab === "manual" && p.sourceType && p.sourceType !== "manual" && (
-                                <Badge variant="outline" className="mt-1 text-[9px] bg-muted/10">{p.sourceType}</Badge>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-xs text-muted-foreground hidden md:table-cell">
-                              {p.campaignName || "—"}
-                            </td>
-                            <td className="py-3 px-4 text-xs hidden lg:table-cell">
-                              {p.supplierName || <span className="text-muted-foreground">—</span>}
-                            </td>
-                            <td className="py-3 px-4 text-right font-mono font-semibold text-xs">
-                              {formatCurrency(Number(p.amount))}
-                            </td>
-                            <td className="py-3 px-4 text-center text-xs hidden md:table-cell">
-                              <span className={isOverdue ? "text-red-400 font-semibold" : "text-muted-foreground"}>
-                                {formatDate(p.dueDate)}
-                                {isOverdue && " (atrasado)"}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-center text-xs hidden md:table-cell">
-                              {p.paymentDate ? <span className="text-emerald-400">{formatDate(p.paymentDate)}</span> : "—"}
-                            </td>
-                            <td className="py-3 px-4 text-center">
-                              <Badge variant="outline" className={`text-[9px] ${sc.color}`}>{sc.label}</Badge>
-                            </td>
-                            <td className="py-3 px-4 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {p.status === "pendente" && (
-                                  <>
-                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-emerald-400" title="Marcar como pago"
-                                      onClick={() => { setPayDialogId(p.id); setPayDate(new Date().toISOString().split("T")[0]); setProofUrl(""); }}>
-                                      <Check className="w-3.5 h-3.5" />
-                                    </Button>
-                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Editar"
-                                      onClick={() => setEditDialog({ id: p.id, dueDate: p.dueDate || "", amount: p.amount, supplierId: p.supplierId ? String(p.supplierId) : "", notes: p.notes || "" })}>
-                                      <Pencil className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </>
-                                )}
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400" title="Remover"
-                                  onClick={() => { if (confirm("Remover esta conta a pagar?")) deleteMutation.mutate({ id: p.id }); }}>
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+            <Select value={supplierFilter || "all"} onValueChange={(v) => setSupplierFilter(v === "all" ? "" : v)}>
+              <SelectTrigger className="w-[180px] h-9 text-xs"><SelectValue placeholder="Fornecedor" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos fornecedores</SelectItem>
+                {suppliersList.map((s: Supplier) => (
+                  <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center gap-1 text-xs">
+              <Label className="text-[10px] text-muted-foreground">Venc. de</Label>
+              <Input type="date" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} className="h-9 w-[140px] text-xs" />
+              <Label className="text-[10px] text-muted-foreground ml-1">até</Label>
+              <Input type="date" value={dueTo} onChange={(e) => setDueTo(e.target.value)} className="h-9 w-[140px] text-xs" />
+            </div>
+
+            {campaignIdFilter && (
+              <Badge variant="outline" className="h-9 px-3 gap-2 text-xs bg-primary/10 text-primary border-primary/30">
+                Campanha #{campaignIdFilter}
+                <button onClick={() => setCampaignIdFilter(null)} className="hover:text-foreground">
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
             )}
-          </TabsContent>
-        ))}
-      </Tabs>
 
+            {hasAnyFilter && (
+              <Button variant="ghost" size="sm" className="h-9 text-xs gap-1" onClick={clearFilters}>
+                <X className="w-3 h-3" /> Limpar filtros
+              </Button>
+            )}
+
+            <div className="ml-auto flex items-center gap-2">
+              {selectedIds.length > 0 && (
+                <Button
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => { setBulkPayDate(new Date().toISOString().split("T")[0]); setBulkPayOpen(true); }}
+                >
+                  <Check className="w-4 h-4" /> Marcar {selectedIds.length} como pago
+                </Button>
+              )}
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setCreateDialog(true)}>
+                <Plus className="w-4 h-4" /> Nova Conta
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Lista */}
+        {isLoading ? (
+          <div className="text-center py-8 text-muted-foreground">Carregando...</div>
+        ) : visibleRows.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <CircleDollarSign className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p>Nenhuma conta encontrada com os filtros atuais</p>
+            {hasAnyFilter && (
+              <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={clearFilters}>
+                Limpar filtros
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="bg-card border border-border/30 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/30 bg-muted/20">
+                    <th className="text-left py-3 px-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={allPendingSelected}
+                        onChange={toggleSelectAll}
+                        aria-label="Selecionar pendentes"
+                      />
+                    </th>
+                    <th className="text-left py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Tipo</th>
+                    <th className="text-left py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Descrição</th>
+                    <th className="text-left py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hidden md:table-cell">Campanha</th>
+                    <th className="text-left py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hidden lg:table-cell">Beneficiário</th>
+                    <th className="text-center py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hidden lg:table-cell">Compet.</th>
+                    <th className="text-right py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Valor</th>
+                    <th className="text-center py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hidden md:table-cell">Vencimento</th>
+                    <th className="text-center py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hidden md:table-cell">Pagamento</th>
+                    <th className="text-center py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Status</th>
+                    <th className="text-right py-3 px-4 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleRows.map((p) => {
+                    const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.pendente;
+                    const sm = getSourceMeta(p.sourceType);
+                    const SourceIcon = sm.icon;
+                    const isOverdue = p.status === "pendente" && p.dueDate && p.dueDate < new Date().toISOString().split("T")[0];
+                    const checked = selectedIds.includes(p.id);
+                    return (
+                      <tr key={p.id} className="border-b border-border/10 hover:bg-muted/10 transition-colors">
+                        <td className="py-3 px-3">
+                          {p.status === "pendente" && (
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleSelect(p.id)}
+                              aria-label={`Selecionar conta ${p.id}`}
+                            />
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge variant="outline" className={`text-[9px] gap-1 ${sm.badgeClass}`}>
+                            <SourceIcon className="w-3 h-3" />
+                            {sm.shortLabel}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          <p className="font-medium text-xs">{p.description}</p>
+                          {p.notes && <p className="text-[10px] text-muted-foreground mt-0.5">{p.notes}</p>}
+                        </td>
+                        <td className="py-3 px-4 text-xs text-muted-foreground hidden md:table-cell">
+                          {p.campaignName || "—"}
+                        </td>
+                        <td className="py-3 px-4 text-xs hidden lg:table-cell">
+                          {p.supplierName || <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="py-3 px-4 text-center text-xs hidden lg:table-cell text-muted-foreground font-mono">
+                          {p.competenceMonth || "—"}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-xs">
+                          {formatCurrency(Number(p.amount))}
+                        </td>
+                        <td className="py-3 px-4 text-center text-xs hidden md:table-cell">
+                          <span className={isOverdue ? "text-red-400 font-semibold" : "text-muted-foreground"}>
+                            {formatDate(p.dueDate)}
+                            {isOverdue && " (atrasado)"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center text-xs hidden md:table-cell">
+                          {p.paymentDate ? <span className="text-emerald-400">{formatDate(p.paymentDate)}</span> : "—"}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <Badge variant="outline" className={`text-[9px] ${sc.color}`}>{sc.label}</Badge>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {p.status === "pendente" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-emerald-400"
+                                  title="Marcar como pago"
+                                  onClick={() => {
+                                    setPayDialogId(p.id);
+                                    setPayDate(new Date().toISOString().split("T")[0]);
+                                    setProofUrl("");
+                                  }}
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0"
+                                  title="Editar"
+                                  onClick={() => setEditDialog({
+                                    id: p.id,
+                                    dueDate: p.dueDate || "",
+                                    amount: p.amount,
+                                    supplierId: p.supplierId ? String(p.supplierId) : "",
+                                    notes: p.notes || "",
+                                  })}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-red-400"
+                              title="Remover"
+                              onClick={() => { if (confirm("Remover esta conta a pagar?")) deleteMutation.mutate({ id: p.id }); }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Dialog — marcar pago */}
       <Dialog open={payDialogId !== null} onOpenChange={() => setPayDialogId(null)}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader><DialogTitle>Registrar Pagamento</DialogTitle></DialogHeader>
@@ -498,33 +611,51 @@ export default function AccountsPayablePage() {
             </div>
             <div>
               <Label className="text-xs">Comprovante (URL)</Label>
-              <Input value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} placeholder="URL do comprovante (opcional)" />
+              <Input
+                value={proofUrl}
+                onChange={(e) => setProofUrl(e.target.value)}
+                placeholder="URL do comprovante (opcional)"
+              />
             </div>
-            <Button className="w-full" disabled={!payDate || markPaidMutation.isPending}
-              onClick={() => payDialogId && markPaidMutation.mutate({ id: payDialogId, paymentDate: payDate, proofUrl: proofUrl || undefined })}>
+            <Button
+              className="w-full"
+              disabled={!payDate || markPaidMutation.isPending}
+              onClick={() => payDialogId && markPaidMutation.mutate({
+                id: payDialogId,
+                paymentDate: payDate,
+                proofUrl: proofUrl || undefined,
+              })}
+            >
               {markPaidMutation.isPending ? "Registrando..." : "Confirmar Pagamento"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Dialog — bulk marcar pago */}
       <Dialog open={bulkPayOpen} onOpenChange={setBulkPayOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader><DialogTitle>Marcar {selectedIds.length} contas como pagas</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">Total: <strong>{formatCurrency(totalSel)}</strong></p>
+            <p className="text-xs text-muted-foreground">
+              Total: <strong>{formatCurrency(totalSel)}</strong>
+            </p>
             <div>
               <Label className="text-xs">Data do Pagamento</Label>
               <Input type="date" value={bulkPayDate} onChange={(e) => setBulkPayDate(e.target.value)} />
             </div>
-            <Button className="w-full" disabled={!bulkPayDate || bulkPaidMutation.isPending}
-              onClick={() => bulkPaidMutation.mutate({ ids: selectedIds, paymentDate: bulkPayDate })}>
+            <Button
+              className="w-full"
+              disabled={!bulkPayDate || bulkPaidMutation.isPending}
+              onClick={() => bulkPaidMutation.mutate({ ids: selectedIds, paymentDate: bulkPayDate })}
+            >
               {bulkPaidMutation.isPending ? "Registrando..." : "Confirmar pagamento em lote"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Dialog — editar */}
       <Dialog open={editDialog !== null} onOpenChange={() => setEditDialog(null)}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader><DialogTitle>Editar Conta a Pagar</DialogTitle></DialogHeader>
@@ -532,15 +663,25 @@ export default function AccountsPayablePage() {
             <div className="space-y-4">
               <div>
                 <Label className="text-xs">Data de Vencimento</Label>
-                <Input type="date" value={editDialog.dueDate} onChange={(e) => setEditDialog({ ...editDialog, dueDate: e.target.value })} />
+                <Input
+                  type="date"
+                  value={editDialog.dueDate}
+                  onChange={(e) => setEditDialog({ ...editDialog, dueDate: e.target.value })}
+                />
               </div>
               <div>
                 <Label className="text-xs">Valor</Label>
-                <Input value={editDialog.amount} onChange={(e) => setEditDialog({ ...editDialog, amount: e.target.value })} />
+                <Input
+                  value={editDialog.amount}
+                  onChange={(e) => setEditDialog({ ...editDialog, amount: e.target.value })}
+                />
               </div>
               <div>
                 <Label className="text-xs">Fornecedor</Label>
-                <Select value={editDialog.supplierId || "none"} onValueChange={(v) => setEditDialog({ ...editDialog, supplierId: v === "none" ? "" : v })}>
+                <Select
+                  value={editDialog.supplierId || "none"}
+                  onValueChange={(v) => setEditDialog({ ...editDialog, supplierId: v === "none" ? "" : v })}
+                >
                   <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Nenhum</SelectItem>
@@ -552,16 +693,22 @@ export default function AccountsPayablePage() {
               </div>
               <div>
                 <Label className="text-xs">Notas</Label>
-                <Input value={editDialog.notes} onChange={(e) => setEditDialog({ ...editDialog, notes: e.target.value })} />
+                <Input
+                  value={editDialog.notes}
+                  onChange={(e) => setEditDialog({ ...editDialog, notes: e.target.value })}
+                />
               </div>
-              <Button className="w-full" disabled={updateMutation.isPending}
+              <Button
+                className="w-full"
+                disabled={updateMutation.isPending}
                 onClick={() => updateMutation.mutate({
                   id: editDialog.id,
                   dueDate: editDialog.dueDate || undefined,
                   amount: editDialog.amount || undefined,
                   supplierId: editDialog.supplierId ? parseInt(editDialog.supplierId) : null,
                   notes: editDialog.notes || undefined,
-                })}>
+                })}
+              >
                 {updateMutation.isPending ? "Salvando..." : "Salvar"}
               </Button>
             </div>
@@ -569,26 +716,40 @@ export default function AccountsPayablePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog — criar */}
       <Dialog open={createDialog} onOpenChange={setCreateDialog}>
         <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader><DialogTitle>Nova Conta a Pagar (manual)</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Nova Conta a Pagar</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
               <Label className="text-xs">Categoria *</Label>
-              <Select value={createForm.sourceType} onValueChange={(v) => setCreateForm({ ...createForm, sourceType: v as SourceType })}>
+              <Select
+                value={createForm.sourceType}
+                onValueChange={(v) => setCreateForm({ ...createForm, sourceType: v as SourceType })}
+              >
                 <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="restaurant_commission">Comissão Restaurante</SelectItem>
-                  <SelectItem value="vip_repasse">Repasse Sala VIP</SelectItem>
-                  <SelectItem value="supplier_cost">Fornecedor (Produção)</SelectItem>
-                  <SelectItem value="freight_cost">Frete</SelectItem>
-                  <SelectItem value="manual">Outros / Manual</SelectItem>
+                  {SOURCE_ORDER.map((s) => {
+                    const meta = SOURCE_META[s];
+                    const Icon = meta.icon;
+                    return (
+                      <SelectItem key={s} value={s}>
+                        <span className="inline-flex items-center gap-2">
+                          <Icon className="w-3.5 h-3.5" />
+                          {meta.label}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs">Campanha *</Label>
-              <Select value={createForm.campaignId || "none"} onValueChange={(v) => setCreateForm({ ...createForm, campaignId: v === "none" ? "" : v })}>
+              <Select
+                value={createForm.campaignId || "none"}
+                onValueChange={(v) => setCreateForm({ ...createForm, campaignId: v === "none" ? "" : v })}
+              >
                 <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione a campanha" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Selecione...</SelectItem>
@@ -600,7 +761,10 @@ export default function AccountsPayablePage() {
             </div>
             <div>
               <Label className="text-xs">Fornecedor (opcional)</Label>
-              <Select value={createForm.supplierId || "none"} onValueChange={(v) => setCreateForm({ ...createForm, supplierId: v === "none" ? "" : v })}>
+              <Select
+                value={createForm.supplierId || "none"}
+                onValueChange={(v) => setCreateForm({ ...createForm, supplierId: v === "none" ? "" : v })}
+              >
                 <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
@@ -612,23 +776,41 @@ export default function AccountsPayablePage() {
             </div>
             <div>
               <Label className="text-xs">Descrição *</Label>
-              <Input value={createForm.description} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} placeholder="Ex: NF #1234 - Lote 2" />
+              <Input
+                value={createForm.description}
+                onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                placeholder="Ex: NF #1234 - Lote 2"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Valor (R$) *</Label>
-                <Input value={createForm.amount} onChange={(e) => setCreateForm({ ...createForm, amount: e.target.value })} placeholder="0.00" />
+                <Input
+                  value={createForm.amount}
+                  onChange={(e) => setCreateForm({ ...createForm, amount: e.target.value })}
+                  placeholder="0.00"
+                />
               </div>
               <div>
                 <Label className="text-xs">Vencimento</Label>
-                <Input type="date" value={createForm.dueDate} onChange={(e) => setCreateForm({ ...createForm, dueDate: e.target.value })} />
+                <Input
+                  type="date"
+                  value={createForm.dueDate}
+                  onChange={(e) => setCreateForm({ ...createForm, dueDate: e.target.value })}
+                />
               </div>
             </div>
             <div>
               <Label className="text-xs">Notas</Label>
-              <Input value={createForm.notes} onChange={(e) => setCreateForm({ ...createForm, notes: e.target.value })} placeholder="Observações (opcional)" />
+              <Input
+                value={createForm.notes}
+                onChange={(e) => setCreateForm({ ...createForm, notes: e.target.value })}
+                placeholder="Observações (opcional)"
+              />
             </div>
-            <Button className="w-full" disabled={!createForm.description || !createForm.amount || !createForm.campaignId || createMutation.isPending}
+            <Button
+              className="w-full"
+              disabled={!createForm.description || !createForm.amount || !createForm.campaignId || createMutation.isPending}
               onClick={() => createMutation.mutate({
                 campaignId: parseInt(createForm.campaignId),
                 type: createForm.type,
@@ -638,7 +820,8 @@ export default function AccountsPayablePage() {
                 dueDate: createForm.dueDate || undefined,
                 supplierId: createForm.supplierId ? parseInt(createForm.supplierId) : undefined,
                 notes: createForm.notes || undefined,
-              })}>
+              })}
+            >
               {createMutation.isPending ? "Criando..." : "Criar Conta a Pagar"}
             </Button>
           </div>

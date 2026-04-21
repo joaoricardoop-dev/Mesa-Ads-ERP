@@ -2135,6 +2135,7 @@ export const financialRouter = router({
       dueDateFrom: z.string().optional(),
       dueDateTo: z.string().optional(),
       supplierId: z.number().optional(),
+      competenceMonth: z.string().optional(), // YYYY-MM — regime de competência
     }).optional())
     .query(async ({ ctx, input }) => {
       requireFinancialAccess(ctx.user.role);
@@ -2147,6 +2148,7 @@ export const financialRouter = router({
       if (input?.supplierId) conditions.push(eq(accountsPayable.supplierId, input.supplierId));
       if (input?.dueDateFrom) conditions.push(gte(accountsPayable.dueDate, input.dueDateFrom));
       if (input?.dueDateTo) conditions.push(lte(accountsPayable.dueDate, input.dueDateTo));
+      if (input?.competenceMonth) conditions.push(eq(accountsPayable.competenceMonth, input.competenceMonth));
       const rows = await db
         .select({
           ap: accountsPayable,
