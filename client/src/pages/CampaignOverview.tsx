@@ -16,6 +16,8 @@ import {
   FileText,
   ChevronDown,
   ExternalLink,
+  Settings2,
+  Info,
 } from "lucide-react";
 import { useState } from "react";
 import { CampaignConsolidated } from "@/components/campaign/CampaignConsolidated";
@@ -459,7 +461,135 @@ export default function CampaignOverview() {
             </div>
           </section>
         )}
+
+        {!loadingCamp && campaign && (
+          <CampaignEconomicsSection campaign={campaign as any} />
+        )}
       </div>
     </div>
+  );
+}
+
+// ── Economics & Infos Gerais (após batches) ─────────────────────────────────
+function CampaignEconomicsSection({ campaign }: { campaign: any }) {
+  const [open, setOpen] = useState(false);
+
+  const fmtDate = (s?: string | null) => {
+    if (!s) return "—";
+    const d = new Date(s.length === 10 ? `${s}T00:00:00` : s);
+    return isNaN(d.getTime()) ? s : d.toLocaleDateString("pt-BR");
+  };
+  const fmtPct = (v: any) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+    return `${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+  };
+  const fmtMoney = (v: any) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+    return formatCurrency(n);
+  };
+
+  const infos: Array<{ label: string; value: React.ReactNode }> = [
+    { label: "Cliente", value: campaign.clientName || campaign.clientId || "—" },
+    { label: "Status", value: campaign.status ?? "—" },
+    { label: "Tipo", value: campaign.campaignType ?? "—" },
+    { label: "Produto", value: campaign.productName ?? "—" },
+    { label: "Início", value: fmtDate(campaign.startDate) },
+    { label: "Fim", value: fmtDate(campaign.endDate) },
+    { label: "Veiculação", value: `${fmtDate(campaign.veiculacaoStartDate)} → ${fmtDate(campaign.veiculacaoEndDate)}` },
+    { label: "Vendedor", value: campaign.assignedToName || campaign.assignedTo || "—" },
+    { label: "Parceiro (Agência)", value: campaign.partnerName || (campaign.partnerId ? `#${campaign.partnerId}` : "—") },
+    { label: "Bonificada", value: campaign.isBonificada ? "Sim" : "Não" },
+  ];
+
+  const economics: Array<{ label: string; value: React.ReactNode }> = [
+    { label: "Pricing", value: campaign.pricingType === "fixed" ? "Fixo" : "Variável" },
+    { label: "Markup (%)", value: fmtPct(campaign.markupPercent) },
+    { label: "Preço Fixo", value: fmtMoney(campaign.fixedPrice) },
+    { label: "Comissão Restaurante", value: fmtPct(campaign.restaurantCommission) },
+    { label: "Comissão Vendedor", value: fmtPct(campaign.sellerCommission) },
+    { label: "Alíquota Imposto", value: fmtPct(campaign.taxRate) },
+    { label: "BV Agência", value: campaign.hasAgencyBv ? fmtPct(campaign.agencyBvPercent) : "—" },
+    { label: "Tamanho do Batch", value: campaign.batchSize?.toLocaleString("pt-BR") ?? "—" },
+    { label: "Custo do Batch", value: fmtMoney(campaign.batchCost) },
+    { label: "Custo Produção", value: fmtMoney(campaign.productionCost) },
+    { label: "Custo Frete", value: fmtMoney(campaign.freightCost) },
+    { label: "Duração Contrato (meses)", value: campaign.contractDuration ?? "—" },
+  ];
+
+  return (
+    <section className="bg-card border border-border/30 rounded-xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Settings2 className="w-4 h-4 text-primary" />
+          <h2 className="text-sm font-semibold uppercase tracking-wider">Economics & Infos Gerais</h2>
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            Parâmetros padrão da campanha (cada batch pode sobrescrever)
+          </span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="border-t border-border/30 p-4 space-y-6">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="w-3.5 h-3.5 text-muted-foreground" />
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Infos Gerais
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {infos.map((row) => (
+                <div key={row.label} className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                    {row.label}
+                  </div>
+                  <div className="text-sm font-medium truncate" title={typeof row.value === "string" ? row.value : undefined}>
+                    {row.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Settings2 className="w-3.5 h-3.5 text-muted-foreground" />
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Economics (padrão)
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {economics.map((row) => (
+                <div key={row.label} className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                    {row.label}
+                  </div>
+                  <div className="text-sm font-medium tabular-nums truncate">{row.value}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-3">
+              Estes são os valores padrão usados como base. Cada batch pode definir overrides na aba Financeiro.
+            </p>
+          </div>
+
+          {campaign.notes && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                Observações
+              </div>
+              <p className="text-sm whitespace-pre-wrap">{campaign.notes}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
