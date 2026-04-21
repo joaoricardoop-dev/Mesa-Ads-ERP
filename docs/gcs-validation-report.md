@@ -1,13 +1,13 @@
 # Validação do Google Cloud Storage em produção
 
-Data da validação: 2026-04-20 (revalidado no mesmo dia, sem mudanças)
+Data da validação: 2026-04-20 (revalidado em 2026-04-21 na task #111)
 Responsável: validação automatizada (task #102, pré-requisito do Marketplace v2)
 
-> **Revalidação 2026-04-20 ~15:51 UTC:** rerodados todos os artefatos da seção 3 contra `https://mesaads.com.br`. Resultados idênticos: rotas seguem devolvendo `text/html` 3826 bytes (SPA), `last-modified: Fri, 17 Apr 2026 18:45:58 GMT` na build publicada não mudou, e o banco de produção ainda tem os mesmos 10 logos (mais recente `TAMBAQUI DE BANDA` em 2026-04-10). Nenhuma republicação aconteceu desde a primeira execução; a follow-up #111 segue sendo o próximo passo necessário.
+> **Revalidação 2026-04-21 (task #111):** repetidos os curls da seção 3 contra `https://mesaads.com.br` — produção segue na build antiga (HTML 3826 bytes para os 4 endpoints). A republicação NÃO pôde ser disparada pelo agente de task (apenas o app principal/usuário pode clicar em **Publish**). Em compensação foi feito o `npm run build` local e verificado que `dist/index.js` contém `setupPublicLogoUploadRoutes`, `restaurant-logo/serve` e `restaurant-logo/upload-public`; a configuração de deploy em `.replit` (`autoscale`, `npm run start`, `bash scripts/pre-deploy.sh && npm run build`) está correta. Os mesmos curls rodados localmente (`http://localhost:5000`) retornam `image/png` 24825 bytes e `400 JSON {"error":"Nenhum arquivo enviado."}`, confirmando que basta o usuário clicar em **Publish** no app principal (após o merge desta task) para que produção passe a servir corretamente.
 
 ## Resumo executivo
 
-**Status: PARCIAL — uploads históricos OK, mas o endpoint público de leitura (`/api/restaurant-logo/serve/...`) NÃO está disponível na build atualmente publicada em `mesaads.com.br`. É preciso republicar a aplicação antes de avançar com qualquer feature do Marketplace v2 que dependa de upload/exibição de arquivos.**
+**Status: PARCIAL — uploads históricos OK, build do branch atual contém as rotas e funciona localmente, mas a produção em `mesaads.com.br` ainda serve a build antiga. Ação pendente: usuário precisa clicar em **Publish** no app principal após o merge desta task. Depois disso, rerodar os curls da seção 3 contra produção.**
 
 ## O que foi verificado
 
