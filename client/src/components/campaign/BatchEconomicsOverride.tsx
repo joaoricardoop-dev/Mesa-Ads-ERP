@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, X, Check, Settings2 } from "lucide-react";
+import { Pencil, X, Check, Settings2, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 type FinancialsData = RouterOutputs["campaignPhase"]["getFinancials"];
@@ -92,18 +92,30 @@ export function BatchEconomicsOverride({
 
   const canalTipo = financials.canalTipo;
   const hasBV = !!partner;
+  const overrideCount = Object.values(overrides).filter((v) => v != null && v !== "").length;
+  const [open, setOpen] = useState(false);
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="w-full flex items-center gap-2 text-left"
+          aria-expanded={open}
+        >
+          {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
           <Settings2 className="w-4 h-4" />
-          Parâmetros deste Batch
+          <CardTitle className="text-base">Parâmetros deste Batch</CardTitle>
+          {overrideCount > 0 && (
+            <Badge className="bg-amber-100 text-amber-800">{overrideCount} override{overrideCount > 1 ? "s" : ""}</Badge>
+          )}
           <span className="text-xs text-muted-foreground font-normal ml-auto">
-            Vazio = herda da campanha
+            {open ? "Vazio = herda da campanha" : "Clique para editar"}
           </span>
-        </CardTitle>
+        </button>
       </CardHeader>
+      {open && (
       <CardContent className="pt-0">
         <div className="overflow-hidden rounded-md border">
           <table className="w-full text-sm">
@@ -221,6 +233,7 @@ export function BatchEconomicsOverride({
           deste batch (paid/pending preservados).
         </p>
       </CardContent>
+      )}
     </Card>
   );
 }
