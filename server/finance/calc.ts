@@ -279,12 +279,20 @@ export type EffectiveSource = "override" | "inherited" | "default";
 
 export interface EffectiveParam<T> { value: T; source: EffectiveSource; }
 
-function eff<T>(override: T | null | undefined, base: T): EffectiveParam<T> {
-  if (override != null && override !== "" as any) {
-    const v = typeof override === "number" ? override : (typeof override === "string" ? override : override);
-    return { value: v as T, source: "override" };
+// effNumeric: para campos numéricos (taxa %, valor R$). Aceita override
+// como number ou string (vindo do decimal do Postgres) e cai no base
+// quando o override é null/undefined/string vazia.
+function effNumeric(
+  override: string | number | null | undefined,
+  base: number,
+): EffectiveParam<number> {
+  if (override === null || override === undefined) {
+    return { value: base, source: "inherited" };
   }
-  return { value: base, source: "inherited" };
+  if (typeof override === "string" && override.trim() === "") {
+    return { value: base, source: "inherited" };
+  }
+  return { value: num(override, base), source: "override" };
 }
 
 export interface PhaseFinancials {
@@ -368,7 +376,7 @@ export function calcPhaseFinancials(input: {
     }
     return totW > 0 ? acc / totW : TAX_RATES.irpjDefault * 100;
   })();
-  const irpjEff = eff<number>(overrides.taxRateOverride, irpjAvg);
+  const irpjEff = effNumeric(overrides.taxRateOverride, irpjAvg);
   const irpjAmount = receita * (irpjEff.value / 100);
   const pisCofinsAmount = receita * TAX_RATES.pisCofins;
   const issAmount = receita * ((input.issRatePercent ?? 0) / 100);
@@ -376,7 +384,7 @@ export function calcPhaseFinancials(input: {
 
   // ── Canal (XOR) ─────────────────────────────────────────────────────────
   const restCommBase = num(campaign.restaurantCommission);
-  const restCommEff = eff<number>(overrides.restaurantCommissionOverride, restCommBase);
+  const restCommEff = effNumeric(overrides.restaurantCommissionOverride, restCommBase);
 
   // VIP rate base: media ponderada de productVipProviderCommissionPercent OU vipProviderRepassePercent
   const vipBase = (() => {
@@ -391,7 +399,7 @@ export function calcPhaseFinancials(input: {
     }
     return totW > 0 ? acc / totW : 0;
   })();
-  const vipEff = eff<number>(overrides.vipRepasseOverride, vipBase);
+  const vipEff = effNumeric(overrides.vipRepasseOverride, vipBase);
 
   let canalValor = 0;
   if (isBonificada) {
@@ -414,20 +422,20 @@ export function calcPhaseFinancials(input: {
   const freightFromItems = canalTipo === "vip" || isBonificada
     ? 0
     : items.reduce((s, it) => s + num(it.freightCost ?? 0), 0);
-  const freightEff = eff<number>(overrides.freightCostOverride, freightFromItems);
+  const freightEff = effNumeric(overrides.freightCostOverride, freightFromItems);
   const freightCost = roundCents(freightEff.value);
 
   const baseContribuicao = roundCents(base - freightCost - productionCost);
 
   // ── BV da Campanha (com gross-up) ───────────────────────────────────────
   const bvBaseRate = num(campaign.agencyBvPercent ?? campaign.partnerCommissionPercent ?? 0);
-  const bvEff = eff<number>(overrides.bvPercentOverride, bvBaseRate);
+  const bvEff = effNumeric(overrides.bvPercentOverride, bvBaseRate);
   const bvActive = !isBonificada && (campaign.hasAgencyBv !== false) && bvEff.value > 0;
 
   const grossUpBase = num(
     campaign.partnerGrossUpRate ?? campaign.globalBvGrossUpRate ?? (DEFAULT_BV_GROSS_UP_RATE * 100),
   );
-  const grossUpEff = eff<number>(overrides.grossUpRateOverride, grossUpBase);
+  const grossUpEff = effNumeric(overrides.grossUpRateOverride, grossUpBase);
   const grossUpRateDecimal = grossUpEff.value / 100;
 
   // Base do BV: receita − impostos − canal (após canal já descontado).
