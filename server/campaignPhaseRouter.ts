@@ -842,7 +842,7 @@ export const campaignPhaseRouter = router({
   // Retorna tudo que a UI do batch precisa: phase, items, campaign,
   // financials (calcPhaseFinancials), invoice única, payables filtrados,
   // overrides e dados do parceiro p/ exibir BV.
-  getFinancials: protectedProcedure
+  getFinancials: comercialProcedure
     .input(z.object({ phaseId: z.number() }))
     .query(async ({ input }) => {
       const db = await getDatabase();
