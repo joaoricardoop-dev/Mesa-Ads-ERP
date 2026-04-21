@@ -1,9 +1,478 @@
 {
-  "id": "9901a8da-0548-4a49-8ce3-3932022c8cf9",
-  "prevId": "c96c58fe-c094-4e0f-bceb-48d30f3b1ef5",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.accounts_payable": {
+      "name": "accounts_payable",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "campaignId": {
+          "name": "campaignId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaignPhaseId": {
+          "name": "campaignPhaseId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaignItemId": {
+          "name": "campaignItemId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invoiceId": {
+          "name": "invoiceId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "supplierId": {
+          "name": "supplierId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vipProviderId": {
+          "name": "vipProviderId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type": {
+          "name": "type",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dueDate": {
+          "name": "dueDate",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paymentDate": {
+          "name": "paymentDate",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pendente'"
+        },
+        "recipientType": {
+          "name": "recipientType",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proofUrl": {
+          "name": "proofUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sourceType": {
+          "name": "sourceType",
+          "type": "accounts_payable_source_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manual'"
+        },
+        "sourceRef": {
+          "name": "sourceRef",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "competenceMonth": {
+          "name": "competenceMonth",
+          "type": "varchar(7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdBySystem": {
+          "name": "createdBySystem",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_accounts_payable_campaign_id": {
+          "name": "idx_accounts_payable_campaign_id",
+          "columns": [
+            {
+              "expression": "campaignId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_accounts_payable_status": {
+          "name": "idx_accounts_payable_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_accounts_payable_type": {
+          "name": "idx_accounts_payable_type",
+          "columns": [
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_accounts_payable_vip_provider_id": {
+          "name": "idx_accounts_payable_vip_provider_id",
+          "columns": [
+            {
+              "expression": "vipProviderId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_accounts_payable_campaign_phase_id": {
+          "name": "idx_accounts_payable_campaign_phase_id",
+          "columns": [
+            {
+              "expression": "campaignPhaseId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_accounts_payable_campaign_item_id": {
+          "name": "idx_accounts_payable_campaign_item_id",
+          "columns": [
+            {
+              "expression": "campaignItemId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_accounts_payable_status_due": {
+          "name": "idx_accounts_payable_status_due",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "dueDate",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_accounts_payable_source_type_competence": {
+          "name": "idx_accounts_payable_source_type_competence",
+          "columns": [
+            {
+              "expression": "sourceType",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "competenceMonth",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_ap_partner_commission_partner_month": {
+          "name": "uq_ap_partner_commission_partner_month",
+          "columns": [
+            {
+              "expression": "(\"sourceRef\"->>'partnerId')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"competenceMonth\"",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"sourceType\" = 'bv_campanha'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text AND (\"sourceRef\" ? 'supplementOf'::text) = false",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_ap_restaurant_commission_invoice": {
+          "name": "uq_ap_restaurant_commission_invoice",
+          "columns": [
+            {
+              "expression": "(\"sourceRef\"->>'invoiceId')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"sourceType\" = 'restaurant_commission'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text AND (\"sourceRef\" ? 'invoiceId'::text)",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_ap_restaurant_commission_payment": {
+          "name": "uq_ap_restaurant_commission_payment",
+          "columns": [
+            {
+              "expression": "(\"sourceRef\"->>'restaurantPaymentId')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"sourceType\" = 'restaurant_commission'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text AND (\"sourceRef\" ? 'restaurantPaymentId'::text)",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_ap_restaurant_payment_source": {
+          "name": "uq_ap_restaurant_payment_source",
+          "columns": [
+            {
+              "expression": "(\"sourceRef\"->>'restaurantPaymentId')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"sourceType\" = 'restaurant_commission'::accounts_payable_source_type AND (\"sourceRef\" ? 'restaurantPaymentId'::text)",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_ap_tax_invoice_kind": {
+          "name": "uq_ap_tax_invoice_kind",
+          "columns": [
+            {
+              "expression": "(\"sourceRef\"->>'invoiceId')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "(\"sourceRef\"->>'kind')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"sourceType\" = 'tax'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_ap_vip_repasse_invoice": {
+          "name": "uq_ap_vip_repasse_invoice",
+          "columns": [
+            {
+              "expression": "(\"sourceRef\"->>'invoiceId')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"sourceType\" = 'vip_repasse'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "accounts_payable_campaignId_campaigns_id_fk": {
+          "name": "accounts_payable_campaignId_campaigns_id_fk",
+          "tableFrom": "accounts_payable",
+          "tableTo": "campaigns",
+          "columnsFrom": [
+            "campaignId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "accounts_payable_campaignPhaseId_campaign_phases_id_fk": {
+          "name": "accounts_payable_campaignPhaseId_campaign_phases_id_fk",
+          "tableFrom": "accounts_payable",
+          "tableTo": "campaign_phases",
+          "columnsFrom": [
+            "campaignPhaseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "accounts_payable_campaignItemId_campaign_items_id_fk": {
+          "name": "accounts_payable_campaignItemId_campaign_items_id_fk",
+          "tableFrom": "accounts_payable",
+          "tableTo": "campaign_items",
+          "columnsFrom": [
+            "campaignItemId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "accounts_payable_invoiceId_invoices_id_fk": {
+          "name": "accounts_payable_invoiceId_invoices_id_fk",
+          "tableFrom": "accounts_payable",
+          "tableTo": "invoices",
+          "columnsFrom": [
+            "invoiceId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "accounts_payable_supplierId_suppliers_id_fk": {
+          "name": "accounts_payable_supplierId_suppliers_id_fk",
+          "tableFrom": "accounts_payable",
+          "tableTo": "suppliers",
+          "columnsFrom": [
+            "supplierId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "accounts_payable_vipProviderId_vip_providers_id_fk": {
+          "name": "accounts_payable_vipProviderId_vip_providers_id_fk",
+          "tableFrom": "accounts_payable",
+          "tableTo": "vip_providers",
+          "columnsFrom": [
+            "vipProviderId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.active_restaurants": {
       "name": "active_restaurants",
       "schema": "",
@@ -299,6 +768,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "lat": {
+          "name": "lat",
+          "type": "numeric(10, 7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lng": {
+          "name": "lng",
+          "type": "numeric(10, 7)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "parentRestaurantId": {
           "name": "parentRestaurantId",
           "type": "integer",
@@ -433,6 +914,286 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.bank_accounts": {
+      "name": "bank_accounts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bank": {
+          "name": "bank",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agency": {
+          "name": "agency",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "account": {
+          "name": "account",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "initialBalance": {
+          "name": "initialBalance",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'BRL'"
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.bank_transactions": {
+      "name": "bank_transactions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "bankAccountId": {
+          "name": "bankAccountId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "externalId": {
+          "name": "externalId",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "importBatchId": {
+          "name": "importBatchId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reconciled": {
+          "name": "reconciled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "reconciledAt": {
+          "name": "reconciledAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reconciledBy": {
+          "name": "reconciledBy",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matchedEntityType": {
+          "name": "matchedEntityType",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matchedEntityId": {
+          "name": "matchedEntityId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matches": {
+          "name": "matches",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_bank_tx_account": {
+          "name": "idx_bank_tx_account",
+          "columns": [
+            {
+              "expression": "bankAccountId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_bank_tx_date": {
+          "name": "idx_bank_tx_date",
+          "columns": [
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_bank_tx_reconciled": {
+          "name": "idx_bank_tx_reconciled",
+          "columns": [
+            {
+              "expression": "reconciled",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_bank_tx_match": {
+          "name": "idx_bank_tx_match",
+          "columns": [
+            {
+              "expression": "matchedEntityType",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "matchedEntityId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "bank_transactions_bankAccountId_bank_accounts_id_fk": {
+          "name": "bank_transactions_bankAccountId_bank_accounts_id_fk",
+          "tableFrom": "bank_transactions",
+          "tableTo": "bank_accounts",
+          "columnsFrom": [
+            "bankAccountId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_bank_tx_account_external": {
+          "name": "uq_bank_tx_account_external",
+          "nullsNotDistinct": false,
+          "columns": [
+            "bankAccountId",
+            "externalId"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -906,6 +1667,102 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.campaign_drafts": {
+      "name": "campaign_drafts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "clientId": {
+          "name": "clientId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cartJson": {
+          "name": "cartJson",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_campaign_drafts_client_id": {
+          "name": "idx_campaign_drafts_client_id",
+          "columns": [
+            {
+              "expression": "clientId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_campaign_drafts_expires_at": {
+          "name": "idx_campaign_drafts_expires_at",
+          "columns": [
+            {
+              "expression": "expiresAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "campaign_drafts_clientId_clients_id_fk": {
+          "name": "campaign_drafts_clientId_clients_id_fk",
+          "tableFrom": "campaign_drafts",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "clientId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.campaign_history": {
       "name": "campaign_history",
       "schema": "",
@@ -937,6 +1794,12 @@
         "userId": {
           "name": "userId",
           "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "userName": {
+          "name": "userName",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
@@ -982,6 +1845,455 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.campaign_items": {
+      "name": "campaign_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "campaignPhaseId": {
+          "name": "campaignPhaseId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "unitPrice": {
+          "name": "unitPrice",
+          "type": "numeric(12, 4)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0.0000'"
+        },
+        "totalPrice": {
+          "name": "totalPrice",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "productionCost": {
+          "name": "productionCost",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0.00'"
+        },
+        "freightCost": {
+          "name": "freightCost",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0.00'"
+        },
+        "restaurantId": {
+          "name": "restaurantId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shareIndex": {
+          "name": "shareIndex",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_campaign_items_phase_id": {
+          "name": "idx_campaign_items_phase_id",
+          "columns": [
+            {
+              "expression": "campaignPhaseId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_campaign_items_product_id": {
+          "name": "idx_campaign_items_product_id",
+          "columns": [
+            {
+              "expression": "productId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_campaign_items_restaurant_id": {
+          "name": "idx_campaign_items_restaurant_id",
+          "columns": [
+            {
+              "expression": "restaurantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "campaign_items_campaignPhaseId_campaign_phases_id_fk": {
+          "name": "campaign_items_campaignPhaseId_campaign_phases_id_fk",
+          "tableFrom": "campaign_items",
+          "tableTo": "campaign_phases",
+          "columnsFrom": [
+            "campaignPhaseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "campaign_items_productId_products_id_fk": {
+          "name": "campaign_items_productId_products_id_fk",
+          "tableFrom": "campaign_items",
+          "tableTo": "products",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "campaign_items_restaurantId_active_restaurants_id_fk": {
+          "name": "campaign_items_restaurantId_active_restaurants_id_fk",
+          "tableFrom": "campaign_items",
+          "tableTo": "active_restaurants",
+          "columnsFrom": [
+            "restaurantId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.campaign_phases": {
+      "name": "campaign_phases",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "campaignId": {
+          "name": "campaignId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "periodStart": {
+          "name": "periodStart",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "periodEnd": {
+          "name": "periodEnd",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "campaign_phase_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'planejada'"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit_price_override": {
+          "name": "unit_price_override",
+          "type": "numeric(12, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "markup_override": {
+          "name": "markup_override",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tax_rate_override": {
+          "name": "tax_rate_override",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "restaurant_commission_override": {
+          "name": "restaurant_commission_override",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vip_repasse_override": {
+          "name": "vip_repasse_override",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bv_percent_override": {
+          "name": "bv_percent_override",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gross_up_rate_override": {
+          "name": "gross_up_rate_override",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batch_cost_override": {
+          "name": "batch_cost_override",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "freight_cost_override": {
+          "name": "freight_cost_override",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "override_notes": {
+          "name": "override_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "override_updated_at": {
+          "name": "override_updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "override_updated_by": {
+          "name": "override_updated_by",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "briefingEnteredAt": {
+          "name": "briefingEnteredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "designEnteredAt": {
+          "name": "designEnteredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aprovacaoEnteredAt": {
+          "name": "aprovacaoEnteredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "producaoEnteredAt": {
+          "name": "producaoEnteredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "distribuicaoEnteredAt": {
+          "name": "distribuicaoEnteredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "veiculacaoEnteredAt": {
+          "name": "veiculacaoEnteredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "concluidaAt": {
+          "name": "concluidaAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_campaign_phases_campaign_id": {
+          "name": "idx_campaign_phases_campaign_id",
+          "columns": [
+            {
+              "expression": "campaignId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_campaign_phases_status": {
+          "name": "idx_campaign_phases_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_campaign_phases_period": {
+          "name": "idx_campaign_phases_period",
+          "columns": [
+            {
+              "expression": "periodStart",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "periodEnd",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "campaign_phases_campaignId_campaigns_id_fk": {
+          "name": "campaign_phases_campaignId_campaigns_id_fk",
+          "tableFrom": "campaign_phases",
+          "tableTo": "campaigns",
+          "columnsFrom": [
+            "campaignId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_campaign_phase_sequence": {
+          "name": "uq_campaign_phase_sequence",
+          "nullsNotDistinct": false,
+          "columns": [
+            "campaignId",
+            "sequence"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1203,6 +2515,271 @@
         "campaign_proofs_campaignId_campaigns_id_fk": {
           "name": "campaign_proofs_campaignId_campaigns_id_fk",
           "tableFrom": "campaign_proofs",
+          "tableTo": "campaigns",
+          "columnsFrom": [
+            "campaignId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.campaign_report_photos": {
+      "name": "campaign_report_photos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "reportId": {
+          "name": "reportId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "caption": {
+          "name": "caption",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_campaign_report_photos_report_id": {
+          "name": "idx_campaign_report_photos_report_id",
+          "columns": [
+            {
+              "expression": "reportId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "campaign_report_photos_reportId_campaign_reports_id_fk": {
+          "name": "campaign_report_photos_reportId_campaign_reports_id_fk",
+          "tableFrom": "campaign_report_photos",
+          "tableTo": "campaign_reports",
+          "columnsFrom": [
+            "reportId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.campaign_reports": {
+      "name": "campaign_reports",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "campaignId": {
+          "name": "campaignId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "periodStart": {
+          "name": "periodStart",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "periodEnd": {
+          "name": "periodEnd",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reportType": {
+          "name": "reportType",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'coaster'"
+        },
+        "numRestaurants": {
+          "name": "numRestaurants",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "coastersDistributed": {
+          "name": "coastersDistributed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "usagePerDay": {
+          "name": "usagePerDay",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 3
+        },
+        "daysInPeriod": {
+          "name": "daysInPeriod",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 30
+        },
+        "numScreens": {
+          "name": "numScreens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "spotsPerDay": {
+          "name": "spotsPerDay",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "spotDurationSeconds": {
+          "name": "spotDurationSeconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 30
+        },
+        "activationEvents": {
+          "name": "activationEvents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "peoplePerEvent": {
+          "name": "peoplePerEvent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "totalImpressions": {
+          "name": "totalImpressions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publishedAt": {
+          "name": "publishedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_campaign_reports_campaign_id": {
+          "name": "idx_campaign_reports_campaign_id",
+          "columns": [
+            {
+              "expression": "campaignId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_campaign_reports_published_at": {
+          "name": "idx_campaign_reports_published_at",
+          "columns": [
+            {
+              "expression": "publishedAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "campaign_reports_campaignId_campaigns_id_fk": {
+          "name": "campaign_reports_campaignId_campaigns_id_fk",
+          "tableFrom": "campaign_reports",
           "tableTo": "campaigns",
           "columnsFrom": [
             "campaignId"
@@ -1571,6 +3148,80 @@
           "primaryKey": false,
           "notNull": false
         },
+        "proposalSignedAt": {
+          "name": "proposalSignedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "briefingEnteredAt": {
+          "name": "briefingEnteredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "designEnteredAt": {
+          "name": "designEnteredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aprovacaoEnteredAt": {
+          "name": "aprovacaoEnteredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "producaoEnteredAt": {
+          "name": "producaoEnteredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "distribuicaoEnteredAt": {
+          "name": "distribuicaoEnteredAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "partnerId": {
+          "name": "partnerId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hasAgencyBv": {
+          "name": "hasAgencyBv",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "agencyBvPercent": {
+          "name": "agencyBvPercent",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'20.00'"
+        },
+        "assignedTo": {
+          "name": "assignedTo",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assignedToName": {
+          "name": "assignedToName",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assignedToAvatar": {
+          "name": "assignedToAvatar",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -1667,6 +3318,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_campaigns_partner_id": {
+          "name": "idx_campaigns_partner_id",
+          "columns": [
+            {
+              "expression": "partnerId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1715,6 +3381,19 @@
           "tableTo": "products",
           "columnsFrom": [
             "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "campaigns_partnerId_partners_id_fk": {
+          "name": "campaigns_partnerId_partners_id_fk",
+          "tableFrom": "campaigns",
+          "tableTo": "partners",
+          "columnsFrom": [
+            "partnerId"
           ],
           "columnsTo": [
             "id"
@@ -1838,9 +3517,63 @@
           "notNull": false,
           "default": false
         },
+        "utm_source": {
+          "name": "utm_source",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utm_medium": {
+          "name": "utm_medium",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utm_campaign": {
+          "name": "utm_campaign",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utm_content": {
+          "name": "utm_content",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utm_term": {
+          "name": "utm_term",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "referrer": {
+          "name": "referrer",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "landing_path": {
+          "name": "landing_path",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "parentId": {
           "name": "parentId",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "partnerId": {
+          "name": "partnerId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "show_agency_pricing": {
+          "name": "show_agency_pricing",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
@@ -1921,6 +3654,19 @@
           "tableTo": "clients",
           "columnsFrom": [
             "parentId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "clients_partnerId_partners_id_fk": {
+          "name": "clients_partnerId_partners_id_fk",
+          "tableFrom": "clients",
+          "tableTo": "partners",
+          "columnsFrom": [
+            "partnerId"
           ],
           "columnsTo": [
             "id"
@@ -2109,6 +3855,441 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.crm_notifications": {
+      "name": "crm_notifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "eventType": {
+          "name": "eventType",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "leadId": {
+          "name": "leadId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "partnerId": {
+          "name": "partnerId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaignId": {
+          "name": "campaignId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "clientId": {
+          "name": "clientId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "restaurantId": {
+          "name": "restaurantId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "readAt": {
+          "name": "readAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_crm_notifications_lead_id": {
+          "name": "idx_crm_notifications_lead_id",
+          "columns": [
+            {
+              "expression": "leadId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_crm_notifications_read_at": {
+          "name": "idx_crm_notifications_read_at",
+          "columns": [
+            {
+              "expression": "readAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_crm_notifications_created_at": {
+          "name": "idx_crm_notifications_created_at",
+          "columns": [
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_crm_notifications_campaign_id": {
+          "name": "idx_crm_notifications_campaign_id",
+          "columns": [
+            {
+              "expression": "campaignId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_crm_notifications_client_id": {
+          "name": "idx_crm_notifications_client_id",
+          "columns": [
+            {
+              "expression": "clientId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_crm_notifications_restaurant_id": {
+          "name": "idx_crm_notifications_restaurant_id",
+          "columns": [
+            {
+              "expression": "restaurantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "crm_notifications_leadId_leads_id_fk": {
+          "name": "crm_notifications_leadId_leads_id_fk",
+          "tableFrom": "crm_notifications",
+          "tableTo": "leads",
+          "columnsFrom": [
+            "leadId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "crm_notifications_partnerId_partners_id_fk": {
+          "name": "crm_notifications_partnerId_partners_id_fk",
+          "tableFrom": "crm_notifications",
+          "tableTo": "partners",
+          "columnsFrom": [
+            "partnerId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "crm_notifications_campaignId_campaigns_id_fk": {
+          "name": "crm_notifications_campaignId_campaigns_id_fk",
+          "tableFrom": "crm_notifications",
+          "tableTo": "campaigns",
+          "columnsFrom": [
+            "campaignId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "crm_notifications_clientId_clients_id_fk": {
+          "name": "crm_notifications_clientId_clients_id_fk",
+          "tableFrom": "crm_notifications",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "clientId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.financial_audit_log": {
+      "name": "financial_audit_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "entityType": {
+          "name": "entityType",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entityId": {
+          "name": "entityId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action": {
+          "name": "action",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actorUserId": {
+          "name": "actorUserId",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actorRole": {
+          "name": "actorRole",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "before": {
+          "name": "before",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "after": {
+          "name": "after",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_fin_audit_entity": {
+          "name": "idx_fin_audit_entity",
+          "columns": [
+            {
+              "expression": "entityType",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entityId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_fin_audit_actor": {
+          "name": "idx_fin_audit_actor",
+          "columns": [
+            {
+              "expression": "actorUserId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_fin_audit_created_at": {
+          "name": "idx_fin_audit_created_at",
+          "columns": [
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_fin_audit_action": {
+          "name": "idx_fin_audit_action",
+          "columns": [
+            {
+              "expression": "action",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.integration_tokens": {
+      "name": "integration_tokens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accessToken": {
+          "name": "accessToken",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refreshToken": {
+          "name": "refreshToken",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tokenType": {
+          "name": "tokenType",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scopes": {
+          "name": "scopes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "integration_tokens_provider_unique": {
+          "name": "integration_tokens_provider_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "provider"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.invoices": {
       "name": "invoices",
       "schema": "",
@@ -2124,6 +4305,12 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true
+        },
+        "campaignPhaseId": {
+          "name": "campaignPhaseId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "clientId": {
           "name": "clientId",
@@ -2143,6 +4330,34 @@
           "primaryKey": false,
           "notNull": true
         },
+        "billingType": {
+          "name": "billingType",
+          "type": "billing_mode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'bruto'"
+        },
+        "withheldTax": {
+          "name": "withheldTax",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "issRate": {
+          "name": "issRate",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0.00'"
+        },
+        "issRetained": {
+          "name": "issRetained",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "issueDate": {
           "name": "issueDate",
           "type": "date",
@@ -2157,6 +4372,12 @@
         },
         "paymentDate": {
           "name": "paymentDate",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "receivedDate": {
+          "name": "receivedDate",
           "type": "date",
           "primaryKey": false,
           "notNull": false
@@ -2178,6 +4399,18 @@
         "notes": {
           "name": "notes",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "documentUrl": {
+          "name": "documentUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "documentLabel": {
+          "name": "documentLabel",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": false
         },
@@ -2256,6 +4489,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_invoices_campaign_phase_id": {
+          "name": "idx_invoices_campaign_phase_id",
+          "columns": [
+            {
+              "expression": "campaignPhaseId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2270,6 +4518,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "invoices_campaignPhaseId_campaign_phases_id_fk": {
+          "name": "invoices_campaignPhaseId_campaign_phases_id_fk",
+          "tableFrom": "invoices",
+          "tableTo": "campaign_phases",
+          "columnsFrom": [
+            "campaignPhaseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "invoices_clientId_clients_id_fk": {
@@ -2786,6 +5047,38 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.media_kit_settings": {
+      "name": "media_kit_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "pdfUrl": {
+          "name": "pdfUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.operational_costs": {
       "name": "operational_costs",
       "schema": "",
@@ -2936,6 +5229,20 @@
           "notNull": true,
           "default": "'10.00'"
         },
+        "billingMode": {
+          "name": "billingMode",
+          "type": "billing_mode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'bruto'"
+        },
+        "grossUpRate": {
+          "name": "grossUpRate",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "status",
@@ -3019,8 +5326,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.product_categories": {
-      "name": "product_categories",
+    "public.product_discount_price_tiers": {
+      "name": "product_discount_price_tiers",
       "schema": "",
       "columns": {
         "id": {
@@ -3029,31 +5336,104 @@
           "primaryKey": true,
           "notNull": true
         },
-        "name": {
-          "name": "name",
-          "type": "varchar(100)",
+        "productId": {
+          "name": "productId",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "color": {
-          "name": "color",
-          "type": "varchar(30)",
+        "priceMin": {
+          "name": "priceMin",
+          "type": "numeric(12, 2)",
           "primaryKey": false,
-          "notNull": false,
-          "default": "'gray'"
+          "notNull": true
         },
-        "description": {
-          "name": "description",
-          "type": "text",
+        "priceMax": {
+          "name": "priceMax",
+          "type": "numeric(12, 2)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "isActive": {
-          "name": "isActive",
-          "type": "boolean",
+        "discountPercent": {
+          "name": "discountPercent",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_product_discount_price_tiers_product_id": {
+          "name": "idx_product_discount_price_tiers_product_id",
+          "columns": [
+            {
+              "expression": "productId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "product_discount_price_tiers_productId_products_id_fk": {
+          "name": "product_discount_price_tiers_productId_products_id_fk",
+          "tableFrom": "product_discount_price_tiers",
+          "tableTo": "products",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.product_locations": {
+      "name": "product_locations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "restaurantId": {
+          "name": "restaurantId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "maxShares": {
+          "name": "maxShares",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": true
+          "default": 1
+        },
+        "cycleWeeks": {
+          "name": "cycleWeeks",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 4
         },
         "createdAt": {
           "name": "createdAt",
@@ -3063,10 +5443,77 @@
           "default": "now()"
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
+      "indexes": {
+        "idx_product_locations_product_id": {
+          "name": "idx_product_locations_product_id",
+          "columns": [
+            {
+              "expression": "productId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_product_locations_restaurant_id": {
+          "name": "idx_product_locations_restaurant_id",
+          "columns": [
+            {
+              "expression": "restaurantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "product_locations_productId_products_id_fk": {
+          "name": "product_locations_productId_products_id_fk",
+          "tableFrom": "product_locations",
+          "tableTo": "products",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "product_locations_restaurantId_active_restaurants_id_fk": {
+          "name": "product_locations_restaurantId_active_restaurants_id_fk",
+          "tableFrom": "product_locations",
+          "tableTo": "active_restaurants",
+          "columnsFrom": [
+            "restaurantId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "uq_product_location": {
+          "name": "uq_product_location",
+          "nullsNotDistinct": false,
+          "columns": [
+            "productId",
+            "restaurantId"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -3103,13 +5550,15 @@
           "name": "custoUnitario",
           "type": "numeric(10, 4)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'0.0000'"
         },
         "frete": {
           "name": "frete",
           "type": "numeric(10, 2)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'0.00'"
         },
         "margem": {
           "name": "margem",
@@ -3124,6 +5573,12 @@
           "primaryKey": false,
           "notNull": false,
           "default": 1
+        },
+        "precoBase": {
+          "name": "precoBase",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -3192,13 +5647,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": false,
-          "default": "'coaster'"
-        },
-        "categoryId": {
-          "name": "categoryId",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
+          "default": "'impressos'"
         },
         "unitLabel": {
           "name": "unitLabel",
@@ -3262,12 +5711,111 @@
           "notNull": false,
           "default": "'10.00'"
         },
+        "pricingMode": {
+          "name": "pricingMode",
+          "type": "pricing_mode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'cost_based'"
+        },
+        "entryType": {
+          "name": "entryType",
+          "type": "entry_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'tiers'"
+        },
+        "visibleToPartners": {
+          "name": "visibleToPartners",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "visibleToAdvertisers": {
+          "name": "visibleToAdvertisers",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "workflowTemplate": {
+          "name": "workflowTemplate",
+          "type": "workflow_template",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
         "isActive": {
           "name": "isActive",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "impressionFormulaType": {
+          "name": "impressionFormulaType",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'por_coaster'"
+        },
+        "attentionFactor": {
+          "name": "attentionFactor",
+          "type": "numeric(4, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'1.00'"
+        },
+        "frequencyParam": {
+          "name": "frequencyParam",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'1.00'"
+        },
+        "distributionType": {
+          "name": "distributionType",
+          "type": "distribution_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'rede'"
+        },
+        "defaultPessoasPorMesa": {
+          "name": "defaultPessoasPorMesa",
+          "type": "numeric(4, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'3.00'"
+        },
+        "loopDurationSeconds": {
+          "name": "loopDurationSeconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 30
+        },
+        "frequenciaAparicoes": {
+          "name": "frequenciaAparicoes",
+          "type": "numeric(4, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'1.00'"
+        },
+        "vipProviderId": {
+          "name": "vipProviderId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vipProviderCommissionPercent": {
+          "name": "vipProviderCommissionPercent",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
         },
         "createdAt": {
           "name": "createdAt",
@@ -3286,12 +5834,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "products_categoryId_product_categories_id_fk": {
-          "name": "products_categoryId_product_categories_id_fk",
+        "products_vipProviderId_vip_providers_id_fk": {
+          "name": "products_vipProviderId_vip_providers_id_fk",
           "tableFrom": "products",
-          "tableTo": "product_categories",
+          "tableTo": "vip_providers",
           "columnsFrom": [
-            "categoryId"
+            "vipProviderId"
           ],
           "columnsTo": [
             "id"
@@ -3365,6 +5913,32 @@
           "primaryKey": false,
           "notNull": false
         },
+        "restaurantId": {
+          "name": "restaurantId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shareIndex": {
+          "name": "shareIndex",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cycleWeeks": {
+          "name": "cycleWeeks",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 4
+        },
+        "cycles": {
+          "name": "cycles",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 1
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -3403,6 +5977,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_quotation_items_restaurant_id": {
+          "name": "idx_quotation_items_restaurant_id",
+          "columns": [
+            {
+              "expression": "restaurantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -3430,6 +6019,19 @@
             "id"
           ],
           "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "quotation_items_restaurantId_active_restaurants_id_fk": {
+          "name": "quotation_items_restaurantId_active_restaurants_id_fk",
+          "tableFrom": "quotation_items",
+          "tableTo": "active_restaurants",
+          "columnsFrom": [
+            "restaurantId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -3711,11 +6313,92 @@
           "primaryKey": false,
           "notNull": false
         },
+        "periodStart": {
+          "name": "periodStart",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batchWeeks": {
+          "name": "batchWeeks",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 4
+        },
         "createdBy": {
           "name": "createdBy",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
+        },
+        "isCustomProduct": {
+          "name": "isCustomProduct",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "customProductName": {
+          "name": "customProductName",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customProjectCost": {
+          "name": "customProjectCost",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customPricingMode": {
+          "name": "customPricingMode",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customMarginPercent": {
+          "name": "customMarginPercent",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customFinalPrice": {
+          "name": "customFinalPrice",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customRestaurantCommission": {
+          "name": "customRestaurantCommission",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customPartnerCommission": {
+          "name": "customPartnerCommission",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customSellerCommission": {
+          "name": "customSellerCommission",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agencyCommissionPercent": {
+          "name": "agencyCommissionPercent",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'internal'"
         },
         "createdAt": {
           "name": "createdAt",
@@ -4491,6 +7174,148 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.seasonal_multipliers": {
+      "name": "seasonal_multipliers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "productId": {
+          "name": "productId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "restaurantId": {
+          "name": "restaurantId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "seasonLabel": {
+          "name": "seasonLabel",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "startDate": {
+          "name": "startDate",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endDate": {
+          "name": "endDate",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "multiplier": {
+          "name": "multiplier",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'1.00'"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_seasonal_multipliers_product_id": {
+          "name": "idx_seasonal_multipliers_product_id",
+          "columns": [
+            {
+              "expression": "productId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_seasonal_multipliers_restaurant_id": {
+          "name": "idx_seasonal_multipliers_restaurant_id",
+          "columns": [
+            {
+              "expression": "restaurantId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_seasonal_multipliers_period": {
+          "name": "idx_seasonal_multipliers_period",
+          "columns": [
+            {
+              "expression": "startDate",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "endDate",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "seasonal_multipliers_productId_products_id_fk": {
+          "name": "seasonal_multipliers_productId_products_id_fk",
+          "tableFrom": "seasonal_multipliers",
+          "tableTo": "products",
+          "columnsFrom": [
+            "productId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "seasonal_multipliers_restaurantId_active_restaurants_id_fk": {
+          "name": "seasonal_multipliers_restaurantId_active_restaurants_id_fk",
+          "tableFrom": "seasonal_multipliers",
+          "tableTo": "active_restaurants",
+          "columnsFrom": [
+            "restaurantId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.service_order_items": {
       "name": "service_order_items",
       "schema": "",
@@ -4615,6 +7440,92 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.service_order_trackings": {
+      "name": "service_order_trackings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "serviceOrderId": {
+          "name": "serviceOrderId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "trackingCode": {
+          "name": "trackingCode",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "freightProvider": {
+          "name": "freightProvider",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expectedDate": {
+          "name": "expectedDate",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label": {
+          "name": "label",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_so_trackings_so_id": {
+          "name": "idx_so_trackings_so_id",
+          "columns": [
+            {
+              "expression": "serviceOrderId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "service_order_trackings_serviceOrderId_service_orders_id_fk": {
+          "name": "service_order_trackings_serviceOrderId_service_orders_id_fk",
+          "tableFrom": "service_order_trackings",
+          "tableTo": "service_orders",
+          "columnsFrom": [
+            "serviceOrderId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.service_orders": {
       "name": "service_orders",
       "schema": "",
@@ -4640,6 +7551,12 @@
         },
         "campaignId": {
           "name": "campaignId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaignPhaseId": {
+          "name": "campaignPhaseId",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -4778,6 +7695,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "trackingCode": {
+          "name": "trackingCode",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "freightProvider": {
+          "name": "freightProvider",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "freightExpectedDate": {
+          "name": "freightExpectedDate",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -4877,6 +7812,19 @@
           "tableTo": "campaigns",
           "columnsFrom": [
             "campaignId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "service_orders_campaignPhaseId_campaign_phases_id_fk": {
+          "name": "service_orders_campaignPhaseId_campaign_phases_id_fk",
+          "tableFrom": "service_orders",
+          "tableTo": "campaign_phases",
+          "columnsFrom": [
+            "campaignPhaseId"
           ],
           "columnsTo": [
             "id"
@@ -5334,6 +8282,98 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.user_restaurants": {
+      "name": "user_restaurants",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "restaurant_id": {
+          "name": "restaurant_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_user_restaurants_user_id": {
+          "name": "idx_user_restaurants_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_user_restaurants_restaurant_id": {
+          "name": "idx_user_restaurants_restaurant_id",
+          "columns": [
+            {
+              "expression": "restaurant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_restaurants_restaurant_id_active_restaurants_id_fk": {
+          "name": "user_restaurants_restaurant_id_active_restaurants_id_fk",
+          "tableFrom": "user_restaurants",
+          "tableTo": "active_restaurants",
+          "columnsFrom": [
+            "restaurant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_user_restaurant": {
+          "name": "uq_user_restaurant",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id",
+            "restaurant_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.users": {
       "name": "users",
       "schema": "",
@@ -5434,6 +8474,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "preferences": {
+          "name": "preferences",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -5465,88 +8512,165 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "user_restaurants": {
-      "name": "user_restaurants",
+    "public.vip_providers": {
+      "name": "vip_providers",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "serial",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "user_id": {
-          "name": "user_id",
-          "type": "varchar",
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "company": {
+          "name": "company",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cnpj": {
+          "name": "cnpj",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contactName": {
+          "name": "contactName",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contactPhone": {
+          "name": "contactPhone",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contactEmail": {
+          "name": "contactEmail",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "location": {
+          "name": "location",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repassePercent": {
+          "name": "repassePercent",
+          "type": "numeric(5, 2)",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": "'10.00'"
         },
-        "restaurant_id": {
-          "name": "restaurant_id",
-          "type": "integer",
+        "billingMode": {
+          "name": "billingMode",
+          "type": "billing_mode",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": "'bruto'"
         },
-        "created_at": {
-          "name": "created_at",
+        "status": {
+          "name": "status",
+          "type": "status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
           "default": "now()"
         }
       },
       "indexes": {
-        "idx_user_restaurants_user_id": {
-          "name": "idx_user_restaurants_user_id",
+        "idx_vip_providers_status": {
+          "name": "idx_vip_providers_status",
           "columns": [
-            "user_id"
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
-        "idx_user_restaurants_restaurant_id": {
-          "name": "idx_user_restaurants_restaurant_id",
+        "idx_vip_providers_cnpj": {
+          "name": "idx_vip_providers_cnpj",
           "columns": [
-            "restaurant_id"
+            {
+              "expression": "cnpj",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
-      "foreignKeys": {
-        "user_restaurants_restaurant_id_active_restaurants_id_fk": {
-          "name": "user_restaurants_restaurant_id_active_restaurants_id_fk",
-          "tableFrom": "user_restaurants",
-          "tableTo": "active_restaurants",
-          "columnsFrom": [
-            "restaurant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "uq_user_restaurant": {
-          "name": "uq_user_restaurant",
-          "nullsNotDistinct": false,
-          "columns": [
-            "user_id",
-            "restaurant_id"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
     }
   },
   "enums": {
+    "public.accounts_payable_source_type": {
+      "name": "accounts_payable_source_type",
+      "schema": "public",
+      "values": [
+        "restaurant_commission",
+        "vip_repasse",
+        "supplier_cost",
+        "freight_cost",
+        "bv_campanha",
+        "seller_commission",
+        "tax",
+        "manual"
+      ]
+    },
+    "public.billing_mode": {
+      "name": "billing_mode",
+      "schema": "public",
+      "values": [
+        "bruto",
+        "liquido"
+      ]
+    },
     "public.budget_status": {
       "name": "budget_status",
       "schema": "public",
@@ -5554,6 +8678,16 @@
         "active",
         "expired",
         "rejected"
+      ]
+    },
+    "public.campaign_phase_status": {
+      "name": "campaign_phase_status",
+      "schema": "public",
+      "values": [
+        "planejada",
+        "ativa",
+        "concluida",
+        "cancelada"
       ]
     },
     "public.campaign_status": {
@@ -5570,7 +8704,11 @@
         "transito",
         "executar",
         "veiculacao",
-        "inativa"
+        "inativa",
+        "briefing",
+        "design",
+        "aprovacao",
+        "distribuicao"
       ]
     },
     "public.contact_type": {
@@ -5583,10 +8721,38 @@
         "outro"
       ]
     },
+    "public.distribution_type": {
+      "name": "distribution_type",
+      "schema": "public",
+      "values": [
+        "rede",
+        "local_especifico"
+      ]
+    },
+    "public.entry_type": {
+      "name": "entry_type",
+      "schema": "public",
+      "values": [
+        "tiers",
+        "fixed_quantities"
+      ]
+    },
+    "public.impression_formula_type": {
+      "name": "impression_formula_type",
+      "schema": "public",
+      "values": [
+        "por_coaster",
+        "por_tela",
+        "por_visitante",
+        "por_evento",
+        "manual"
+      ]
+    },
     "public.invoice_status": {
       "name": "invoice_status",
       "schema": "public",
       "values": [
+        "prevista",
         "emitida",
         "paga",
         "vencida",
@@ -5610,6 +8776,14 @@
         "consultor"
       ]
     },
+    "public.pricing_mode": {
+      "name": "pricing_mode",
+      "schema": "public",
+      "values": [
+        "cost_based",
+        "price_based"
+      ]
+    },
     "public.product_type": {
       "name": "product_type",
       "schema": "public",
@@ -5620,7 +8794,11 @@
         "totem",
         "adesivo",
         "porta_guardanapo",
-        "outro"
+        "outro",
+        "impressos",
+        "eletronicos",
+        "telas",
+        "janelas_digitais"
       ]
     },
     "public.production_status": {
@@ -5662,7 +8840,8 @@
       "schema": "public",
       "values": [
         "anunciante",
-        "producao"
+        "producao",
+        "distribuicao"
       ]
     },
     "public.social_class": {
@@ -5698,6 +8877,15 @@
         "vigente",
         "encerrado"
       ]
+    },
+    "public.workflow_template": {
+      "name": "workflow_template",
+      "schema": "public",
+      "values": [
+        "fisico",
+        "eletronico_cliente_envia",
+        "ativacao_evento"
+      ]
     }
   },
   "schemas": {},
@@ -5706,8 +8894,10 @@
   "policies": {},
   "views": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
-  }
+    "tables": {},
+    "columns": {}
+  },
+  "id": "9901a8da-0548-4a49-8ce3-3932022c8cf9",
+  "prevId": "c96c58fe-c094-4e0f-bceb-48d30f3b1ef5"
 }
