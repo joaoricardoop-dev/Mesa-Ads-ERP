@@ -18,6 +18,7 @@ import { TRPCError } from "@trpc/server";
 import { calcPhaseFinancials, type PhaseItemLike, type PhaseOverrides } from "./finance/calc";
 import { materializePayablesForInvoice } from "./finance/payables";
 import { recordAudit } from "./finance/audit";
+import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
 
 const PHASE_OVERRIDE_FIELDS = [
   "unitPriceOverride",
@@ -279,6 +280,10 @@ export const campaignPhaseRouter = router({
       status: z.enum(PHASE_STATUS_ENUM).default("planejada"),
       notes: z.string().optional(),
       // sequence é calculado automaticamente (próximo disponível)
+      // autoSchedule: gera fatura prevista para esta nova fase (default true)
+      // pra manter cronograma consistente em todos os fluxos de criação.
+      autoSchedule: z.boolean().default(true),
+      dueOffsetDays: z.number().int().min(0).max(120).default(15),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -286,25 +291,37 @@ export const campaignPhaseRouter = router({
       const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
       if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
 
-      // Próximo sequence
-      const [maxSeq] = await db
-        .select({ max: sql<number>`COALESCE(MAX(${campaignPhases.sequence}), 0)::int` })
-        .from(campaignPhases)
-        .where(eq(campaignPhases.campaignId, input.campaignId));
+      // Insert + auto-schedule rodam numa transação única — se o agendamento
+      // falhar, a fase não fica órfã sem cronograma e o cliente pode reenviar
+      // sem risco de duplicar phases.
+      return await db.transaction(async (tx) => {
+        const [maxSeq] = await tx
+          .select({ max: sql<number>`COALESCE(MAX(${campaignPhases.sequence}), 0)::int` })
+          .from(campaignPhases)
+          .where(eq(campaignPhases.campaignId, input.campaignId));
 
-      const [created] = await db
-        .insert(campaignPhases)
-        .values({
-          campaignId: input.campaignId,
-          sequence: (maxSeq?.max ?? 0) + 1,
-          label: input.label,
-          periodStart: input.periodStart,
-          periodEnd: input.periodEnd,
-          status: input.status,
-          notes: input.notes ?? null,
-        })
-        .returning();
-      return created;
+        const [created] = await tx
+          .insert(campaignPhases)
+          .values({
+            campaignId: input.campaignId,
+            sequence: (maxSeq?.max ?? 0) + 1,
+            label: input.label,
+            periodStart: input.periodStart,
+            periodEnd: input.periodEnd,
+            status: input.status,
+            notes: input.notes ?? null,
+          })
+          .returning();
+
+        if (input.autoSchedule && created) {
+          await scheduleInvoicesForCampaign(
+            tx,
+            { id: campaign.id, clientId: campaign.clientId },
+            { dueOffsetDays: input.dueOffsetDays, restrictToPhaseIds: [created.id] },
+          );
+        }
+        return created;
+      });
     }),
 
   updatePhase: comercialProcedure
@@ -791,47 +808,15 @@ export const campaignPhaseRouter = router({
 
         let scheduledInvoices = 0;
         if (input.autoScheduleInvoices && createdPhases.length > 0) {
-          const addDays = (iso: string, days: number) => {
-            const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
-            d.setUTCDate(d.getUTCDate() + days);
-            return d.toISOString().slice(0, 10);
-          };
-          const newPhaseIds = createdPhases.map((cp) => cp.phaseId);
-          const phaseRows = await tx.select().from(campaignPhases).where(sql`${campaignPhases.id} IN (${sql.join(newPhaseIds.map((id) => sql`${id}`), sql`, `)})`);
-          const itemRows = await tx.select().from(campaignItems).where(sql`${campaignItems.campaignPhaseId} IN (${sql.join(newPhaseIds.map((id) => sql`${id}`), sql`, `)})`);
-          const revenueByPhase: Record<number, number> = {};
-          for (const it of itemRows) {
-            const v = it.totalPrice != null
-              ? parseFloat(it.totalPrice)
-              : it.quantity * parseFloat(it.unitPrice);
-            revenueByPhase[it.campaignPhaseId] = (revenueByPhase[it.campaignPhaseId] ?? 0) + v;
-          }
-          const existing = await tx
-            .select({ phaseId: invoices.campaignPhaseId })
-            .from(invoices)
-            .where(sql`${invoices.campaignPhaseId} IN (${sql.join(newPhaseIds.map((id) => sql`${id}`), sql`, `)}) AND ${invoices.status} <> 'cancelada'`);
-          const skip = new Set<number>(existing.map((r: any) => r.phaseId).filter((x: any): x is number => x != null));
-
-          const toInsert: any[] = [];
-          for (const p of phaseRows) {
-            if (skip.has(p.id)) continue;
-            toInsert.push({
-              campaignId: input.campaignId,
-              campaignPhaseId: p.id,
-              clientId: campaign.clientId,
-              invoiceNumber: `PREV-${input.campaignId}-${p.sequence}`,
-              amount: (revenueByPhase[p.id] ?? 0).toFixed(2),
-              billingType: "bruto" as const,
-              issueDate: p.periodStart,
-              dueDate: addDays(p.periodStart, input.dueOffsetDays),
-              status: "prevista" as const,
-              notes: `Fatura prevista — Batch ${p.sequence} (${p.label})`,
-            });
-          }
-          if (toInsert.length > 0) {
-            await tx.insert(invoices).values(toInsert);
-            scheduledInvoices = toInsert.length;
-          }
+          const result = await scheduleInvoicesForCampaign(
+            tx,
+            { id: campaign.id, clientId: campaign.clientId },
+            {
+              dueOffsetDays: input.dueOffsetDays,
+              restrictToPhaseIds: createdPhases.map((cp) => cp.phaseId),
+            },
+          );
+          scheduledInvoices = result.created;
         }
 
         return { createdPhases, count: createdPhases.length, scheduledInvoices };

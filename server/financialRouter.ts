@@ -23,6 +23,7 @@ import { VIP_PRODUCT_TIPOS } from "./productRouter";
 import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { materializePayablesForInvoice, type DbClient } from "./finance/payables";
+import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
 import { recordAudit } from "./finance/audit";
 import { audited } from "./finance/auditMiddleware";
 import { financialAuditLog } from "../drizzle/schema";
@@ -2837,71 +2838,17 @@ export const financialRouter = router({
       const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
       if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
 
-      const phaseRows = await db
-        .select()
-        .from(campaignPhases)
-        .where(eq(campaignPhases.campaignId, input.campaignId))
-        .orderBy(campaignPhases.sequence);
-      const phases = input.phaseId
-        ? phaseRows.filter((p) => p.id === input.phaseId)
-        : phaseRows;
-      if (phases.length === 0) {
-        return { created: 0, skipped: 0, total: 0 };
-      }
-
-      const phaseIds = phases.map((p) => p.id);
-      const items = await db
-        .select()
-        .from(campaignItems)
-        .where(inArray(campaignItems.campaignPhaseId, phaseIds));
-      const revenueByPhase: Record<number, number> = {};
-      for (const it of items) {
-        const v = it.totalPrice != null
-          ? parseFloat(it.totalPrice)
-          : it.quantity * parseFloat(it.unitPrice);
-        revenueByPhase[it.campaignPhaseId] = (revenueByPhase[it.campaignPhaseId] ?? 0) + v;
-      }
-
-      const existing = await db
-        .select({ phaseId: invoices.campaignPhaseId, status: invoices.status })
-        .from(invoices)
-        .where(and(
-          eq(invoices.campaignId, input.campaignId),
-          inArray(invoices.campaignPhaseId, phaseIds),
-          sql`${invoices.status} <> 'cancelada'`,
-        ));
-      const phasesWithInvoice = new Set<number>();
-      for (const row of existing) if (row.phaseId != null) phasesWithInvoice.add(row.phaseId);
-
-      const addDays = (iso: string, days: number) => {
-        const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
-        d.setUTCDate(d.getUTCDate() + days);
-        return d.toISOString().slice(0, 10);
-      };
-
-      const toInsert: any[] = [];
-      let skipped = 0;
-      for (const p of phases) {
-        if (phasesWithInvoice.has(p.id)) { skipped++; continue; }
-        const amount = (revenueByPhase[p.id] ?? 0).toFixed(2);
-        toInsert.push({
-          campaignId: input.campaignId,
-          campaignPhaseId: p.id,
-          clientId: campaign.clientId,
-          invoiceNumber: `PREV-${input.campaignId}-${p.sequence}`,
-          amount,
-          billingType: "bruto" as const,
-          issueDate: p.periodStart,
-          dueDate: addDays(p.periodStart, input.dueOffsetDays),
-          status: "prevista" as const,
-          notes: `Fatura prevista — Batch ${p.sequence} (${p.label})`,
-        });
-      }
-
-      if (toInsert.length > 0) {
-        await db.insert(invoices).values(toInsert);
-      }
-      return { created: toInsert.length, skipped, total: phases.length };
+      // Refactored to use shared helper (server/utils/scheduleInvoices.ts).
+      // Preserva o filtro opcional `phaseId` do card "Gerar nova" via
+      // restrictToPhaseIds.
+      return await scheduleInvoicesForCampaign(
+        db,
+        { id: campaign.id, clientId: campaign.clientId },
+        {
+          dueOffsetDays: input.dueOffsetDays,
+          restrictToPhaseIds: input.phaseId ? [input.phaseId] : undefined,
+        },
+      );
     }),
 
   // ── Confirmar emissão de uma fatura prevista ─────────────────────────────

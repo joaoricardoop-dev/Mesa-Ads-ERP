@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { createCrmNotification } from "./notificationRouter";
 import { buildCampaignName } from "./utils/campaignName";
+import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
 
 const MONTH_NAMES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -614,6 +615,11 @@ export const quotationRouter = router({
 
       await autoCreateInvoice(db, { id: campaign.id, clientId: campaign.clientId }, { totalValue: quotation[0].totalValue, isBonificada: quotation[0].isBonificada });
 
+      // Garante cronograma de faturas previstas para todas as fases criadas
+      // a partir dos quotation_items (idempotente — pula fases já com fatura).
+      // Falha propaga: cotação não pode ser marcada como ganha sem cronograma.
+      await scheduleInvoicesForCampaign(db, { id: campaign.id, clientId: campaign.clientId });
+
       await db
         .update(quotations)
         .set({ status: "win", updatedAt: new Date() })
@@ -943,6 +949,11 @@ export const quotationRouter = router({
       }
 
       await autoCreateInvoice(db, { id: campaign.id, clientId: campaign.clientId }, { totalValue: quotation[0].totalValue, isBonificada: quotation[0].isBonificada });
+
+      // Garante cronograma de faturas previstas para todas as fases da campanha
+      // gerada via OS assinada (idempotente — pula fases já com fatura).
+      // Falha propaga: assinatura de OS não pode concluir sem cronograma.
+      await scheduleInvoicesForCampaign(db, { id: campaign.id, clientId: campaign.clientId });
 
       await db
         .update(quotations)
