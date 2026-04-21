@@ -190,13 +190,13 @@ export default function AccountsPayablePage() {
     : ((campaignsData as { items?: CampaignSummary[] } | undefined)?.items ?? []);
 
   // For "manual" tab, server filter only matches sourceType=manual; we extend it to also include
-  // tax / partner_commission / seller_commission via separate queries merged in memory.
+  // tax / bv_campanha / seller_commission via separate queries merged in memory.
   const { data: taxRows = [] } = trpc.financial.listAccountsPayable.useQuery(
     { ...filters, sourceType: "tax" },
     { enabled: activeTab === "manual" },
   );
   const { data: partnerRows = [] } = trpc.financial.listAccountsPayable.useQuery(
-    { ...filters, sourceType: "partner_commission" },
+    { ...filters, sourceType: "bv_campanha" },
     { enabled: activeTab === "manual" },
   );
   const { data: sellerRows = [] } = trpc.financial.listAccountsPayable.useQuery(

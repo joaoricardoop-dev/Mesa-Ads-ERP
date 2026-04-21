@@ -68,7 +68,7 @@ export interface MaterializeResult {
 
 const EMPTY: MaterializeResult = { created: 0, updated: 0, cancelled: 0 };
 
-const PAYMENT_DERIVED_SOURCE_TYPES = ["restaurant_commission", "vip_repasse", "partner_commission"] as const;
+const PAYMENT_DERIVED_SOURCE_TYPES = ["restaurant_commission", "vip_repasse", "bv_campanha"] as const;
 
 export async function materializePayablesForInvoice(
   db: Db,
@@ -344,7 +344,7 @@ async function materializePartnerCommission(
   // (parceiro, mês) podem perder a contribuição de uma das invoices
   // (lost-update em RMW, ou onConflictDoNothing dropando o segundo insert).
   // Advisory locks transacionais são liberados no commit/rollback.
-  const lockKey = `partner_commission:${partner.id}:${compMonth}`;
+  const lockKey = `bv_campanha:${partner.id}:${compMonth}`;
   await db.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
 
   const existing = await db
@@ -352,7 +352,7 @@ async function materializePartnerCommission(
     .from(accountsPayable)
     .where(
       and(
-        eq(accountsPayable.sourceType, "partner_commission"),
+        eq(accountsPayable.sourceType, "bv_campanha"),
         sql`${accountsPayable.sourceRef}->>'partnerId' = ${String(partner.id)}`,
         eq(accountsPayable.competenceMonth, compMonth),
         // Para idempotência, evitamos colidir com APs já pagas: se a do mês
@@ -380,7 +380,7 @@ async function materializePartnerCommission(
           competenceMonth: compMonth,
           invoiceIds: [...ids, invoice.id],
         } satisfies SourceRef,
-        description: `Comissão Parceiro - ${partner.name} (${compMonth}) - ${ids.length + 1} NFs`,
+        description: `BV da Campanha - ${partner.name} (${compMonth}) - ${ids.length + 1} NFs`,
         updatedAt: new Date(),
       })
       .where(eq(accountsPayable.id, openExisting.id));
@@ -395,15 +395,15 @@ async function materializePartnerCommission(
 
   await db.insert(accountsPayable).values({
     campaignId: invoice.campaignId,
-    type: "comissao_parceiro",
+    type: "bv_campanha",
     description: paidExisting
-      ? `Comissão Parceiro - ${partner.name} (${compMonth} suplementar) - NF ${invoice.invoiceNumber || invoice.id}`
-      : `Comissão Parceiro - ${partner.name} (${compMonth}) - NF ${invoice.invoiceNumber || invoice.id}`,
+      ? `BV da Campanha - ${partner.name} (${compMonth} suplementar) - NF ${invoice.invoiceNumber || invoice.id}`
+      : `BV da Campanha - ${partner.name} (${compMonth}) - NF ${invoice.invoiceNumber || invoice.id}`,
     amount: result.amount.toFixed(2),
     recipientType: "parceiro",
     status: "pendente",
     dueDate: safeDueDate(lastDayOfMonth(compMonth)),
-    sourceType: "partner_commission",
+    sourceType: "bv_campanha",
     sourceRef: (paidExisting
       ? {
           partnerId: partner.id,
@@ -441,15 +441,15 @@ async function cancelDerivedPayables(
   );
 
   // Bloqueia se algum derivado já está pago.
-  // Para partner_commission agregada: bloqueia só se a invoice está dentro de uma AP paga.
+  // Para bv_campanha agregada: bloqueia só se a invoice está dentro de uma AP paga.
   for (const ap of inScope) {
     if (ap.status !== "pago") continue;
-    if (ap.sourceType === "partner_commission") {
+    if (ap.sourceType === "bv_campanha") {
       const refIds = ap.sourceRef?.invoiceIds;
       const ids: number[] = Array.isArray(refIds) ? (refIds as number[]) : [];
       if (ids.includes(invoiceId)) {
         throw new Error(
-          `Não é possível cancelar/reverter: comissão de parceiro do mês ${ap.competenceMonth} já foi paga.`,
+          `Não é possível cancelar/reverter: BV da Campanha do mês ${ap.competenceMonth} já foi pago.`,
         );
       }
     } else {
@@ -464,7 +464,7 @@ async function cancelDerivedPayables(
   for (const ap of inScope) {
     if (ap.status === "pago" || ap.status === "cancelada") continue;
 
-    if (ap.sourceType === "partner_commission") {
+    if (ap.sourceType === "bv_campanha") {
       // Remove só a contribuição desta invoice do agregado e recalcula.
       const refIds = ap.sourceRef?.invoiceIds;
       const ids: number[] = Array.isArray(refIds) ? (refIds as number[]) : [];
@@ -485,7 +485,7 @@ async function cancelDerivedPayables(
               ...((ap.sourceRef as SourceRef) ?? {}),
               invoiceIds: remaining,
             } satisfies SourceRef,
-            description: `Comissão Parceiro - recalculada - ${remaining.length} NFs`,
+            description: `BV da Campanha - recalculada - ${remaining.length} NFs`,
             updatedAt: new Date(),
           })
           .where(eq(accountsPayable.id, ap.id));

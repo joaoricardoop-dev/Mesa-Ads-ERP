@@ -1197,6 +1197,58 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       END $$;
     `,
   },
+  {
+    // Task #148 — Aba Financeiro do Batch v2.
+    //  • Rename atômico do enum value 'partner_commission' → 'bv_campanha'
+    //    (BV da Campanha é o termo canônico; "comissão parceiro" deprecado).
+    //  • Override columns por batch em campaign_phases (todos nullable;
+    //    null = herda da campanha).
+    //  • partners.grossUpRate (nullable) e finance_settings KV global.
+    //  • Atualiza coluna legada accounts_payable.type='comissao_parceiro'
+    //    → 'bv_campanha' (varchar livre, batch update).
+    name: "task_148_batch_financial_overrides_and_bv_rename",
+    sql: `
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM pg_enum e
+          JOIN pg_type t ON e.enumtypid = t.oid
+          WHERE t.typname = 'accounts_payable_source_type'
+            AND e.enumlabel = 'partner_commission'
+        ) THEN
+          ALTER TYPE accounts_payable_source_type RENAME VALUE 'partner_commission' TO 'bv_campanha';
+        END IF;
+      END $$;
+
+      ALTER TABLE "campaign_phases"
+        ADD COLUMN IF NOT EXISTS "unit_price_override" decimal(12,4),
+        ADD COLUMN IF NOT EXISTS "markup_override" decimal(8,2),
+        ADD COLUMN IF NOT EXISTS "tax_rate_override" decimal(5,2),
+        ADD COLUMN IF NOT EXISTS "restaurant_commission_override" decimal(5,2),
+        ADD COLUMN IF NOT EXISTS "vip_repasse_override" decimal(5,2),
+        ADD COLUMN IF NOT EXISTS "bv_percent_override" decimal(5,2),
+        ADD COLUMN IF NOT EXISTS "gross_up_rate_override" decimal(5,2),
+        ADD COLUMN IF NOT EXISTS "batch_cost_override" decimal(14,2),
+        ADD COLUMN IF NOT EXISTS "freight_cost_override" decimal(12,2),
+        ADD COLUMN IF NOT EXISTS "override_notes" text,
+        ADD COLUMN IF NOT EXISTS "override_updated_at" timestamp,
+        ADD COLUMN IF NOT EXISTS "override_updated_by" varchar(255);
+
+      ALTER TABLE "partners" ADD COLUMN IF NOT EXISTS "grossUpRate" decimal(5,2);
+
+      CREATE TABLE IF NOT EXISTS "finance_settings" (
+        "key" varchar(100) PRIMARY KEY,
+        "value" text NOT NULL,
+        "updatedAt" timestamp NOT NULL DEFAULT now()
+      );
+      INSERT INTO "finance_settings" ("key", "value")
+        VALUES ('bv_gross_up_rate', '14.17')
+        ON CONFLICT ("key") DO NOTHING;
+
+      UPDATE "accounts_payable" SET "type" = 'bv_campanha' WHERE "type" = 'comissao_parceiro';
+
+      COMMENT ON COLUMN "accounts_payable"."sourceType" IS 'Origem semântica: restaurant_commission | vip_repasse | supplier_cost | freight_cost | bv_campanha | seller_commission | tax | manual. Glossário §4.';
+    `,
+  },
 ];
 
 export async function runMigrations() {

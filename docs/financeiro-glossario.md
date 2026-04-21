@@ -29,7 +29,7 @@ nomenclatura, **este glossário é a fonte da verdade**.
 |---|---|---|---|
 | **Comissão Restaurante** | % devido ao restaurante pela veiculação em **bolacha física**. **Não se aplica** a produtos digitais (tela/janela VIP). | `campaigns.restaurantCommission` (%) → gera `restaurant_payments` | Pagamentos a Locais |
 | **Repasse Restaurante** | Valor em R$ a pagar ao restaurante (calculado a partir da Comissão Restaurante). | `restaurantPayments.amount` | Pagamentos a Locais, Contas a Pagar |
-| **Comissão Parceiro** | % devido ao parceiro indicador/agência sobre a base de cálculo definida (`bruto` ou `liquido`). Agregada por `(partnerId, competenceMonth)` no ledger. | `partners.commissionPercent` + `partners.billingMode` (ou `campaigns.agencyBvPercent` quando `hasAgencyBv=true`) | Comissão de Parceiros, Contas a Pagar, Portal Parceiro |
+| **BV da Campanha** | Bonificação por Veiculação devida ao parceiro/agência sobre a base de cálculo (`bruto` ou `liquido`). Agregada por `(partnerId, competenceMonth)` no ledger. Inclui **gross-up tributário**: o valor exibido em DRE é `bvLiquido + bvGrossUp`, onde `bvLiquido = base × bv%` e `bvTotal = bvLiquido / (1 − grossUpRate)`. _Termo legado "Comissão Parceiro" deprecado em Task #148._ | `partners.commissionPercent` + `partners.billingMode` + `partners.grossUpRate` (ou `campaigns.agencyBvPercent` quando `hasAgencyBv=true`); override por batch em `campaign_phases.bv_percent_override` / `gross_up_rate_override`; default global em `finance_settings('bv_gross_up_rate')` (14.17%). | DRE do batch, Comissão de Parceiros, Contas a Pagar, Portal Parceiro |
 | **Comissão Vendedor** | % devido ao vendedor interno sobre a venda. | `campaigns.sellerCommission` | Relatório de comissão |
 | **Repasse Sala VIP** | Valor pago ao provedor de sala VIP (aeroporto, lounge etc.) pela veiculação em telas/janelas digitais — **substitui** a comissão restaurante quando o produto é digital. | `vipProviders.commissionPercent` + `vipProviders.billingMode` → AP `sourceType='vip_repasse'` | Provedores Sala VIP, Contas a Pagar |
 | **Comissão Agência** | % adicional para agência de propaganda (quando aplicável). | `quotations.agencyCommissionPercent` | Cotações |
@@ -55,7 +55,7 @@ materializador automático — vive aqui. O glossário canônico de origens é
 | `vip_repasse` | Repasse para provedor Sala VIP em produto digital. | Materializador de `vip_providers` quando invoice é paga. |
 | `supplier_cost` | Custo de produção (gráfica/fornecedor). Enum disponível, mas o sync atual de custos por campanha (`syncCampaignCostPayables`) ainda insere essas linhas usando apenas o campo legado `type='producao'` — o `sourceType` permanece com o default `manual`. Lançamentos manuais via `accountsPayable.create` podem definir `supplier_cost` explicitamente. |
 | `freight_cost` | Frete (material → restaurantes). Mesma observação de `supplier_cost`: o sync por campanha usa `type='frete'` e default `manual`; ajustes manuais podem definir `freight_cost`. |
-| `partner_commission` | Comissão de parceiro/agência, agregada por `(partnerId, competenceMonth)`. | Materializador disparado em `markInvoicePaid`. |
+| `bv_campanha` | BV da Campanha (parceiro/agência), agregada por `(partnerId, competenceMonth)`. Inclui gross-up tributário no valor armazenado. _Renomeado de `partner_commission` em Task #148._ | Materializador disparado em `markInvoicePaid` ou `confirmInvoiceEmission`. |
 | `seller_commission` | Comissão de vendedor interno. Enum reservado; **ainda não há materializador em runtime** — registros são criados manualmente. |
 | `tax` | Imposto a recolher derivado de uma fatura emitida. | Materializador disparado em `createInvoice` (causal: spec exige ≥1 AP `tax` com `invoiceId` setado). |
 | `manual` | Despesa avulsa lançada por humano. | Lançada na UI de Contas a Pagar. |
@@ -95,7 +95,7 @@ materializador automático — vive aqui. O glossário canônico de origens é
 **Lifecycle hooks (causais)**:
 - `createInvoice` materializa pelo menos 1 AP `sourceType='tax'` vinculada via `invoiceId`.
 - `markInvoicePaid` dispara, sob advisory lock idempotente, os materializadores
-  de `partner_commission`, `vip_repasse` (apenas para itens de produto digital)
+  de `bv_campanha`, `vip_repasse` (apenas para itens de produto digital)
   e `restaurant_commission` (espelhando os `restaurant_payments` do mês).
 - `bank.reconcile` em transação `credit` casando uma fatura → status vira `paga` + `receivedDate` recebe a data da transação.
 

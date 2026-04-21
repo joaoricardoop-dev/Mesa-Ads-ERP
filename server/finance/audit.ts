@@ -8,7 +8,10 @@ export type AuditAction =
   | "mark_paid"
   | "revert_payment"
   | "cancel"
-  | "generate";
+  | "generate"
+  | "set_override"
+  | "clear_override"
+  | "regenerate_payables";
 
 export type AuditEntityType =
   | "invoice"
@@ -16,7 +19,8 @@ export type AuditEntityType =
   | "operational_cost"
   | "vip_provider"
   | "partner"
-  | "restaurant_payment";
+  | "restaurant_payment"
+  | "campaign_phase";
 
 export interface AuditCtx {
   user: { id: string; role: string | null } | null;

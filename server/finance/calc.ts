@@ -220,3 +220,272 @@ export function safeDueDate(target?: string | null): string {
   if (!target) return today;
   return target > today ? target : today;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task #148 — calcPhaseFinancials: fonte única de DRE por batch.
+//
+// Estrutura contábil do DRE do batch:
+//   Receita
+//     − Impostos (IRPJ + PIS/COFINS + ISS quando aplicável)
+//     − Canal (Restaurante OU VIP, mutuamente exclusivos pelo tipo do produto)
+//   = Base
+//     − Frete (físico)
+//     − Produção (físico)
+//   = Base de Contribuição
+//     − BV da Campanha (com gross-up tributário visível)
+//     − Comissão Vendedor (rateada por receita)
+//   = Lucro Líquido
+//
+// Invariante: Σ batches.lucroLiquido === Consolidado.lucroLiquido (até R$ 0,01).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const DEFAULT_BV_GROSS_UP_RATE = 0.1417;
+
+export interface PhaseItemLike {
+  productTipo: string | null;
+  quantity: number;
+  unitPrice: string | number;
+  totalPrice?: string | number | null;
+  productionCost?: string | number;
+  freightCost?: string | number;
+  productIrpj?: string | number | null;
+  vipProviderRepassePercent?: string | number | null;
+  productVipProviderCommissionPercent?: string | number | null;
+  vipProviderId?: number | null;
+}
+
+export interface PhaseOverrides {
+  unitPriceOverride?: string | number | null;
+  taxRateOverride?: string | number | null;
+  restaurantCommissionOverride?: string | number | null;
+  vipRepasseOverride?: string | number | null;
+  bvPercentOverride?: string | number | null;
+  grossUpRateOverride?: string | number | null;
+  freightCostOverride?: string | number | null;
+}
+
+export interface PhaseCampaignContext {
+  isBonificada: boolean | null;
+  restaurantCommission: string | number;
+  sellerCommission: string | number | null;
+  agencyBvPercent?: string | number | null;
+  hasAgencyBv?: boolean | null;
+  partnerCommissionPercent?: string | number | null; // partners.commissionPercent
+  partnerGrossUpRate?: string | number | null;       // partners.grossUpRate
+  globalBvGrossUpRate?: string | number | null;      // finance_settings('bv_gross_up_rate')
+}
+
+export type EffectiveSource = "override" | "inherited" | "default";
+
+export interface EffectiveParam<T> { value: T; source: EffectiveSource; }
+
+function eff<T>(override: T | null | undefined, base: T): EffectiveParam<T> {
+  if (override != null && override !== "" as any) {
+    const v = typeof override === "number" ? override : (typeof override === "string" ? override : override);
+    return { value: v as T, source: "override" };
+  }
+  return { value: base, source: "inherited" };
+}
+
+export interface PhaseFinancials {
+  // Tipo do canal escolhido por XOR
+  canalTipo: "restaurante" | "vip" | "none";
+  // Linhas em R$
+  receita: number;
+  impostos: number;
+  canalValor: number;
+  base: number;
+  freightCost: number;
+  productionCost: number;
+  baseContribuicao: number;
+  bvLiquido: number;
+  bvGrossUp: number;
+  bvTotal: number;
+  sellerCommission: number;
+  lucroLiquido: number;
+  margemPct: number;
+  // Parâmetros efetivos (com fonte) p/ UI mostrar badge override/herdado
+  effective: {
+    taxRate: EffectiveParam<number>;          // %
+    restaurantCommission: EffectiveParam<number>; // %
+    vipRepasse: EffectiveParam<number>;       // %
+    bvPercent: EffectiveParam<number>;        // %
+    grossUpRate: EffectiveParam<number>;      // % (sobre 1)
+    freightCost: EffectiveParam<number>;      // R$
+    sellerCommission: EffectiveParam<number>; // %
+  };
+  // Breakdown opcional p/ debug/UI clicável
+  details: {
+    taxesBreakdown: { irpj: number; pisCofins: number; iss: number };
+    bvBase: number;
+    sellerRate: number;
+  };
+}
+
+export function calcPhaseFinancials(input: {
+  items: PhaseItemLike[];
+  campaign: PhaseCampaignContext;
+  overrides: PhaseOverrides;
+  // Para rateio de seller_commission: se passado, o cálculo retorna a fatia
+  // proporcional do batch (receitaBatch / receitaCampanha). Default: full.
+  campaignTotalRevenue?: number;
+  // ISS: se a campanha aplica ISS retido fora da AP (default: 0%).
+  issRatePercent?: number;
+}): PhaseFinancials {
+  const { items, campaign, overrides } = input;
+
+  const isBonificada = !!campaign.isBonificada;
+
+  // ── Receita: items × unitPrice (com override por batch) ─────────────────
+  const upOverride = overrides.unitPriceOverride != null && overrides.unitPriceOverride !== ""
+    ? num(overrides.unitPriceOverride) : null;
+  const receita = items.reduce((s, it) => {
+    if (it.totalPrice != null && upOverride == null) return s + num(it.totalPrice);
+    const unit = upOverride != null ? upOverride : num(it.unitPrice);
+    return s + (it.quantity * unit);
+  }, 0);
+
+  // ── Tipo do canal (XOR pelo tipo do PRIMEIRO item — assumimos batch
+  // homogêneo por produto). Se misto, prevalece o que aparecer primeiro;
+  // o materializer valida a consistência.
+  const firstDigital = items.find((i) => i.productTipo === "telas" || i.productTipo === "janelas_digitais");
+  const firstPhysical = items.find((i) => i.productTipo && i.productTipo !== "telas" && i.productTipo !== "janelas_digitais");
+  const isDigital = !!firstDigital && !firstPhysical;
+  const canalTipo: "restaurante" | "vip" | "none" = isBonificada
+    ? "none"
+    : (isDigital ? "vip" : (firstPhysical ? "restaurante" : "none"));
+
+  // ── Impostos ────────────────────────────────────────────────────────────
+  // Taxa efetiva = override do batch OU média ponderada de products.irpj.
+  const irpjAvg = (() => {
+    if (items.length === 0) return TAX_RATES.irpjDefault * 100;
+    let totW = 0; let acc = 0;
+    for (const it of items) {
+      const w = it.totalPrice != null ? num(it.totalPrice) : it.quantity * num(it.unitPrice);
+      const r = num(it.productIrpj, TAX_RATES.irpjDefault * 100);
+      acc += r * w;
+      totW += w;
+    }
+    return totW > 0 ? acc / totW : TAX_RATES.irpjDefault * 100;
+  })();
+  const irpjEff = eff<number>(overrides.taxRateOverride, irpjAvg);
+  const irpjAmount = receita * (irpjEff.value / 100);
+  const pisCofinsAmount = receita * TAX_RATES.pisCofins;
+  const issAmount = receita * ((input.issRatePercent ?? 0) / 100);
+  const impostos = roundCents(irpjAmount + pisCofinsAmount + issAmount);
+
+  // ── Canal (XOR) ─────────────────────────────────────────────────────────
+  const restCommBase = num(campaign.restaurantCommission);
+  const restCommEff = eff<number>(overrides.restaurantCommissionOverride, restCommBase);
+
+  // VIP rate base: media ponderada de productVipProviderCommissionPercent OU vipProviderRepassePercent
+  const vipBase = (() => {
+    if (!isDigital) return 0;
+    let totW = 0; let acc = 0;
+    for (const it of items) {
+      if (!(it.productTipo === "telas" || it.productTipo === "janelas_digitais")) continue;
+      const w = it.totalPrice != null ? num(it.totalPrice) : it.quantity * num(it.unitPrice);
+      const rate = num(it.productVipProviderCommissionPercent ?? it.vipProviderRepassePercent ?? 0);
+      acc += rate * w;
+      totW += w;
+    }
+    return totW > 0 ? acc / totW : 0;
+  })();
+  const vipEff = eff<number>(overrides.vipRepasseOverride, vipBase);
+
+  let canalValor = 0;
+  if (isBonificada) {
+    canalValor = 0;
+  } else if (canalTipo === "restaurante") {
+    canalValor = roundCents(receita * (restCommEff.value / 100));
+  } else if (canalTipo === "vip") {
+    // Repasse VIP: base = receita − impostos − sellerComm (consistente com calcVipRepasse)
+    const sellerRateForVipBase = num(campaign.sellerCommission) / 100;
+    const baseVip = receita - impostos - (receita * sellerRateForVipBase);
+    canalValor = baseVip > 0 ? roundCents(baseVip * (vipEff.value / 100)) : 0;
+  }
+
+  const base = roundCents(receita - impostos - canalValor);
+
+  // ── Custos físicos ──────────────────────────────────────────────────────
+  const productionCost = canalTipo === "vip" || isBonificada
+    ? 0
+    : roundCents(items.reduce((s, it) => s + num(it.productionCost ?? 0), 0));
+  const freightFromItems = canalTipo === "vip" || isBonificada
+    ? 0
+    : items.reduce((s, it) => s + num(it.freightCost ?? 0), 0);
+  const freightEff = eff<number>(overrides.freightCostOverride, freightFromItems);
+  const freightCost = roundCents(freightEff.value);
+
+  const baseContribuicao = roundCents(base - freightCost - productionCost);
+
+  // ── BV da Campanha (com gross-up) ───────────────────────────────────────
+  const bvBaseRate = num(campaign.agencyBvPercent ?? campaign.partnerCommissionPercent ?? 0);
+  const bvEff = eff<number>(overrides.bvPercentOverride, bvBaseRate);
+  const bvActive = !isBonificada && (campaign.hasAgencyBv !== false) && bvEff.value > 0;
+
+  const grossUpBase = num(
+    campaign.partnerGrossUpRate ?? campaign.globalBvGrossUpRate ?? (DEFAULT_BV_GROSS_UP_RATE * 100),
+  );
+  const grossUpEff = eff<number>(overrides.grossUpRateOverride, grossUpBase);
+  const grossUpRateDecimal = grossUpEff.value / 100;
+
+  // Base do BV: receita − impostos − canal (após canal já descontado).
+  const bvBase = receita - impostos - canalValor;
+  let bvLiquido = 0;
+  let bvTotal = 0;
+  if (bvActive && bvBase > 0) {
+    bvLiquido = roundCents(bvBase * (bvEff.value / 100));
+    if (grossUpRateDecimal > 0 && grossUpRateDecimal < 1) {
+      bvTotal = roundCents(bvLiquido / (1 - grossUpRateDecimal));
+    } else {
+      bvTotal = bvLiquido;
+    }
+  }
+  const bvGrossUp = roundCents(bvTotal - bvLiquido);
+
+  // ── Comissão Vendedor (rateada por receita) ─────────────────────────────
+  const sellerRate = num(campaign.sellerCommission) / 100;
+  const sellerEff: EffectiveParam<number> = { value: sellerRate * 100, source: "inherited" };
+  const totalRevForRatio = input.campaignTotalRevenue && input.campaignTotalRevenue > 0
+    ? input.campaignTotalRevenue
+    : receita;
+  const sellerCommissionTotal = isBonificada ? 0 : ((input.campaignTotalRevenue ?? receita) * sellerRate);
+  const sellerCommission = totalRevForRatio > 0
+    ? roundCents((receita / totalRevForRatio) * sellerCommissionTotal)
+    : 0;
+
+  const lucroLiquido = roundCents(baseContribuicao - bvTotal - sellerCommission);
+  const margemPct = receita > 0 ? lucroLiquido / receita : 0;
+
+  return {
+    canalTipo,
+    receita: roundCents(receita),
+    impostos,
+    canalValor,
+    base,
+    freightCost,
+    productionCost,
+    baseContribuicao,
+    bvLiquido,
+    bvGrossUp,
+    bvTotal,
+    sellerCommission,
+    lucroLiquido,
+    margemPct,
+    effective: {
+      taxRate: irpjEff,
+      restaurantCommission: restCommEff,
+      vipRepasse: vipEff,
+      bvPercent: bvEff,
+      grossUpRate: grossUpEff,
+      freightCost: freightEff,
+      sellerCommission: sellerEff,
+    },
+    details: {
+      taxesBreakdown: { irpj: roundCents(irpjAmount), pisCofins: roundCents(pisCofinsAmount), iss: roundCents(issAmount) },
+      bvBase: roundCents(bvBase),
+      sellerRate,
+    },
+  };
+}

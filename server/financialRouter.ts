@@ -997,6 +997,22 @@ export const financialRouter = router({
       requireFinancialAccess(ctx.user.role);
       const db = await getDatabase();
       const [before] = await db.select().from(invoices).where(eq(invoices.id, input.id));
+      if (!before) throw new TRPCError({ code: "NOT_FOUND", message: "Fatura não encontrada" });
+      // Não permite pular a etapa de emissão: 'prevista' precisa virar
+      // 'emitida' antes (via confirmInvoiceEmission), o que cria os APs de
+      // impostos. Senão o passivo fiscal seria perdido.
+      if (before.status === "prevista") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Fatura ainda está prevista. Confirme a emissão antes de marcar como paga.",
+        });
+      }
+      if (before.status === "cancelada") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Fatura cancelada não pode ser marcada como paga." });
+      }
+      if (before.status === "paga") {
+        return before; // idempotente
+      }
       // Finrefac fase 3: pagamento + materialização atômicos.
       const updated = await db.transaction(async (tx: DbClient) => {
         const [row] = await tx
@@ -2113,7 +2129,7 @@ export const financialRouter = router({
       type: z.string().optional(),
       sourceType: z.enum([
         "restaurant_commission", "vip_repasse", "supplier_cost", "freight_cost",
-        "partner_commission", "seller_commission", "tax", "manual",
+        "bv_campanha", "seller_commission", "tax", "manual",
       ]).optional(),
       dueDateFrom: z.string().optional(),
       dueDateTo: z.string().optional(),
@@ -2169,7 +2185,7 @@ export const financialRouter = router({
         "vip_repasse",
         "supplier_cost",
         "freight_cost",
-        "partner_commission",
+        "bv_campanha",
         "seller_commission",
         "tax",
         "manual",
@@ -2536,7 +2552,7 @@ export const financialRouter = router({
 
       // ── BV de Agência + Comissão Comercial ──────────────────────────────
       // BV de Agência: para campanhas SEM partnerId. Quando há partnerId, o
-      // BV já é capturado em accounts_payable.sourceType='partner_commission'
+      // BV já é capturado em accounts_payable.sourceType='bv_campanha'
       // (ver server/finance/payables.ts → upsertPartnerCommissionForInvoice).
       // Esta SQL preenche o gap das campanhas sem parceiro associado, evitando
       // double-counting com partnerCommissions agregado abaixo.
@@ -2592,7 +2608,7 @@ export const financialRouter = router({
         const v = parseFloat(r.total);
         if (r.sourceType === "restaurant_commission") restaurantCommissions += v;
         else if (r.sourceType === "vip_repasse") vipRepasses += v;
-        else if (r.sourceType === "partner_commission") partnerCommission += v;
+        else if (r.sourceType === "bv_campanha") partnerCommission += v;
         else if (r.sourceType === "tax") taxes += v;
         else if (r.type === "producao") production += v;
         else if (r.type === "frete") freight += v;
@@ -2941,17 +2957,19 @@ export const financialRouter = router({
       if (input.documentLabel != null) updates.documentLabel = input.documentLabel;
       if (input.notes != null) updates.notes = input.notes;
 
-      const [updated] = await db
-        .update(invoices)
-        .set(updates)
-        .where(eq(invoices.id, input.id))
-        .returning();
-
-      try {
-        await materializePayablesForInvoice(db as unknown as DbClient, updated.id, "emitida");
-      } catch (err) {
-        console.warn("[confirmInvoiceEmission] materializePayables failed:", err);
-      }
+      // Emissão + materialização de impostos devem ser ATÔMICAS: se o
+      // materializer falha, a emissão é revertida (não pode ficar fatura
+      // 'emitida' sem AP de imposto associada).
+      const updated = await db.transaction(async (tx: DbClient) => {
+        const [row] = await tx
+          .update(invoices)
+          .set(updates)
+          .where(eq(invoices.id, input.id))
+          .returning();
+        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Falha ao atualizar fatura" });
+        await materializePayablesForInvoice(tx, row.id, "emitida");
+        return row;
+      });
       try {
         await recordAudit(
           db as unknown as DbClient,

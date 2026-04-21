@@ -205,6 +205,20 @@ export const campaignPhases = pgTable("campaign_phases", {
   periodEnd: date("periodEnd").notNull(),
   status: campaignPhaseStatusEnum("status").default("planejada").notNull(),
   notes: text("notes"),
+  // ── Overrides por batch (Task #148) ───────────────────────────────────
+  // Todos nullable; null = herda do campo equivalente em campaigns.
+  unitPriceOverride: decimal("unit_price_override", { precision: 12, scale: 4 }),
+  markupOverride: decimal("markup_override", { precision: 8, scale: 2 }),
+  taxRateOverride: decimal("tax_rate_override", { precision: 5, scale: 2 }),
+  restaurantCommissionOverride: decimal("restaurant_commission_override", { precision: 5, scale: 2 }),
+  vipRepasseOverride: decimal("vip_repasse_override", { precision: 5, scale: 2 }),
+  bvPercentOverride: decimal("bv_percent_override", { precision: 5, scale: 2 }),
+  grossUpRateOverride: decimal("gross_up_rate_override", { precision: 5, scale: 2 }),
+  batchCostOverride: decimal("batch_cost_override", { precision: 14, scale: 2 }),
+  freightCostOverride: decimal("freight_cost_override", { precision: 12, scale: 2 }),
+  overrideNotes: text("override_notes"),
+  overrideUpdatedAt: timestamp("override_updated_at"),
+  overrideUpdatedBy: varchar("override_updated_by", { length: 255 }),
   // Timeline própria por batch (mesmas etapas do pipeline da campanha)
   briefingEnteredAt: timestamp("briefingEnteredAt"),
   designEnteredAt: timestamp("designEnteredAt"),
@@ -559,6 +573,8 @@ export const partners = pgTable("partners", {
   type: partnerTypeEnum("type").default("indicador").notNull(),
   commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("10.00").notNull(),
   billingMode: billingModeEnum("billingMode").default("bruto").notNull(),
+  // Override do gross-up tributário do BV deste parceiro (cascata: global → partner → phase).
+  grossUpRate: decimal("grossUpRate", { precision: 5, scale: 2 }),
   status: statusEnum("status").default("active").notNull(),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1275,7 +1291,7 @@ export const accountsPayableSourceTypeEnum = pgEnum("accounts_payable_source_typ
   "vip_repasse",
   "supplier_cost",
   "freight_cost",
-  "partner_commission",
+  "bv_campanha",
   "seller_commission",
   "tax",
   "manual",

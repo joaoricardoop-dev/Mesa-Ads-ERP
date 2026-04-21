@@ -50,7 +50,7 @@ export const parceiroPortalRouter = router({
       const totalRevenue = wonQuotations.reduce((s, q) => s + Number(q.totalValue || 0), 0);
 
       // Comissão real do parceiro vive em accounts_payable (ledger único,
-      // finrefac fase 2). sourceType='partner_commission' agregada por
+      // finrefac fase 2). sourceType='bv_campanha' agregada por
       // (partnerId, competenceMonth). Substitui o cálculo live sobre
       // quotations.status='win' (que ignorava recebimento real).
       const partnerIdStr = String(partnerId);
@@ -70,7 +70,7 @@ export const parceiroPortalRouter = router({
         .leftJoin(campaigns, eq(campaigns.id, accountsPayable.campaignId))
         .leftJoin(clients, eq(clients.id, campaigns.clientId))
         .where(and(
-          eq(accountsPayable.sourceType, "partner_commission"),
+          eq(accountsPayable.sourceType, "bv_campanha"),
           sql`${accountsPayable.sourceRef}->>'partnerId' = ${partnerIdStr}`,
         ));
 
