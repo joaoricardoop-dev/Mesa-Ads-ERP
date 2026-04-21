@@ -2824,6 +2824,10 @@ export const financialRouter = router({
   generateScheduledInvoices: protectedProcedure
     .input(z.object({
       campaignId: z.number(),
+      // Quando informado, escopa a geração apenas a este batch (usado pelo
+      // card "Gerar nova" da aba Financeiro). Sem ele, comporta-se como
+      // antes, agendando para todos os batches sem fatura ativa.
+      phaseId: z.number().optional(),
       dueOffsetDays: z.number().int().min(0).max(120).default(15),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -2833,11 +2837,14 @@ export const financialRouter = router({
       const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
       if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
 
-      const phases = await db
+      const phaseRows = await db
         .select()
         .from(campaignPhases)
         .where(eq(campaignPhases.campaignId, input.campaignId))
         .orderBy(campaignPhases.sequence);
+      const phases = input.phaseId
+        ? phaseRows.filter((p) => p.id === input.phaseId)
+        : phaseRows;
       if (phases.length === 0) {
         return { created: 0, skipped: 0, total: 0 };
       }

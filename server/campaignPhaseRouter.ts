@@ -882,7 +882,7 @@ export const campaignPhaseRouter = router({
       const partner = await resolvePartnerForCampaignBasic(db, campaign);
 
       const overrides = extractOverridesFromPhase(phase);
-      const financials = calcPhaseFinancials({
+      const calcInput = {
         items: itemsForCalc,
         campaign: {
           isBonificada: campaign.isBonificada,
@@ -894,8 +894,20 @@ export const campaignPhaseRouter = router({
           partnerGrossUpRate: (partner as any)?.grossUpRate ?? null,
           globalBvGrossUpRate: null,
         },
-        overrides,
-      });
+      } as const;
+      const financials = calcPhaseFinancials({ ...calcInput, overrides });
+      // Para a coluna "Campanha (herdado)" da UI: rodamos o cálculo SEM
+      // overrides do batch e devolvemos os valores efetivos resultantes.
+      const financialsInherited = calcPhaseFinancials({ ...calcInput, overrides: {} });
+      const inherited = {
+        taxRate: financialsInherited.effective.taxRate.value,
+        restaurantCommission: financialsInherited.effective.restaurantCommission.value,
+        vipRepasse: financialsInherited.effective.vipRepasse.value,
+        bvPercent: financialsInherited.effective.bvPercent.value,
+        grossUpRate: financialsInherited.effective.grossUpRate.value,
+        freightCost: financialsInherited.effective.freightCost.value,
+        productionCost: financialsInherited.effective.productionCost.value,
+      };
 
       // Fatura "atual" do batch: prioriza a mais recente NÃO cancelada;
       // se todas estiverem canceladas, devolve a última cancelada para
@@ -916,23 +928,18 @@ export const campaignPhaseRouter = router({
         invoice = lastCancelled;
       }
 
-      // Payables: união dos APs vinculados (a) à fatura por sourceRef.invoiceId,
-      // (b) a qualquer fatura listada em sourceRef.invoiceIds (agregados de BV),
-      // ou (c) ao próprio batch (campaignPhaseId direto).
-      const idStr = invoice ? String(invoice.id) : null;
-      const payables = await db.select().from(accountsPayable).where(
-        idStr
-          ? sql`(${accountsPayable.campaignPhaseId} = ${input.phaseId})
-                OR (${accountsPayable.sourceRef}->>'invoiceId') = ${idStr}
-                OR (${accountsPayable.sourceRef}->'invoiceIds') @> ${sql`${JSON.stringify([invoice!.id])}::jsonb`}`
-          : sql`${accountsPayable.campaignPhaseId} = ${input.phaseId}`,
-      );
+      // Payables EXCLUSIVAMENTE deste batch — escopo estrito por
+      // campaignPhaseId. APs agregados (BV mensal/multi-batch) são
+      // expostos separadamente quando necessário; não entram nesta lista.
+      const payables = await db.select().from(accountsPayable)
+        .where(eq(accountsPayable.campaignPhaseId, input.phaseId));
 
       return {
         phase,
         campaign,
         items: itemRows,
         financials,
+        inherited,
         invoice: invoice ?? null,
         payables,
         overrides,

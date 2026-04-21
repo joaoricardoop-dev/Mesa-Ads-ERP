@@ -31,6 +31,8 @@ export function BatchFinancialTab({
       <BatchEconomicsOverride
         phaseId={phaseId}
         financials={data.financials}
+        inherited={data.inherited}
+        overrides={data.overrides}
         partner={data.partner}
         onChange={() => refetch()}
       />

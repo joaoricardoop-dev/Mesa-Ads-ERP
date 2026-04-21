@@ -10,9 +10,14 @@ import { toast } from "sonner";
 type FinancialsData = RouterOutputs["campaignPhase"]["getFinancials"];
 type Financials = FinancialsData["financials"];
 type Partner = FinancialsData["partner"];
+type Inherited = FinancialsData["inherited"];
+type Overrides = FinancialsData["overrides"];
 type EffectiveKey = keyof Financials["effective"];
+type InheritedKey = keyof Inherited;
 
 const OVERRIDE_FIELDS = [
+  "unitPriceOverride",
+  "markupOverride",
   "taxRateOverride",
   "restaurantCommissionOverride",
   "vipRepasseOverride",
@@ -25,43 +30,51 @@ type OverrideField = (typeof OVERRIDE_FIELDS)[number];
 
 type Field = {
   key: OverrideField;
-  effectiveKey: EffectiveKey;
+  effectiveKey: EffectiveKey | null;   // null = não há valor "efetivo" agregado
+  inheritedKey: InheritedKey | null;
   label: string;
   unit: "%" | "R$";
   applies: (canalTipo: Financials["canalTipo"], hasBV: boolean) => boolean;
+  hint?: string;
 };
 
 const FIELDS: Field[] = [
-  { key: "taxRateOverride",              effectiveKey: "taxRate",              label: "Alíquota IRPJ",          unit: "%",  applies: () => true },
-  { key: "restaurantCommissionOverride", effectiveKey: "restaurantCommission", label: "Comissão Restaurante",   unit: "%",  applies: (c) => c === "restaurante" },
-  { key: "vipRepasseOverride",           effectiveKey: "vipRepasse",           label: "Repasse Sala VIP",       unit: "%",  applies: (c) => c === "vip" },
-  { key: "bvPercentOverride",            effectiveKey: "bvPercent",            label: "BV da Campanha",         unit: "%",  applies: (_, b) => b },
-  { key: "grossUpRateOverride",          effectiveKey: "grossUpRate",          label: "Gross-up BV",            unit: "%",  applies: (_, b) => b },
-  { key: "freightCostOverride",          effectiveKey: "freightCost",          label: "Custo Frete",            unit: "R$", applies: () => true },
-  { key: "batchCostOverride",            effectiveKey: "productionCost",       label: "Custo Produção (batch)", unit: "R$", applies: () => true },
+  { key: "unitPriceOverride",            effectiveKey: null,                   inheritedKey: null,                  label: "Preço unitário (override por item)", unit: "R$", applies: () => true,             hint: "Aplica a todos os itens deste batch" },
+  { key: "markupOverride",               effectiveKey: null,                   inheritedKey: null,                  label: "Markup (%)",            unit: "%",  applies: () => true,             hint: "Aplica a todos os itens deste batch" },
+  { key: "taxRateOverride",              effectiveKey: "taxRate",              inheritedKey: "taxRate",             label: "Alíquota IRPJ",          unit: "%",  applies: () => true },
+  { key: "restaurantCommissionOverride", effectiveKey: "restaurantCommission", inheritedKey: "restaurantCommission",label: "Comissão Restaurante",   unit: "%",  applies: (c) => c === "restaurante" },
+  { key: "vipRepasseOverride",           effectiveKey: "vipRepasse",           inheritedKey: "vipRepasse",          label: "Repasse Sala VIP",       unit: "%",  applies: (c) => c === "vip" },
+  { key: "bvPercentOverride",            effectiveKey: "bvPercent",            inheritedKey: "bvPercent",           label: "BV da Campanha",         unit: "%",  applies: (_, b) => b },
+  { key: "grossUpRateOverride",          effectiveKey: "grossUpRate",          inheritedKey: "grossUpRate",         label: "Gross-up BV",            unit: "%",  applies: (_, b) => b },
+  { key: "freightCostOverride",          effectiveKey: "freightCost",          inheritedKey: "freightCost",         label: "Custo Frete",            unit: "R$", applies: () => true },
+  { key: "batchCostOverride",            effectiveKey: "productionCost",       inheritedKey: "productionCost",      label: "Custo Produção (batch)", unit: "R$", applies: () => true },
 ];
+
+function parseBR(v: string): string | null {
+  const s = v.trim().replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  if (!s) return null;
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
+  return s;
+}
 
 function fmt(value: number, unit: "%" | "R$") {
   if (unit === "%") return `${value.toFixed(2).replace(".", ",")}%`;
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function inheritedFor(effective: { value: number; source: string }): number | null {
-  // Quando NÃO há override, effective.value já é o herdado.
-  if (effective.source !== "override") return effective.value;
-  // Quando há override, o backend ainda não devolve o valor herdado
-  // explícito; renderizamos "—" para evitar mostrar zeros sintéticos.
-  return null;
-}
 
 export function BatchEconomicsOverride({
   phaseId,
   financials,
+  inherited,
+  overrides,
   partner,
   onChange,
 }: {
   phaseId: number;
   financials: Financials;
+  inherited: Inherited;
+  overrides: Overrides;
   partner: Partner;
   onChange: () => void;
 }) {
@@ -104,21 +117,36 @@ export function BatchEconomicsOverride({
             </thead>
             <tbody>
               {FIELDS.map((f) => {
-                const eff = financials.effective[f.effectiveKey];
-                const isOverride = eff.source === "override";
+                const eff = f.effectiveKey ? financials.effective[f.effectiveKey] : null;
+                const overrideRaw = overrides[f.key];
+                const isOverride = eff ? eff.source === "override" : overrideRaw != null;
                 const isEditing = editing === f.key;
                 const applies = f.applies(canalTipo, hasBV);
-                const inherited = inheritedFor(eff);
+                const inheritedVal = f.inheritedKey ? inherited[f.inheritedKey] : null;
+                const overrideNum = overrideRaw != null ? Number(overrideRaw) : null;
+                const submit = () => {
+                  const parsed = draft.trim() === "" ? null : parseBR(draft);
+                  if (draft.trim() !== "" && parsed === null) {
+                    toast.error("Valor inválido — use formato 12,34");
+                    return;
+                  }
+                  setMut.mutate({ phaseId, field: f.key, value: parsed });
+                };
                 return (
                   <tr key={f.key} className={`border-t ${applies ? "" : "opacity-60"}`}>
                     <td className="px-3 py-2">
                       {f.label}
+                      {f.hint && (
+                        <span className="ml-2 text-xs text-muted-foreground">· {f.hint}</span>
+                      )}
                       {!applies && (
                         <span className="ml-2 text-xs text-muted-foreground">(não aplicável a este canal)</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                      {inherited === null ? "—" : fmt(inherited, f.unit)}
+                      {inheritedVal !== null && inheritedVal !== undefined
+                        ? fmt(inheritedVal, f.unit)
+                        : <span title="Valor herdado é definido por item — não há agregado da campanha">—</span>}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {isEditing ? (
@@ -127,15 +155,15 @@ export function BatchEconomicsOverride({
                           value={draft}
                           onChange={(e) => setDraft(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") setMut.mutate({ phaseId, field: f.key, value: draft || null });
+                            if (e.key === "Enter") submit();
                             if (e.key === "Escape") setEditing(null);
                           }}
                           className="h-7 text-right w-24 ml-auto"
                           placeholder={f.unit === "%" ? "0,00" : "0,00"}
                         />
-                      ) : isOverride ? (
+                      ) : isOverride && (eff || overrideNum !== null) ? (
                         <span className="inline-flex items-center gap-2">
-                          {fmt(eff.value, f.unit)}
+                          {fmt(eff ? eff.value : overrideNum!, f.unit)}
                           <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">override</Badge>
                         </span>
                       ) : (
@@ -147,7 +175,7 @@ export function BatchEconomicsOverride({
                         {isEditing ? (
                           <>
                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0"
-                              onClick={() => setMut.mutate({ phaseId, field: f.key, value: draft || null })}
+                              onClick={submit}
                               disabled={setMut.isPending}>
                               <Check className="w-3.5 h-3.5" />
                             </Button>
@@ -159,7 +187,15 @@ export function BatchEconomicsOverride({
                           <>
                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0"
                               disabled={!applies}
-                              onClick={() => { setDraft(isOverride ? String(eff.value) : ""); setEditing(f.key); }}>
+                              onClick={() => {
+                                const cur = eff && isOverride
+                                  ? String(eff.value).replace(".", ",")
+                                  : overrideRaw != null
+                                    ? String(overrideRaw).replace(".", ",")
+                                    : "";
+                                setDraft(cur);
+                                setEditing(f.key);
+                              }}>
                               <Pencil className="w-3.5 h-3.5" />
                             </Button>
                             {isOverride && (

@@ -56,7 +56,7 @@ export function BatchInvoiceCard({
               ? "Última fatura deste batch foi cancelada — gerar nova prevista para reabrir o ciclo."
               : "Sem fatura prevista para este batch."}
           </div>
-          <Button size="sm" onClick={() => generateMut.mutate({ campaignId })} disabled={generateMut.isPending}>
+          <Button size="sm" onClick={() => generateMut.mutate({ campaignId, phaseId })} disabled={generateMut.isPending}>
             {isCancelled ? <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> : <Calendar className="w-3.5 h-3.5 mr-1.5" />}
             {isCancelled ? "Gerar nova" : "Agendar fatura"}
           </Button>
