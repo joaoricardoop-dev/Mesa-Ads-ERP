@@ -1265,18 +1265,18 @@ export const appRouter = router({
     getCampaigns: internalProcedure
       .input(z.object({ clientId: z.number(), includeChildren: z.boolean().optional() }))
       .query(async ({ input }) => {
-        const allCampaigns = await listCampaigns();
+        const { items } = await listCampaigns();
         if (!input.includeChildren) {
-          return allCampaigns.filter((c: any) => c.clientId === input.clientId);
+          return items.filter((c: any) => c.clientId === input.clientId);
         }
         const { getDb: getDatabase } = await import("./db");
         const db = await getDatabase();
-        if (!db) return allCampaigns.filter((c: any) => c.clientId === input.clientId);
+        if (!db) return items.filter((c: any) => c.clientId === input.clientId);
         const { clients: clientsTable } = await import("../drizzle/schema");
         const { eq } = await import("drizzle-orm");
         const children = await db.select({ id: clientsTable.id }).from(clientsTable).where(eq(clientsTable.parentId, input.clientId));
         const ids = new Set([input.clientId, ...children.map(c => c.id)]);
-        return allCampaigns.filter((c: any) => ids.has(c.clientId));
+        return items.filter((c: any) => ids.has(c.clientId));
       }),
 
     getQuotations: internalProcedure
@@ -3002,8 +3002,8 @@ export const appRouter = router({
     myCampaigns: anuncianteProcedure.query(async ({ ctx }) => {
       const user = ctx.user;
       if (!user || !user.clientId) return [];
-      const allCampaigns = await listCampaigns();
-      return allCampaigns.filter((c: any) => c.clientId === user.clientId);
+      const { items } = await listCampaigns();
+      return items.filter((c: any) => c.clientId === user.clientId);
     }),
 
     myQuotations: anuncianteProcedure.query(async ({ ctx }) => {
