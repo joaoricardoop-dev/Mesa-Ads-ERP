@@ -1,0 +1,285 @@
+Entendi as correções. Refiz o DRE, a lista de payables e o componente de override com as regras certas: exclusividade por tipo de produto, BV no lugar de comissão parceiro (com gross-up), e ordem correta do DRE.
+
+---
+
+# Prompt para Replit — Refatorar Aba "Financeiro" dentro do Batch (v2)
+
+## Problema
+
+Em [CampaignDetail.tsx](client/src/pages/CampaignDetail.tsx) linhas **3028-3550+**, a aba **Financeiro** do batch hoje:
+
+1. **Mistura escopo** — mostra parâmetros, DRE total (Mensal + Total), faturas e contas a pagar da campanha inteira. Em 6 batches, os mesmos dados se repetem 6 vezes.
+2. **Duplica o Consolidado** — que já é a fonte de verdade da campanha.
+3. **DRE está errado** — aplica comissão restaurante mesmo em telas, separa "comissão parceiro" (conceito extinto), não aplica gross-up no BV, e ordena as deduções fora do padrão contábil.
+4. **Economics não são editáveis por batch** — um batch com frete especial ou desconto pontual não tem onde registrar.
+
+## Objetivo
+
+Aba Financeiro do batch passa a ter exatamente 4 blocos, **no escopo exclusivo do batch**:
+
+1. Economics do Batch (editáveis com override sobre a campanha)
+2. DRE do Batch (estrutura contábil correta, condicional por tipo de produto)
+3. Custos e Repasses do Batch (auto-gerados quando emite fatura do batch)
+4. Fatura do Batch (única, 1 batch = 1 mês = 1 fatura)
+
+## DRE do Batch — estrutura correta
+
+**Ordem fixa das deduções** (a aba atual está fora de ordem):
+
+```
+Receita Bruta (faturamento do batch)
+(-) Impostos                                    [alíquota × receita]
+= Receita após Impostos
+(-) Comissão do Canal                           [exclusiva por tipo de produto ⬇]
+= Base
+(-) Custo Frete
+(-) Custo Produção
+= Base de Contribuição
+(-) BV da Campanha                              [com gross-up, só se há agência/parceiro]
+= Lucro Líquido
+Margem (%)
+```
+
+### Regra condicional da "Comissão do Canal" (mutuamente exclusiva)
+
+| Tipo do produto do batch | Linha exibida | Origem do % |
+|---|---|---|
+| `coaster` / `bolacha` / físico | **Comissão Restaurante** (% × Receita após Impostos) | `restaurantCommission` da campanha, override do batch, ou % do próprio restaurante |
+| `telas` / `janelas_digitais` | **Repasse Sala VIP** (% × Receita após Impostos) | `vipProviderCommissionPercent` do produto, override do batch |
+| outro / bonificada | linha não é exibida | — |
+
+- Nunca os dois ao mesmo tempo. A UI deve exibir apenas a linha aplicável — a outra nem renderiza.
+- Se for bolacha e houver múltiplos restaurantes no batch, a comissão é **rateada por restaurante** (1 linha de payable por restaurante), mas no DRE aparece consolidada numa única linha (soma).
+
+### BV da Campanha (substitui "Comissão Parceiro")
+
+- A linha antiga **"Comissão Parceiro"** deixa de existir — renomear para **"BV da Campanha"** em schema, UI, payables e glossário.
+- Aplica **gross-up**: o valor exibido e efetivamente pago é inflado para compensar tributos sobre o BV.
+- Fórmula: `bvBruto = baseContribuicao × (bvPercent / 100) / (1 - grossUpRate)`
+  - `grossUpRate` default = taxa efetiva configurada em parâmetro do sistema (ex: 14,17% para IRRF+PIS/COFINS quando aplicável) — deixar como config global em `finance.grossUp.bvTaxRate`, com override por campanha/parceiro
+- No DRE, exibir duas sub-linhas legíveis sob "BV da Campanha":
+  ```
+  (-) BV da Campanha (gross-up)               R$ X.XXX
+      ├─ BV líquido (N%)                       R$ Y.YYY
+      └─ Gross-up tributário                   R$ Z.ZZZ
+  ```
+- Só aparece se `campaign.partnerId` existe e `bvPercent > 0`.
+
+### Campanha Bonificada
+
+- Sem receita → DRE simplificado: só mostra os custos (Produção + Frete + Comissão canal se houver) somados na linha "Total Bonificação" negativo.
+
+## Bloco 1 — Economics Editáveis do Batch
+
+Tabela 3 colunas: **Parâmetro** · **Campanha (herdado)** · **Este Batch (override)**.
+
+**Campos permitidos** (dependem do tipo de produto):
+
+| Campo | Sempre | Só se bolacha | Só se tela/janela | Se tem parceiro |
+|---|---|---|---|---|
+| Preço unitário / Markup | ✓ | | | |
+| Alíquota Impostos (%) | ✓ | | | |
+| Comissão Restaurante (%) | | ✓ | | |
+| Repasse Sala VIP (%) | | | ✓ | |
+| BV da Campanha (%) | | | | ✓ |
+| Gross-up rate (%) | | | | ✓ (só admin) |
+| Custo Produção (lote) | ✓ | | | |
+| Custo Frete | ✓ | | | |
+
+**Removidos da versão anterior:** Comissão Vendedor, Comissão Parceiro (virou BV).
+
+**Comportamento:**
+- Linha com override → badge "override" laranja, botão "Restaurar padrão" ao lado
+- Linha herdada → badge "herdado" cinza
+- Ao salvar → chama `campaignPhase.setOverride`, recalcula o DRE e regenera lançamentos `prevista` do batch
+- Visibilidade condicional: a linha "Comissão Restaurante" só aparece se o produto do batch for bolacha; "Repasse VIP" só se for tela/janela digital
+
+**Schema:**
+```sql
+ALTER TABLE campaign_phases ADD COLUMN:
+  unit_price_override, markup_override,
+  tax_rate_override,
+  restaurant_commission_override,
+  vip_repasse_override,
+  bv_percent_override,
+  gross_up_rate_override,
+  batch_cost_override, freight_cost_override,
+  override_notes, override_updated_at, override_updated_by
+```
+Todos nullable — NULL = herda da campanha.
+
+## Bloco 2 — DRE do Batch
+
+- Renderiza **exatamente** a estrutura acima, condicional por tipo de produto
+- Coluna única de valores (deletar "Mensal × Total" — isso é do Consolidado)
+- Cada linha é clicável → expande mostrando: fórmula, operandos, origem dos % (herdado/override), valor de cada operando
+- Destacar margem com cor: verde ≥ 15%, amarelo 5-15%, vermelho < 5%
+
+## Bloco 3 — Custos e Repasses do Batch (auto-gerados)
+
+**Ao confirmar emissão da fatura do batch** → gera em `accountsPayable` com `campaignPhaseId` preenchido:
+
+| Tipo payable | Condição | Valor | Destinatário | Vencimento default |
+|---|---|---|---|---|
+| `producao` | sempre | `batchCostEffective` | fornecedor de produção padrão | `producaoEnteredAt + 30 dias` |
+| `frete` | `freightCost > 0` | `freightCostEffective` | transportadora padrão | `distribuicaoEnteredAt + 30 dias` |
+| `comissao_restaurante` | **só bolacha** | `receitaAposImpostos × %` rateada por restaurante do batch | cada restaurante ativo | `periodEnd + 10 dias` |
+| `repasse_vip` | **só tela/janela** | `receitaAposImpostos × %vipRepasse` | VIP provider do produto | `periodEnd + 10 dias` |
+| `bv_campanha` | `partnerId AND bvPercent > 0` | `baseContribuicao × bvPercent / (1 - grossUpRate)` | partner vinculado | `periodEnd + 15 dias` |
+| `imposto_iss`, `imposto_irpj` | já existe trigger | — | — | — |
+
+**Removidos da v1:** `comissao_parceiro` (virou `bv_campanha`), `comissao_vendedor` (não existe mais), `bv_agencia` separado (agora é só `bv_campanha` com gross-up).
+
+**Endpoints:**
+- `campaignPhase.generatePayables(phaseId)` — idempotente, usa `calcPhaseFinancials` para decidir quais tipos criar com base no produto. Inclui a lógica do XOR (restaurante ou VIP, nunca os dois).
+- `campaignPhase.regeneratePayables(phaseId)` — recalcula e atualiza apenas lançamentos `prevista`.
+- Trigger automático em `invoice.confirmEmission(invoiceId)` quando `campaignPhaseId` presente.
+
+**UI do bloco:**
+- Tabela: Tipo · Destinatário · Valor · Venc. · Status · Ações
+- Filtro implícito: só lançamentos com `campaignPhaseId === phase.id`
+- Se não há fatura emitida: "Aguardando emissão da fatura para gerar lançamentos"
+- Botão "Regenerar (só previstos)" — protege `pendente`/`pago`
+- Botão "Adicionar lançamento manual" — para custos extras específicos do batch (ex: ativação, brinde)
+- Linha do tipo `bv_campanha` exibe breakdown do gross-up em tooltip (líquido + tributário)
+
+## Bloco 4 — Fatura do Batch (única)
+
+Sem mudanças da v1:
+- Card único por status (`prevista` / `emitida` / `paga` / `vencida` / `cancelada`)
+- Nunca lista faturas de outros batches
+- Botões: Confirmar emissão → Marcar como paga → Cancelar (se ainda não pago)
+
+## O que REMOVER da aba atual
+
+- ❌ Bloco "Parâmetros Financeiros da Campanha" (linhas 3038-3193) — migra parâmetros da campanha pra tela de edição de campanha; no batch só existe override
+- ❌ Coluna "Total ({dur}m)" do DRE (linhas 3319-3339 e 3354-3434) — totais moram no Consolidado
+- ❌ Lista "Faturas desta Campanha" (linhas 3438+) — já vai pro Consolidado
+- ❌ Botão "Gerar Lançamentos" genérico — substituir por auto-trigger na emissão + "Regenerar" explícito
+- ❌ Qualquer referência a "Comissão Parceiro" na UI, schema, enums e docs — renomear tudo para "BV da Campanha"
+- ❌ Linha "Comissão Vendedor" (sellerCommission) do DRE do batch — se o campo ainda é usado em outra tela, mantém schema; mas no DRE do batch não aparece
+
+## Lógica de cálculo — invariantes obrigatórias
+
+Criar/atualizar `calcPhaseFinancials` em [server/finance/calc.ts](server/finance/calc.ts):
+
+```ts
+function calcPhaseFinancials(phaseId): {
+  receitaBruta,
+  impostos,
+  receitaAposImpostos,
+  canalTipo: 'restaurante' | 'sala_vip' | null,
+  canalValor,                       // comissão rest OU repasse VIP (nunca os dois)
+  canalPercent,
+  base,                             // receitaAposImpostos - canalValor
+  custoProducao, custoFrete,
+  baseContribuicao,
+  bvAplicavel: boolean,
+  bvPercent, grossUpRate,
+  bvLiquido, bvGrossUp, bvTotal,    // breakdown
+  lucroLiquido, margemPct,
+  effectiveParams                   // quais vieram de override × quais herdados
+}
+```
+
+**Invariantes testadas:**
+- Produto bolacha → `canalTipo === 'restaurante'`, nunca `'sala_vip'`
+- Produto tela/janela → `canalTipo === 'sala_vip'`, nunca `'restaurante'`
+- `SUM(calcPhaseFinancials(p).lucroLiquido for p in campaign.phases) === calcCampaignConsolidated(campaign).lucroLiquido` (até o centavo)
+- `bvTotal === bvLiquido + bvGrossUp` (idempotência do gross-up)
+- Sem BV configurado → `bvAplicavel === false` e linha some do DRE
+
+## Arquivos
+
+**Criar:**
+1. `client/src/components/campaign/BatchFinancialTab.tsx` — orquestra os 4 blocos
+2. `client/src/components/campaign/BatchEconomicsOverride.tsx` — Bloco 1 (com visibilidade condicional)
+3. `client/src/components/campaign/BatchDRE.tsx` — Bloco 2 (com condicional restaurante/VIP + gross-up expandível)
+4. `client/src/components/campaign/BatchPayablesList.tsx` — Bloco 3
+5. `client/src/components/campaign/BatchInvoiceCard.tsx` — Bloco 4
+
+**Modificar:**
+6. [client/src/pages/CampaignDetail.tsx](client/src/pages/CampaignDetail.tsx) — trocar bloco 3028-3550 por `<BatchFinancialTab phaseId={currentPhase.id} />`
+7. [server/campaignPhaseRouter.ts](server/campaignPhaseRouter.ts) — `getOverrides`, `setOverride`, `clearOverride`, `generatePayables`, `regeneratePayables`
+8. [server/finance/calc.ts](server/finance/calc.ts) — implementar `calcPhaseFinancials` com XOR e gross-up
+9. [server/finance/payables.ts](server/finance/payables.ts) — remover `comissao_parceiro`, adicionar `bv_campanha` com gross-up; remover `comissao_vendedor` da auto-geração; aplicar XOR restaurante vs VIP
+10. [server/financialRouter.ts](server/financialRouter.ts) — hook em `confirmEmission` dispara `generatePayables`
+11. [docs/financeiro-glossario.md](docs/financeiro-glossario.md) — atualizar: "Comissão Parceiro" → deprecada; "BV da Campanha" (novo); explicar gross-up
+
+**Schema migration:**
+12. Renomear `payable.type = 'comissao_parceiro'` → `'bv_campanha'` (UPDATE em massa com log)
+13. Adicionar `campaign_phases` colunas de override (nullable)
+14. Opcional: adicionar `config.finance.grossUpRate` (default 14.17%) em tabela de settings
+
+## Layout final
+
+```
+┌─────────────────────────────────────────────────┐
+│ Aba: Financeiro — Batch 3 · Mar/26              │
+│ Produto: Telas Digitais                          │
+├─────────────────────────────────────────────────┤
+│ ECONOMICS DESTE BATCH                 [Editar]  │
+│                    Campanha       Este Batch    │
+│ Preço unit.        R$ 40,00       R$ 40,00 (h)  │
+│ Impostos           6%             6% (h)        │
+│ Repasse Sala VIP   12%            15% (override)│
+│ BV Campanha        10%            10% (h)       │
+│ Gross-up           14,17%         14,17% (h)    │
+│ Custo Produção     R$ 2.500       R$ 2.500 (h)  │
+│ Custo Frete        R$ 800         R$ 800 (h)    │
+│ (Com. Restaurante não aplica — produto é tela)  │
+├─────────────────────────────────────────────────┤
+│ DRE DO BATCH                                     │
+│   Receita Bruta                      R$ 20.000   │
+│   (-) Impostos (6%)                  R$  1.200   │
+│   = Receita após Impostos            R$ 18.800   │
+│   (-) Repasse Sala VIP (15%)         R$  2.820   │
+│   = Base                             R$ 15.980   │
+│   (-) Custo Frete                    R$    800   │
+│   (-) Custo Produção                 R$  2.500   │
+│   = Base de Contribuição             R$ 12.680   │
+│   (-) BV Campanha (gross-up)         R$  1.478   │
+│       ├─ BV líquido (10%)            R$  1.268   │
+│       └─ Gross-up (14,17%)           R$    210   │
+│   = Lucro Líquido                    R$ 11.202   │
+│   Margem: 56,0% ✓                                │
+├─────────────────────────────────────────────────┤
+│ CUSTOS E REPASSES DESTE BATCH                    │
+│ [Regenerar previstos] [+ Manual]                 │
+│ Tipo         Destinatário     Valor    Venc. Sts│
+│ Produção     Gráfica ABC      2.500   05/03 Pend│
+│ Frete        Transp. XYZ        800   10/03 Pend│
+│ Repasse VIP  VIP Provider A   2.820   10/04 Prev│
+│ BV Camp.     Agência Z        1.478   15/04 Prev│
+│ ISS          Prefeitura         940   20/03 Prev│
+│ IRPJ         Receita          1.200   30/04 Prev│
+├─────────────────────────────────────────────────┤
+│ FATURA DESTE BATCH                               │
+│ ○ Prevista · R$ 20.000 · Emitir em 01/03/26     │
+│ [Confirmar emissão →]                            │
+└─────────────────────────────────────────────────┘
+```
+
+## Critério de aceite
+
+- [ ] Produto = bolacha → DRE tem linha "Comissão Restaurante" e **não** "Repasse VIP"; payables geram `comissao_restaurante` (N linhas, 1 por restaurante do batch), nunca `repasse_vip`
+- [ ] Produto = tela/janela → DRE tem linha "Repasse Sala VIP" e **não** "Comissão Restaurante"; payables geram exatamente 1 `repasse_vip`
+- [ ] BV = 10% e gross-up = 14,17% → `bvTotal = base × 0.10 / (1 - 0.1417)` (validar com caso manual); exibe breakdown em 2 sub-linhas
+- [ ] `calcPhaseFinancials` obedece a ordem: Receita → Impostos → Canal → Base → Frete → Produção → Base Contribuição → BV → Lucro
+- [ ] Sem agência/parceiro → linha BV some do DRE e nenhum payable `bv_campanha` é gerado
+- [ ] Override em "Repasse VIP" do Batch 3 não afeta Batch 4; regenerar recalcula só `prevista`
+- [ ] Soma de `lucroLiquido` dos batches = `lucroLiquido` do Consolidado (até o centavo) — teste unitário
+- [ ] Enum/schema e UI completamente limpos de "comissão parceiro" (grep retorna zero em `client/` e `server/`, exceto migration de rename)
+- [ ] e2e `e2e/batch-financial-dre.spec.ts`: criar campanha bolacha 3 batches → validar comissão restaurante em todos, sem VIP; criar campanha tela 3 batches → validar VIP em todos, sem restaurante; validar BV com gross-up
+
+## Restrições
+
+- Consolidado é única fonte da campanha — essa aba só fala do batch
+- Portal do anunciante: só vê fatura do batch (leitura); não vê DRE nem payables
+- Auditoria grava: override set/clear, regenerate de payables, emissão de fatura
+- Respeita regime competência/caixa da Fase 7 já implementado
+- Migration de rename `comissao_parceiro` → `bv_campanha` preserva dados históricos com anotação
+
+---
+
+Estrutura do DRE agora reflete a regra de negócio real: canal exclusivo por tipo de produto, BV no lugar de comissão parceiro com gross-up visível, e ordem contábil correta (impostos → canal → base → custos → contribuição → BV → lucro). Quer que eu também atualize o glossário financeiro agora ou prefere deixar o Replit cuidar disso quando rodar o prompt?
