@@ -12,7 +12,9 @@ import {
   boolean,
   index,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
@@ -1340,6 +1342,28 @@ export const accountsPayable = pgTable("accounts_payable", {
   index("idx_accounts_payable_campaign_item_id").on(t.campaignItemId),
   index("idx_accounts_payable_status_due").on(t.status, t.dueDate),
   index("idx_accounts_payable_source_type_competence").on(t.sourceType, t.competenceMonth),
+  // Partial unique indexes do ledger (criados via server/migrations.ts).
+  // Declarados aqui apenas para que drizzle-kit os reconheça e não tente
+  // recriá-los gerando SQL inválido (ex.: identificadores camelCase sem
+  // aspas). NÃO modificar sem aplicar a migração SQL correspondente.
+  uniqueIndex("uq_ap_partner_commission_partner_month")
+    .on(sql`("sourceRef"->>'partnerId')`, t.competenceMonth)
+    .where(sql`"sourceType" = 'bv_campanha' AND "status" <> 'cancelada' AND ("sourceRef" ? 'supplementOf') = false`),
+  uniqueIndex("uq_ap_restaurant_commission_invoice")
+    .on(sql`("sourceRef"->>'invoiceId')`)
+    .where(sql`"sourceType" = 'restaurant_commission' AND "status" <> 'cancelada' AND ("sourceRef" ? 'invoiceId')`),
+  uniqueIndex("uq_ap_restaurant_commission_payment")
+    .on(sql`("sourceRef"->>'restaurantPaymentId')`)
+    .where(sql`"sourceType" = 'restaurant_commission' AND "status" <> 'cancelada' AND ("sourceRef" ? 'restaurantPaymentId')`),
+  uniqueIndex("uq_ap_restaurant_payment_source")
+    .on(sql`("sourceRef"->>'restaurantPaymentId')`)
+    .where(sql`"sourceType" = 'restaurant_commission' AND ("sourceRef" ? 'restaurantPaymentId')`),
+  uniqueIndex("uq_ap_tax_invoice_kind")
+    .on(sql`("sourceRef"->>'invoiceId')`, sql`("sourceRef"->>'kind')`)
+    .where(sql`"sourceType" = 'tax' AND "status" <> 'cancelada'`),
+  uniqueIndex("uq_ap_vip_repasse_invoice")
+    .on(sql`("sourceRef"->>'invoiceId')`)
+    .where(sql`"sourceType" = 'vip_repasse' AND "status" <> 'cancelada'`),
 ]);
 
 export type AccountPayable = typeof accountsPayable.$inferSelect;
