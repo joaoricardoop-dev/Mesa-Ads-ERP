@@ -1,0 +1,304 @@
+Status atual (verificado em main @ a3ed78a)
+✅ Backend pronto — você já implementou:
+
+calcPhaseFinancials em server/finance/calc.ts:333 com XOR canal (restaurante/VIP), overrides por batch, impostos, BV com gross-up
+Rename comissao_parceiro → bv_campanha em payables
+Colunas de override em campaign_phases (schema.ts)
+Glossário atualizado
+❌ Front-end NÃO tocado — client/src/pages/CampaignDetail.tsx continua em 4299 linhas com os blocos antigos errados. Os componentes BatchFinancialTab, BatchEconomicsOverride, BatchDRE, BatchPayablesList, BatchInvoiceCard não existem.
+
+Resultado: usuário abre a aba Financeiro dentro de um batch de Janela Digital da campanha SKN e vê:
+
+Bugs visíveis (evidência: 3 screenshots anexas)
+Bloco "Parâmetros Financeiros da Campanha" ainda renderiza dentro do batch (linhas 3038–3193 de CampaignDetail.tsx). Deve ser deletado — parâmetros da campanha não moram no escopo do batch.
+Bloco "Contas a Pagar" vazio com botão "Gerar Lançamentos" (linhas 3195–3278). Auto-geração não está acontecendo na emissão da fatura. A fatura FAT-2026-0003 está paga, e mesmo assim não há um único lançamento. O botão existe, mas não é isso que queremos — deve ser automático ao confirmar emissão.
+DRE com estrutura errada + duas colunas (Mensal + Total 6M) (linhas 3281–3436). Screenshot mostra:
+Receita Bruta           R$ 16.821  /  R$ 100.926
+(−) Impostos (15%)      R$ 2.523   /  R$ 15.139
+= Base após Impostos    R$ 14.297  /  R$ 85.787
+= Base Comissão Parceiro R$ 11.668 /  R$ 70.008     ← PULA FRETE, PRODUÇÃO, CANAL
+(−) Comissão The White 10%  R$ 1.167 / R$ 7.001
+Lucro Líquido           R$ 10.501  /  R$ 63.008
+Margem                                  62,4%
+Errado por 4 motivos:
+Pula as linhas de Frete, Produção e Repasse VIP entre "Base após Impostos" e "Base Comissão Parceiro"
+O produto é Janela Digital mas não aparece linha de Repasse Sala VIP (e os parâmetros ainda mostram "Comissão Rest. 10%" que não se aplica)
+Ainda usa o termo "Comissão Parceiro" e "Comissão The White" em vez de "BV da Campanha"
+Mostra coluna "Total (6M)" — total da campanha não mora no escopo do batch, isso é Consolidado
+Divergência de cálculo do BV — screenshot 2 mostra "Comissão The White (10%) = R$ 1.166,81" e screenshot 3 mostra "Comissão 10% sobre base = R$ 1.286,81". São o mesmo conceito, duas bases diferentes. Usar só calcPhaseFinancials.bv.total como fonte única.
+"Faturas desta Campanha" (linhas 3438+) com botão "+ Emitir Fatura" — no escopo do batch deve ser card único da fatura deste batch, não lista.
+Bloco "Comissão do Parceiro (The White)" separado (screenshot 3) — redundante, duplicando o cálculo do DRE. Deletar. O BV já aparece no DRE como linha dedicada.
+Overrides por batch não aparecem em lugar nenhum no front — backend tem as colunas, UI não expõe.
+O que executar AGORA (só front, backend já existe)
+1. Deletar as linhas 3028–3550+ de client/src/pages/CampaignDetail.tsx
+Substituir toda a <TabsContent value="financeiro"> por:
+
+<TabsContent value="financeiro" className="space-y-4">
+  <BatchFinancialTab
+    campaignId={campaignId}
+    phaseId={currentPhase.id}
+  />
+</TabsContent>
+Deletar também o bloco "Comissão do Parceiro" que aparece logo abaixo (screenshot 3) — ele está redundante porque o BV agora é linha do DRE.
+
+2. Criar client/src/components/campaign/BatchFinancialTab.tsx
+Orquestrador dos 4 blocos. Usa um único endpoint novo:
+
+trpc.campaignPhase.getFinancials.useQuery({ phaseId })
+// retorna: { phase, financials (de calcPhaseFinancials), invoice, payables, overrides }
+Criar esse endpoint em server/campaignPhaseRouter.ts invocando calcPhaseFinancials que você já implementou.
+
+Layout:
+
+┌────────────────────────────────────────┐
+│ <BatchEconomicsOverride />             │
+│ <BatchDRE />                           │
+│ <BatchPayablesList />                  │
+│ <BatchInvoiceCard />                   │
+└────────────────────────────────────────┘
+3. Criar client/src/components/campaign/BatchEconomicsOverride.tsx
+Tabela 3 colunas: Parâmetro · Campanha (herdado) · Este Batch
+
+Exibição condicional por tipo de produto do batch (batch atual é Janela Digital → tipo "vip"):
+
+Se canalTipo === 'vip': mostra linha "Repasse Sala VIP", esconde linha "Comissão Restaurante"
+Se canalTipo === 'restaurante': mostra "Comissão Restaurante", esconde "Repasse Sala VIP"
+Campos exibidos:
+
+Preço unitário / Markup
+Alíquota Impostos
+Comissão Restaurante (só se bolacha)
+Repasse Sala VIP (só se telas/janelas_digitais)
+BV da Campanha (% — só se campaign.partnerId)
+Gross-up rate (% — só se BV ativo, editável por admin)
+Custo Produção
+Custo Frete
+Cada linha:
+
+Valor herdado em texto cinza + badge "herdado"
+Se override existe: valor em texto normal, badge laranja "override", botão × "Restaurar"
+Botão "Editar" ao lado de cada valor → input inline
+Mutations:
+
+campaignPhase.setOverride({ phaseId, field, value })
+campaignPhase.clearOverride({ phaseId, field })
+Ao salvar, invalidar query getFinancials → recalcula DRE e payables prevista sem reload.
+
+4. Criar client/src/components/campaign/BatchDRE.tsx
+Coluna única (sem "Mensal × Total"). Renderiza financials retornado pelo backend:
+
+Receita Bruta                        R$ 16.821,00
+(−) Impostos                         R$  2.523,15
+= Receita após Impostos              R$ 14.297,85
+(−) Repasse Sala VIP (X%)            R$      Y,YY    ← só pra este batch (Janela Digital)
+= Base                               R$      Z,ZZ
+(−) Custo Frete                      R$      0,00
+(−) Custo Produção                   R$  1.200,00
+= Base de Contribuição               R$      W,WW
+(−) BV da Campanha (10% + gross-up)  R$  1.286,81
+    ├─ BV líquido (10%)              R$  1.167,81
+    └─ Gross-up (14,17%)             R$    119,00
+= Lucro Líquido                      R$      L,LL
+  Margem: XX,X%
+Regras:
+
+Linha de canal é condicional: Repasse VIP para digital OU Comissão Restaurante para bolacha, nunca ambas
+Linha BV só aparece se financials.bv.applicable === true
+Nome da linha é "BV da Campanha" sempre — nunca "Comissão Parceiro" ou "Comissão [nome do parceiro]"
+Cada linha clicável → tooltip com a fórmula aplicada
+Margem: verde ≥ 15%, amarelo 5–15%, vermelho < 5%
+Usa os mesmos números que calcPhaseFinancials retorna — não recalcular no front.
+
+5. Criar client/src/components/campaign/BatchPayablesList.tsx
+Lista de accountsPayable filtrada por campaignPhaseId === phase.id.
+
+Sem botão "Gerar Lançamentos" — geração é automática.
+
+Quando a fatura do batch está emitida ou paga e não há payables → chama automaticamente campaignPhase.generatePayables(phaseId) uma vez (mutation disparada pelo useEffect na montagem, com guard contra duplicata).
+
+Tabela: Tipo · Destinatário · Valor · Vencimento · Status · Ações
+Filtro: só do phase atual
+Botão "Regenerar previstos" — regera só lançamentos prevista, preserva pendente/pago
+Botão "+ Lançamento manual" — dialog para custo extra do batch
+
+6. Criar client/src/components/campaign/BatchInvoiceCard.tsx
+Card único com a fatura deste batch (1 batch = 1 fatura).
+
+Estados visuais:
+
+prevista: card azul, botão "Confirmar emissão"
+emitida: card amarelo, número NF, botão "Marcar como paga"
+paga: card verde, link do comprovante, link da conciliação bancária
+vencida: card vermelho
+cancelada: card cinza, botão "Gerar nova"
+Não listar outras faturas. Nunca. Se usuário quer ver todas, Consolidado tem o cronograma.
+
+7. Endpoint backend novo
+Em server/campaignPhaseRouter.ts:
+
+getFinancials: comercialProcedure
+  .input(z.object({ phaseId: z.number() }))
+  .query(async ({ input }) => {
+    const phase = await db.query.campaignPhases.findFirst({ where: eq(campaignPhases.id, input.phaseId) });
+    const items = await db.query.campaignItems.findMany({ where: eq(campaignItems.campaignPhaseId, input.phaseId) });
+    const campaign = await db.query.campaigns.findFirst({ where: eq(campaigns.id, phase.campaignId) });
+    const overrides = extractOverridesFromPhase(phase);
+    const financials = calcPhaseFinancials({ items, campaign, overrides, issRatePercent: 0 });
+    const invoice = await db.query.invoices.findFirst({ where: eq(invoices.campaignPhaseId, input.phaseId) });
+    const payables = await db.query.accountsPayable.findMany({ where: eq(accountsPayable.campaignPhaseId, input.phaseId) });
+    return { phase, financials, invoice, payables, overrides };
+  }),
+
+setOverride: comercialProcedure
+  .input(z.object({ phaseId: z.number(), field: z.string(), value: z.string().nullable() }))
+  .mutation(...)  // whitelisted fields
+
+clearOverride: comercialProcedure.input(...).mutation(...)
+
+generatePayables: comercialProcedure
+  .input(z.object({ phaseId: z.number() }))
+  .mutation(async ({ input }) => { /* idempotente, usa calcPhaseFinancials */ }),
+
+regeneratePayables: comercialProcedure
+  .input(z.object({ phaseId: z.number() }))
+  .mutation(...) // só toca em 'prevista'
+Hook automático em invoice.confirmEmission (ou invoice.markPaid) → chama generatePayables quando campaignPhaseId presente e ainda não há lançamentos.
+
+8. Textos e terminologia — zero tolerância
+grep -r "Comissão Parceiro\|Comissão do Parceiro\|comissao_parceiro\|Comissão The White" em client/ deve retornar zero. Substituir todas as ocorrências por "BV da Campanha" ou bv_campanha.
+
+O nome do parceiro (ex: "The White") vai em subtítulo discreto, tipo:
+
+BV da Campanha (10% + gross-up) · Pago a: The White
+Nunca na label principal da linha do DRE.
+
+Critério de aceite com dados reais (campanha SKN)
+Abrir Batch Abr/2026 da campanha SKN INCORPORADORA (produto: Janela Digital — Sala Vip Manaus Airport) e validar:
+
+não concluído
+Bloco "Parâmetros Financeiros da Campanha" sumiu da aba
+não concluído
+"Faturas desta Campanha" substituído por card único da fatura FAT-2026-0003
+não concluído
+Seção "Comissão do Parceiro (The White)" sumiu — BV virou linha do DRE
+não concluído
+DRE tem na ordem correta: Receita → Impostos → Repasse Sala VIP → Base → Frete → Produção → Base Contribuição → BV da Campanha → Lucro
+não concluído
+Linha "Comissão Restaurante" não aparece (produto é digital)
+não concluído
+Linha "Repasse Sala VIP" aparece com valor calculado corretamente
+não concluído
+Linha "BV da Campanha" mostra breakdown gross-up (líquido + gross-up separados)
+não concluído
+Não existe coluna "Total (6M)" — só valores do batch
+não concluído
+Contas a Pagar deste batch foi gerado automaticamente (fatura paga → tem payables); sem botão "Gerar Lançamentos"
+não concluído
+Um único número de BV na tela — sem divergência entre R$ 1.166,81 e R$ 1.286,81
+não concluído
+Bloco Economics do Batch mostra override editável pra Repasse VIP, BV%, frete, produção; esconde "Comissão Restaurante" (produto é digital)
+não concluído
+grep -r "Comissão Parceiro" client/ = zero
+não concluído
+CampaignDetail.tsx abaixo de 3500 linhas (hoje 4299)
+Restrições
+Não mexer no backend — já está correto, só usar
+Não quebrar outras abas (Painel, Consolidado, Distribuição, Cliente, Histórico, Relatórios)
+Manter o header "Você está vendo Batch 1 — Mês 1" que já existe
+Auditoria grava: override set/clear, regenerate payables
+Manda esse prompt pro Replit. Ele já fez o trabalho pesado do backend; falta só executar o front e deletar o código legado.
+
+bv da campanha é adicionado em cima do faturamento, é 20% do faturamento bruto por exemplo. nao tem deducao.
+
+Entendi — BV é acréscimo ao faturamento, não dedução. Corrigindo o prompt pontualmente:
+
+Correção — BV da Campanha não é dedução
+Modelo correto:
+
+BV é uma camada adicional cobrada em cima do faturamento bruto (ex: 20% × faturamento)
+BV não afeta o DRE da empresa — nem entra como receita nossa, nem sai como custo nosso
+BV é apenas informação comercial (registra o que o parceiro ganhou sobre essa campanha)
+Se existe um repasse financeiro de BV intermediado pela empresa, é modelado como lançamento equilibrado (entrada + saída de mesmo valor) que zera no DRE
+Ajustes no prompt anterior
+1. DRE do Batch — remover linha de BV das deduções
+Estrutura final correta:
+
+Faturamento Bruto                      R$ 16.821,00
+(−) Impostos (15%)                     R$  2.523,15
+= Receita após Impostos                R$ 14.297,85
+(−) Repasse Sala VIP                   R$      ...     ← canal (ou Com. Restaurante se bolacha)
+= Base
+(−) Custo Frete
+(−) Custo Produção
+= Base de Contribuição
+(−) Comissão Comercial (vendedor interno, se aplicável)
+= Lucro Líquido                        R$      L,LL
+  Margem: XX,X%
+Linha de BV removida do DRE. O lucro líquido do batch não é reduzido por BV em hipótese alguma.
+
+2. BV vira card separado, fora do DRE
+Criar um card discreto abaixo ou ao lado do DRE do batch, com visual claramente distinto (borda tracejada, cor neutra):
+
+┌───────────────────────────────────────────────┐
+│ BV DA CAMPANHA (informativo — não deduz)      │
+│                                               │
+│ Parceiro: The White                           │
+│ % sobre Faturamento Bruto: 20%                │
+│ Valor do BV: R$ 3.364,20                      │
+│ Total cobrado do cliente (Fat. + BV):         │
+│   R$ 20.185,20                                │
+│                                               │
+│ ⓘ Pago diretamente pelo cliente ao parceiro.  │
+│   Não impacta o lucro líquido da empresa.     │
+└───────────────────────────────────────────────┘
+3. Payables — remover bv_campanha da auto-geração
+Deletar o tipo bv_campanha dos payables auto-gerados — a empresa não paga BV
+Se houver operação de repasse intermediado (caso específico: cliente paga empresa o total, empresa repassa ao parceiro), modelar como par equilibrado:
+receitaAdicional tipo bv_recebido (crédito) = valor do BV
+accountsPayable tipo bv_repasse (débito) = mesmo valor
+Os dois cancelam no DRE, registram a entrada/saída apenas na conciliação
+Default: não criar payable de BV. Só se explicitamente marcado no campo bvFluxo = 'intermediado' da campanha (adicionar flag no schema)
+4. Bloco "Economics do Batch" — ajustar campos de BV
+Manter campo "BV da Campanha (%)" editável (informativo)
+Remover campo "Gross-up rate" — não aplica no modelo de acréscimo
+Adicionar campo "Fluxo do BV" (toggle): direto (cliente paga ao parceiro) | intermediado (empresa recebe e repassa)
+Default direto — sem lançamentos financeiros
+5. Schema — ajustes
+Adicionar coluna bv_fluxo em campaigns (enum: direto | intermediado, default direto)
+Remover coluna gross_up_rate_override de campaign_phases (se já criada na migration anterior, fazer rollback)
+Atualizar calcPhaseFinancials em server/finance/calc.ts:
+BV sai do bloco de deduções
+Retornar campo separado bv: { parceiro, percentSobreFaturamento, valorBV, totalCobradoCliente, fluxo } — puramente informativo
+lucroLiquido calculado SEM BV
+Rodar testes unitários pra garantir: lucroLiquido é o mesmo com e sem BV configurado
+6. Glossário — atualizar
+Em docs/financeiro-glossario.md:
+
+### BV da Campanha
+
+Acréscimo comercial sobre o faturamento bruto, destinado ao parceiro/agência.
+
+- **Calculado como:** % sobre faturamento bruto (ex: 20%)
+- **Não é dedução:** não impacta o lucro líquido da empresa
+- **Natureza:** valor pago pelo cliente ao parceiro, diretamente ou via repasse
+  intermediado pela empresa (neutro no DRE em ambos os casos)
+- **Fluxo:**
+  - `direto` (default): cliente paga ao parceiro separadamente. Não gera
+    lançamentos na empresa.
+  - `intermediado`: empresa recebe total (faturamento + BV) e repassa BV ao
+    parceiro. Gera par equilibrado receita/payable que zera no DRE.
+- **Substituiu:** o conceito antigo de "Comissão Parceiro" (que erroneamente
+  era tratado como dedução).
+7. Critério de aceite — ajustar
+não concluído
+DRE do batch não tem linha de BV nas deduções
+não concluído
+Lucro líquido do batch é idêntico com ou sem BV configurado (teste unitário)
+não concluído
+Card "BV da Campanha (informativo)" aparece separado, com visual neutro, mostrando: parceiro, %, valor absoluto, total cobrado do cliente
+não concluído
+Com bvFluxo = direto (default): nenhum payable de BV é gerado
+não concluído
+Com bvFluxo = intermediado: gera par bv_recebido + bv_repasse de mesmo valor
+não concluído
+grep -r "comissao_parceiro\|bv_campanha como dedução" = zero
