@@ -70,6 +70,10 @@ export function BatchDRE({ financials, partner }: { financials: Financials; part
   const showVip = f.canalTipo === "vip";
   const showBV = (f.bvTotal ?? 0) > 0;
 
+  const taxTooltip = `IRPJ: ${formatCurrency(f.details.taxesBreakdown.irpj)}${
+    f.details.taxesBreakdown.iss > 0 ? ` · ISS: ${formatCurrency(f.details.taxesBreakdown.iss)}` : ""
+  }`;
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -82,41 +86,56 @@ export function BatchDRE({ financials, partner }: { financials: Financials; part
       <CardContent className="pt-0">
         <Row label="Faturamento Bruto" value={f.receita} />
         <Row
-          label={`Impostos (${(f.effective.taxRate.value).toFixed(1).replace(".", ",")}% + PIS/COFINS)`}
+          label={`Impostos (${(f.effective.taxRate.value).toFixed(1).replace(".", ",")}%)`}
           value={f.impostos}
           kind="subtract"
-          tooltip={`IRPJ: ${formatCurrency(f.details.taxesBreakdown.irpj)} · PIS/COFINS: ${formatCurrency(f.details.taxesBreakdown.pisCofins)} · ISS: ${formatCurrency(f.details.taxesBreakdown.iss)}`}
-        />
-        {showRestaurante && (
-          <Row
-            label={`Comissão Restaurante (${(f.effective.restaurantCommission.value).toFixed(1).replace(".", ",")}%)`}
-            value={f.canalValor}
-            kind="subtract"
-            tooltip="Repasse ao restaurante sobre o faturamento bruto."
-          />
-        )}
-        {showVip && (
-          <Row
-            label={`Repasse Sala VIP (${(f.effective.vipRepasse.value).toFixed(1).replace(".", ",")}%)`}
-            value={f.canalValor}
-            kind="subtract"
-            tooltip="Repasse à operadora VIP sobre receita líquida de impostos e comissão."
-          />
-        )}
-        <Row label="Base após Canal" value={f.base} kind="subtotal" />
-
-        <Row label="Custo Frete" value={f.freightCost} kind="subtract" />
-        <Row label="Custo Produção" value={f.productionCost} kind="subtract" />
-        <Row label="Base de Contribuição" value={f.baseContribuicao} kind="subtotal" />
-
-        <Row
-          label={`Comissão Vendedor (${(f.effective.sellerCommission.value).toFixed(1).replace(".", ",")}%)`}
-          value={f.sellerCommission}
-          kind="subtract"
-          tooltip="Comissão do vendedor rateada por receita do batch."
+          tooltip={taxTooltip}
         />
 
-        <Row label="Lucro Líquido" value={f.lucroLiquido} kind="total" />
+        {showVip ? (
+          <>
+            {/* Fluxo VIP: Faturamento − Imposto − Comissão Vendedor → base do repasse */}
+            <Row
+              label={`Comissão Vendedor (${(f.effective.sellerCommission.value).toFixed(1).replace(".", ",")}%)`}
+              value={f.sellerCommission}
+              kind="subtract"
+              tooltip="Comissão do vendedor rateada por receita do batch."
+            />
+            <Row label="Base para Repasse" value={f.receita - f.impostos - f.sellerCommission} kind="subtotal" />
+            <Row
+              label={`Repasse Sala VIP (${(f.effective.vipRepasse.value).toFixed(1).replace(".", ",")}%)`}
+              value={f.canalValor}
+              kind="subtract"
+              tooltip="Repasse à operadora VIP calculado sobre o que sobra após impostos e comissão do vendedor."
+            />
+            <Row label="Lucro Líquido" value={f.lucroLiquido} kind="total" />
+          </>
+        ) : (
+          <>
+            {showRestaurante && (
+              <Row
+                label={`Comissão Restaurante (${(f.effective.restaurantCommission.value).toFixed(1).replace(".", ",")}%)`}
+                value={f.canalValor}
+                kind="subtract"
+                tooltip="Repasse ao restaurante sobre o faturamento bruto."
+              />
+            )}
+            <Row label="Base após Canal" value={f.base} kind="subtotal" />
+
+            <Row label="Custo Frete" value={f.freightCost} kind="subtract" />
+            <Row label="Custo Produção" value={f.productionCost} kind="subtract" />
+            <Row label="Base de Contribuição" value={f.baseContribuicao} kind="subtotal" />
+
+            <Row
+              label={`Comissão Vendedor (${(f.effective.sellerCommission.value).toFixed(1).replace(".", ",")}%)`}
+              value={f.sellerCommission}
+              kind="subtract"
+              tooltip="Comissão do vendedor rateada por receita do batch."
+            />
+
+            <Row label="Lucro Líquido" value={f.lucroLiquido} kind="total" />
+          </>
+        )}
 
         {showBV && (
           <div className="mt-4 pt-3 border-t border-amber-200 bg-amber-50/40 -mx-4 px-4 -mb-4 pb-3 rounded-b-md">

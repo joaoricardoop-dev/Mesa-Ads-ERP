@@ -6,8 +6,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const TAX_RATES = {
-  // PIS 0,65% + COFINS 3,00% = 3,65% (regime presumido). Pode virar produto-específico no futuro.
-  pisCofins: 0.0365,
+  // PIS/COFINS — não recolhidos pela empresa (regime atual). Mantido como 0
+  // para que toda a estrutura de breakdown continue funcionando sem mudanças
+  // no schema; basta voltar para 0.0365 caso o regime mude.
+  pisCofins: 0,
   // IRPJ default quando produto não define (6% padrão histórico).
   irpjDefault: 0.06,
 } as const;
