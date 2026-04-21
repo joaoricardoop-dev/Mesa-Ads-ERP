@@ -1347,23 +1347,23 @@ export const accountsPayable = pgTable("accounts_payable", {
   // recriá-los gerando SQL inválido (ex.: identificadores camelCase sem
   // aspas). NÃO modificar sem aplicar a migração SQL correspondente.
   uniqueIndex("uq_ap_partner_commission_partner_month")
-    .on(sql`("sourceRef"->>'partnerId')`, t.competenceMonth)
-    .where(sql`"sourceType" = 'bv_campanha' AND "status" <> 'cancelada' AND ("sourceRef" ? 'supplementOf') = false`),
+    .on(sql`("sourceRef"->>'partnerId')`, sql`"competenceMonth"`)
+    .where(sql`"sourceType" = 'bv_campanha'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text AND ("sourceRef" ? 'supplementOf'::text) = false`),
   uniqueIndex("uq_ap_restaurant_commission_invoice")
     .on(sql`("sourceRef"->>'invoiceId')`)
-    .where(sql`"sourceType" = 'restaurant_commission' AND "status" <> 'cancelada' AND ("sourceRef" ? 'invoiceId')`),
+    .where(sql`"sourceType" = 'restaurant_commission'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text AND ("sourceRef" ? 'invoiceId'::text)`),
   uniqueIndex("uq_ap_restaurant_commission_payment")
     .on(sql`("sourceRef"->>'restaurantPaymentId')`)
-    .where(sql`"sourceType" = 'restaurant_commission' AND "status" <> 'cancelada' AND ("sourceRef" ? 'restaurantPaymentId')`),
+    .where(sql`"sourceType" = 'restaurant_commission'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text AND ("sourceRef" ? 'restaurantPaymentId'::text)`),
   uniqueIndex("uq_ap_restaurant_payment_source")
     .on(sql`("sourceRef"->>'restaurantPaymentId')`)
-    .where(sql`"sourceType" = 'restaurant_commission' AND ("sourceRef" ? 'restaurantPaymentId')`),
+    .where(sql`"sourceType" = 'restaurant_commission'::accounts_payable_source_type AND ("sourceRef" ? 'restaurantPaymentId'::text)`),
   uniqueIndex("uq_ap_tax_invoice_kind")
     .on(sql`("sourceRef"->>'invoiceId')`, sql`("sourceRef"->>'kind')`)
-    .where(sql`"sourceType" = 'tax' AND "status" <> 'cancelada'`),
+    .where(sql`"sourceType" = 'tax'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text`),
   uniqueIndex("uq_ap_vip_repasse_invoice")
     .on(sql`("sourceRef"->>'invoiceId')`)
-    .where(sql`"sourceType" = 'vip_repasse' AND "status" <> 'cancelada'`),
+    .where(sql`"sourceType" = 'vip_repasse'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text`),
 ]);
 
 export type AccountPayable = typeof accountsPayable.$inferSelect;
