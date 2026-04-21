@@ -1,7 +1,7 @@
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 
-const MIGRATIONS: Array<{ name: string; sql: string }> = [
+export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
   {
     name: "add_quotation_period_start",
     sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "periodStart" date; ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "batchWeeks" integer DEFAULT 4;`,
@@ -754,7 +754,12 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     // Idempotente: usa IF NOT EXISTS em colunas/índices e DO blocks em
     // constraints. Não destrutivo — `type` permanece para compat.
     name: "finrefac_02_accounts_payable_ledger_columns",
-    sql: `
+    sql: [
+      // Chunk 1: criar/normalizar o enum. Precisa rodar em transação
+      // separada do uso (PG não permite ADD VALUE + uso na mesma tx,
+      // erro 55P04 unsafe use of new value). Lida com DBs onde o enum
+      // já existe com valores legados (ex.: 'bv_campanha').
+      `
       DO $$ BEGIN
         CREATE TYPE accounts_payable_source_type AS ENUM (
           'restaurant_commission',
@@ -767,7 +772,18 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
           'manual'
         );
       EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
+      `,
+      `ALTER TYPE accounts_payable_source_type ADD VALUE IF NOT EXISTS 'restaurant_commission';`,
+      `ALTER TYPE accounts_payable_source_type ADD VALUE IF NOT EXISTS 'vip_repasse';`,
+      `ALTER TYPE accounts_payable_source_type ADD VALUE IF NOT EXISTS 'supplier_cost';`,
+      `ALTER TYPE accounts_payable_source_type ADD VALUE IF NOT EXISTS 'freight_cost';`,
+      `ALTER TYPE accounts_payable_source_type ADD VALUE IF NOT EXISTS 'partner_commission';`,
+      `ALTER TYPE accounts_payable_source_type ADD VALUE IF NOT EXISTS 'seller_commission';`,
+      `ALTER TYPE accounts_payable_source_type ADD VALUE IF NOT EXISTS 'tax';`,
+      `ALTER TYPE accounts_payable_source_type ADD VALUE IF NOT EXISTS 'manual';`,
+      // Chunk 2: colunas, backfills, índices e constraints. Já pode
+      // referenciar livremente todos os labels canônicos.
+      `
       ALTER TABLE "accounts_payable"
         ADD COLUMN IF NOT EXISTS "sourceType" accounts_payable_source_type;
       ALTER TABLE "accounts_payable"
@@ -845,6 +861,7 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       COMMENT ON COLUMN "accounts_payable"."competenceMonth" IS 'Mês de competência (YYYY-MM) para DRE/relatórios.';
       COMMENT ON COLUMN "accounts_payable"."createdBySystem" IS 'true = gerado por trigger/sync; false = lançamento manual.';
     `,
+    ],
   },
   {
     // Refatoração financeira fase 2 — Backfill ledger a partir de
@@ -1214,6 +1231,11 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
           JOIN pg_type t ON e.enumtypid = t.oid
           WHERE t.typname = 'accounts_payable_source_type'
             AND e.enumlabel = 'partner_commission'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM pg_enum e
+          JOIN pg_type t ON e.enumtypid = t.oid
+          WHERE t.typname = 'accounts_payable_source_type'
+            AND e.enumlabel = 'bv_campanha'
         ) THEN
           ALTER TYPE accounts_payable_source_type RENAME VALUE 'partner_commission' TO 'bv_campanha';
         END IF;
@@ -1260,10 +1282,32 @@ export async function runMigrations() {
 
   for (const migration of MIGRATIONS) {
     try {
-      await db.execute(sql.raw(migration.sql));
+      const chunks = Array.isArray(migration.sql)
+        ? migration.sql
+        : [migration.sql];
+      for (const chunk of chunks) {
+        await db.execute(sql.raw(chunk));
+      }
       console.log(`[Migrations] Applied: ${migration.name}`);
     } catch (err: any) {
-      console.warn(`[Migrations] ${migration.name} skipped or failed:`, err?.message || err);
+      const root = err?.cause ?? err;
+      const detail = {
+        code: root?.code,
+        message: root?.message?.split("\n")[0],
+        detail: root?.detail,
+        hint: root?.hint,
+        position: root?.position,
+        where: root?.where,
+        schema: root?.schema,
+        table: root?.table,
+        column: root?.column,
+        constraint: root?.constraint,
+        wrappedMessage: err?.message?.split("\n")[0],
+      };
+      console.warn(
+        `[Migrations] ${migration.name} skipped or failed:`,
+        JSON.stringify(detail, null, 2),
+      );
     }
   }
 }
