@@ -3029,10 +3029,12 @@ export default function CampaignDetail() {
               {currentPhaseId != null ? (
                 <BatchFinancialTab campaignId={campaignId} phaseId={currentPhaseId} />
               ) : (
-                <div className="text-sm text-muted-foreground py-8 text-center border rounded-md">
-                  Selecione um batch para ver os dados financeiros operacionais.
-                  <br/>Para visão consolidada da campanha, use a aba Consolidado.
-                </div>
+                <>
+                  <div className="text-xs text-muted-foreground px-1">
+                    Esta campanha não tem batches — exibindo visão consolidada.
+                  </div>
+                  <CampaignConsolidation campaignId={campaign.id} />
+                </>
               )}
             </TabsContent>
 

@@ -4,7 +4,11 @@ import { formatCurrency } from "@/lib/format";
 import { CircleDollarSign, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-type Financials = any;
+import type { RouterOutputs } from "@/lib/trpc";
+
+type FinancialsData = RouterOutputs["campaignPhase"]["getFinancials"];
+type Financials = FinancialsData["financials"];
+type Partner = FinancialsData["partner"];
 
 function pct(v: number) { return `${(v * 100).toFixed(1).replace(".", ",")}%`; }
 
@@ -54,9 +58,9 @@ function Row({
   );
 }
 
-export function BatchDRE({ financials, partner }: { financials: Financials; partner: any }) {
+export function BatchDRE({ financials, partner }: { financials: Financials; partner: Partner }) {
   const f = financials;
-  const margin = f.margemPct as number;
+  const margin = f.margemPct;
   const marginColor =
     margin >= 0.15 ? "bg-emerald-100 text-emerald-800" :
     margin >= 0.05 ? "bg-amber-100 text-amber-800" :

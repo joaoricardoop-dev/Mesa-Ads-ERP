@@ -45,6 +45,38 @@ function extractOverridesFromPhase(phase: any): PhaseOverrides {
   };
 }
 
+// Após mudar override de um batch, regenera APs PREVISTOS (status='pendente'
+// + createdBySystem=true) sem tocar em pago/cancelado. Idempotente.
+async function softRegenPredictedPayables(db: any, phaseId: number) {
+  const [invoice] = await db.select().from(invoices)
+    .where(and(eq(invoices.campaignPhaseId, phaseId), sql`${invoices.status} <> 'cancelada'`))
+    .orderBy(desc(invoices.id)).limit(1);
+  if (!invoice) return { regenerated: 0, cancelled: 0, invoiceId: null as number | null };
+  // Cancela APs previstos vinculados via sourceRef.invoiceId OU via
+  // sourceRef.invoiceIds[] (BV agregado). Preserva pago/cancelado.
+  const idStr = String(invoice.id);
+  const cancelled = await db.update(accountsPayable).set({
+    status: "cancelada", updatedAt: new Date(),
+  }).where(and(
+    sql`(
+      (${accountsPayable.sourceRef}->>'invoiceId') = ${idStr}
+      OR (${accountsPayable.sourceRef}->'invoiceIds') @> ${sql`${JSON.stringify([invoice.id])}::jsonb`}
+    )`,
+    eq(accountsPayable.status, "pendente"),
+    eq(accountsPayable.createdBySystem, true),
+  )).returning();
+  let totalCreated = 0;
+  if (invoice.status === "emitida" || invoice.status === "paga") {
+    const r1 = await materializePayablesForInvoice(db, invoice.id, "emitida");
+    totalCreated += r1.created;
+  }
+  if (invoice.status === "paga") {
+    const r2 = await materializePayablesForInvoice(db, invoice.id, "paga");
+    totalCreated += r2.created;
+  }
+  return { regenerated: totalCreated, cancelled: cancelled.length, invoiceId: invoice.id };
+}
+
 // Mesma cadeia que server/finance/payables.ts:resolvePartnerForCampaign
 // (quotation → campaign.partnerId → client.partnerId) para evitar divergência
 // entre o DRE do batch e os APs materializados pelo ledger.
@@ -865,15 +897,24 @@ export const campaignPhaseRouter = router({
         overrides,
       });
 
-      // Fatura ativa: a mais recente que NÃO esteja cancelada (preferimos
-      // emitida/paga; cai em prevista). Evita pegar resíduos antigos.
-      const [invoice] = await db.select().from(invoices)
+      // Fatura "atual" do batch: prioriza a mais recente NÃO cancelada;
+      // se todas estiverem canceladas, devolve a última cancelada para
+      // o front renderizar o CTA "Gerar nova".
+      const [activeInv] = await db.select().from(invoices)
         .where(and(
           eq(invoices.campaignPhaseId, input.phaseId),
           sql`${invoices.status} <> 'cancelada'`,
         ))
         .orderBy(desc(invoices.id))
         .limit(1);
+      let invoice = activeInv;
+      if (!invoice) {
+        const [lastCancelled] = await db.select().from(invoices)
+          .where(eq(invoices.campaignPhaseId, input.phaseId))
+          .orderBy(desc(invoices.id))
+          .limit(1);
+        invoice = lastCancelled;
+      }
 
       // Payables: união dos APs vinculados (a) à fatura por sourceRef.invoiceId,
       // (b) a qualquer fatura listada em sourceRef.invoiceIds (agregados de BV),
@@ -917,6 +958,7 @@ export const campaignPhaseRouter = router({
         updatedAt: new Date(),
       };
       const [updated] = await db.update(campaignPhases).set(updates).where(eq(campaignPhases.id, input.phaseId)).returning();
+      const regen = await softRegenPredictedPayables(db as any, input.phaseId);
       try {
         await recordAudit(db as any, { user: { id: ctx.user.id, role: (ctx.user as any).role ?? null } }, {
           entityType: "campaign_phase",
@@ -924,10 +966,10 @@ export const campaignPhaseRouter = router({
           action: "set_override",
           before: { [input.field]: before },
           after: { [input.field]: input.value },
-          metadata: { field: input.field },
+          metadata: { field: input.field, regen },
         });
       } catch {}
-      return updated;
+      return { ...updated, regen };
     }),
 
   clearOverride: comercialProcedure
@@ -947,6 +989,7 @@ export const campaignPhaseRouter = router({
         updatedAt: new Date(),
       };
       const [updated] = await db.update(campaignPhases).set(updates).where(eq(campaignPhases.id, input.phaseId)).returning();
+      const regen = await softRegenPredictedPayables(db as any, input.phaseId);
       try {
         await recordAudit(db as any, { user: { id: ctx.user.id, role: (ctx.user as any).role ?? null } }, {
           entityType: "campaign_phase",
@@ -954,10 +997,10 @@ export const campaignPhaseRouter = router({
           action: "clear_override",
           before: { [input.field]: before },
           after: { [input.field]: null },
-          metadata: { field: input.field },
+          metadata: { field: input.field, regen },
         });
       } catch {}
-      return updated;
+      return { ...updated, regen };
     }),
 
   // Geração idempotente: dispara o materializer da fatura do batch.

@@ -43,6 +43,7 @@ export function BatchFinancialTab({
       />
       <BatchPayablesList
         phaseId={phaseId}
+        campaignId={campaignId}
         invoice={data.invoice}
         payables={data.payables}
         onChange={() => refetch()}
