@@ -4,6 +4,10 @@ import { cn } from "@/lib/utils";
 interface ExternalShellProps {
   children: ReactNode;
   className?: string;
+  /** Extra classes for the inner z-10 wrapper that holds the children.
+   * Use this to pass flex/sizing classes (e.g. "flex flex-1 min-h-0 w-full")
+   * so the children participate correctly in the outer layout. */
+  innerClassName?: string;
   /** When true, applies the full "ambient" treatment with grain, spotlight, and orbs.
    * When false, only the color/font tokens are applied (useful for sub-areas already inside an ExternalShell). */
   ambient?: boolean;
@@ -16,7 +20,7 @@ interface ExternalShellProps {
  *
  * Internal ERP views are NOT wrapped, so the existing UI stays untouched.
  */
-export function ExternalShell({ children, className, ambient = true }: ExternalShellProps) {
+export function ExternalShell({ children, className, innerClassName, ambient = true }: ExternalShellProps) {
   useEffect(() => {
     if (!ambient) return;
     const handler = (e: PointerEvent) => {
@@ -58,7 +62,7 @@ export function ExternalShell({ children, className, ambient = true }: ExternalS
           />
         </>
       )}
-      <div className="relative z-10">{children}</div>
+      <div className={cn("relative z-10", innerClassName)}>{children}</div>
     </div>
   );
 }

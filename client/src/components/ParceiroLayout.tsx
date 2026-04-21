@@ -33,7 +33,7 @@ export function ParceiroLayout({ user, children, impersonation, onExitImpersonat
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="h-full w-full min-h-0 flex flex-col bg-background">
       {impersonation && (
         <div className="flex items-center justify-between px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 shrink-0">
           <div className="flex items-center gap-2">

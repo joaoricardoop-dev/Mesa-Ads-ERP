@@ -517,7 +517,10 @@ function AuthenticatedApp() {
 
   if (isAnunciante) {
     return (
-      <ExternalShell className="h-screen flex overflow-hidden min-h-0">
+      <ExternalShell
+        className="h-screen flex overflow-hidden min-h-0"
+        innerClassName="flex flex-1 min-h-0 w-full"
+      >
         <DashboardLayout user={effectiveUser} impersonation={impersonation} onExitImpersonation={() => setImpersonation(null)}>
           <AnuncianteRouter key={devClientIdOverride ?? "no-client"} />
         </DashboardLayout>
@@ -539,7 +542,10 @@ function AuthenticatedApp() {
 
   if (isParceiro) {
     return (
-      <ExternalShell>
+      <ExternalShell
+        className="h-screen flex overflow-hidden min-h-0"
+        innerClassName="flex flex-1 min-h-0 w-full"
+      >
         <ParceiroLayout
           user={effectiveUser}
           impersonation={impersonation}
