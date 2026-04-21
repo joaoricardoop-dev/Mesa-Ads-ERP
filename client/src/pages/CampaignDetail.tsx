@@ -2721,7 +2721,8 @@ export default function CampaignDetail() {
                 </div>
               )}
 
-              {/* ─── Separador visual ─── */}
+              {/* ─── Indicadores financeiros — ocultos no contexto do batch (vivem na aba Financeiro) ─── */}
+              {currentPhaseId == null && (<>
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-border/20" />
                 <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">Indicadores Financeiros</span>
@@ -3017,6 +3018,7 @@ export default function CampaignDetail() {
                   </>
                 )}
               </div>
+              </>)}
             </TabsContent>
 
             {/* ─── FASES ─── */}
