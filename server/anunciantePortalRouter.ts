@@ -61,6 +61,34 @@ const productTipoSchema = z.enum([
 ]);
 
 export const anunciantePortalRouter = router({
+  // Indicador rápido para o builder distinguir "marketplace ainda vazio"
+  // (precisa de cadastro pelo admin) de "filtros zeraram a lista". Retorna
+  // contagens globais de restaurantes ativos, produtos visíveis a anunciantes
+  // e vínculos productLocations existentes.
+  getMarketplaceStats: anuncianteProcedure.query(async () => {
+    const db = await getDatabase();
+    const [activeRest] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(activeRestaurants)
+      .where(eq(activeRestaurants.status, "active"));
+    const [visibleProducts] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(products)
+      .where(and(eq(products.isActive, true), eq(products.visibleToAdvertisers, true)));
+    const [locations] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(productLocations);
+    return {
+      activeRestaurants: Number(activeRest?.count ?? 0),
+      advertiserProducts: Number(visibleProducts?.count ?? 0),
+      productLocations: Number(locations?.count ?? 0),
+      marketplaceReady:
+        Number(activeRest?.count ?? 0) > 0 &&
+        Number(visibleProducts?.count ?? 0) > 0 &&
+        Number(locations?.count ?? 0) > 0,
+    };
+  }),
+
   // Lista locais ativos com seus shares disponíveis no período. Filtros
   // opcionais por tipo de produto, bairro e janela de datas. Retorna também
   // rating, audiência estimada e categorias excluídas (alerta de conflito).
@@ -106,7 +134,13 @@ export const anunciantePortalRouter = router({
         .innerJoin(products, eq(products.id, productLocations.productId))
         .where(and(...productConditions));
 
-      if (slotRows.length === 0) return [];
+      if (slotRows.length === 0) {
+        console.warn(
+          "[anunciantePortal.listAvailableLocations] resultado vazio: nenhum productLocations com produtos visíveis a anunciantes",
+          { productType, neighborhood, startDate, endDate },
+        );
+        return [];
+      }
 
       const restaurantIds = Array.from(new Set(slotRows.map((s) => s.restaurantId)));
 
@@ -135,7 +169,13 @@ export const anunciantePortalRouter = router({
         .from(activeRestaurants)
         .where(and(...restaurantConditions));
 
-      if (restaurantRows.length === 0) return [];
+      if (restaurantRows.length === 0) {
+        console.warn(
+          "[anunciantePortal.listAvailableLocations] resultado vazio: nenhum restaurante ativo bate com os filtros",
+          { productType, neighborhood, startDate, endDate, candidateRestaurantIds: restaurantIds.length },
+        );
+        return [];
+      }
 
       const allowedRestaurantIds = new Set(restaurantRows.map((r) => r.id));
 

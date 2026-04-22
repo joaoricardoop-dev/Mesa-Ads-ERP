@@ -34,6 +34,8 @@ export function StepLocais({ clientLabel }: Props) {
     neighborhood: neighborhood || undefined,
   });
 
+  const { data: marketplaceStats } = trpc.anunciantePortal.getMarketplaceStats.useQuery();
+
   const neighborhoods = useMemo(() => {
     const set = new Set<string>();
     for (const l of locais) if (l.neighborhood) set.add(l.neighborhood);
@@ -140,13 +142,18 @@ export function StepLocais({ clientLabel }: Props) {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-chalk-muted">
+        <div className="flex items-center gap-2 text-sm text-chalk-muted" data-testid="locais-loading">
           <Loader2 className="w-4 h-4 animate-spin" /> carregando locais…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-hairline p-10 text-center text-sm text-chalk-muted">
-          Nenhum local encontrado neste período/bairro.
-        </div>
+        <EmptyLocaisState
+          marketplaceReady={marketplaceStats?.marketplaceReady ?? true}
+          hasFilters={Boolean(query || neighborhood)}
+          onClearFilters={() => {
+            setQuery("");
+            setNeighborhood("");
+          }}
+        />
       ) : view === "map" ? (
         <SimpleMapPlaceholder count={filtered.length} />
       ) : (
@@ -214,6 +221,58 @@ export function StepLocais({ clientLabel }: Props) {
         </div>
       )}
     </WizardShell>
+  );
+}
+
+function EmptyLocaisState({
+  marketplaceReady,
+  hasFilters,
+  onClearFilters,
+}: {
+  marketplaceReady: boolean;
+  hasFilters: boolean;
+  onClearFilters: () => void;
+}) {
+  if (!marketplaceReady) {
+    return (
+      <div
+        className="rounded-2xl border border-dashed border-hairline p-10 text-center text-sm text-chalk-muted"
+        data-testid="empty-marketplace"
+      >
+        <div className="text-chalk font-medium mb-1">Ainda não há locais disponíveis no marketplace</div>
+        <div className="text-xs">
+          Estamos cadastrando novos restaurantes e produtos. Volte em breve ou fale com o seu contato comercial.
+        </div>
+      </div>
+    );
+  }
+  if (hasFilters) {
+    return (
+      <div
+        className="rounded-2xl border border-dashed border-hairline p-10 text-center text-sm text-chalk-muted"
+        data-testid="empty-filters"
+      >
+        <div className="text-chalk font-medium mb-1">Nenhum local bate com os filtros aplicados</div>
+        <div className="text-xs mb-4">Tente trocar o bairro, ampliar o período ou limpar os filtros.</div>
+        <button
+          type="button"
+          onClick={onClearFilters}
+          className="text-[11px] uppercase tracking-[0.18em] font-semibold text-mesa-neon hover:brightness-110 transition"
+          data-testid="clear-filters"
+        >
+          limpar filtros
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="rounded-2xl border border-dashed border-hairline p-10 text-center text-sm text-chalk-muted"
+      data-testid="empty-period"
+    >
+      <div className="text-chalk font-medium mb-1">Nenhum local com disponibilidade neste período</div>
+      <div className="text-xs">Tente outras datas — todos os shares deste intervalo já estão reservados.</div>
+    </div>
   );
 }
 

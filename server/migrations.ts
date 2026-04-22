@@ -1271,6 +1271,28 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       COMMENT ON COLUMN "accounts_payable"."sourceType" IS 'Origem semântica: restaurant_commission | vip_repasse | supplier_cost | freight_cost | bv_campanha | seller_commission | tax | manual. Glossário §4.';
     `,
   },
+  {
+    // Task #165 — Backfill productLocations para produtos "rede" visíveis a
+    // anunciantes. Sem essas linhas, o builder de campanha mostra "Nenhum
+    // local encontrado" porque o join (productLocations × products × active
+    // restaurants) zera. Para produtos com distributionType='rede' a regra
+    // de negócio é "disponível em todos os locais ativos"; criamos uma linha
+    // por par (produto rede visível, restaurante ativo) com defaults
+    // (maxShares=1, cycleWeeks=4) — admin pode ajustar depois na aba "Locais".
+    // Idempotente: ON CONFLICT DO NOTHING usa o índice uq_product_location.
+    name: "task_165_backfill_product_locations_for_rede_products",
+    sql: `
+      INSERT INTO "product_locations" ("productId", "restaurantId", "maxShares", "cycleWeeks")
+      SELECT p.id, r.id, 1, 4
+      FROM "products" p
+      CROSS JOIN "active_restaurants" r
+      WHERE p."isActive" = true
+        AND p."visibleToAdvertisers" = true
+        AND p."distributionType" = 'rede'
+        AND r.status = 'active'
+      ON CONFLICT ON CONSTRAINT "uq_product_location" DO NOTHING;
+    `,
+  },
 ];
 
 export async function runMigrations() {

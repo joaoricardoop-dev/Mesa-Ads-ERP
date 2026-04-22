@@ -25,7 +25,7 @@ export function ShareAvailabilityBadge({ available, total, className }: Props) {
       )}
       data-testid="share-availability-badge"
     >
-      {available} de {total} shares
+      {available <= 0 ? `esgotado · 0/${total}` : `${available} de ${total} shares`}
     </span>
   );
 }
