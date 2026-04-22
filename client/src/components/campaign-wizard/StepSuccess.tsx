@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { useWizardStore } from "./wizardStore";
 import { MesaButton, MesaAdsLogo } from "./mesa/MesaUI";
+import { WizardTopBar } from "./WizardTopBar";
 
 interface Props {
   role: "anunciante" | "parceiro" | "internal";
@@ -20,13 +21,16 @@ export function StepSuccess({ role }: Props) {
 
   return (
     <div className="relative min-h-screen flex flex-col text-chalk overflow-hidden">
-      <header className="relative z-20 px-6 sm:px-10 pt-6 pb-4 flex items-center justify-between">
-        <a href="/" className="inline-flex items-center gap-3">
-          <MesaAdsLogo className="text-xl" />
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-chalk-dim border-l border-hairline pl-3">
-            auto-checkout
-          </span>
-        </a>
+      <header className="relative z-20 px-6 sm:px-10 pt-6 pb-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <a href="/" className="inline-flex items-center gap-3">
+            <MesaAdsLogo className="text-xl" />
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-chalk-dim border-l border-hairline pl-3">
+              auto-checkout
+            </span>
+          </a>
+        </div>
+        <WizardTopBar forceStep="success" />
       </header>
 
       <main className="flex-1 grid place-items-center px-6 py-12">

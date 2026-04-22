@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useWizardStore, STEP_ORDER, WizardStep } from "./wizardStore";
 import { MesaButton, MesaChip } from "./mesa/MesaUI";
 import { MesaProgressRail } from "./mesa/MesaProgressRail";
+import { WizardTopBar } from "./WizardTopBar";
 import { cn } from "@/lib/utils";
 
 interface WizardShellProps {
@@ -44,8 +45,9 @@ export function WizardShell({
     <div className="relative min-h-screen text-chalk lg:pl-[124px] pt-[64px] lg:pt-0">
       <MesaProgressRail />
 
-      <header className="relative z-10 px-6 sm:px-10 pt-6 pb-4 flex items-center justify-end">
-        <div className="flex items-center gap-3">
+      <header className="relative z-10 px-6 sm:px-10 pt-6 pb-4 flex flex-col gap-3">
+        <WizardTopBar />
+        <div className="flex items-center justify-end gap-3">
           <MesaChip tone="neon" dot size="xs">
             ao vivo
           </MesaChip>

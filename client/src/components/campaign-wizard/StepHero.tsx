@@ -6,6 +6,7 @@ import { useWizardStore } from "./wizardStore";
 import { CoasterStage } from "./mesa/CoasterStage";
 import { MesaButton, MesaChip } from "./mesa/MesaUI";
 import { MesaProgressRail } from "./mesa/MesaProgressRail";
+import { WizardTopBar } from "./WizardTopBar";
 
 interface Props {
   role: "anunciante" | "parceiro" | "internal" | "guest";
@@ -36,8 +37,9 @@ export function StepHero({ role: _role }: Props) {
       <div className="pointer-events-none absolute inset-0 z-[1] lg:left-[124px] top-[64px] lg:top-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(4,4,5,0.55)_55%,rgba(4,4,5,0.92)_100%)]" />
 
       <div className="relative z-10 min-h-[calc(100vh-64px)] lg:min-h-screen flex flex-col">
-        <header className="px-6 sm:px-10 pt-6 flex items-center justify-end">
-          <div className="flex items-center gap-3">
+        <header className="px-6 sm:px-10 pt-6 flex flex-col gap-3">
+          <WizardTopBar />
+          <div className="flex items-center justify-end gap-3">
             <MesaChip tone="neon" dot size="xs">ao vivo</MesaChip>
             {!isAuthenticated && (
               <button

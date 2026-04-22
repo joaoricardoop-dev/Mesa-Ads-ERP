@@ -13,6 +13,7 @@ import { StepCarrinho } from "./StepCarrinho";
 import { StepCheckout } from "./StepCheckout";
 import { StepSuccess } from "./StepSuccess";
 import { MesaButton, MesaAdsLogo } from "./mesa/MesaUI";
+import { WizardTopBar } from "./WizardTopBar";
 import { cn } from "@/lib/utils";
 
 type Source = "self_service_anunciante" | "self_service_parceiro" | "internal";
@@ -397,19 +398,22 @@ function ClientPicker({
 
   return (
     <div className="min-h-screen text-chalk">
-      <header className="px-6 sm:px-10 pt-6 pb-4 flex items-center justify-between">
-        <a href="/" className="inline-flex items-center gap-3">
-          <MesaAdsLogo className="text-xl" />
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-chalk-dim border-l border-hairline pl-3">
-            auto-checkout
-          </span>
-        </a>
-        <button
-          onClick={onBack}
-          className="text-[12px] text-chalk-muted hover:text-chalk transition-colors"
-        >
-          ← voltar para o início
-        </button>
+      <header className="px-6 sm:px-10 pt-6 pb-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <a href="/" className="inline-flex items-center gap-3">
+            <MesaAdsLogo className="text-xl" />
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-chalk-dim border-l border-hairline pl-3">
+              auto-checkout
+            </span>
+          </a>
+          <button
+            onClick={onBack}
+            className="text-[12px] text-chalk-muted hover:text-chalk transition-colors"
+          >
+            ← voltar para o início
+          </button>
+        </div>
+        <WizardTopBar forceStep="picker" />
       </header>
       <div className="max-w-3xl mx-auto px-6 sm:px-10 py-10">
         <div className="text-[10px] uppercase tracking-[0.22em] text-mesa-neon mb-3">
