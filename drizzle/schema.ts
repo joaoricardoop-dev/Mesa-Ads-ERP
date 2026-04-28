@@ -1008,13 +1008,6 @@ export const products = pgTable("products", {
   frequenciaAparicoes: decimal("frequenciaAparicoes", { precision: 4, scale: 2 }).default("1.00").notNull(),
   vipProviderId: integer("vipProviderId").references(() => vipProviders.id, { onDelete: "set null" }),
   vipProviderCommissionPercent: decimal("vipProviderCommissionPercent", { precision: 5, scale: 2 }),
-  // Linha comercial usada na vitrine pública (/vitrine) para agrupar o
-  // catálogo (ex: "midia_digital", "midia_impressa", "live_marketing").
-  // Null = produto legado, não aparece em /vitrine.
-  commercialLine: varchar("commercialLine", { length: 50 }),
-  // Preço de referência mensal para vitrine pública (R$/mês). Usado apenas
-  // como vitrine — o preço real do orçamento ainda passa por tiers/fórmula.
-  monthlyPrice: decimal("monthlyPrice", { precision: 12, scale: 2 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

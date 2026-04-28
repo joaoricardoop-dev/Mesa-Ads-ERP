@@ -1294,232 +1294,49 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     `,
   },
   {
-    // Task #170 — Vitrine pública /vitrine.
-    // Adiciona colunas usadas pelo catálogo público:
-    //   commercialLine: agrupa produtos por linha comercial (midia_digital,
-    //                   midia_impressa, live_marketing).
-    //   monthlyPrice:   preço de referência mensal exibido na vitrine
-    //                   (valor de display — orçamento real continua nos tiers).
-    name: "task_170_add_vitrine_columns_to_products",
-    sql: `
-      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "commercialLine" varchar(50);
-      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "monthlyPrice" numeric(12, 2);
-      CREATE INDEX IF NOT EXISTS "idx_products_commercial_line" ON "products" ("commercialLine");
-    `,
-  },
-  {
-    // Task #170 — Seed do Manauara Shopping (VIP Provider) + 10 produtos
-    // novos da vitrine. Idempotente: cada INSERT usa WHERE NOT EXISTS pelo
-    // nome canônico, então rodar mais de uma vez não duplica nada.
-    // Os produtos ficam visibleToAdvertisers=true para aparecerem na vitrine,
-    // mas isActive=true e vinculados ao Manauara como provedor VIP (50% de
-    // repasse). Não cria productLocations automaticamente — admin pode
-    // ativar via aba "Locais" se quiser oferecer no /montar-campanha.
-    name: "task_170_seed_manauara_vitrine_catalog",
+    // Task #170 — ROLLBACK da vitrine pública /vitrine.
+    // Reverte o seed do Manauara + colunas commercialLine/monthlyPrice
+    // adicionados originalmente. Idempotente: usa DELETE por nome canônico
+    // e DROP COLUMN IF EXISTS, então pode rodar em DBs já limpos sem erro.
+    // Ordem: deleta produtos seedados → deleta o provider Manauara (que só
+    // existe se foi seedado) → dropa o índice e as duas colunas adicionadas.
+    // Em DBs novos onde a coluna nunca existiu, a cláusula WHERE com
+    // information_schema evita erro ao referenciar coluna inexistente.
+    name: "task_170_rollback_vitrine_catalog",
     sql: `
       DO $$
-      DECLARE
-        v_provider_id INT;
       BEGIN
-        -- 1. VIP Provider "Manauara Shopping" (50% de repasse).
-        SELECT id INTO v_provider_id
-        FROM "vip_providers"
+        -- 1. Remover os 10 produtos seedados pelo nome canônico (idempotente).
+        --    productLocations e demais FKs em cascata (ON DELETE CASCADE/SET NULL).
+        DELETE FROM "products" WHERE "name" IN (
+          'Manauara — Painel LED Praça Central',
+          'Manauara — Totens Digitais 55"',
+          'Manauara — Janelas Digitais Sala VIP',
+          'Manauara — Elevadores Digitais',
+          'Manauara — Adesivos de Chão',
+          'Manauara — Backlights Praça de Alimentação',
+          'Manauara — Bolachas Publicitárias Praça',
+          'Manauara — Stand de Mídia Praça Central',
+          'Manauara — Sampling com Promotor',
+          'Manauara — Pop-up Store Sazonal'
+        );
+
+        -- 2. Remover o VIP Provider Manauara — só apaga se não tiver mais
+        --    nenhum produto referenciando (segurança extra contra deletar
+        --    em DBs onde admin já tinha cadastrado outros produtos depois).
+        DELETE FROM "vip_providers"
         WHERE "name" = 'Manauara Shopping'
-        LIMIT 1;
-
-        IF v_provider_id IS NULL THEN
-          INSERT INTO "vip_providers" (
-            "name", "company", "location", "repassePercent", "billingMode",
-            "status", "notes"
-          ) VALUES (
-            'Manauara Shopping',
-            'Manauara Shopping Center',
-            'Manaus/AM',
-            50.00,
-            'bruto',
-            'active',
-            'Shopping parceiro — vitrine pública /vitrine. Repasse 50% sobre faturamento bruto das mídias do mall.'
-          )
-          RETURNING id INTO v_provider_id;
-        END IF;
-
-        -- 2. Catálogo Manauara — 10 produtos agrupados em 3 linhas
-        --    comerciais. Insere apenas se ainda não existir produto com o
-        --    mesmo nome canônico.
-
-        -- ── MÍDIA DIGITAL (4 produtos) ────────────────────────────────────
-        INSERT INTO "products" (
-          "name", "description", "tipo", "unitLabel", "unitLabelPlural",
-          "temDistribuicaoPorLocal", "defaultQtyPerLocation", "defaultSemanas",
-          "pricingMode", "entryType", "visibleToPartners", "visibleToAdvertisers",
-          "isActive", "distributionType", "vipProviderId",
-          "vipProviderCommissionPercent", "commercialLine", "monthlyPrice",
-          "imagemUrl"
-        )
-        SELECT 'Manauara — Painel LED Praça Central', 'Painel LED de alta resolução posicionado na praça central do Manauara Shopping. Loop de 30s, 2 spots/min em horário de pico. Audiência estimada: 180 mil pessoas/mês.',
-               'telas', 'spot', 'spots',
-               false, 1, 4,
-               'price_based', 'fixed_quantities', false, true,
-               true, 'local_especifico', v_provider_id,
-               50.00, 'midia_digital', 18000.00,
-               null
-        WHERE NOT EXISTS (SELECT 1 FROM "products" WHERE "name" = 'Manauara — Painel LED Praça Central');
-
-        INSERT INTO "products" (
-          "name", "description", "tipo", "unitLabel", "unitLabelPlural",
-          "temDistribuicaoPorLocal", "defaultQtyPerLocation", "defaultSemanas",
-          "pricingMode", "entryType", "visibleToPartners", "visibleToAdvertisers",
-          "isActive", "distributionType", "vipProviderId",
-          "vipProviderCommissionPercent", "commercialLine", "monthlyPrice",
-          "imagemUrl"
-        )
-        SELECT 'Manauara — Totens Digitais 55"', 'Rede de totens interativos 55" distribuídos em corredores de alta circulação. Loops de 15s rotativos com 6 anunciantes simultâneos.',
-               'totem', 'totem', 'totens',
-               false, 8, 4,
-               'price_based', 'fixed_quantities', false, true,
-               true, 'local_especifico', v_provider_id,
-               50.00, 'midia_digital', 9500.00,
-               null
-        WHERE NOT EXISTS (SELECT 1 FROM "products" WHERE "name" = 'Manauara — Totens Digitais 55"');
-
-        INSERT INTO "products" (
-          "name", "description", "tipo", "unitLabel", "unitLabelPlural",
-          "temDistribuicaoPorLocal", "defaultQtyPerLocation", "defaultSemanas",
-          "pricingMode", "entryType", "visibleToPartners", "visibleToAdvertisers",
-          "isActive", "distributionType", "vipProviderId",
-          "vipProviderCommissionPercent", "commercialLine", "monthlyPrice",
-          "imagemUrl"
-        )
-        SELECT 'Manauara — Janelas Digitais Sala VIP', 'Telas verticais 32" em ambientes VIP (lounges, cinema premium, salões executivos). Audiência qualificada classe A/B.',
-               'janelas_digitais', 'tela', 'telas',
-               false, 6, 4,
-               'price_based', 'fixed_quantities', false, true,
-               true, 'local_especifico', v_provider_id,
-               50.00, 'midia_digital', 7200.00,
-               null
-        WHERE NOT EXISTS (SELECT 1 FROM "products" WHERE "name" = 'Manauara — Janelas Digitais Sala VIP');
-
-        INSERT INTO "products" (
-          "name", "description", "tipo", "unitLabel", "unitLabelPlural",
-          "temDistribuicaoPorLocal", "defaultQtyPerLocation", "defaultSemanas",
-          "pricingMode", "entryType", "visibleToPartners", "visibleToAdvertisers",
-          "isActive", "distributionType", "vipProviderId",
-          "vipProviderCommissionPercent", "commercialLine", "monthlyPrice",
-          "imagemUrl"
-        )
-        SELECT 'Manauara — Elevadores Digitais', 'Telas 21" instaladas dentro dos elevadores e escadas rolantes. Tempo médio de exposição: 38 segundos por jornada.',
-               'telas', 'tela', 'telas',
-               false, 12, 4,
-               'price_based', 'fixed_quantities', false, true,
-               true, 'local_especifico', v_provider_id,
-               50.00, 'midia_digital', 6500.00,
-               null
-        WHERE NOT EXISTS (SELECT 1 FROM "products" WHERE "name" = 'Manauara — Elevadores Digitais');
-
-        -- ── MÍDIA IMPRESSA (3 produtos) ───────────────────────────────────
-        INSERT INTO "products" (
-          "name", "description", "tipo", "unitLabel", "unitLabelPlural",
-          "temDistribuicaoPorLocal", "defaultQtyPerLocation", "defaultSemanas",
-          "pricingMode", "entryType", "visibleToPartners", "visibleToAdvertisers",
-          "isActive", "distributionType", "vipProviderId",
-          "vipProviderCommissionPercent", "commercialLine", "monthlyPrice",
-          "imagemUrl"
-        )
-        SELECT 'Manauara — Adesivos de Chão', 'Adesivos de alto-tráfego nos corredores principais. Aplicação profissional, durabilidade 60 dias garantida.',
-               'adesivo', 'adesivo', 'adesivos',
-               false, 20, 4,
-               'price_based', 'fixed_quantities', false, true,
-               true, 'local_especifico', v_provider_id,
-               50.00, 'midia_impressa', 4800.00,
-               null
-        WHERE NOT EXISTS (SELECT 1 FROM "products" WHERE "name" = 'Manauara — Adesivos de Chão');
-
-        INSERT INTO "products" (
-          "name", "description", "tipo", "unitLabel", "unitLabelPlural",
-          "temDistribuicaoPorLocal", "defaultQtyPerLocation", "defaultSemanas",
-          "pricingMode", "entryType", "visibleToPartners", "visibleToAdvertisers",
-          "isActive", "distributionType", "vipProviderId",
-          "vipProviderCommissionPercent", "commercialLine", "monthlyPrice",
-          "imagemUrl"
-        )
-        SELECT 'Manauara — Backlights Praça de Alimentação', 'Painéis backlight 1,2x1,8m na praça de alimentação. Frente para fluxo natural de público durante refeições.',
-               'display', 'painel', 'painéis',
-               false, 4, 4,
-               'price_based', 'fixed_quantities', false, true,
-               true, 'local_especifico', v_provider_id,
-               50.00, 'midia_impressa', 5400.00,
-               null
-        WHERE NOT EXISTS (SELECT 1 FROM "products" WHERE "name" = 'Manauara — Backlights Praça de Alimentação');
-
-        INSERT INTO "products" (
-          "name", "description", "tipo", "unitLabel", "unitLabelPlural",
-          "temDistribuicaoPorLocal", "defaultQtyPerLocation", "defaultSemanas",
-          "pricingMode", "entryType", "visibleToPartners", "visibleToAdvertisers",
-          "isActive", "distributionType", "vipProviderId",
-          "vipProviderCommissionPercent", "commercialLine", "monthlyPrice",
-          "imagemUrl"
-        )
-        SELECT 'Manauara — Bolachas Publicitárias Praça', 'Bolachas (coasters) personalizadas distribuídas nas mesas da praça de alimentação e cafeterias do shopping.',
-               'coaster', 'bolacha', 'bolachas',
-               false, 5000, 4,
-               'price_based', 'fixed_quantities', false, true,
-               true, 'local_especifico', v_provider_id,
-               50.00, 'midia_impressa', 3200.00,
-               null
-        WHERE NOT EXISTS (SELECT 1 FROM "products" WHERE "name" = 'Manauara — Bolachas Publicitárias Praça');
-
-        -- ── LIVE MARKETING (3 produtos) ───────────────────────────────────
-        INSERT INTO "products" (
-          "name", "description", "tipo", "unitLabel", "unitLabelPlural",
-          "temDistribuicaoPorLocal", "defaultQtyPerLocation", "defaultSemanas",
-          "pricingMode", "entryType", "visibleToPartners", "visibleToAdvertisers",
-          "isActive", "distributionType", "vipProviderId",
-          "vipProviderCommissionPercent", "commercialLine", "monthlyPrice",
-          "imagemUrl", "workflowTemplate"
-        )
-        SELECT 'Manauara — Stand de Mídia Praça Central', 'Stand físico premium 6m² na praça central com promotor da marca. Inclui montagem, energia e espaço por 7 dias úteis.',
-               'outro', 'ativação', 'ativações',
-               false, 1, 1,
-               'price_based', 'fixed_quantities', false, true,
-               true, 'local_especifico', v_provider_id,
-               50.00, 'live_marketing', 28000.00,
-               null, 'ativacao_evento'
-        WHERE NOT EXISTS (SELECT 1 FROM "products" WHERE "name" = 'Manauara — Stand de Mídia Praça Central');
-
-        INSERT INTO "products" (
-          "name", "description", "tipo", "unitLabel", "unitLabelPlural",
-          "temDistribuicaoPorLocal", "defaultQtyPerLocation", "defaultSemanas",
-          "pricingMode", "entryType", "visibleToPartners", "visibleToAdvertisers",
-          "isActive", "distributionType", "vipProviderId",
-          "vipProviderCommissionPercent", "commercialLine", "monthlyPrice",
-          "imagemUrl", "workflowTemplate"
-        )
-        SELECT 'Manauara — Sampling com Promotor', 'Equipe de promotores faz distribuição de amostras/folhetos em pontos estratégicos do mall. 3 promotores × 6h/dia.',
-               'outro', 'ação', 'ações',
-               false, 1, 1,
-               'price_based', 'fixed_quantities', false, true,
-               true, 'local_especifico', v_provider_id,
-               50.00, 'live_marketing', 14000.00,
-               null, 'ativacao_evento'
-        WHERE NOT EXISTS (SELECT 1 FROM "products" WHERE "name" = 'Manauara — Sampling com Promotor');
-
-        INSERT INTO "products" (
-          "name", "description", "tipo", "unitLabel", "unitLabelPlural",
-          "temDistribuicaoPorLocal", "defaultQtyPerLocation", "defaultSemanas",
-          "pricingMode", "entryType", "visibleToPartners", "visibleToAdvertisers",
-          "isActive", "distributionType", "vipProviderId",
-          "vipProviderCommissionPercent", "commercialLine", "monthlyPrice",
-          "imagemUrl", "workflowTemplate"
-        )
-        SELECT 'Manauara — Pop-up Store Sazonal', 'Loja pop-up temporária 25m² em ponto premium do shopping para lançamentos e ativações de marca. Período: 14 dias.',
-               'outro', 'projeto', 'projetos',
-               false, 1, 2,
-               'price_based', 'fixed_quantities', false, true,
-               true, 'local_especifico', v_provider_id,
-               50.00, 'live_marketing', 65000.00,
-               null, 'ativacao_evento'
-        WHERE NOT EXISTS (SELECT 1 FROM "products" WHERE "name" = 'Manauara — Pop-up Store Sazonal');
+          AND NOT EXISTS (
+            SELECT 1 FROM "products" p
+            WHERE p."vipProviderId" = "vip_providers".id
+          );
       END $$;
+
+      -- 3. Dropar índice e colunas adicionadas. IF EXISTS torna idempotente
+      --    em DBs novos onde a coluna nunca existiu.
+      DROP INDEX IF EXISTS "idx_products_commercial_line";
+      ALTER TABLE "products" DROP COLUMN IF EXISTS "commercialLine";
+      ALTER TABLE "products" DROP COLUMN IF EXISTS "monthlyPrice";
     `,
   },
 ];
