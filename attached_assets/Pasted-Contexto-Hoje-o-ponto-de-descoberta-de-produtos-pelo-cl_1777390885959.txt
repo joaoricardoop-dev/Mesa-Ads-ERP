@@ -1,0 +1,201 @@
+Contexto
+Hoje o ponto de descoberta de produtos pelo cliente externo é o wizard /montar-campanha (client/src/components/campaign-wizard/CampaignWizard.tsx) — ele abre direto no Step Hero (CTA) e depois no Step Locais. Não há uma vitrine de produtos (catálogo navegável) antes do wizard. O cliente que entra pela landing não vê o portfólio de mídias disponíveis sem se logar e iniciar o checkout.
+
+A inspiração é aquiads.com.br — uma landing/vitrine que:
+
+Tem hero com headline + campo de busca por endereço + CTA dominante
+Lista mídias em cards visuais agrupados por linha/categoria
+Mostra estatísticas de cobertura ("82.731 pontos para anunciar")
+Tem carrossel de depoimentos
+CTAs ubíquos ("simular campanha", "ver combos", "falar com especialista")
+Escopo
+Criar uma vitrine pública /vitrine (nova rota não-autenticada) que serve como ponte entre LandingPage e o wizard /montar-campanha. Adicionar os 10 produtos novos do Manauara Shopping puxando-os do products router (não hardcode).
+
+Parte 1 — Backend: schema + dados
+1.1 Estender enum productTypeEnum
+Em drizzle/schema.ts:982-1013 o tipo é o discriminador técnico. As 3 linhas comerciais novas não devem entrar no enum — em vez disso, adicionar coluna nova:
+
+ALTER TABLE products ADD COLUMN "commercialLine" VARCHAR(40);
+-- valores semânticos: 'midia_digital' | 'midia_impressa' | 'live_marketing'
+E enriquecer tipo apenas se faltar valor técnico real. Para os 10 produtos:
+
+Mídia Digital → tipo='telas' ou 'janelas_digitais' (já existem)
+Mídia Impressa → tipo='adesivo' ou 'impressos' (já existem)
+Live Marketing → tipo='outro' + nova flag/campo formato='stand' (ou criar tipo='stand')
+1.2 Criar VipProvider "Manauara Shopping"
+Migration idempotente em server/migrations.ts:
+
+INSERT INTO vip_providers (name, "repassePercent", status)
+VALUES ('Manauara Shopping', 50.00, 'active')
+ON CONFLICT (name) DO NOTHING;
+1.3 Seed dos 10 produtos
+Script em server/seed-manauara-products.ts (executável manual, idempotente via ON CONFLICT):
+
+Categoria	Nome curto	Descrição (productName)	Preço/mês	tipo	commercialLine
+Mídia Digital	Circuito de Hall	TVs do Hall	R$ 6.500	telas	midia_digital
+Mídia Digital	Circuito de Totens	Totens digitais 43"	R$ 6.000	telas	midia_digital
+Mídia Digital	Circuito de Elevador	Elevadores Digitais	R$ 4.000	janelas_digitais	midia_digital
+Mídia Digital	Circuito Corporate	TVs dos Elevadores Corporate	R$ 3.500	telas	midia_digital
+Mídia Digital	Tela Exterior	Painel LED Externo	R$ 2.500	telas	midia_digital
+Mídia Impressa	Adesivo Elevadores	Adesivo em Elevadores	R$ 3.500	adesivo	midia_impressa
+Mídia Impressa	Adesivo Escada Rolante	Adesivo em Escada Rolante	R$ 5.000	adesivo	midia_impressa
+Mídia Impressa	Adesivo Cancela e Pórtico	Cancelas e Pórticos	R$ 5.000	adesivo	midia_impressa
+Mídia Impressa	Adesivo Portas	Portas de Acesso	R$ 5.000	adesivo	midia_impressa
+Live Marketing	Stand de Mídia	Área de 10m² (2x5)	R$ 5.000	outro	live_marketing
+Todos com:
+
+vipProviderId = id do Manauara Shopping
+vipProviderCommissionPercent = 50.00
+distributionType = local_especifico
+visibleToAdvertisers = true
+visibleToPartners = true
+isActive = true
+pricingMode = fixed_price (preço/mês fixo)
+monthlyPrice ou tier única = valor da tabela
+imagemUrl = placeholder por enquanto (campo já existe no schema)
+1.4 Endpoint novo product.publicCatalog
+Em server/productRouter.ts, adicionar:
+
+publicCatalog: publicProcedure
+  .input(z.object({
+    locationName: z.string().optional(), // pra futura busca por endereço/cidade
+  }).optional())
+  .query(async ({ input }) => {
+    // retorna produtos visíveis a anunciantes, agrupados por commercialLine
+    // shape: {
+    //   stats: { totalProducts, totalLocations, totalRestaurants },
+    //   lines: [{
+    //     line: 'midia_digital',
+    //     label: 'Mídia Digital',
+    //     description: '...',
+    //     products: [{ id, name, productName, monthlyPrice, imagemUrl, locationName }]
+    //   }, ...]
+    // }
+  }),
+Parte 2 — Frontend: vitrine pública /vitrine
+2.1 Rota
+Adicionar em client/src/App.tsx:
+
+<Route path="/vitrine" component={lazy(() => import('@/pages/Vitrine'))} />
+Sem auth gate. Acessível por usuários deslogados.
+
+2.2 Estrutura da página
+Criar client/src/pages/Vitrine.tsx com 6 seções verticais:
+
+Seção 1 — Hero (full viewport height)
+┌────────────────────────────────────────────────────────┐
+│ [logo mesa.ads]              [entrar] [falar c/ time] │
+├────────────────────────────────────────────────────────┤
+│                                                        │
+│  O jeito mais inteligente de anunciar onde            │
+│  seu público está.                                     │
+│                                                        │
+│  Telas digitais, adesivos premium e ativações em      │
+│  shopping, salas VIP e restaurantes selecionados.     │
+│                                                        │
+│  ┌──────────────────────────────────────────┐         │
+│  │ 📍 Onde você quer anunciar?  [Buscar →] │         │
+│  └──────────────────────────────────────────┘         │
+│                                                        │
+│  [✨ Ver mídias disponíveis]   [Falar com especialista]│
+│                                                        │
+└────────────────────────────────────────────────────────┘
+Visual: fundo escuro (mantém identidade dark da Mesa-Ads), background com sutil parallax ou gradient. Tipografia display grande, similar ao StepHero atual (text-mega style). Headline em verde neon (text-mesa-neon) para destacar palavra-chave.
+
+Seção 2 — Stats (faixa horizontal)
+┌────────────────────────────────────────────────────────┐
+│   45+ pontos    ·    3 categorias    ·    1 cidade    │
+│   premiums          de mídia              (Manaus)     │
+└────────────────────────────────────────────────────────┘
+Vem do endpoint product.publicCatalog().stats. Substitui "82.731 pontos" do aquiads (que é nacional) por nossa realidade local.
+
+Seção 3 — Como funciona (4 features em cards)
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│  📍      │ │  🖼️      │ │  📊      │ │  🤝      │
+│ Escolha  │ │ Personal.│ │ Métricas │ │ Suporte  │
+│ os pontos│ │ a arte   │ │ ao vivo  │ │ comercial│
+└──────────┘ └──────────┘ └──────────┘ └──────────┘
+Seção 4 — Catálogo de mídias (CORE — agrupado por linha comercial)
+Para cada line retornada pelo publicCatalog:
+
+┌────────────────────────────────────────────────────────┐
+│ 📺 MÍDIA DIGITAL                                       │
+│ Telas e painéis digitais em pontos de alta circulação │
+│                                                        │
+│ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐      │
+│ │ [foto]  │ │ [foto]  │ │ [foto]  │ │ [foto]  │      │
+│ │         │ │         │ │         │ │         │      │
+│ │ Circuito│ │ Circuito│ │ Circuito│ │ Circuito│      │
+│ │ de Hall │ │ Totens  │ │ Elevador│ │ Corporat│      │
+│ │         │ │         │ │         │ │         │      │
+│ │ R$ 6.500│ │ R$ 6.000│ │ R$ 4.000│ │ R$ 3.500│      │
+│ │ /mês    │ │ /mês    │ │ /mês    │ │ /mês    │      │
+│ │         │ │         │ │         │ │         │      │
+│ │ 📍 Manau│ │ 📍 Manau│ │ 📍 Manau│ │ 📍 Manau│      │
+│ │ [Anunci.]│ │ [Anunci.]│ │ [Anunci.]│ │ [Anunci.]│      │
+│ └─────────┘ └─────────┘ └─────────┘ └─────────┘      │
+└────────────────────────────────────────────────────────┘
+Visual do card:
+
+Background: bg-ink-900/50 border-hairline rounded-2xl
+Imagem 16:9 no topo (placeholder se não tiver imagemUrl)
+Título do produto em font-display
+Subtítulo (productName/descrição) em text-chalk-muted text-xs
+Preço destacado em text-mesa-neon font-bold
+Pin do local com ícone
+CTA "Anunciar" → vai pro wizard com produto pré-selecionado: /montar-campanha?productId=X
+Repetir o bloco para Mídia Impressa (4 cards) e Live Marketing (1 card).
+
+Seção 5 — Depoimentos (carrossel)
+Reaproveitar dados da landing atual. 3-5 cards com logo + citação + nome.
+
+Seção 6 — CTA final + Footer
+┌────────────────────────────────────────────────────────┐
+│  Pronto pra começar?                                   │
+│  [Montar minha campanha]   [Falar com um especialista]│
+└────────────────────────────────────────────────────────┘
+2.3 Integração com o wizard
+Modificar CampaignWizard.tsx ou MontarCampanha.tsx:
+
+Se ?productId=X na URL, pré-popular o store: setar locais default (todos onde aquele produto está disponível) e ir direto ao Step 2 ("locais") com filtro aplicado, ou Step 3 ("produtos") já com aquele produto destacado.
+2.4 Modificar a Landing existente
+Em client/src/pages/LandingPage.tsx, trocar o CTA principal "Montar campanha" → "Ver mídias disponíveis" apontando para /vitrine. Mantém "Falar com especialista" como secundário.
+
+Parte 3 — Critério de aceite
+não concluído
+/vitrine carrega sem auth, em 6 seções verticais (hero / stats / como funciona / catálogo / depoimentos / CTA)
+não concluído
+Catálogo mostra 3 grupos (Mídia Digital, Mídia Impressa, Live Marketing) populados por product.publicCatalog, zero hardcode no front
+não concluído
+Os 10 produtos do Manauara Shopping aparecem corretamente com nome, preço e localidade (Manaus)
+não concluído
+Cada card tem CTA "Anunciar" que abre /montar-campanha?productId=X
+não concluído
+Quando o wizard recebe productId na URL, ele pré-seleciona aquele produto e pula direto pro step apropriado
+não concluído
+Visual coerente com o resto do app (bg-ink-*, text-chalk-*, text-mesa-neon, font-display)
+não concluído
+Mobile responsivo: hero stack em 1 coluna, catálogo vira 1-2 cards por linha
+não concluído
+Performance: publicCatalog < 200ms, página < 2s LCP
+não concluído
+SEO básico: <title>, <meta description>, OG tags
+não concluído
+Estende enum tipo se necessário, adiciona coluna commercialLine, cria VipProvider Manauara, seeda os 10 produtos via migration idempotente
+não concluído
+Adicionar test e2e e2e/vitrine.spec.ts que: abre /vitrine, valida 3 grupos, valida 10 cards, clica num card → vai pro wizard com productId
+Parte 4 — Restrições
+Não duplicar a landing existente — /vitrine é catálogo, LandingPage é institucional. Linkam entre si
+Não tocar no wizard além de aceitar ?productId=X (pré-seleção)
+Imagens: usar placeholder por agora; criar slot imagemUrl no Card que cai pra ícone se vazio
+Manter Replit Object Storage como destino de futuras imagens (já configurado)
+Auditoria financeira (já existente) registra criação dos novos produtos
+i18n: tudo em PT-BR, sem keys ainda (consistente com o resto)
+Ordem de execução sugerida
+Migration: commercialLine column + VipProvider Manauara
+Seed dos 10 produtos via script
+Endpoint product.publicCatalog
+Página /vitrine com seções 1-6
+Pré-seleção via ?productId=X no wizard
+Atualizar landing CTA
+Test e2e
