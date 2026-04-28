@@ -52,6 +52,7 @@ import RestaurantOnboarding from "./pages/RestaurantOnboarding";
 import RestaurantInviteAccept from "./pages/RestaurantInviteAccept";
 import Onboarding from "./pages/Onboarding";
 import MontarCampanha from "./pages/MontarCampanha";
+import Vitrine from "./pages/Vitrine";
 import { captureTrackingFromUrl } from "./lib/utmTracking";
 import TermTemplates from "./pages/TermTemplates";
 import IntegrationSettings from "./pages/IntegrationSettings";
@@ -581,6 +582,13 @@ function App() {
           <Switch>
             <Route path="/parceiro/convite/:token" component={RestaurantInviteAccept} />
             <Route path="/parceiro" component={RestaurantOnboarding} />
+            <Route path="/vitrine">
+              {() => (
+                <ExternalShell>
+                  <Vitrine />
+                </ExternalShell>
+              )}
+            </Route>
             <Route path="/montar-campanha">
               {() => (
                 <ExternalShell>

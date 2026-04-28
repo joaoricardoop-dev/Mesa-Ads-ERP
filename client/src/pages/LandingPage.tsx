@@ -201,13 +201,14 @@ function Hero() {
         </div>
         <div className="flex items-center gap-6">
           <a
-            href="/montar-campanha"
+            href="/vitrine"
+            data-testid="landing-cta-vitrine"
             className="text-sm font-medium transition-colors"
             style={{ color: "hsl(0 0% 50%)" }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "hsl(0 0% 95%)")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "hsl(0 0% 50%)")}
           >
-            Montar campanha
+            Ver mídias disponíveis
           </a>
           <a
             href="#contato"

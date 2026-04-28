@@ -66,6 +66,56 @@ export const productRouter = router({
     return all.filter((p) => p.isActive && p.visibleToAdvertisers);
   }),
 
+  // Catálogo público da vitrine (/vitrine). Devolve apenas produtos ativos,
+  // visíveis a anunciantes E com commercialLine preenchida — agrupados pela
+  // própria linha comercial. Os campos retornados são intencionalmente
+  // restritos ao que a vitrine pública precisa (não vaza margem/custo).
+  publicCatalog: publicProcedure.query(async () => {
+    const db = await getDatabase();
+    const rows = await db
+      .select({
+        id: products.id,
+        name: products.name,
+        description: products.description,
+        tipo: products.tipo,
+        unitLabel: products.unitLabel,
+        unitLabelPlural: products.unitLabelPlural,
+        imagemUrl: products.imagemUrl,
+        commercialLine: products.commercialLine,
+        monthlyPrice: products.monthlyPrice,
+        workflowTemplate: products.workflowTemplate,
+      })
+      .from(products)
+      .where(
+        and(
+          eq(products.isActive, true),
+          eq(products.visibleToAdvertisers, true),
+          sql`${products.commercialLine} IS NOT NULL`,
+        ),
+      )
+      .orderBy(asc(products.commercialLine), asc(products.name));
+
+    type CatalogProduct = (typeof rows)[number] & { monthlyPriceNumber: number | null };
+    const groups = new Map<string, CatalogProduct[]>();
+    for (const r of rows) {
+      const key = r.commercialLine ?? "outros";
+      const arr = groups.get(key) ?? [];
+      arr.push({
+        ...r,
+        monthlyPriceNumber: r.monthlyPrice ? parseFloat(r.monthlyPrice) : null,
+      });
+      groups.set(key, arr);
+    }
+
+    return {
+      lines: Array.from(groups.entries()).map(([line, products]) => ({
+        line,
+        products,
+      })),
+      totalProducts: rows.length,
+    };
+  }),
+
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {

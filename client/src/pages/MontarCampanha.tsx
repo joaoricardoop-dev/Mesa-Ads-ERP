@@ -10,13 +10,32 @@ export default function MontarCampanha() {
 
     try {
       const params = new URLSearchParams(window.location.search);
+      let mutated = false;
+
+      // ?productId=N vindo da vitrine pública (/vitrine). Persiste no store
+      // como pré-seleção — passos do wizard podem destacar/auto-adicionar
+      // este produto. Não pula etapas: o usuário ainda escolhe locais.
+      const productIdParam = params.get("productId");
+      if (productIdParam) {
+        const pid = Number(productIdParam);
+        if (Number.isFinite(pid) && pid > 0) {
+          useWizardStore.getState().setPreselectedProduct(pid);
+        }
+        params.delete("productId");
+        mutated = true;
+      }
+
       const stepParam = params.get("step");
       if (stepParam && STEP_ORDER.includes(stepParam as WizardStep)) {
-        const productId = useWizardStore.getState().productId;
-        if (productId) {
+        const preselected = useWizardStore.getState().preselectedProductId;
+        if (preselected) {
           useWizardStore.getState().goTo(stepParam as WizardStep);
         }
         params.delete("step");
+        mutated = true;
+      }
+
+      if (mutated) {
         const newSearch = params.toString();
         const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "") + window.location.hash;
         window.history.replaceState(null, "", newUrl);

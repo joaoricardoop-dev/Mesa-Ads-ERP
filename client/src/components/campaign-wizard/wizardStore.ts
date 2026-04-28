@@ -64,6 +64,10 @@ interface WizardState {
   quotationNumber: string | null;
   quotationId: number | null;
   draftLoaded: boolean;
+  // Pré-seleção vinda da vitrine pública (/vitrine?productId=X). Persistido
+  // no localStorage para sobreviver ao redirect para login. Null = sem
+  // pré-seleção; passos do wizard podem usar para destacar/auto-adicionar.
+  preselectedProductId: number | null;
 
   goTo: (s: WizardStep) => void;
   next: () => void;
@@ -78,6 +82,7 @@ interface WizardState {
   setConfirm: (patch: Partial<ConfirmState>) => void;
   setSuccess: (quotationNumber: string, quotationId: number) => void;
   hydrateFromDraft: (cart: Partial<WizardState>) => void;
+  setPreselectedProduct: (productId: number | null) => void;
   reset: () => void;
 }
 
@@ -111,6 +116,7 @@ export const useWizardStore = create<WizardState>()(
       quotationNumber: null,
       quotationId: null,
       draftLoaded: false,
+      preselectedProductId: null,
 
       goTo: (s) => set({ step: s }),
       next: () => {
@@ -171,6 +177,7 @@ export const useWizardStore = create<WizardState>()(
           ...draft,
           draftLoaded: true,
         })),
+      setPreselectedProduct: (productId) => set({ preselectedProductId: productId }),
       reset: () => {
         const r = defaultRange();
         set({
@@ -183,6 +190,7 @@ export const useWizardStore = create<WizardState>()(
           quotationNumber: null,
           quotationId: null,
           draftLoaded: false,
+          preselectedProductId: null,
         });
       },
     }),
@@ -195,6 +203,7 @@ export const useWizardStore = create<WizardState>()(
         endDate: s.endDate,
         cart: s.cart,
         confirm: s.confirm,
+        preselectedProductId: s.preselectedProductId,
       }),
     },
   ),
