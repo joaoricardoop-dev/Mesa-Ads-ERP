@@ -5,6 +5,7 @@ import { serviceOrders, campaigns, clients, quotations, campaignHistory, product
 import { eq, and, desc, sql, inArray, ilike } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createCampaignRestaurantStatusNotifications } from "./notificationRouter";
+import { withUniqueRetry } from "./utils/uniqueNumberRetry";
 
 async function getDatabase() {
   const d = await getDb();
@@ -174,52 +175,59 @@ export const serviceOrderRouter = router({
       if (input.status === "assinada" && updated.quotationId) {
         const quotation = await db.select().from(quotations).where(eq(quotations.id, updated.quotationId)).limit(1);
         if (quotation[0] && quotation[0].status === "os_gerada") {
-          const year = new Date().getFullYear();
-          const prefix = `CMP-${year}-`;
-          const maxResult = await db
-            .select({ maxNum: sql<string>`MAX("campaignNumber")` })
-            .from(campaigns)
-            .where(sql`"campaignNumber" LIKE ${prefix + '%'}`);
-          const maxStr = maxResult[0]?.maxNum;
-          let seqNum = 1;
-          if (maxStr) {
-            const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
-            if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
-          }
-          const campaignNumber = `${prefix}${String(seqNum).padStart(4, "0")}`;
-
           const q = quotation[0];
           const clientRows = await db.select().from(clients).where(eq(clients.id, q.clientId!)).limit(1);
           const clientName = clientRows[0]?.name || clientRows[0]?.company || "Cliente";
 
-          const [campaign] = await db.insert(campaigns).values({
-            campaignNumber,
-            clientId: q.clientId!,
-            name: `${clientName} - Campanha`,
-            startDate: updated.periodStart || new Date().toISOString().split("T")[0],
-            endDate: updated.periodEnd || new Date().toISOString().split("T")[0],
-            status: "briefing",
-            quotationId: q.id,
-            proposalSignedAt: new Date(),
-            briefingEnteredAt: new Date(),
-            coastersPerRestaurant: 500,
-            usagePerDay: 3,
-            daysPerMonth: 26,
-            activeRestaurants: 10,
-            pricingType: "variable",
-            markupPercent: "30.00",
-            fixedPrice: "0.00",
-            commissionType: "variable",
-            restaurantCommission: "20.00",
-            fixedCommission: "0.0500",
-            sellerCommission: "10.00",
-            taxRate: "15.00",
-            contractDuration: q.cycles || 6,
-            batchSize: q.coasterVolume,
-            batchCost: "1200.00",
-            notes: q.notes,
-            productId: q.productId,
-          }).returning();
+          // Retry on PG 23505 (campaigns_campaignNumber_unique) — gera número
+          // a partir de MAX() e tenta novamente em caso de corrida.
+          const { campaign, campaignNumber } = await withUniqueRetry(
+            async () => {
+              const year = new Date().getFullYear();
+              const prefix = `CMP-${year}-`;
+              const maxResult = await db
+                .select({ maxNum: sql<string>`MAX("campaignNumber")` })
+                .from(campaigns)
+                .where(sql`"campaignNumber" LIKE ${prefix + '%'}`);
+              const maxStr = maxResult[0]?.maxNum;
+              let seqNum = 1;
+              if (maxStr) {
+                const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
+                if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
+              }
+              const num = `${prefix}${String(seqNum).padStart(4, "0")}`;
+              const [c] = await db.insert(campaigns).values({
+                campaignNumber: num,
+                clientId: q.clientId!,
+                name: `${clientName} - Campanha`,
+                startDate: updated.periodStart || new Date().toISOString().split("T")[0],
+                endDate: updated.periodEnd || new Date().toISOString().split("T")[0],
+                status: "briefing",
+                quotationId: q.id,
+                proposalSignedAt: new Date(),
+                briefingEnteredAt: new Date(),
+                coastersPerRestaurant: 500,
+                usagePerDay: 3,
+                daysPerMonth: 26,
+                activeRestaurants: 10,
+                pricingType: "variable",
+                markupPercent: "30.00",
+                fixedPrice: "0.00",
+                commissionType: "variable",
+                restaurantCommission: "20.00",
+                fixedCommission: "0.0500",
+                sellerCommission: "10.00",
+                taxRate: "15.00",
+                contractDuration: q.cycles || 6,
+                batchSize: q.coasterVolume,
+                batchCost: "1200.00",
+                notes: q.notes,
+                productId: q.productId,
+              }).returning();
+              return { campaign: c, campaignNumber: num };
+            },
+            { constraintName: "campaigns_campaignNumber_unique" },
+          );
 
           await db.insert(campaignHistory).values({
             campaignId: campaign.id,

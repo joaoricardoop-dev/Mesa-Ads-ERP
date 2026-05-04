@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { createCrmNotification } from "./notificationRouter";
 import { buildCampaignName } from "./utils/campaignName";
 import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
+import { withUniqueRetry, describeDbError } from "./utils/uniqueNumberRetry";
 
 const MONTH_NAMES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -509,37 +510,45 @@ export const quotationRouter = router({
       if (!quotation[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
       if (quotation[0].status === "win") throw new TRPCError({ code: "BAD_REQUEST", message: "Cotação já foi convertida" });
 
-      const campaignNumber = await generateCampaignNumber(db);
       const [cliRow] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, quotation[0].clientId!)).limit(1);
       const campaignName = buildCampaignName(cliRow?.name, input.startDate);
 
-      const [campaign] = await db.insert(campaigns).values({
-        campaignNumber,
-        clientId: quotation[0].clientId!,
-        name: campaignName,
-        startDate: input.startDate,
-        endDate: input.endDate,
-        status: "active",
-        quotationId: quotation[0].id,
-        coastersPerRestaurant: quotation[0].coasterVolume,
-        usagePerDay: 3,
-        daysPerMonth: 26,
-        activeRestaurants: 1,
-        pricingType: "variable",
-        markupPercent: "30.00",
-        fixedPrice: "0.00",
-        commissionType: "variable",
-        restaurantCommission: "20.00",
-        fixedCommission: "0.0500",
-        sellerCommission: "10.00",
-        taxRate: "15.00",
-        contractDuration: quotation[0].cycles || 6,
-        batchSize: quotation[0].coasterVolume,
-        batchCost: "1200.00",
-        notes: quotation[0].notes,
-        isBonificada: quotation[0].isBonificada,
-        productId: quotation[0].productId,
-      }).returning();
+      // Retry on PG 23505 (campaigns_campaignNumber_unique): regenera o número
+      // a partir de MAX() em caso de corrida com outra conversão de cotação.
+      const { campaign, campaignNumber } = await withUniqueRetry(
+        async () => {
+          const num = await generateCampaignNumber(db);
+          const [c] = await db.insert(campaigns).values({
+            campaignNumber: num,
+            clientId: quotation[0].clientId!,
+            name: campaignName,
+            startDate: input.startDate,
+            endDate: input.endDate,
+            status: "active",
+            quotationId: quotation[0].id,
+            coastersPerRestaurant: quotation[0].coasterVolume,
+            usagePerDay: 3,
+            daysPerMonth: 26,
+            activeRestaurants: 1,
+            pricingType: "variable",
+            markupPercent: "30.00",
+            fixedPrice: "0.00",
+            commissionType: "variable",
+            restaurantCommission: "20.00",
+            fixedCommission: "0.0500",
+            sellerCommission: "10.00",
+            taxRate: "15.00",
+            contractDuration: quotation[0].cycles || 6,
+            batchSize: quotation[0].coasterVolume,
+            batchCost: "1200.00",
+            notes: quotation[0].notes,
+            isBonificada: quotation[0].isBonificada,
+            productId: quotation[0].productId,
+          }).returning();
+          return { campaign: c, campaignNumber: num };
+        },
+        { constraintName: "campaigns_campaignNumber_unique" },
+      );
 
       await db.insert(campaignHistory).values({
         campaignId: campaign.id,
@@ -892,38 +901,46 @@ export const quotationRouter = router({
       }
       const avgCommission = totalCoasters > 0 ? (weightedCommissionSum / totalCoasters).toFixed(2) : "20.00";
 
-      const campaignNumber = await generateCampaignNumber(db);
       const [cliRow2] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, quotation[0].clientId!)).limit(1);
       const campaignName = buildCampaignName(cliRow2?.name, derivedStartDate);
       const isBonificada = !!quotation[0].isBonificada;
 
-      const [campaign] = await db.insert(campaigns).values({
-        campaignNumber,
-        clientId: quotation[0].clientId!,
-        name: campaignName,
-        startDate: derivedStartDate,
-        endDate: derivedEndDate,
-        status: "producao",
-        quotationId: quotation[0].id,
-        coastersPerRestaurant: allocatedRestaurants.length > 0 ? Math.round(totalCoasters / allocatedRestaurants.length) : quotation[0].coasterVolume,
-        usagePerDay: 3,
-        daysPerMonth: 26,
-        activeRestaurants: allocatedRestaurants.length,
-        pricingType: "variable",
-        markupPercent: isBonificada ? "0.00" : "30.00",
-        fixedPrice: "0.00",
-        commissionType: "variable",
-        restaurantCommission: isBonificada ? "0.00" : avgCommission,
-        fixedCommission: isBonificada ? "0.00" : "0.0500",
-        sellerCommission: isBonificada ? "0.00" : "10.00",
-        taxRate: isBonificada ? "0.00" : "15.00",
-        contractDuration: input.batchIds.length,
-        batchSize: quotation[0].coasterVolume,
-        batchCost: "1200.00",
-        notes: quotation[0].notes,
-        isBonificada,
-        productId: quotation[0].productId,
-      }).returning();
+      // Retry on PG 23505 (campaigns_campaignNumber_unique): regenera o número
+      // se outra OS sendo assinada simultaneamente comitar primeiro.
+      const { campaign, campaignNumber } = await withUniqueRetry(
+        async () => {
+          const num = await generateCampaignNumber(db);
+          const [c] = await db.insert(campaigns).values({
+            campaignNumber: num,
+            clientId: quotation[0].clientId!,
+            name: campaignName,
+            startDate: derivedStartDate,
+            endDate: derivedEndDate,
+            status: "producao",
+            quotationId: quotation[0].id,
+            coastersPerRestaurant: allocatedRestaurants.length > 0 ? Math.round(totalCoasters / allocatedRestaurants.length) : quotation[0].coasterVolume,
+            usagePerDay: 3,
+            daysPerMonth: 26,
+            activeRestaurants: allocatedRestaurants.length,
+            pricingType: "variable",
+            markupPercent: isBonificada ? "0.00" : "30.00",
+            fixedPrice: "0.00",
+            commissionType: "variable",
+            restaurantCommission: isBonificada ? "0.00" : avgCommission,
+            fixedCommission: isBonificada ? "0.00" : "0.0500",
+            sellerCommission: isBonificada ? "0.00" : "10.00",
+            taxRate: isBonificada ? "0.00" : "15.00",
+            contractDuration: input.batchIds.length,
+            batchSize: quotation[0].coasterVolume,
+            batchCost: "1200.00",
+            notes: quotation[0].notes,
+            isBonificada,
+            productId: quotation[0].productId,
+          }).returning();
+          return { campaign: c, campaignNumber: num };
+        },
+        { constraintName: "campaigns_campaignNumber_unique" },
+      );
 
       await db.insert(campaignBatchAssignments).values(
         input.batchIds.map(batchId => ({

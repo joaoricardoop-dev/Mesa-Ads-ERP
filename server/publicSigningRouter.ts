@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { quotations, clients, leads, serviceOrders, quotationRestaurants, activeRestaurants, campaigns, campaignHistory, campaignRestaurants, campaignBatches, campaignBatchAssignments, invoices, quotationItems, products } from "../drizzle/schema";
 import { eq, inArray, asc, sql } from "drizzle-orm";
 import { buildCampaignName } from "./utils/campaignName";
+import { withUniqueRetry, describeDbError, isUniqueViolation } from "./utils/uniqueNumberRetry";
 
 async function getDatabase() {
   const d = await getDb();
@@ -264,82 +265,101 @@ export function setupPublicSigningRoutes(app: express.Express) {
       let campaignId: number = 0;
       let campaignNumber: string = "";
 
-      await db.transaction(async (tx) => {
-        campaignNumber = await generateCampaignNumber(tx);
+      // Envolve a transação inteira em retry on-23505: se duas assinaturas
+      // concorrentes lerem o mesmo MAX(campaignNumber) e uma delas trombar
+      // na constraint UNIQUE `campaigns_campaignNumber_unique`, recomeçamos
+      // a transação com um número novo (gerado a partir do MAX já comitado
+      // pela vencedora). Em PG, qualquer INSERT que falhe dentro de uma
+      // transação a aborta, então o retry precisa ser POR FORA do
+      // db.transaction, não dentro.
+      await withUniqueRetry(
+        () =>
+          db.transaction(async (tx) => {
+            campaignNumber = await generateCampaignNumber(tx);
 
-        await tx.update(quotations).set({
-          signedAt,
-          signedBy: signerName,
-          signatureData,
-          status: "win",
-          updatedAt: new Date(),
-        }).where(eq(quotations.id, quotation[0].id));
+            await tx.update(quotations).set({
+              signedAt,
+              signedBy: signerName,
+              signatureData,
+              status: "win",
+              updatedAt: new Date(),
+            }).where(eq(quotations.id, quotation[0].id));
 
-        await tx.update(serviceOrders).set({
-          status: "assinada",
-          signedByName: signerName,
-          signedByCpf: signerCpf,
-          signedAt,
-          signatureHash,
-          signatureUrl: `digital:${signatureHash.substring(0, 16)}`,
-          updatedAt: new Date(),
-        }).where(eq(serviceOrders.id, os[0].id));
+            await tx.update(serviceOrders).set({
+              status: "assinada",
+              signedByName: signerName,
+              signedByCpf: signerCpf,
+              signedAt,
+              signatureHash,
+              signatureUrl: `digital:${signatureHash.substring(0, 16)}`,
+              updatedAt: new Date(),
+            }).where(eq(serviceOrders.id, os[0].id));
 
-        const [campaign] = await tx.insert(campaigns).values({
-          campaignNumber,
-          clientId: resolvedClientId,
-          name: campaignName,
-          startDate: firstBatch.startDate,
-          endDate: lastBatch.endDate,
-          status: "producao",
-          quotationId: quotation[0].id,
-          coastersPerRestaurant: allocatedRestaurants.length > 0 ? Math.round(totalCoasters / allocatedRestaurants.length) : quotation[0].coasterVolume,
-          usagePerDay: 3,
-          daysPerMonth: 26,
-          activeRestaurants: allocatedRestaurants.length,
-          pricingType: "variable",
-          markupPercent: isBonificada ? "0.00" : "30.00",
-          fixedPrice: "0.00",
-          commissionType: "variable",
-          restaurantCommission: isBonificada ? "0.00" : avgCommission,
-          fixedCommission: isBonificada ? "0.00" : "0.0500",
-          sellerCommission: isBonificada ? "0.00" : "10.00",
-          taxRate: isBonificada ? "0.00" : "15.00",
-          contractDuration: batchIds.length,
-          batchSize: quotation[0].coasterVolume,
-          batchCost: "1200.00",
-          notes: quotation[0].notes,
-          isBonificada,
-          productId: quotation[0].productId,
-        }).returning();
+            const [campaign] = await tx.insert(campaigns).values({
+              campaignNumber,
+              clientId: resolvedClientId,
+              name: campaignName,
+              startDate: firstBatch.startDate,
+              endDate: lastBatch.endDate,
+              status: "producao",
+              quotationId: quotation[0].id,
+              coastersPerRestaurant: allocatedRestaurants.length > 0 ? Math.round(totalCoasters / allocatedRestaurants.length) : quotation[0].coasterVolume,
+              usagePerDay: 3,
+              daysPerMonth: 26,
+              activeRestaurants: allocatedRestaurants.length,
+              pricingType: "variable",
+              markupPercent: isBonificada ? "0.00" : "30.00",
+              fixedPrice: "0.00",
+              commissionType: "variable",
+              restaurantCommission: isBonificada ? "0.00" : avgCommission,
+              fixedCommission: isBonificada ? "0.00" : "0.0500",
+              sellerCommission: isBonificada ? "0.00" : "10.00",
+              taxRate: isBonificada ? "0.00" : "15.00",
+              contractDuration: batchIds.length,
+              batchSize: quotation[0].coasterVolume,
+              batchCost: "1200.00",
+              notes: quotation[0].notes,
+              isBonificada,
+              productId: quotation[0].productId,
+            }).returning();
 
-        campaignId = campaign.id;
+            campaignId = campaign.id;
 
-        await tx.insert(campaignBatchAssignments).values(
-          batchIds.map(batchId => ({ campaignId: campaign.id, batchId }))
-        );
+            await tx.insert(campaignBatchAssignments).values(
+              batchIds.map(batchId => ({ campaignId: campaign.id, batchId }))
+            );
 
-        await tx.insert(campaignHistory).values({
-          campaignId: campaign.id,
-          action: "created_from_quotation",
-          details: `Campanha criada via assinatura digital por ${signerName} (CPF: ${maskedCpf}) — ${batchRecords.length} batch(es)`,
-        });
-
-        if (allocatedRestaurants.length > 0) {
-          await tx.insert(campaignRestaurants).values(
-            allocatedRestaurants.map(r => ({
+            await tx.insert(campaignHistory).values({
               campaignId: campaign.id,
-              restaurantId: r.restaurantId,
-              coastersCount: r.coasterQuantity,
-            }))
-          );
-        }
+              action: "created_from_quotation",
+              details: `Campanha criada via assinatura digital por ${signerName} (CPF: ${maskedCpf}) — ${batchRecords.length} batch(es)`,
+            });
 
-        await tx.update(serviceOrders).set({
-          campaignId: campaign.id,
-          updatedAt: new Date(),
-        }).where(eq(serviceOrders.id, os[0].id));
-      });
+            if (allocatedRestaurants.length > 0) {
+              await tx.insert(campaignRestaurants).values(
+                allocatedRestaurants.map(r => ({
+                  campaignId: campaign.id,
+                  restaurantId: r.restaurantId,
+                  coastersCount: r.coasterQuantity,
+                }))
+              );
+            }
+
+            await tx.update(serviceOrders).set({
+              campaignId: campaign.id,
+              updatedAt: new Date(),
+            }).where(eq(serviceOrders.id, os[0].id));
+          }),
+        {
+          constraintName: "campaigns_campaignNumber_unique",
+          maxRetries: 5,
+          onRetry: (attempt) => {
+            console.warn(
+              `[publicSigning] campaignNumber collision (constraint=campaigns_campaignNumber_unique) — retrying transaction (attempt ${attempt})`,
+            );
+          },
+        },
+      );
 
       if (!isBonificada && campaignId > 0 && quotation[0].totalValue && parseFloat(quotation[0].totalValue) > 0) {
         try {
@@ -385,7 +405,8 @@ export function setupPublicSigningRoutes(app: express.Express) {
       });
     } catch (err: any) {
       console.error("Error signing quotation:", err);
-      res.status(500).json({ error: "Erro ao processar assinatura" });
+      const status = isUniqueViolation(err) ? 409 : 500;
+      res.status(status).json({ error: describeDbError(err, "Erro ao processar assinatura") });
     }
   });
 
