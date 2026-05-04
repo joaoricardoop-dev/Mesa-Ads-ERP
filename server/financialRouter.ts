@@ -24,6 +24,7 @@ import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { materializePayablesForInvoice, type DbClient } from "./finance/payables";
 import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
+import { nextNumber } from "./utils/numberCounter";
 import { recordAudit } from "./finance/audit";
 import { audited } from "./finance/auditMiddleware";
 import { financialAuditLog } from "../drizzle/schema";
@@ -817,18 +818,11 @@ export const financialRouter = router({
 
       const issueDate = input.issueDate || new Date().toISOString().split("T")[0];
       const year = parseInt(issueDate.slice(0, 4), 10);
-      const prefix = `FAT-${year}-`;
-      const maxResult = await db
-        .select({ maxNum: sql<string>`MAX("invoiceNumber")` })
-        .from(invoices)
-        .where(sql`"invoiceNumber" LIKE ${prefix + '%'}`);
-      const maxStr = maxResult[0]?.maxNum;
-      let seqNum = 1;
-      if (maxStr) {
-        const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
-        if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
-      }
-      const invoiceNumber = `${prefix}${String(seqNum).padStart(4, "0")}`;
+      // Task #173 — número atômico via number_counters (sem race).
+      const invoiceNumber = await nextNumber(db, "invoice", year);
+      // Sequência global do ano embutida no número (FAT-YYYY-NNNN), usada
+      // pela validação estrita logo abaixo para detectar gaps.
+      const seqNum = parseInt(invoiceNumber.split("-")[2] ?? "0", 10);
 
       // Finrefac #4 — validação de numeração sequencial por cliente+ano,
       // atrás do flag INVOICE_NUMBERING_STRICT. Auditoria fiscal exige que
@@ -2887,18 +2881,8 @@ export const financialRouter = router({
       let invoiceNumber = input.invoiceNumber?.trim();
       if (!invoiceNumber) {
         const year = parseInt(issueDate.slice(0, 4), 10);
-        const prefix = `FAT-${year}-`;
-        const maxResult = await db
-          .select({ maxNum: sql<string>`MAX("invoiceNumber")` })
-          .from(invoices)
-          .where(sql`"invoiceNumber" LIKE ${prefix + '%'}`);
-        const maxStr = maxResult[0]?.maxNum;
-        let seqNum = 1;
-        if (maxStr && maxStr.startsWith(prefix)) {
-          const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
-          if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
-        }
-        invoiceNumber = `${prefix}${String(seqNum).padStart(4, "0")}`;
+        // Task #173 — número atômico via number_counters (sem race).
+        invoiceNumber = await nextNumber(db, "invoice", year);
       }
 
       const updates: any = {

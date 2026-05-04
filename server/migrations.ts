@@ -1339,6 +1339,104 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       ALTER TABLE "products" DROP COLUMN IF EXISTS "monthlyPrice";
     `,
   },
+  {
+    // Task #173 — Numeração atômica via tabela contadora.
+    //
+    // Substitui o padrão MAX("xNumber") + INSERT (que era racy e dependia de
+    // retry on-23505 pra corretude sob concorrência) por
+    // INSERT ... ON CONFLICT DO UPDATE ... RETURNING — atômico no row-lock
+    // do Postgres. Cada (scope, year) tem uma linha única; concorrentes
+    // pegam o lock em sequência e cada uma recebe um valor distinto.
+    //
+    // Backfill: semeamos last_value com o MAX atual extraído de campaigns,
+    // quotations, invoices e service_orders (3 prefixos OS), pra que o
+    // próximo número gerado continue a partir de onde a numeração estava.
+    // ON CONFLICT DO NOTHING torna o backfill idempotente — se a tabela
+    // já existir com dados (re-run), nada é sobrescrito.
+    //
+    // O wrapper withUniqueRetry continua nos call-sites como cinto-de-
+    // segurança contra qualquer linha pré-existente que ainda colida, mas
+    // o caminho feliz não depende mais dele.
+    name: "task_173_number_counters_table_and_backfill",
+    sql: `
+      CREATE TABLE IF NOT EXISTS "number_counters" (
+        "scope"      varchar(40) NOT NULL,
+        "year"       integer     NOT NULL,
+        "last_value" bigint      NOT NULL DEFAULT 0,
+        "createdAt"  timestamp   NOT NULL DEFAULT now(),
+        "updatedAt"  timestamp   NOT NULL DEFAULT now(),
+        PRIMARY KEY ("scope", "year")
+      );
+
+      -- Backfill: campaigns (CMP-YYYY-NNNN). SUBSTRING extrai o YYYY do
+      -- prefixo e MAX(NNNN) garante continuidade. Idempotente via ON CONFLICT.
+      INSERT INTO "number_counters" ("scope", "year", "last_value")
+      SELECT
+        'campaign'::varchar AS scope,
+        CAST(SUBSTRING("campaignNumber" FROM 5 FOR 4) AS integer) AS year,
+        MAX(CAST(SUBSTRING("campaignNumber" FROM 10) AS integer)) AS last_value
+      FROM "campaigns"
+      WHERE "campaignNumber" ~ '^CMP-[0-9]{4}-[0-9]+$'
+      GROUP BY CAST(SUBSTRING("campaignNumber" FROM 5 FOR 4) AS integer)
+      ON CONFLICT ("scope", "year") DO NOTHING;
+
+      -- Backfill: quotations (QOT-YYYY-NNNN).
+      INSERT INTO "number_counters" ("scope", "year", "last_value")
+      SELECT
+        'quotation'::varchar AS scope,
+        CAST(SUBSTRING("quotationNumber" FROM 5 FOR 4) AS integer) AS year,
+        MAX(CAST(SUBSTRING("quotationNumber" FROM 10) AS integer)) AS last_value
+      FROM "quotations"
+      WHERE "quotationNumber" ~ '^QOT-[0-9]{4}-[0-9]+$'
+      GROUP BY CAST(SUBSTRING("quotationNumber" FROM 5 FOR 4) AS integer)
+      ON CONFLICT ("scope", "year") DO NOTHING;
+
+      -- Backfill: invoices (FAT-YYYY-NNNN).
+      INSERT INTO "number_counters" ("scope", "year", "last_value")
+      SELECT
+        'invoice'::varchar AS scope,
+        CAST(SUBSTRING("invoiceNumber" FROM 5 FOR 4) AS integer) AS year,
+        MAX(CAST(SUBSTRING("invoiceNumber" FROM 10) AS integer)) AS last_value
+      FROM "invoices"
+      WHERE "invoiceNumber" ~ '^FAT-[0-9]{4}-[0-9]+$'
+      GROUP BY CAST(SUBSTRING("invoiceNumber" FROM 5 FOR 4) AS integer)
+      ON CONFLICT ("scope", "year") DO NOTHING;
+
+      -- Backfill: service_orders, três prefixos distintos por type.
+      -- OS-ANT-YYYY-NNNN
+      INSERT INTO "number_counters" ("scope", "year", "last_value")
+      SELECT
+        'os_anunciante'::varchar AS scope,
+        CAST(SPLIT_PART("orderNumber", '-', 3) AS integer) AS year,
+        MAX(CAST(SPLIT_PART("orderNumber", '-', 4) AS integer)) AS last_value
+      FROM "service_orders"
+      WHERE "orderNumber" ~ '^OS-ANT-[0-9]{4}-[0-9]+$'
+      GROUP BY CAST(SPLIT_PART("orderNumber", '-', 3) AS integer)
+      ON CONFLICT ("scope", "year") DO NOTHING;
+
+      -- OS-PROD-YYYY-NNNN
+      INSERT INTO "number_counters" ("scope", "year", "last_value")
+      SELECT
+        'os_producao'::varchar AS scope,
+        CAST(SPLIT_PART("orderNumber", '-', 3) AS integer) AS year,
+        MAX(CAST(SPLIT_PART("orderNumber", '-', 4) AS integer)) AS last_value
+      FROM "service_orders"
+      WHERE "orderNumber" ~ '^OS-PROD-[0-9]{4}-[0-9]+$'
+      GROUP BY CAST(SPLIT_PART("orderNumber", '-', 3) AS integer)
+      ON CONFLICT ("scope", "year") DO NOTHING;
+
+      -- OS-DIST-YYYY-NNNN
+      INSERT INTO "number_counters" ("scope", "year", "last_value")
+      SELECT
+        'os_distribuicao'::varchar AS scope,
+        CAST(SPLIT_PART("orderNumber", '-', 3) AS integer) AS year,
+        MAX(CAST(SPLIT_PART("orderNumber", '-', 4) AS integer)) AS last_value
+      FROM "service_orders"
+      WHERE "orderNumber" ~ '^OS-DIST-[0-9]{4}-[0-9]+$'
+      GROUP BY CAST(SPLIT_PART("orderNumber", '-', 3) AS integer)
+      ON CONFLICT ("scope", "year") DO NOTHING;
+    `,
+  },
 ];
 
 export async function runMigrations() {

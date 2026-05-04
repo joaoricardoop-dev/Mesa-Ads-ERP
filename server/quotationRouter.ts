@@ -9,6 +9,7 @@ import { createCrmNotification } from "./notificationRouter";
 import { buildCampaignName } from "./utils/campaignName";
 import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
 import { withUniqueRetry, describeDbError } from "./utils/uniqueNumberRetry";
+import { nextNumber } from "./utils/numberCounter";
 
 const MONTH_NAMES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -27,52 +28,20 @@ async function getDatabase() {
   return d;
 }
 
+// Task #173 — geradores atômicos via tabela contadora (number_counters).
+// Substituem o padrão MAX(...) + INSERT (racy) por upsert atômico no row-lock
+// do Postgres. O wrapper withUniqueRetry continua nos call-sites como safety
+// belt mas o caminho feliz não depende mais dele.
 async function generateQuotationNumber(db: any) {
-  const year = new Date().getFullYear();
-  const prefix = `QOT-${year}-`;
-  const result = await db
-    .select({ maxNum: sql<string>`MAX("quotationNumber")` })
-    .from(quotations)
-    .where(sql`"quotationNumber" LIKE ${prefix + '%'}`);
-  const maxStr = result[0]?.maxNum;
-  let seqNum = 1;
-  if (maxStr) {
-    const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
-    if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
-  }
-  return `${prefix}${String(seqNum).padStart(4, "0")}`;
+  return nextNumber(db, "quotation");
 }
 
 async function generateCampaignNumber(db: any) {
-  const year = new Date().getFullYear();
-  const prefix = `CMP-${year}-`;
-  const result = await db
-    .select({ maxNum: sql<string>`MAX("campaignNumber")` })
-    .from(campaigns)
-    .where(sql`"campaignNumber" LIKE ${prefix + '%'}`);
-  const maxStr = result[0]?.maxNum;
-  let seqNum = 1;
-  if (maxStr) {
-    const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
-    if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
-  }
-  return `${prefix}${String(seqNum).padStart(4, "0")}`;
+  return nextNumber(db, "campaign");
 }
 
 async function generateInvoiceNumber(db: any) {
-  const year = new Date().getFullYear();
-  const prefix = `FAT-${year}-`;
-  const result = await db
-    .select({ maxNum: sql<string>`MAX("invoiceNumber")` })
-    .from(invoices)
-    .where(sql`"invoiceNumber" LIKE ${prefix + '%'}`);
-  const maxStr = result[0]?.maxNum;
-  let seqNum = 1;
-  if (maxStr) {
-    const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
-    if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
-  }
-  return `${prefix}${String(seqNum).padStart(4, "0")}`;
+  return nextNumber(db, "invoice");
 }
 
 async function autoCreateInvoice(db: any, campaign: { id: number; clientId: number }, quotation: { totalValue: string | null; isBonificada: boolean | null }) {
@@ -105,14 +74,8 @@ async function autoCreateInvoice(db: any, campaign: { id: number; clientId: numb
 }
 
 async function generateOSNumber(db: any) {
-  const year = new Date().getFullYear();
-  const pattern = `OS-ANT-${year}-%`;
-  const maxResult = await db
-    .select({ maxSeq: sql<string>`MAX(CAST(SPLIT_PART("orderNumber", '-', 4) AS INTEGER))` })
-    .from(serviceOrders)
-    .where(sql`${serviceOrders.orderNumber} LIKE ${pattern}`);
-  const seqNum = Number(maxResult[0]?.maxSeq || 0) + 1;
-  return `OS-ANT-${year}-${String(seqNum).padStart(4, "0")}`;
+  // Task #173 — número atômico via number_counters (sem race).
+  return nextNumber(db, "os_anunciante");
 }
 
 export const quotationRouter = router({

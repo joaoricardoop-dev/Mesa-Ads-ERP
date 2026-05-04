@@ -2,9 +2,10 @@ import express from "express";
 import crypto from "crypto";
 import { getDb } from "./db";
 import { quotations, clients, leads, serviceOrders, quotationRestaurants, activeRestaurants, campaigns, campaignHistory, campaignRestaurants, campaignBatches, campaignBatchAssignments, invoices, quotationItems, products } from "../drizzle/schema";
-import { eq, inArray, asc, sql } from "drizzle-orm";
+import { eq, inArray, asc } from "drizzle-orm";
 import { buildCampaignName } from "./utils/campaignName";
 import { withUniqueRetry, describeDbError, isUniqueViolation } from "./utils/uniqueNumberRetry";
+import { nextNumber } from "./utils/numberCounter";
 
 async function getDatabase() {
   const d = await getDb();
@@ -12,20 +13,10 @@ async function getDatabase() {
   return d;
 }
 
+// Task #173 — gerador atômico via tabela contadora (number_counters).
+// Substitui MAX("campaignNumber") + INSERT (racy) por upsert atômico.
 async function generateCampaignNumber(db: any) {
-  const year = new Date().getFullYear();
-  const prefix = `CMP-${year}-`;
-  const result = await db
-    .select({ maxNum: sql<string>`MAX("campaignNumber")` })
-    .from(campaigns)
-    .where(sql`"campaignNumber" LIKE ${prefix + '%'}`);
-  const maxStr = result[0]?.maxNum;
-  let seqNum = 1;
-  if (maxStr) {
-    const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
-    if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
-  }
-  return `${prefix}${String(seqNum).padStart(4, "0")}`;
+  return nextNumber(db, "campaign");
 }
 
 export function setupPublicSigningRoutes(app: express.Express) {
@@ -363,13 +354,8 @@ export function setupPublicSigningRoutes(app: express.Express) {
 
       if (!isBonificada && campaignId > 0 && quotation[0].totalValue && parseFloat(quotation[0].totalValue) > 0) {
         try {
-          const invYear = new Date().getFullYear();
-          const invPrefix = `FAT-${invYear}-`;
-          const invMax = await db.select({ maxNum: sql<string>`MAX("invoiceNumber")` }).from(invoices).where(sql`"invoiceNumber" LIKE ${invPrefix + '%'}`);
-          const invMaxStr = invMax[0]?.maxNum;
-          let invSeq = 1;
-          if (invMaxStr) { const n = parseInt(invMaxStr.slice(invPrefix.length), 10); if (!isNaN(n)) invSeq = n + 1; }
-          const invoiceNumber = `${invPrefix}${String(invSeq).padStart(4, "0")}`;
+          // Task #173 — número atômico via number_counters (sem race).
+          const invoiceNumber = await nextNumber(db, "invoice");
           const today = new Date().toISOString().split("T")[0];
           const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
           await db.insert(invoices).values({

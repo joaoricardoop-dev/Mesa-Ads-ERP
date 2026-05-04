@@ -50,10 +50,12 @@ type FakeHandle = {
   inserted: Map<unknown, unknown[]>;
   updates: Array<{ table: unknown; set: unknown }>;
   queueSelect: (rows: unknown[]) => void;
+  queueExecute: (rows: unknown[]) => void;
 };
 
 function makeFakeDb(): FakeHandle {
   const selectQueue: unknown[][] = [];
+  const executeQueue: unknown[][] = [];
   const inserted = new Map<unknown, unknown[]>();
   const updates: Array<{ table: unknown; set: unknown }> = [];
 
@@ -105,7 +107,13 @@ function makeFakeDb(): FakeHandle {
       return out;
     },
     transaction: async <R>(fn: (tx: FakeDb) => Promise<R>): Promise<R> => fn(db),
-    execute: () => Promise.resolve(undefined),
+    // Task #173 — `nextNumber()` faz `db.execute(sql\`...\`)` e espera o
+    // formato neon { rows: [{ next_value: N }] }. O queue permite que cada
+    // teste enfileire o próximo valor retornado.
+    execute: () => {
+      const next = executeQueue.shift() ?? [];
+      return Promise.resolve({ rows: next });
+    },
   };
 
   return {
@@ -114,6 +122,9 @@ function makeFakeDb(): FakeHandle {
     updates,
     queueSelect: (rows) => {
       selectQueue.push(rows);
+    },
+    queueExecute: (rows) => {
+      executeQueue.push(rows);
     },
   };
 }
@@ -281,7 +292,8 @@ describe("quotation.markWin auto-schedule", () => {
         status: "ativa",
       },
     ]);
-    fake.queueSelect([{ maxNum: null }]); // generateCampaignNumber
+    // Task #173 — generateCampaignNumber agora usa nextNumber → db.execute.
+    fake.queueExecute([{ next_value: 1 }]);
     fake.queueSelect([{ name: "Cliente Teste" }]); // client lookup
     fake.queueSelect([]); // quotationItems lookup → no shared items, skip phase loop
 
@@ -313,7 +325,8 @@ describe("quotation.markWin auto-schedule", () => {
         status: "ativa",
       },
     ]);
-    fake.queueSelect([{ maxNum: null }]);
+    // Task #173 — generateCampaignNumber agora usa nextNumber → db.execute.
+    fake.queueExecute([{ next_value: 2 }]);
     fake.queueSelect([{ name: "Outro Cliente" }]);
     fake.queueSelect([]);
     scheduleSpy.mockRejectedValueOnce(new Error("schedule blew up"));
