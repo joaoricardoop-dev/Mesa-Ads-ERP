@@ -49,6 +49,14 @@ test.describe("builder /montar-campanha — passo LOCAIS", () => {
   test("lista pelo menos 1 local no período padrão e atualiza ao trocar datas", async ({ page }) => {
     test.skip(!anuncianteUser, "no anunciante user with clientId");
 
+    // Cold-start no cloud build (cr-2-4, 2 vCPU) é lento: bundle JS de ~5.8MB
+    // + Clerk SDK init podem consumir 20–30s antes do useAuth disparar a
+    // primeira requisição /api/auth/user. Local levou 7s, cloud bate 20s.
+    // Subimos o limite por-teste pra 120s (default do config é 60s) pra dar
+    // folga ao funil completo: navegação + auth probe + visibilidade da CTA
+    // + carga da step LOCAIS + refetch ao trocar datas.
+    test.setTimeout(120_000);
+
     await devLogin(page.request, anuncianteUser!.id);
 
     // O hook useAuth só vira isAuthenticated=true depois que /api/auth/user
@@ -56,16 +64,17 @@ test.describe("builder /montar-campanha — passo LOCAIS", () => {
     // renderiza a CTA de visitante ("quero anunciar"), o que causava timeouts
     // intermitentes na asserção abaixo. Aguardamos a resposta da probe de
     // auth como sinal real (sem waitForTimeout) antes de afirmar sobre a CTA.
+    // Timeout estendido pra 60s pra absorver cold-start do Clerk no cloud.
     const authReady = page.waitForResponse(
       (r) => r.url().includes("/api/auth/user") && r.status() === 200,
-      { timeout: 20_000 },
+      { timeout: 60_000 },
     );
     await page.goto("/montar-campanha");
     await authReady;
 
     // Hero → clica para escolher locais
     const cta = page.getByRole("button", { name: /escolher locais/i });
-    await expect(cta).toBeVisible({ timeout: 20_000 });
+    await expect(cta).toBeVisible({ timeout: 30_000 });
     await cta.click();
 
     // Passo 01 · locais
