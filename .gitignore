@@ -121,3 +121,4 @@ CLAUDE.md
 # E2E / dev cookie artifacts
 cookies.txt
 *.cookies
+.auth/
