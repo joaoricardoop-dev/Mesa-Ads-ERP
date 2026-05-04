@@ -42,10 +42,16 @@ export function useAuth() {
   const queryClient = useQueryClient();
   const [devLoggedIn, setDevLoggedIn] = useState(false);
 
+  // Em dev, dispara o probe IMEDIATAMENTE — sem esperar o Clerk SDK terminar
+  // de carregar. O backend `/api/auth/user` (ver server/_core/index.ts) checa
+  // o cookie `dev_user_id` ANTES de qualquer chamada Clerk, então o probe
+  // resolve em milissegundos com 200 (cookie válido) ou 401 (sem cookie).
+  // Isso desacopla o login dev do bootstrap do bundle Clerk (~5.8MB) e
+  // destrava E2E em cold-start (Task #179).
   const devProbe = useQuery<User | null>({
     queryKey: ["/api/auth/user", "dev-probe"],
     queryFn: fetchDbUser,
-    enabled: IS_DEV && isLoaded && !isSignedIn && !devLoggedIn,
+    enabled: IS_DEV && !devLoggedIn,
     retry: false,
     staleTime: 1000 * 60 * 5,
   });
@@ -88,14 +94,21 @@ export function useAuth() {
     queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
   }, [queryClient]);
 
-  const effectivelyLoading = !isLoaded
-    || (isSignedIn && isDbLoading)
-    || (IS_DEV && !isSignedIn && !devLoggedIn && devProbe.isLoading);
+  // Se o cookie dev já resolveu com um usuário válido, curto-circuita o
+  // loading sem esperar Clerk. Em produção, IS_DEV=false → comportamento
+  // original (gateado pelo Clerk).
+  const effectivelyLoading = hasDevCookie
+    ? false
+    : !isLoaded
+      || (isSignedIn && isDbLoading)
+      || (IS_DEV && !isSignedIn && !devLoggedIn && devProbe.isLoading);
 
   return {
     user,
     isLoading: effectivelyLoading,
-    isAuthenticated: isLoaded && isEffectivelySignedIn && !!user,
+    // hasDevCookie implica que o probe resolveu com user válido — não
+    // precisa esperar isLoaded do Clerk pra liberar a UI autenticada.
+    isAuthenticated: (hasDevCookie || isLoaded) && isEffectivelySignedIn && !!user,
     isAuthError: isLoaded && isEffectivelySignedIn && isDbError && !isNotRegistered && !user,
     isNotRegistered,
     logout: (devLoggedIn || hasDevCookie) ? devLogout : () => signOut(),

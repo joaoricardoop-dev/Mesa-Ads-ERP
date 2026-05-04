@@ -23,8 +23,18 @@ export default defineConfig({
         stderr: "pipe",
       },
   projects: [
+    // Roda uma única vez antes da suite: aquece o servidor + grava o
+    // storageState do anunciante em `.auth/anunciante.json`. Specs que
+    // precisam navegar autenticados consomem o arquivo via
+    // `test.use({ storageState: ANUNCIANTE_AUTH_FILE })`.
+    {
+      name: "setup",
+      testMatch: /global\.setup\.ts/,
+      timeout: 180_000,
+    },
     {
       name: "chromium",
+      dependencies: ["setup"],
       use: { ...devices["Desktop Chrome"] },
     },
   ],
