@@ -13,12 +13,18 @@ async function getDatabase() {
 
 async function generateCampaignNumber(db: any) {
   const year = new Date().getFullYear();
-  const countResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
+  const prefix = `CMP-${year}-`;
+  const result = await db
+    .select({ maxNum: sql<string>`MAX("campaignNumber")` })
     .from(campaigns)
-    .where(sql`"campaignNumber" LIKE ${'CMP-' + year + '-%'}`);
-  const seqNum = Number(countResult[0]?.count || 0) + 1;
-  return `CMP-${year}-${String(seqNum).padStart(4, "0")}`;
+    .where(sql`"campaignNumber" LIKE ${prefix + '%'}`);
+  const maxStr = result[0]?.maxNum;
+  let seqNum = 1;
+  if (maxStr) {
+    const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
+    if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
+  }
+  return `${prefix}${String(seqNum).padStart(4, "0")}`;
 }
 
 export function setupPublicSigningRoutes(app: express.Express) {
@@ -250,15 +256,17 @@ export function setupPublicSigningRoutes(app: express.Express) {
       }
       const avgCommission = totalCoasters > 0 ? (weightedCommissionSum / totalCoasters).toFixed(2) : "20.00";
 
-      const campaignNumber = await generateCampaignNumber(db);
       const [cliRowSign] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, resolvedClientId)).limit(1);
       const campaignName = buildCampaignName(cliRowSign?.name, firstBatch.startDate);
       const maskedCpf = `***.***.${cpfClean.substring(6, 9)}-${cpfClean.substring(9)}`;
       const isBonificada = !!quotation[0].isBonificada;
 
       let campaignId: number = 0;
+      let campaignNumber: string = "";
 
       await db.transaction(async (tx) => {
+        campaignNumber = await generateCampaignNumber(tx);
+
         await tx.update(quotations).set({
           signedAt,
           signedBy: signerName,

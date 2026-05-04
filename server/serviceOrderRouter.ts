@@ -175,12 +175,18 @@ export const serviceOrderRouter = router({
         const quotation = await db.select().from(quotations).where(eq(quotations.id, updated.quotationId)).limit(1);
         if (quotation[0] && quotation[0].status === "os_gerada") {
           const year = new Date().getFullYear();
-          const countResult = await db
-            .select({ count: sql<number>`COUNT(*)` })
+          const prefix = `CMP-${year}-`;
+          const maxResult = await db
+            .select({ maxNum: sql<string>`MAX("campaignNumber")` })
             .from(campaigns)
-            .where(sql`"campaignNumber" LIKE ${'CMP-' + year + '-%'}`);
-          const seqNum = Number(countResult[0]?.count || 0) + 1;
-          const campaignNumber = `CMP-${year}-${String(seqNum).padStart(4, "0")}`;
+            .where(sql`"campaignNumber" LIKE ${prefix + '%'}`);
+          const maxStr = maxResult[0]?.maxNum;
+          let seqNum = 1;
+          if (maxStr) {
+            const lastSeq = parseInt(maxStr.slice(prefix.length), 10);
+            if (!isNaN(lastSeq)) seqNum = lastSeq + 1;
+          }
+          const campaignNumber = `${prefix}${String(seqNum).padStart(4, "0")}`;
 
           const q = quotation[0];
           const clientRows = await db.select().from(clients).where(eq(clients.id, q.clientId!)).limit(1);
