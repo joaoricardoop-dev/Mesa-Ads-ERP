@@ -50,11 +50,22 @@ test.describe("builder /montar-campanha — passo LOCAIS", () => {
     test.skip(!anuncianteUser, "no anunciante user with clientId");
 
     await devLogin(page.request, anuncianteUser!.id);
+
+    // O hook useAuth só vira isAuthenticated=true depois que /api/auth/user
+    // responde 200 com o payload do anunciante. Antes disso, o StepHero
+    // renderiza a CTA de visitante ("quero anunciar"), o que causava timeouts
+    // intermitentes na asserção abaixo. Aguardamos a resposta da probe de
+    // auth como sinal real (sem waitForTimeout) antes de afirmar sobre a CTA.
+    const authReady = page.waitForResponse(
+      (r) => r.url().includes("/api/auth/user") && r.status() === 200,
+      { timeout: 20_000 },
+    );
     await page.goto("/montar-campanha");
+    await authReady;
 
     // Hero → clica para escolher locais
     const cta = page.getByRole("button", { name: /escolher locais/i });
-    await expect(cta).toBeVisible();
+    await expect(cta).toBeVisible({ timeout: 20_000 });
     await cta.click();
 
     // Passo 01 · locais
