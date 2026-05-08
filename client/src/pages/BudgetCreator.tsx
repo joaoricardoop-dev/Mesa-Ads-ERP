@@ -1363,7 +1363,7 @@ export default function BudgetCreator() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1 block">Desc. manual (%)</Label>
-                    <Input type="number" min={0} max={20} step={0.5} value={descontoManual || ""} onChange={(e) => setDescontoManual(Math.min(20, Math.max(0, parseFloat(e.target.value) || 0)))} className="h-8 text-xs" placeholder="0" />
+                    <Input type="number" min={0} max={100} step={0.5} value={descontoManual || ""} onChange={(e) => setDescontoManual(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))} className="h-8 text-xs" placeholder="0" />
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1 block">Comissão de Agência — BV (%)</Label>
