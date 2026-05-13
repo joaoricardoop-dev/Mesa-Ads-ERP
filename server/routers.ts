@@ -366,6 +366,7 @@ export const appRouter = router({
         }
 
         const { createClerkClient } = await import("@clerk/express");
+        const { appUrl } = await import("./_core/appUrl");
         const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
         const email = input.email.toLowerCase().trim();
 
@@ -379,7 +380,7 @@ export const appRouter = router({
               firstName: input.firstName,
               lastName: input.lastName || null,
             },
-            redirectUrl: undefined,
+            redirectUrl: `${appUrl()}/`,
           });
 
           return {
@@ -1237,11 +1238,10 @@ export const appRouter = router({
         }
 
         const { createClerkClient } = await import("@clerk/express");
+        const { appUrl } = await import("./_core/appUrl");
         const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
         const email = input.email.toLowerCase().trim();
         const firstName = input.firstName?.trim() || client.name;
-
-        const appUrl = process.env.APP_URL || `https://${process.env.REPLIT_DEV_DOMAIN}` || "";
 
         try {
           await clerkClient.invitations.createInvitation({
@@ -1251,7 +1251,7 @@ export const appRouter = router({
               clientId: input.clientId,
               firstName,
             },
-            redirectUrl: appUrl ? `${appUrl}/` : undefined,
+            redirectUrl: `${appUrl()}/`,
           });
           return { success: true as const, message: `Convite enviado para ${email}.` };
         } catch (err: any) {

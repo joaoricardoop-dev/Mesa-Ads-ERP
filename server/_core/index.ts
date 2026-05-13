@@ -55,8 +55,8 @@ async function startServer() {
   app.get("/api/melhor-envio/callback", async (req, res) => {
     const { code, error, error_description } = req.query as Record<string, string>;
 
-    const domain = process.env.APP_URL || process.env.REPLIT_DEV_DOMAIN;
-    const baseUrl = domain?.startsWith("http") ? domain : `https://${domain}`;
+    const { appUrl } = await import("./appUrl");
+    const baseUrl = appUrl();
     const callbackUrl = `${baseUrl}/api/melhor-envio/callback`;
     const settingsUrl = `${baseUrl}/configuracoes/integracoes`;
 

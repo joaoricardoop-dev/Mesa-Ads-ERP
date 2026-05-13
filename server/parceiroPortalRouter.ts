@@ -640,6 +640,7 @@ export const parceiroPortalRouter = router({
     }))
     .mutation(async ({ input }) => {
       const { createClerkClient } = await import("@clerk/express");
+      const { appUrl } = await import("./_core/appUrl");
       const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
       const email = input.email.toLowerCase().trim();
 
@@ -652,7 +653,7 @@ export const parceiroPortalRouter = router({
             firstName: input.firstName,
             lastName: input.lastName || null,
           },
-          redirectUrl: undefined,
+          redirectUrl: `${appUrl()}/parceiro`,
         });
 
         return {

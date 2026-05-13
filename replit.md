@@ -30,6 +30,7 @@ The application utilizes a sidebar-based layout built with `shadcn/ui`, offering
 - **Bonificação**: Campaigns and quotations can be marked as `isBonificada`, excluding them from financial KPIs and aggregations.
 - **Campaign Batches**: Divides the year into 13 four-week cycles, used for all campaign/quotation/OS period definitions, with event-aware labels.
 - **System Version Tag**: Displays build-time version and environment (`dev`/`prod`) in the UI.
+- **URL pública canônica**: O servidor resolve a URL pública via `server/_core/appUrl.ts` (helper `appUrl()`). Prioridade: `APP_URL` env → fallback hardcoded `https://app.mesaads.com.br` em produção → `REPLIT_DEV_DOMAIN` em dev. Use SEMPRE esse helper para construir links externos (convites Clerk, callbacks OAuth, links de assinatura digital) em vez de ler `process.env.APP_URL` direto — caso contrário, links em produção podem cair no workspace dev se o secret não estiver configurado. Em produção, manter `APP_URL=https://app.mesaads.com.br` setado é a configuração recomendada (o fallback é apenas rede de segurança).
 
 ### System Design Choices
 - **Monorepo Structure**: Separation into `client/` (frontend), `server/` (backend), and `shared/` (common types and constants).

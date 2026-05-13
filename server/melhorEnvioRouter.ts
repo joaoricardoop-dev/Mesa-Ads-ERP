@@ -9,12 +9,10 @@ import {
   trackShipments,
   calculateFreight,
 } from "./melhorEnvioService";
+import { appUrl } from "./_core/appUrl";
 
 function getCallbackUrl(): string {
-  const domain = process.env.APP_URL || process.env.REPLIT_DEV_DOMAIN;
-  if (!domain) return "";
-  const base = domain.startsWith("http") ? domain : `https://${domain}`;
-  return `${base}/api/melhor-envio/callback`;
+  return `${appUrl()}/api/melhor-envio/callback`;
 }
 
 export const melhorEnvioRouter = router({

@@ -801,12 +801,8 @@ export const quotationRouter = router({
         }).where(eq(serviceOrders.id, os[0].id));
       }
 
-      const baseUrl = process.env.NODE_ENV === "production"
-        ? "https://app.mesaads.com.br"
-        : process.env.REPLIT_DEV_DOMAIN
-          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-          : "";
-      const signingUrl = `${baseUrl}/cotacao/assinar/${token}`;
+      const { appUrl } = await import("./_core/appUrl");
+      const signingUrl = `${appUrl()}/cotacao/assinar/${token}`;
 
       return { token, signingUrl, quotationId: input.quotationId };
     }),
