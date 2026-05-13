@@ -613,27 +613,49 @@ export default function Quotations() {
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {(q as any).isCustomProduct ? (
-                      <div>
-                        <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-violet-500 border-violet-500/30 bg-violet-500/10">
-                          Sob Medida
-                        </Badge>
-                        {q.productName && (
-                          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{q.productName}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        {q.coasterVolume ? (
-                          <span>{q.coasterVolume.toLocaleString("pt-BR")} un.</span>
-                        ) : (
-                          <span className="text-muted-foreground/50 text-xs italic">—</span>
-                        )}
-                        {q.productName && (
-                          <p className="text-[10px] text-muted-foreground/70">{q.productName}</p>
-                        )}
-                      </>
-                    )}
+                    {(() => {
+                      const isCustom = !!(q as any).isCustomProduct;
+                      const hasStandard = !!q.coasterVolume && q.coasterVolume > 0;
+                      if (isCustom && hasStandard) {
+                        return (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-violet-500 border-violet-500/30 bg-violet-500/10">
+                                Sob Medida
+                              </Badge>
+                              <span className="text-xs">+ {q.coasterVolume!.toLocaleString("pt-BR")} un.</span>
+                            </div>
+                            {q.productName && (
+                              <p className="text-[10px] text-muted-foreground/70">{q.productName}</p>
+                            )}
+                          </div>
+                        );
+                      }
+                      if (isCustom) {
+                        return (
+                          <div>
+                            <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-violet-500 border-violet-500/30 bg-violet-500/10">
+                              Sob Medida
+                            </Badge>
+                            {q.productName && (
+                              <p className="text-[10px] text-muted-foreground/70 mt-0.5">{q.productName}</p>
+                            )}
+                          </div>
+                        );
+                      }
+                      return (
+                        <>
+                          {hasStandard ? (
+                            <span>{q.coasterVolume!.toLocaleString("pt-BR")} un.</span>
+                          ) : (
+                            <span className="text-muted-foreground/50 text-xs italic">—</span>
+                          )}
+                          {q.productName && (
+                            <p className="text-[10px] text-muted-foreground/70">{q.productName}</p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
                     {q.totalValue ? formatCurrency(Number(q.totalValue)) : "—"}
