@@ -373,7 +373,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
           isBonificada ? "Bonificado" : fmtCurrency(item.totalPrice * bvScaleFactor),
         ]),
         foot: [[
-          `${items.length} produto${items.length !== 1 ? "s" : ""}${isMixed ? "" : ""}`,
+          `${items.length} produto${items.length !== 1 ? "s" : ""}`,
           "",
           "",
           itemsFootLabel,
