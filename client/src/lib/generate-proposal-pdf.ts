@@ -272,6 +272,12 @@ export function generateProposalPdf(data: ProposalPDFData) {
   const isMultiProduct = !!(data.items && data.items.length > 0);
   const isCustomProduct = data.isCustomProduct === true;
   const isBonificada = data.isBonificada === true;
+  // Em cotações mistas (custom + itens), customFinalPrice carrega a fatia
+  // do projeto sob medida e contractTotal é a soma. Subtraímos para obter
+  // o subtotal só dos itens padrão.
+  const customFinalPriceVal = isCustomProduct && data.customFinalPrice && data.customFinalPrice > 0
+    ? data.customFinalPrice : 0;
+  const isMixed = isCustomProduct && isMultiProduct;
 
   const numRest = data.numRestaurants > 0 ? data.numRestaurants : 1;
   const monthlyTotal = data.monthlyTotal > 0 ? data.monthlyTotal : data.pricePerRestaurant * numRest;
@@ -336,32 +342,14 @@ export function generateProposalPdf(data: ProposalPDFData) {
   y += 8;
 
   // ── SECTION: Service description / Products ──────────────────────────────
-  if (isCustomProduct) {
-    y = checkPageBreak(doc, y, 60);
-    y = drawSectionTitle(doc, "PROPOSTA DE PROJETO", y, margin);
-    const projName = data.customProductName || data.productName || "Projeto Sob Medida";
-    y = drawInfoRow(doc, "Projeto:", projName, y, margin);
-    if (data.customProjectCost) {
-      y = drawInfoRow(doc, "Custo do Projeto:", fmtCurrency(data.customProjectCost), y, margin);
-    }
-    if (data.customPricingMode === "margin" && data.customMarginPercent !== undefined) {
-      y = drawInfoRow(doc, "Margem:", `${data.customMarginPercent.toFixed(1)}%`, y, margin);
-    }
-    if (data.customRestaurantCommission !== undefined) {
-      y = drawInfoRow(doc, "Comissão Restaurante:", `${data.customRestaurantCommission.toFixed(1)}%`, y, margin);
-    }
-    if (data.customPartnerCommission !== undefined && data.customPartnerCommission > 0) {
-      y = drawInfoRow(doc, "BV Parceiro/Agência:", `${data.customPartnerCommission.toFixed(1)}%`, y, margin);
-    }
-    if (data.customSellerCommission !== undefined && data.customSellerCommission > 0) {
-      y = drawInfoRow(doc, "Comissão Vendedor:", `${data.customSellerCommission.toFixed(1)}%`, y, margin);
-    }
-    y += 4;
-    y = checkPageBreak(doc, y, 20);
-    y = drawSectionTitle(doc, "VALOR DO PROJETO", y, margin);
-    y = drawInfoRow(doc, "Valor Total:", isBonificada ? "R$ 0,00 (Bonificada)" : fmtCurrency(contractTotal), y, margin);
-    y += 8;
-  } else if (isMultiProduct) {
+  // Em cotações mistas, renderizamos os dois blocos de forma aditiva: tabela
+  // de itens padrão primeiro (usando itemsSubtotal no rodapé) e em seguida o
+  // bloco de projeto sob medida. Single-product cai no `else` final.
+  const itemsSubtotalForPdf = isMixed
+    ? Math.max(0, contractTotal - customFinalPriceVal)
+    : contractTotal;
+
+  if (isMultiProduct) {
     // Multi-product layout: show a table of all budget items
     y = checkPageBreak(doc, y, 60);
     y = drawSectionTitle(doc, "PRODUTOS DO ORÇAMENTO", y, margin);
@@ -369,7 +357,8 @@ export function generateProposalPdf(data: ProposalPDFData) {
     const items = data.items!;
     const totalVolume = items.reduce((s, i) => s + i.volume, 0);
     const rawItemsTotal = items.reduce((s, i) => s + i.totalPrice, 0);
-    const bvScaleFactor = rawItemsTotal > 0 ? contractTotal / rawItemsTotal : 1;
+    const bvScaleFactor = rawItemsTotal > 0 ? itemsSubtotalForPdf / rawItemsTotal : 1;
+    const itemsFootLabel = isMixed ? "Subtotal itens" : "Total";
     const hasTelasItems = items.some(i => i.spotSeconds !== null && i.spotSeconds !== undefined);
 
     if (hasTelasItems) {
@@ -384,11 +373,11 @@ export function generateProposalPdf(data: ProposalPDFData) {
           isBonificada ? "Bonificado" : fmtCurrency(item.totalPrice * bvScaleFactor),
         ]),
         foot: [[
-          `${items.length} produto${items.length !== 1 ? "s" : ""}`,
+          `${items.length} produto${items.length !== 1 ? "s" : ""}${isMixed ? "" : ""}`,
           "",
           "",
-          "",
-          isBonificada ? "R$ 0,00" : fmtCurrency(contractTotal),
+          itemsFootLabel,
+          isBonificada ? "R$ 0,00" : fmtCurrency(itemsSubtotalForPdf),
         ]],
         theme: "grid",
         styles: { font: FONT_NAME, fontSize: 8 },
@@ -419,8 +408,8 @@ export function generateProposalPdf(data: ProposalPDFData) {
           `${items.length} produto${items.length !== 1 ? "s" : ""}`,
           "",
           fmtNumber(totalVolume) + " un.",
-          "",
-          isBonificada ? "R$ 0,00" : fmtCurrency(contractTotal),
+          itemsFootLabel,
+          isBonificada ? "R$ 0,00" : fmtCurrency(itemsSubtotalForPdf),
         ]],
         theme: "grid",
         styles: { font: FONT_NAME, fontSize: 8 },
@@ -449,7 +438,42 @@ export function generateProposalPdf(data: ProposalPDFData) {
     if (data.numRestaurants > 0) {
       y = drawInfoRow(doc, "Distribuição:", `${data.numRestaurants} restaurante${data.numRestaurants !== 1 ? "s" : ""} parceiro${data.numRestaurants !== 1 ? "s" : ""}`, y, margin);
     }
-  } else {
+  }
+
+  if (isCustomProduct) {
+    y = checkPageBreak(doc, y, 60);
+    y = drawSectionTitle(doc, isMixed ? "PROJETO SOB MEDIDA" : "PROPOSTA DE PROJETO", y, margin);
+    const projName = data.customProductName || data.productName || "Projeto Sob Medida";
+    y = drawInfoRow(doc, "Projeto:", projName, y, margin);
+    if (data.customProjectCost) {
+      y = drawInfoRow(doc, "Custo do Projeto:", fmtCurrency(data.customProjectCost), y, margin);
+    }
+    if (data.customPricingMode === "margin" && data.customMarginPercent !== undefined) {
+      y = drawInfoRow(doc, "Margem:", `${data.customMarginPercent.toFixed(1)}%`, y, margin);
+    }
+    if (data.customRestaurantCommission !== undefined) {
+      y = drawInfoRow(doc, "Comissão Restaurante:", `${data.customRestaurantCommission.toFixed(1)}%`, y, margin);
+    }
+    if (data.customPartnerCommission !== undefined && data.customPartnerCommission > 0) {
+      y = drawInfoRow(doc, "BV Parceiro/Agência:", `${data.customPartnerCommission.toFixed(1)}%`, y, margin);
+    }
+    if (data.customSellerCommission !== undefined && data.customSellerCommission > 0) {
+      y = drawInfoRow(doc, "Comissão Vendedor:", `${data.customSellerCommission.toFixed(1)}%`, y, margin);
+    }
+    y += 4;
+    if (!isMixed) {
+      // Em pure-custom mantemos o bloco "VALOR DO PROJETO". Em mixed, o total
+      // geral aparece depois, no bloco unificado de INVESTIMENTO.
+      y = checkPageBreak(doc, y, 20);
+      y = drawSectionTitle(doc, "VALOR DO PROJETO", y, margin);
+      y = drawInfoRow(doc, "Valor Total:", isBonificada ? "R$ 0,00 (Bonificada)" : fmtCurrency(contractTotal), y, margin);
+    } else {
+      y = drawInfoRow(doc, "Subtotal projeto:", isBonificada ? "R$ 0,00" : fmtCurrency(customFinalPriceVal), y, margin);
+    }
+    y += 8;
+  }
+
+  if (!isCustomProduct && !isMultiProduct) {
     // Single-product layout (original flow)
     y = checkPageBreak(doc, y, 60);
     y = drawSectionTitle(doc, "DESCRIÇÃO DO SERVIÇO", y, margin);
@@ -568,7 +592,73 @@ export function generateProposalPdf(data: ProposalPDFData) {
   y = checkPageBreak(doc, y, 70);
   y = drawSectionTitle(doc, "INVESTIMENTO", y, margin);
 
-  if (isCustomProduct) {
+  if (isMixed) {
+    // Composição: itens padrão + linha do projeto sob medida + total geral.
+    const multiItems = data.items!;
+    const compositionRows = multiItems.length + 1; // +1 para a linha do custom
+    const boxH = isBonificada
+      ? 30
+      : 8 + 12 + compositionRows * 10 + 4 + 14 + 4;
+
+    y = checkPageBreak(doc, y, boxH + 10);
+    doc.setFillColor(...LIGHT_GRAY);
+    doc.roundedRect(margin, y, contentWidth, boxH, 3, 3, "F");
+
+    if (isBonificada) {
+      doc.setTextColor(...GRAY);
+      doc.setFontSize(9);
+      doc.setFont(FONT_NAME, "normal");
+      doc.text("Campanha bonificada — sem custo para o anunciante", margin + 10, y + 12);
+      doc.setTextColor(180, 130, 0);
+      doc.setFontSize(14);
+      doc.setFont(FONT_NAME, "bold");
+      doc.text("R$ 0,00", pageWidth - margin - 10, y + 22, { align: "right" });
+    } else {
+      doc.setTextColor(...GRAY);
+      doc.setFontSize(8);
+      doc.setFont(FONT_NAME, "normal");
+      doc.text("Composição do investimento", margin + 10, y + 10);
+
+      let rowTop = y + 20;
+      const itemsBvScale = (() => {
+        const raw = multiItems.reduce((s, i) => s + i.totalPrice, 0);
+        return raw > 0 ? itemsSubtotalForPdf / raw : 1;
+      })();
+      for (const item of multiItems) {
+        doc.setFontSize(7.5);
+        doc.setFont(FONT_NAME, "normal");
+        doc.setTextColor(...GRAY);
+        doc.text(`${item.productName} · ${item.semanas} sem. · ${fmtNumber(item.volume)} un.`, margin + 12, rowTop);
+        doc.setFont(FONT_NAME, "bold");
+        doc.setTextColor(...DARK_GRAY);
+        doc.text(fmtCurrency(item.totalPrice * itemsBvScale), pageWidth - margin - 10, rowTop, { align: "right" });
+        rowTop += 10;
+      }
+      // Linha do projeto sob medida
+      doc.setFontSize(7.5);
+      doc.setFont(FONT_NAME, "normal");
+      doc.setTextColor(...GRAY);
+      doc.text(`${data.customProductName || "Projeto Sob Medida"} · projeto`, margin + 12, rowTop);
+      doc.setFont(FONT_NAME, "bold");
+      doc.setTextColor(...DARK_GRAY);
+      doc.text(fmtCurrency(customFinalPriceVal), pageWidth - margin - 10, rowTop, { align: "right" });
+      rowTop += 10;
+
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin + 10, rowTop + 2, pageWidth - margin - 10, rowTop + 2);
+
+      doc.setTextColor(...GRAY);
+      doc.setFontSize(8);
+      doc.setFont(FONT_NAME, "normal");
+      doc.text("TOTAL DA PROPOSTA", margin + 10, rowTop + 12);
+      doc.setTextColor(...GREEN);
+      doc.setFontSize(14);
+      doc.setFont(FONT_NAME, "bold");
+      doc.text(fmtCurrency(contractTotal), pageWidth - margin - 10, rowTop + 12, { align: "right" });
+    }
+
+    y += boxH + 10;
+  } else if (isCustomProduct) {
     const boxH = 36;
     y = checkPageBreak(doc, y, boxH + 10);
     doc.setFillColor(...LIGHT_GRAY);

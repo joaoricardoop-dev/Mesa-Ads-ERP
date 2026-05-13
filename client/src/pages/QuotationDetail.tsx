@@ -488,7 +488,16 @@ export default function QuotationDetail() {
                   const bvPercent = Number((quotation as any).agencyCommissionPercent ?? 0);
                   const rawItemsTotal = quotationItemsList.reduce((s, i) => s + Number(i.totalPrice || 0), 0);
                   const totalValue = Number(quotation.totalValue || 0);
-                  const bvScale = bvPercent > 0 && rawItemsTotal > 0 ? totalValue / rawItemsTotal : 1;
+                  // Em cotações mistas (custom + padrão), totalValue inclui ambos.
+                  // Subtraímos a fatia custom para que o subtotal de itens fique correto.
+                  // `isMixed` usa a flag canônica (`isCustomProduct` + presença de itens),
+                  // não o customFinalPrice — assim cobrimos dados legados sem o campo.
+                  const isMixed = !!(quotation as any).isCustomProduct && quotationItemsList.length > 0;
+                  const customCalcPrice = isMixed
+                    ? Number((quotation as any).customFinalPrice || 0)
+                    : 0;
+                  const itemsSubtotalEffective = Math.max(0, totalValue - customCalcPrice);
+                  const bvScale = bvPercent > 0 && rawItemsTotal > 0 ? itemsSubtotalEffective / rawItemsTotal : 1;
                   return (
                   <table className="w-full text-sm">
                     <thead>
@@ -533,18 +542,22 @@ export default function QuotationDetail() {
                             ? `${quotationItemsList.length} produtos · ${quotationItemsList.reduce((s, i) => s + Number(i.quantity), 0).toLocaleString("pt-BR")} un. total`
                             : `${Number(quotationItemsList[0]?.quantity || 0).toLocaleString("pt-BR")} un.`}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">Total</td>
+                        <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">{isMixed ? "Subtotal itens" : "Total"}</td>
                         <td className="px-4 py-2.5 text-right font-mono font-bold text-primary">
                           {quotation.isBonificada
                             ? <span className="text-amber-500">R$ 0,00</span>
-                            : quotation.totalValue ? formatCurrency(Number(quotation.totalValue)) : "—"}
+                            : isMixed
+                              ? formatCurrency(itemsSubtotalEffective)
+                              : quotation.totalValue ? formatCurrency(Number(quotation.totalValue)) : "—"}
                         </td>
                       </tr>
                     </tfoot>
                   </table>
                   );
-                })() : (quotation as any).isCustomProduct ? (
-                  <div className="px-4 py-4 space-y-1.5">
+                })() : null}
+
+                {(quotation as any).isCustomProduct ? (
+                  <div className={`px-4 py-4 space-y-1.5 ${quotationItemsList.length > 0 ? "border-t border-border/20" : ""}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
                         Projeto Sob Medida
@@ -594,13 +607,29 @@ export default function QuotationDetail() {
                       </div>
                     )}
                     <div className="flex justify-between text-sm pt-1 border-t border-border/20 mt-2">
-                      <span className="text-muted-foreground">Valor Total</span>
+                      <span className="text-muted-foreground">{quotationItemsList.length > 0 ? "Subtotal projeto" : "Valor Total"}</span>
                       <span className={`font-mono font-bold ${quotation.isBonificada ? "text-amber-500" : "text-violet-600 dark:text-violet-400"}`}>
-                        {quotation.isBonificada ? "R$ 0,00 (Bonificada)" : quotation.totalValue ? formatCurrency(Number(quotation.totalValue)) : "—"}
+                        {quotation.isBonificada
+                          ? "R$ 0,00 (Bonificada)"
+                          : quotationItemsList.length > 0
+                            ? formatCurrency(Number((quotation as any).customFinalPrice || 0))
+                            : quotation.totalValue ? formatCurrency(Number(quotation.totalValue)) : "—"}
                       </span>
                     </div>
                   </div>
-                ) : (
+                ) : null}
+
+                {/* Total geral quando há itens padrão + projeto sob medida */}
+                {quotationItemsList.length > 0 && (quotation as any).isCustomProduct && (
+                  <div className="px-4 py-3 border-t-2 border-primary/30 bg-primary/5 flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total da cotação</span>
+                    <span className={`font-mono font-bold text-base ${quotation.isBonificada ? "text-amber-500" : "text-primary"}`}>
+                      {quotation.isBonificada ? "R$ 0,00 (Bonificada)" : quotation.totalValue ? formatCurrency(Number(quotation.totalValue)) : "—"}
+                    </span>
+                  </div>
+                )}
+
+                {quotationItemsList.length === 0 && !(quotation as any).isCustomProduct && (
                   <div className="px-4 py-4 space-y-1">
                     {quotation.productName && (
                       <div className="flex justify-between text-sm">

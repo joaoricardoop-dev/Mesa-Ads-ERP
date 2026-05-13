@@ -1231,49 +1231,46 @@ export default function BudgetCreator() {
     const hasCustom = customItems.length > 0;
     const hasRegular = itemCalcs.length > 0;
     if (!hasCustom && !hasRegular) { toast.error("Adicione pelo menos um produto com volume definido"); return; }
-    if (hasCustom && hasRegular) { toast.error("Não é possível combinar produto personalizado com produtos do catálogo na mesma cotação. Crie cotações separadas."); return; }
+    // Header só comporta 1 produto personalizado (campos custom* vivem em quotations).
     if (customItems.length > 1) { toast.error("Apenas um produto personalizado por cotação é permitido."); return; }
 
     setIsGenerating(true);
     try {
-      if (hasCustom) {
-        const cv = customItems[0].customValues!;
-        const quotation = await createQuotation.mutateAsync({
-          clientId: clientId ?? undefined, leadId: leadId ?? undefined,
-          coasterVolume: 0, totalValue: isBonificada ? "0" : cv.calculatedFinalPrice.toFixed(2),
-          notes: notes || undefined, isBonificada, hasPartnerDiscount: descontoParceiro,
-          partnerId: (descontoParceiro || agencyBVPercent > 0) ? partnerId : null,
-          isCustomProduct: true, customProductName: cv.customProductName,
-          customProjectCost: cv.customProjectCost, customPricingMode: cv.customPricingMode,
+      const cv = hasCustom ? customItems[0].customValues! : null;
+      const totalVolume = hasRegular ? itemCalcs.reduce((sum, c) => sum + c.input.volume, 0) : 0;
+      const firstProductId = hasRegular ? itemCalcs[0].item.productId! : null;
+      const regularTotal = (isBonificada || !hasRegular) ? 0 : totals.totalFinal;
+      const customTotal = (isBonificada || !hasCustom) ? 0 : (cv?.calculatedFinalPrice ?? 0);
+      const totalValue = (regularTotal + customTotal).toFixed(2);
+
+      const quotation = await createQuotation.mutateAsync({
+        clientId: clientId ?? undefined, leadId: leadId ?? undefined,
+        coasterVolume: totalVolume,
+        manualDiscountPercent: hasRegular && descontoManual > 0 ? String(descontoManual) : undefined,
+        cycles: hasRegular ? Math.round((itemCalcs[0]?.item.semanas ?? 12) / 4) : undefined,
+        totalValue: isBonificada ? "0" : totalValue,
+        notes: notes || undefined, isBonificada, hasPartnerDiscount: descontoParceiro,
+        productId: firstProductId,
+        partnerId: (descontoParceiro || agencyBVPercent > 0) ? partnerId : null,
+        agencyCommissionPercent: agencyCommissionPercent || null,
+        ...(hasCustom && cv ? {
+          isCustomProduct: true,
+          customProductName: cv.customProductName,
+          customProjectCost: cv.customProjectCost,
+          customPricingMode: cv.customPricingMode,
           customMarginPercent: cv.customPricingMode === "margin" ? cv.customMarginPercent : undefined,
-          customFinalPrice: cv.customPricingMode === "fixed_price" ? cv.customFinalPrice : undefined,
+          // Persistimos sempre o preço final calculado (mesmo em modo "margin")
+          // para que telas downstream (detalhe, PDF, financeiro) consigam separar
+          // a fatia custom do subtotal de itens padrão em cotações mistas.
+          customFinalPrice: cv.calculatedFinalPrice.toFixed(2),
           customRestaurantCommission: cv.customRestaurantCommission,
           customPartnerCommission: cv.customPartnerCommission,
           customSellerCommission: cv.customSellerCommission,
-          agencyCommissionPercent: agencyCommissionPercent || null,
-        });
-        toast.success("Cotação gerada com sucesso!");
-        navigate(`/comercial/cotacoes/${quotation.id}`);
-      } else {
-        const totalVolume = itemCalcs.reduce((sum, c) => sum + c.input.volume, 0);
-        const firstProductId = itemCalcs[0].item.productId!;
-        const regularTotal = isBonificada ? 0 : totals.totalFinal;
-        const totalValue = (regularTotal + customTotalValue).toFixed(2);
+        } : {}),
+      });
 
-        const quotation = await createQuotation.mutateAsync({
-          clientId: clientId ?? undefined, leadId: leadId ?? undefined,
-          coasterVolume: totalVolume,
-          manualDiscountPercent: descontoManual > 0 ? String(descontoManual) : undefined,
-          cycles: Math.round((itemCalcs[0]?.item.semanas ?? 12) / 4),
-          totalValue: isBonificada ? "0" : totalValue,
-          notes: notes || undefined, isBonificada, hasPartnerDiscount: descontoParceiro,
-          productId: firstProductId,
-          partnerId: (descontoParceiro || agencyBVPercent > 0) ? partnerId : null,
-          agencyCommissionPercent: agencyCommissionPercent || null,
-        });
-
+      if (hasRegular) {
         const discountRatio = totals.subtotalPostDuration > 0 ? totals.total / totals.subtotalPostDuration : 1;
-
         for (const { item, input, calc } of itemCalcs) {
           const isItemBonif = isBonificada || !!item.isBonificada;
           const itemTotal = calc.precoComDescDuracao * discountRatio;
@@ -1287,15 +1284,16 @@ export default function BudgetCreator() {
             bonificada: isItemBonif,
           });
         }
-        toast.success("Cotação gerada com sucesso!");
-        navigate(`/comercial/cotacoes/${quotation.id}`);
       }
+
+      toast.success("Cotação gerada com sucesso!");
+      navigate(`/comercial/cotacoes/${quotation.id}`);
     } catch (err: any) {
       toast.error(err?.message || "Erro ao gerar cotação");
     } finally {
       setIsGenerating(false);
     }
-  }, [clientId, leadId, itemCalcs, customItems, customTotalValue, totals, descontoManual, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate, agencyBVPercent, agencyCommissionPercent]);
+  }, [clientId, leadId, itemCalcs, customItems, totals, descontoManual, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate, agencyBVPercent, agencyCommissionPercent]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
