@@ -1224,8 +1224,6 @@ export default function BudgetCreator() {
     return calcBudgetTotals(calcsForTotals, globalParams);
   }, [itemCalcs, globalParams]);
 
-  const customTotalValue = useMemo(() => customItems.reduce((sum, item) => sum + (item.customValues?.calculatedFinalPrice ?? 0), 0), [customItems]);
-
   const handleGerarCotacao = useCallback(async () => {
     if (!clientId && !leadId) { toast.error("Selecione um cliente ou lead antes de gerar a cotação"); return; }
     const hasCustom = customItems.length > 0;
