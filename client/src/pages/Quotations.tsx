@@ -767,14 +767,14 @@ export default function Quotations() {
                                   // cotações puras-custom e mistas (custom + padrão).
                                   isCustomProduct: (q as any).isCustomProduct ?? false,
                                   customProductName: (q as any).customProductName || undefined,
-                                  customProjectCost: (q as any).customProjectCost ? Number((q as any).customProjectCost) : undefined,
+                                  customProjectCost: (q as any).customProjectCost != null ? Number((q as any).customProjectCost) : undefined,
                                   customPricingMode: (q as any).customPricingMode || undefined,
-                                  customMarginPercent: (q as any).customMarginPercent ? Number((q as any).customMarginPercent) : undefined,
-                                  customRestaurantCommission: (q as any).customRestaurantCommission ? Number((q as any).customRestaurantCommission) : undefined,
-                                  customPartnerCommission: (q as any).customPartnerCommission ? Number((q as any).customPartnerCommission) : undefined,
-                                  customSellerCommission: (q as any).customSellerCommission ? Number((q as any).customSellerCommission) : undefined,
-                                  customFinalPrice: (q as any).customFinalPrice ? Number((q as any).customFinalPrice) : undefined,
-                                  agencyCommissionPercent: (q as any).agencyCommissionPercent ? Number((q as any).agencyCommissionPercent) : undefined,
+                                  customMarginPercent: (q as any).customMarginPercent != null ? Number((q as any).customMarginPercent) : undefined,
+                                  customRestaurantCommission: (q as any).customRestaurantCommission != null ? Number((q as any).customRestaurantCommission) : undefined,
+                                  customPartnerCommission: (q as any).customPartnerCommission != null ? Number((q as any).customPartnerCommission) : undefined,
+                                  customSellerCommission: (q as any).customSellerCommission != null ? Number((q as any).customSellerCommission) : undefined,
+                                  customFinalPrice: (q as any).customFinalPrice != null ? Number((q as any).customFinalPrice) : undefined,
+                                  agencyCommissionPercent: (q as any).agencyCommissionPercent != null ? Number((q as any).agencyCommissionPercent) : undefined,
                                   irpj: parseFloat((q as any).productIrpj ?? "6") / 100,
                                 });
                                 toast.success("PDF da proposta gerado!");
