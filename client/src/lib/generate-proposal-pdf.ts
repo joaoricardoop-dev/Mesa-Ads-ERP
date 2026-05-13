@@ -445,21 +445,6 @@ export function generateProposalPdf(data: ProposalPDFData) {
     y = drawSectionTitle(doc, isMixed ? "PROJETO SOB MEDIDA" : "PROPOSTA DE PROJETO", y, margin);
     const projName = data.customProductName || data.productName || "Projeto Sob Medida";
     y = drawInfoRow(doc, "Projeto:", projName, y, margin);
-    if (data.customProjectCost) {
-      y = drawInfoRow(doc, "Custo do Projeto:", fmtCurrency(data.customProjectCost), y, margin);
-    }
-    if (data.customPricingMode === "margin" && data.customMarginPercent !== undefined) {
-      y = drawInfoRow(doc, "Margem:", `${data.customMarginPercent.toFixed(1)}%`, y, margin);
-    }
-    if (data.customRestaurantCommission !== undefined) {
-      y = drawInfoRow(doc, "Comissão Restaurante:", `${data.customRestaurantCommission.toFixed(1)}%`, y, margin);
-    }
-    if (data.customPartnerCommission !== undefined && data.customPartnerCommission > 0) {
-      y = drawInfoRow(doc, "BV Parceiro/Agência:", `${data.customPartnerCommission.toFixed(1)}%`, y, margin);
-    }
-    if (data.customSellerCommission !== undefined && data.customSellerCommission > 0) {
-      y = drawInfoRow(doc, "Comissão Vendedor:", `${data.customSellerCommission.toFixed(1)}%`, y, margin);
-    }
     y += 4;
     if (!isMixed) {
       // Em pure-custom mantemos o bloco "VALOR DO PROJETO". Em mixed, o total
