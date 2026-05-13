@@ -547,6 +547,12 @@ export const quotations = pgTable("quotations", {
   customRestaurantCommission: decimal("customRestaurantCommission", { precision: 5, scale: 2 }),
   customPartnerCommission: decimal("customPartnerCommission", { precision: 5, scale: 2 }),
   customSellerCommission: decimal("customSellerCommission", { precision: 5, scale: 2 }),
+  // Task #186 — vincular projeto custom a um provedor VIP (sala/tela).
+  // Quando definido, o materializador `materializeCustomVipRepasse` gera
+  // AP `vip_repasse` para a fatia custom (proporcional a customFinalPrice
+  // / totalValue da fatura paga). Mantém a regra "tela vs bolacha" para
+  // produtos custom-digitais.
+  customVipProviderId: integer("customVipProviderId").references(() => vipProviders.id, { onDelete: "set null" }),
   agencyCommissionPercent: decimal("agencyCommissionPercent", { precision: 5, scale: 2 }),
   source: varchar("source", { length: 50 }).default("internal"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

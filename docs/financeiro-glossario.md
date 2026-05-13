@@ -111,6 +111,50 @@ A regra é detectada pela função `isDigitalProduct(product)` em
 `products.tipo` é `telas` ou `janelas_digitais`. Produtos digitais costumam
 ter um `vipProviderId` associado para roteamento do repasse.
 
+### 6.1 Cotação mista (custom + itens padrão) — Task #186
+
+Cotações com `isCustomProduct=true` podem coexistir com itens padrão
+(`quotation_items`). O cabeçalho da cotação carrega `customFinalPrice`,
+`customRestaurantCommission`, `customSellerCommission`,
+`customPartnerCommission` para a fatia custom; a fatia padrão usa as
+alíquotas dos restaurantes alocados (avgCommission) e os defaults de
+seller/BV.
+
+No momento da geração da campanha (`signOS` e `markWin` em
+`server/quotationRouter.ts`), o helper `computeQuotationCommissionMix`
+grava no `campaigns` uma **média ponderada** das alíquotas:
+
+```
+weightedRate = (standardSlice × stdRate + customSlice × customRate) / totalValue
+  onde standardSlice = totalValue − customFinalPrice
+       customSlice   = customFinalPrice (0 se isCustomProduct=false)
+```
+
+Isso preserva exatamente o valor materializado pelos AP, já que os
+materializadores aplicam `campaign.<rate> × invoice.amount` sobre o
+valor cheio da fatura — o resultado bate com
+`standardSlice×stdRate + customSlice×customRate`.
+
+Aplicado em três campos: `campaigns.restaurantCommission`,
+`campaigns.sellerCommission`, `campaigns.agencyBvPercent`. Cenários
+puro-standard e puro-custom continuam idênticos: quando um dos slices é
+zero, a ponderação degenera para a alíquota do slice ativo.
+
+**VIP repasse para fatia custom-digital — auto-materializado**: a coluna
+`quotations.customVipProviderId` (FK → `vip_providers`) marca o projeto
+custom como "digital" e habilita auto-materialização. O materializador
+`materializeCustomVipRepasse` em `server/finance/payables.ts` roda em
+paralelo ao `materializeVipRepasse` tradicional (que olha
+`campaign.productId.vipProviderId`) e gera AP `vip_repasse` proporcional
+à fatia custom da fatura, com `sourceRef.slice = "custom"` para
+idempotência. A fórmula (em `calcCustomVipRepasse`) espelha
+`calcVipRepasse`: `share = invoice.amount × (customFinalPrice /
+totalValue)`; `base = share − impostos − sellerCommission da share`;
+`repasse = base × provider.repassePercent`. Se `customVipProviderId`
+estiver `NULL`, o slice custom segue tratado como físico (regra
+"bolacha") e o usuário pode zerar `customRestaurantCommission`
+manualmente quando aplicável.
+
 ## 7. DRE (Dual)
 
 A DRE é apresentada em duas visões, ambas configuráveis em

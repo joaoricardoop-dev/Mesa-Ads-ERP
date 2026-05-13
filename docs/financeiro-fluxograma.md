@@ -134,4 +134,47 @@ geram repasse para o `vipProvider` vinculado.
 
 ---
 
-_Última atualização: refatoração financeira #1–#10 concluída._
+## 6. Cotação mista (custom + itens padrão) — Task #186
+
+```mermaid
+flowchart TD
+  Q[Cotação mista<br/>isCustomProduct=true<br/>+ quotation_items] --> SLICE{Calcular fatias<br/>standardSlice = totalValue − customFinalPrice<br/>customSlice = customFinalPrice}
+  SLICE --> WEIGHT[computeQuotationCommissionMix<br/>media ponderada por receita]
+  WEIGHT --> CAMP[campaigns.restaurantCommission<br/>campaigns.sellerCommission<br/>campaigns.agencyBvPercent]
+  CAMP --> MAT[Materializadores aplicam<br/>campaign.rate × invoice.amount]
+  MAT --> AP_RC[AP restaurant_commission]
+  MAT --> AP_SC[AP seller_commission]
+  MAT --> AP_PC[AP partner_commission]
+
+  subgraph PURE_CUSTOM[puro-custom — fluxo markWin]
+    PC1[standardSlice = 0] --> PC2[weightedRate = customRate]
+  end
+  subgraph PURE_STD[puro-standard]
+    PS1[customSlice = 0] --> PS2[weightedRate = stdRate]
+  end
+```
+
+**Pontos sensíveis cobertos**:
+- `signOS` (`server/quotationRouter.ts`) — usa `sosMix` antes do
+  `INSERT campaigns` para gravar alíquotas ponderadas. Caminho da
+  cotação mista (tem itens padrão alocados a restaurantes).
+- `markWin` (`server/quotationRouter.ts`) — usa `mwMix` no caminho
+  puro-custom (sem alocação de restaurantes) e em qualquer cotação
+  convertida sem OS.
+- `generateOS` permanece neutro: só registra a OS no DB; não toca em
+  alíquotas.
+- Materializadores em `server/finance/payables.ts` — sem alteração;
+  recebem rates ponderados via `campaign.<rate>` e produzem AP corretos.
+
+**Auto-materialização do slice custom-digital**: quando a cotação tem
+`customVipProviderId` definido, `materializeCustomVipRepasse` (em
+`server/finance/payables.ts`) gera AP `vip_repasse` proporcional à fatia
+custom da fatura paga, em paralelo ao `materializeVipRepasse` tradicional
+(idempotência via `sourceRef.slice = "custom"`). Se
+`customVipProviderId` estiver `NULL`, o slice custom é tratado como
+físico (regra "bolacha") e o usuário pode zerar
+`customRestaurantCommission` manualmente.
+
+---
+
+_Última atualização: Task #186 (validação de cotações mistas)._

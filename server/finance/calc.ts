@@ -216,6 +216,119 @@ function roundCents(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Task #186 — Cotações mistas (custom + itens padrão)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// `computeQuotationCommissionMix`
+//   Materializadores aplicam `campaign.<rate> × invoice.amount` sobre o valor
+//   cheio da fatura. Para que isso reproduza standardSlice×stdRate +
+//   customSlice×customRate, gravamos no campaign uma média ponderada por
+//   receita das alíquotas. Aplicado a restaurantCommission, sellerCommission,
+//   agencyBvPercent em `signOS`/`markWin`.
+//
+// `calcCustomVipRepasse`
+//   Quando uma cotação custom tem `customVipProviderId` definido, a fatia
+//   custom dispara repasse VIP automático mesmo sem `products.vipProviderId`.
+//   A fórmula é proporcional: invoiceCustomShare = invoice.amount ×
+//   (customFinalPrice / totalValue). Sobre essa fatia aplicamos
+//   (custom slice − impostos − sellerComm) × repassePercent — espelhando a
+//   regra de `calcVipRepasse` para o produto digital.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface QuotationCommissionInput {
+  totalValue: string | number | null;
+  isCustomProduct: boolean | null;
+  customFinalPrice: string | number | null;
+  customRestaurantCommission: string | number | null;
+  customSellerCommission: string | number | null;
+  customPartnerCommission: string | number | null;
+}
+export interface StandardRates {
+  restaurantCommissionPercent: number;
+  sellerCommissionPercent: number;
+  agencyBvPercent: number;
+}
+export interface CommissionMixResult {
+  restaurantCommission: string;
+  sellerCommission: string;
+  agencyBvPercent: string;
+  hasCustomSlice: boolean;
+}
+export function computeQuotationCommissionMix(
+  quotation: QuotationCommissionInput,
+  std: StandardRates,
+): CommissionMixResult {
+  const total = num(quotation.totalValue);
+  const customSlice = quotation.isCustomProduct ? num(quotation.customFinalPrice) : 0;
+  const standardSlice = Math.max(0, total - customSlice);
+
+  if (total <= 0 || customSlice <= 0) {
+    return {
+      restaurantCommission: std.restaurantCommissionPercent.toFixed(2),
+      sellerCommission: std.sellerCommissionPercent.toFixed(2),
+      agencyBvPercent: std.agencyBvPercent.toFixed(2),
+      hasCustomSlice: false,
+    };
+  }
+
+  const customRest = num(quotation.customRestaurantCommission);
+  const customSeller = num(quotation.customSellerCommission);
+  const customBv = num(quotation.customPartnerCommission);
+
+  const weight = (stdRate: number, customRate: number) =>
+    ((standardSlice * stdRate) + (customSlice * customRate)) / total;
+
+  return {
+    restaurantCommission: weight(std.restaurantCommissionPercent, customRest).toFixed(2),
+    sellerCommission: weight(std.sellerCommissionPercent, customSeller).toFixed(2),
+    agencyBvPercent: weight(std.agencyBvPercent, customBv).toFixed(2),
+    hasCustomSlice: true,
+  };
+}
+
+export interface CustomVipRepasseQuotation {
+  isCustomProduct: boolean | null;
+  customFinalPrice: string | number | null;
+  customVipProviderId: number | null;
+  totalValue: string | number | null;
+  customSellerCommission?: string | number | null;
+}
+export function calcCustomVipRepasse(args: {
+  quotation: CustomVipRepasseQuotation;
+  invoice: InvoiceLike;
+  campaign: CampaignLike;
+  vipProvider: VipProviderLike | null;
+}): number {
+  const { quotation, invoice, campaign, vipProvider } = args;
+  if (campaign.isBonificada) return 0;
+  if (!quotation.isCustomProduct || !quotation.customVipProviderId) return 0;
+  if (!vipProvider || vipProvider.status !== "active") return 0;
+
+  const total = num(quotation.totalValue);
+  const customFinal = num(quotation.customFinalPrice);
+  if (total <= 0 || customFinal <= 0) return 0;
+
+  // Fatia da invoice atribuída ao slice custom (proporcional).
+  const invoiceCustomShare = num(invoice.amount) * (customFinal / total);
+  if (invoiceCustomShare <= 0) return 0;
+
+  // Espelha calcVipRepasse: base = share − impostos da share − sellerComm da share
+  const irpjRate = TAX_RATES.irpjDefault;
+  const issRate = num(invoice.issRate) / 100;
+  const issShare = invoice.issRetained || issRate <= 0 ? 0 : invoiceCustomShare * issRate;
+  const taxesShare = invoiceCustomShare * (irpjRate + TAX_RATES.pisCofins) + issShare;
+  // Para a fatia custom, o seller rate aplicável é o customSellerCommission
+  // (que já está ponderado em campaign.sellerCommission, mas sobre a share
+  // queremos a alíquota original da fatia).
+  const customSellerRate = num(quotation.customSellerCommission) / 100;
+  const sellerCommShare = invoiceCustomShare * customSellerRate;
+  const base = invoiceCustomShare - taxesShare - sellerCommShare;
+  if (base <= 0) return 0;
+
+  const rate = num(vipProvider.repassePercent) / 100;
+  return roundCents(base * rate);
+}
+
 // dueDate >= createdAt para satisfazer chk_accounts_payable_due_after_created
 // quando createdBySystem=true. Se o alvo é passado, usamos hoje.
 export function safeDueDate(target?: string | null): string {

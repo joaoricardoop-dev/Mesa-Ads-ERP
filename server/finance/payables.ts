@@ -33,6 +33,7 @@ import {
   calcTaxes,
   calcRestaurantCommission,
   calcVipRepasse,
+  calcCustomVipRepasse,
   calcPartnerCommission,
   competenceMonthFor,
   lastDayOfMonth,
@@ -100,8 +101,13 @@ export async function materializePayablesForInvoice(
   // event === 'paga'
   const r1 = await materializeRestaurantCommission(db, invoice as InvoiceLike, campaign as CampaignLike, product);
   const r2 = await materializeVipRepasse(db, invoice as InvoiceLike, campaign as CampaignLike, product);
+  // Task #186 — repasse VIP da fatia custom (cotação custom-digital com
+  // customVipProviderId vinculado). Roda em paralelo ao materializeVipRepasse
+  // tradicional (que olha campaign.productId.vipProviderId) — ambos são
+  // idempotentes via sourceRef distinto.
+  const r2b = await materializeCustomVipRepasse(db, invoice as InvoiceLike, campaign as CampaignLike);
   const r3 = await materializePartnerCommission(db, invoice as InvoiceLike, campaign as CampaignLike, product);
-  return mergeCounts(r1, r2, r3);
+  return mergeCounts(r1, r2, r2b, r3);
 }
 
 function mergeCounts(...rs: MaterializeResult[]): MaterializeResult {
@@ -275,6 +281,10 @@ async function materializeVipRepasse(
       and(
         eq(accountsPayable.sourceType, "vip_repasse"),
         sql`${accountsPayable.sourceRef}->>'invoiceId' = ${String(invoice.id)}`,
+        // Task #186 — distingue slice "standard" (este materializador) de
+        // "custom" (materializeCustomVipRepasse) para idempotência segura
+        // mesmo se ordem de execução mudar.
+        sql`COALESCE(${accountsPayable.sourceRef}->>'slice', 'standard') = 'standard'`,
       ),
     );
   // Ignora linhas canceladas: permitir re-materialização após reversão.
@@ -294,7 +304,80 @@ async function materializeVipRepasse(
     status: "pendente",
     dueDate: safeDueDate(invoice.paymentDate || null),
     sourceType: "vip_repasse",
-    sourceRef: { invoiceId: invoice.id, vipProviderId: provider.id },
+    sourceRef: { invoiceId: invoice.id, vipProviderId: provider.id, slice: "standard" },
+    competenceMonth: compMonth,
+    createdBySystem: true,
+  }).onConflictDoNothing();
+  return { created: 1, updated: 0, cancelled: 0 };
+}
+
+// ─── REPASSE VIP — FATIA CUSTOM (Task #186) ─────────────────────────────────
+// Para cotações com produto custom (sob medida) vinculadas a um vipProvider
+// via `quotations.customVipProviderId`, materializa AP `vip_repasse`
+// proporcional à fatia custom da fatura. Roda em paralelo ao
+// `materializeVipRepasse` tradicional (que olha `campaign.productId
+// .vipProviderId`). Idempotência: sourceRef inclui `slice: 'custom'`.
+async function materializeCustomVipRepasse(
+  db: Db,
+  invoice: InvoiceLike,
+  campaign: CampaignLike,
+): Promise<MaterializeResult> {
+  if (!campaign.quotationId) return EMPTY;
+  const [quot] = await db
+    .select()
+    .from(quotations)
+    .where(eq(quotations.id, campaign.quotationId))
+    .limit(1);
+  if (!quot || !quot.isCustomProduct || !quot.customVipProviderId) return EMPTY;
+
+  const [provider] = await db
+    .select()
+    .from(vipProviders)
+    .where(eq(vipProviders.id, quot.customVipProviderId))
+    .limit(1);
+  if (!provider) return EMPTY;
+
+  const amount = calcCustomVipRepasse({
+    quotation: {
+      isCustomProduct: quot.isCustomProduct,
+      customFinalPrice: quot.customFinalPrice,
+      customVipProviderId: quot.customVipProviderId,
+      totalValue: quot.totalValue,
+      customSellerCommission: quot.customSellerCommission,
+    },
+    invoice,
+    campaign,
+    vipProvider: provider as VipProviderLike,
+  });
+  if (amount <= 0) return EMPTY;
+
+  const existing = await db
+    .select()
+    .from(accountsPayable)
+    .where(
+      and(
+        eq(accountsPayable.sourceType, "vip_repasse"),
+        sql`${accountsPayable.sourceRef}->>'invoiceId' = ${String(invoice.id)}`,
+        sql`${accountsPayable.sourceRef}->>'slice' = 'custom'`,
+      ),
+    );
+  if (existing.some((r) => r.status !== "cancelada")) return EMPTY;
+
+  const compMonth = competenceMonthFor(invoice.paymentDate || invoice.issueDate);
+  const rate = num(provider.repassePercent);
+  await db.insert(accountsPayable).values({
+    campaignId: invoice.campaignId,
+    campaignPhaseId: invoice.campaignPhaseId ?? null,
+    invoiceId: invoice.id,
+    vipProviderId: provider.id,
+    type: "repasse_vip",
+    description: `Repasse Sala VIP (custom) - ${provider.name} (${rate.toFixed(2)}%) - NF ${invoice.invoiceNumber || invoice.id}`,
+    amount: amount.toFixed(2),
+    recipientType: "vip_provider",
+    status: "pendente",
+    dueDate: safeDueDate(invoice.paymentDate || null),
+    sourceType: "vip_repasse",
+    sourceRef: { invoiceId: invoice.id, vipProviderId: provider.id, slice: "custom" },
     competenceMonth: compMonth,
     createdBySystem: true,
   }).onConflictDoNothing();

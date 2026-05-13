@@ -78,6 +78,12 @@ async function generateOSNumber(db: any) {
   return nextNumber(db, "os_anunciante");
 }
 
+// Task #186 — Cotações mistas (custom + itens padrão). Helper movido para
+// `server/finance/calc.ts` (`computeQuotationCommissionMix`) para que possa
+// ser testado isoladamente em vitest. Para a regra "tela vs bolacha" no
+// slice custom-digital, ver `calcCustomVipRepasse` + `materializeCustomVipRepasse`.
+import { computeQuotationCommissionMix } from "./finance/calc";
+
 export const quotationRouter = router({
   list: protectedProcedure
     .input(z.object({
@@ -124,6 +130,7 @@ export const quotationRouter = router({
           customRestaurantCommission: quotations.customRestaurantCommission,
           customPartnerCommission: quotations.customPartnerCommission,
           customSellerCommission: quotations.customSellerCommission,
+          customVipProviderId: quotations.customVipProviderId,
           agencyCommissionPercent: quotations.agencyCommissionPercent,
           createdAt: quotations.createdAt,
           updatedAt: quotations.updatedAt,
@@ -194,6 +201,7 @@ export const quotationRouter = router({
           customRestaurantCommission: quotations.customRestaurantCommission,
           customPartnerCommission: quotations.customPartnerCommission,
           customSellerCommission: quotations.customSellerCommission,
+          customVipProviderId: quotations.customVipProviderId,
           agencyCommissionPercent: quotations.agencyCommissionPercent,
           createdAt: quotations.createdAt,
           updatedAt: quotations.updatedAt,
@@ -257,6 +265,7 @@ export const quotationRouter = router({
       customRestaurantCommission: z.string().optional(),
       customPartnerCommission: z.string().optional(),
       customSellerCommission: z.string().optional(),
+      customVipProviderId: z.number().int().nullable().optional(),
       agencyCommissionPercent: z.string().optional().nullable(),
     }))
     .mutation(async ({ input }) => {
@@ -349,6 +358,7 @@ export const quotationRouter = router({
         customRestaurantCommission: input.customRestaurantCommission,
         customPartnerCommission: input.customPartnerCommission,
         customSellerCommission: input.customSellerCommission,
+        customVipProviderId: input.customVipProviderId ?? null,
         agencyCommissionPercent: input.agencyCommissionPercent ?? null,
       }).returning();
 
@@ -409,6 +419,7 @@ export const quotationRouter = router({
       customRestaurantCommission: z.string().optional().nullable(),
       customPartnerCommission: z.string().optional().nullable(),
       customSellerCommission: z.string().optional().nullable(),
+      customVipProviderId: z.number().int().nullable().optional(),
       agencyCommissionPercent: z.string().optional().nullable(),
     }))
     .mutation(async ({ input }) => {
@@ -476,6 +487,14 @@ export const quotationRouter = router({
       const [cliRow] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, quotation[0].clientId!)).limit(1);
       const campaignName = buildCampaignName(cliRow?.name, input.startDate);
 
+      // Task #186 — pondera alíquotas entre fatia padrão (defaults) e fatia
+      // custom (custom*Commission do header) quando a cotação tem produto custom.
+      const mwMix = computeQuotationCommissionMix(quotation[0], {
+        restaurantCommissionPercent: 20,
+        sellerCommissionPercent: 10,
+        agencyBvPercent: 20,
+      });
+
       // Retry on PG 23505 (campaigns_campaignNumber_unique): regenera o número
       // a partir de MAX() em caso de corrida com outra conversão de cotação.
       const { campaign, campaignNumber } = await withUniqueRetry(
@@ -497,10 +516,11 @@ export const quotationRouter = router({
             markupPercent: "30.00",
             fixedPrice: "0.00",
             commissionType: "variable",
-            restaurantCommission: "20.00",
+            restaurantCommission: quotation[0].isBonificada ? "0.00" : mwMix.restaurantCommission,
             fixedCommission: "0.0500",
-            sellerCommission: "10.00",
+            sellerCommission: quotation[0].isBonificada ? "0.00" : mwMix.sellerCommission,
             taxRate: "15.00",
+            agencyBvPercent: quotation[0].isBonificada ? "0.00" : mwMix.agencyBvPercent,
             contractDuration: quotation[0].cycles || 6,
             batchSize: quotation[0].coasterVolume,
             batchCost: "1200.00",
@@ -864,6 +884,17 @@ export const quotationRouter = router({
       const campaignName = buildCampaignName(cliRow2?.name, derivedStartDate);
       const isBonificada = !!quotation[0].isBonificada;
 
+      // Task #186 — pondera alíquotas entre fatia padrão (avgCommission /
+      // sellerCommission default / agencyBvPercent default) e fatia custom
+      // (custom*Commission do header), para que materializadores reproduzam
+      // exatamente standardSlice×stdRate + customSlice×customRate ao
+      // aplicar campaign.<rate> × invoice.amount.
+      const sosMix = computeQuotationCommissionMix(quotation[0], {
+        restaurantCommissionPercent: parseFloat(avgCommission),
+        sellerCommissionPercent: 10,
+        agencyBvPercent: 20,
+      });
+
       // Retry on PG 23505 (campaigns_campaignNumber_unique): regenera o número
       // se outra OS sendo assinada simultaneamente comitar primeiro.
       const { campaign, campaignNumber } = await withUniqueRetry(
@@ -885,10 +916,11 @@ export const quotationRouter = router({
             markupPercent: isBonificada ? "0.00" : "30.00",
             fixedPrice: "0.00",
             commissionType: "variable",
-            restaurantCommission: isBonificada ? "0.00" : avgCommission,
+            restaurantCommission: isBonificada ? "0.00" : sosMix.restaurantCommission,
             fixedCommission: isBonificada ? "0.00" : "0.0500",
-            sellerCommission: isBonificada ? "0.00" : "10.00",
+            sellerCommission: isBonificada ? "0.00" : sosMix.sellerCommission,
             taxRate: isBonificada ? "0.00" : "15.00",
+            agencyBvPercent: isBonificada ? "0.00" : sosMix.agencyBvPercent,
             contractDuration: input.batchIds.length,
             batchSize: quotation[0].coasterVolume,
             batchCost: "1200.00",
