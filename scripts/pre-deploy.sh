@@ -19,16 +19,25 @@ echo ""
 echo "=== Pre-deploy: instalando o Chromium do Playwright ==="
 pnpm exec playwright install chromium
 
-# ── Guard rail: exige DATABASE_URL_TEST ────────────────────────────────────────
+# ── Guard rail: resolve DATABASE_URL_TEST ─────────────────────────────────────
 # Sem isso, o dev server abaixo escreveria no DATABASE_URL herdado (= prod).
 # Falhamos cedo e barulhento — preferimos abortar o deploy a poluir produção.
+#
+# Estratégia: se o secret DATABASE_URL_TEST não estiver setado, montamos a URL
+# a partir dos secrets PG* (que apontam para o Postgres nativo Replit, isolado
+# do Neon prod). Isso dispensa qualquer configuração manual: os PG* são
+# provisionados automaticamente quando o projeto tem um banco Replit nativo.
 if [ -z "${DATABASE_URL_TEST:-}" ]; then
-  echo "ERRO: secret DATABASE_URL_TEST não está definido." >&2
-  echo "Os testes E2E precisam de um banco Postgres dedicado para isolar" >&2
-  echo "inserts dos endpoints /api/dev-* do banco de produção." >&2
-  echo "Provisione um banco Neon vazio e adicione DATABASE_URL_TEST nos" >&2
-  echo "Secrets do Replit antes de tentar deploy novamente." >&2
-  exit 1
+  if [ -n "${PGHOST:-}" ] && [ -n "${PGUSER:-}" ] && [ -n "${PGPASSWORD:-}" ] \
+     && [ -n "${PGDATABASE:-}" ] && [ -n "${PGPORT:-}" ]; then
+    DATABASE_URL_TEST="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"
+    echo "DATABASE_URL_TEST derivado dos secrets PG* (host=${PGHOST}, db=${PGDATABASE})."
+  else
+    echo "ERRO: nem DATABASE_URL_TEST nem o conjunto PG* (PGHOST/PGUSER/PGPASSWORD/PGDATABASE/PGPORT) estão definidos." >&2
+    echo "Os testes E2E precisam de um Postgres dedicado para isolar inserts" >&2
+    echo "dos endpoints /api/dev-* do banco de produção." >&2
+    exit 1
+  fi
 fi
 
 if [ "${DATABASE_URL_TEST}" = "${DATABASE_URL:-}" ]; then
@@ -50,7 +59,10 @@ echo "=== Pre-deploy: subindo dev server pra warm-up (banco de TESTE isolado) ==
 # filhos): a `runMigrations()` na inicialização do server vai criar o
 # schema no banco de teste se ainda não existir, e qualquer INSERT
 # subsequente dos endpoints /api/dev-* fica contido ali.
-NODE_ENV=development DATABASE_URL="${DATABASE_URL_TEST}" pnpm run dev > /tmp/pre-deploy-dev.log 2>&1 &
+# Exportamos DATABASE_URL_TEST junto pro processo filho para que o helper
+# assertSafeForDevSeed (server/_core/index.ts) tenha o sinal armado mesmo
+# quando a URL foi derivada dos PG* aqui (i.e. sem o secret explícito).
+NODE_ENV=development DATABASE_URL="${DATABASE_URL_TEST}" DATABASE_URL_TEST="${DATABASE_URL_TEST}" pnpm run dev > /tmp/pre-deploy-dev.log 2>&1 &
 DEV_PID=$!
 trap "kill ${DEV_PID} 2>/dev/null || true" EXIT
 
