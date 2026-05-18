@@ -82,6 +82,28 @@ async function startServer() {
     const cookieParser = await import("cookie-parser");
     app.use(cookieParser.default());
 
+    // Guard rail (Task #189): se DATABASE_URL_TEST estiver setado no
+    // ambiente, exigimos que DATABASE_URL aponte EXATAMENTE para o banco
+    // de teste antes de permitir qualquer INSERT pelos endpoints /api/dev-*.
+    // Cenário: pre-deploy.sh sobe esse server com NODE_ENV=development;
+    // se o pipeline esquecer de redirecionar DATABASE_URL para o banco de
+    // teste, esses endpoints inseririam "E2E Parceiro %" / "E2E Client e2e-%"
+    // em produção (lixo recorrente a cada deploy). Defesa em profundidade
+    // — o pre-deploy.sh já valida isso, mas aqui barramos o caso de qualquer
+    // outra forma de subir o dev server contra um DATABASE_URL errado.
+    function assertSafeForDevSeed(res: import("express").Response): boolean {
+      const testUrl = process.env.DATABASE_URL_TEST;
+      const liveUrl = process.env.DATABASE_URL;
+      if (testUrl && liveUrl && testUrl !== liveUrl) {
+        res.status(503).json({
+          message:
+            "Endpoint /api/dev-* desabilitado: DATABASE_URL_TEST está setado mas DATABASE_URL aponta para outro banco. Exporte DATABASE_URL=$DATABASE_URL_TEST antes de subir o server.",
+        });
+        return false;
+      }
+      return true;
+    }
+
     app.post("/api/dev-login", async (req, res) => {
       try {
         const { authStorage } = await import("../replit_integrations/auth");
@@ -130,6 +152,7 @@ async function startServer() {
     // can clean it up afterwards. Only available in development.
     app.post("/api/dev-ensure-anunciante", async (req, res) => {
       try {
+        if (!assertSafeForDevSeed(res)) return;
         const { authStorage } = await import("../replit_integrations/auth");
         const { getDb } = await import("../db");
         const { clients } = await import("../../drizzle/schema");
@@ -183,6 +206,7 @@ async function startServer() {
     // active_restaurants existente. Sem restaurantes cadastrados retorna 412.
     app.post("/api/dev-ensure-restaurante", async (req, res) => {
       try {
+        if (!assertSafeForDevSeed(res)) return;
         const { authStorage } = await import("../replit_integrations/auth");
         const { getDb } = await import("../db");
         const { activeRestaurants } = await import("../../drizzle/schema");
@@ -233,6 +257,7 @@ async function startServer() {
     // existente. Sem parceiros cadastrados retorna 412.
     app.post("/api/dev-ensure-parceiro", async (req, res) => {
       try {
+        if (!assertSafeForDevSeed(res)) return;
         const { authStorage } = await import("../replit_integrations/auth");
         const { getDb } = await import("../db");
         const { partners } = await import("../../drizzle/schema");
@@ -319,6 +344,7 @@ async function startServer() {
     // markPaymentPaid sem depender do estado pré-existente do banco.
     app.post("/api/dev-seed-restaurant-payment", async (req, res) => {
       try {
+        if (!assertSafeForDevSeed(res)) return;
         const { getDb, addRestaurantPayment } = await import("../db");
         const { campaigns } = await import("../../drizzle/schema");
         const db = await getDb();
@@ -387,6 +413,7 @@ async function startServer() {
     // determinístico em CI sem skip (acceptance finrefac #9).
     app.post("/api/dev-ensure-campaign", async (_req, res) => {
       try {
+        if (!assertSafeForDevSeed(res)) return;
         const { getDb } = await import("../db");
         const { clients, campaigns } = await import("../../drizzle/schema");
         const db = await getDb();
@@ -430,6 +457,7 @@ async function startServer() {
     // sempre tenha contra que emitir uma invoice.
     app.post("/api/dev-seed-campaign-for-partner", async (req, res) => {
       try {
+        if (!assertSafeForDevSeed(res)) return;
         const { getDb } = await import("../db");
         const { clients, campaigns } = await import("../../drizzle/schema");
         const db = await getDb();
@@ -480,6 +508,7 @@ async function startServer() {
     // bancária e2e. Reaproveita o primeiro disponível ou cria um novo.
     app.post("/api/dev-ensure-bank-account", async (_req, res) => {
       try {
+        if (!assertSafeForDevSeed(res)) return;
         const { getDb } = await import("../db");
         const { bankAccounts } = await import("../../drizzle/schema");
         const db = await getDb();
@@ -507,6 +536,7 @@ async function startServer() {
 
     app.post("/api/dev-delete-user", async (req, res) => {
       try {
+        if (!assertSafeForDevSeed(res)) return;
         const id = String(req.body?.userId ?? "");
         if (!id.startsWith("e2e-")) {
           return res

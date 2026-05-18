@@ -1444,6 +1444,32 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       ON CONFLICT ("scope", "year") DO NOTHING;
     `,
   },
+  {
+    // Task #189 — Limpeza retroativa de registros E2E que vazaram para o
+    // banco de produção via pre-deploy.sh (o script subia dev server com
+    // DATABASE_URL=prod, então os endpoints /api/dev-ensure-parceiro e
+    // /api/dev-seed-campaign-for-partner inseriam parceiros/clientes
+    // "E2E Parceiro %"/"E2E Client e2e-%" direto na prod a cada deploy).
+    // Inativamos (status='inactive') em vez de DELETE porque 4 desses
+    // clientes têm invoices reais associadas — preservar trilha financeira
+    // é mais importante que apagar a row. Os registros somem das listas
+    // ativas. Idempotente: só toca quem ainda está active.
+    name: "inactivate_leaked_e2e_records_task_189",
+    sql: `
+      UPDATE "partners"
+         SET "status" = 'inactive', "updatedAt" = NOW()
+       WHERE "name" LIKE 'E2E Parceiro %'
+         AND "status" = 'active';
+      UPDATE "clients"
+         SET "status" = 'inactive', "updatedAt" = NOW()
+       WHERE "name" LIKE 'E2E Client e2e-%'
+         AND "status" = 'active';
+      UPDATE "active_restaurants"
+         SET "status" = 'inactive', "updatedAt" = NOW()
+       WHERE "name" LIKE 'E2E Restaurante %'
+         AND "status" = 'active';
+    `,
+  },
 ];
 
 export async function runMigrations() {
