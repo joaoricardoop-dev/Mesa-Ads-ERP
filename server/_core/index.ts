@@ -14,6 +14,8 @@ import { setupPublicLogoUploadRoutes, setupAuthenticatedLogoUploadRoutes } from 
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 import { runMigrations } from "../migrations";
 import { exchangeCode } from "../melhorEnvioService";
+import { validateLeadSlaFallbackOnBoot } from "./leadSlaConfig";
+import { startLeadSlaScheduler } from "../jobs/leadSlaScheduler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -36,6 +38,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 
 async function startServer() {
   await runMigrations();
+  await validateLeadSlaFallbackOnBoot();
+  startLeadSlaScheduler();
 
   const app = express();
   const server = createServer(app);

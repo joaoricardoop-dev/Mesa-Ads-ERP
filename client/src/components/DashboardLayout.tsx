@@ -603,7 +603,11 @@ function DashboardLayoutContent({
             <span className="text-sm font-medium text-muted-foreground">{activeLabel}</span>
           </div>
           <div className="flex items-center gap-1">
-            <NotificationBell isAdmin={user.role === "admin"} isAnunciante={user.role === "anunciante"} />
+            <NotificationBell
+              isAdmin={user.role === "admin"}
+              isAnunciante={user.role === "anunciante"}
+              isAssignee={["comercial", "operacoes", "financeiro", "manager"].includes(user.role ?? "")}
+            />
             <button
               onClick={toggleTheme}
               className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"

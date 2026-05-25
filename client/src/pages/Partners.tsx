@@ -55,7 +55,16 @@ import {
   ArrowUpDown,
   Users,
   FileText,
+  TrendingUp,
+  Trophy,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface PartnerForm {
   name: string;
@@ -304,13 +313,63 @@ export default function Partners() {
                     {p.commissionPercent}%
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3 h-3" /> {p.leadsCount || 0} leads
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <FileText className="w-3 h-3" /> {p.quotationsCount || 0} cotações
-                      </span>
+                    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3 h-3" /> {p.leadsCount || 0} leads
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <FileText className="w-3 h-3" /> {p.quotationsCount || 0} cotações
+                        </span>
+                      </div>
+                      {p.health && (
+                        <TooltipProvider delayDuration={150}>
+                          <div className="flex items-center gap-3 text-[11px]">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex items-center gap-1 cursor-help">
+                                  <Users className="w-3 h-3 text-blue-400" />
+                                  {p.health.totalLeads}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Leads nos últimos 90 dias</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex items-center gap-1 cursor-help">
+                                  <TrendingUp className="w-3 h-3 text-amber-400" />
+                                  {(p.health.conversionRate * 100).toFixed(0)}%
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Lead → Cotação (90d)</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex items-center gap-1 cursor-help">
+                                  <Trophy className="w-3 h-3 text-emerald-400" />
+                                  {(p.health.winRate * 100).toFixed(0)}%
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Lead → Win (90d)</TooltipContent>
+                            </Tooltip>
+                            {p.health.noConversionBadge && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge
+                                    variant="outline"
+                                    className="gap-1 bg-amber-500/10 text-amber-400 border-amber-500/30 text-[10px] cursor-help"
+                                  >
+                                    <AlertTriangle className="w-3 h-3" /> Sem conversão
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  {p.health.totalLeads} leads nos últimos 90 dias e nenhum virou cotação.
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </TooltipProvider>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-center">

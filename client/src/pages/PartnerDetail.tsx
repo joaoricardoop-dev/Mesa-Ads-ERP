@@ -48,7 +48,14 @@ import {
   Calendar,
   AlertTriangle,
   Sparkles,
+  Trophy,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { LOGO_WHITE_BASE64 } from "@/lib/pdf-assets";
 
 interface PartnerLead {
@@ -453,6 +460,7 @@ export default function PartnerDetail() {
   const { data: partnerLeads = [] } = trpc.partner.getLeads.useQuery({ partnerId }, { enabled: partnerId > 0 });
   const { data: partnerQuotations = [] } = trpc.partner.getQuotations.useQuery({ partnerId }, { enabled: partnerId > 0 });
   const { data: revenueData } = trpc.partner.getRevenue.useQuery({ partnerId }, { enabled: partnerId > 0 });
+  const { data: healthData } = trpc.partner.getHealth.useQuery({ partnerId }, { enabled: partnerId > 0 });
   const { data: partnerUsers = [], refetch: refetchUsers } = trpc.parceiroPortal.getUsers.useQuery(
     { partnerId },
     { enabled: isAdmin && partnerId > 0 },
@@ -606,6 +614,83 @@ export default function PartnerDetail() {
         <KpiCard icon={FileText} label="Cotações" value={partnerQuotations.length} color="bg-purple-500/10 text-purple-500" />
         <KpiCard icon={Megaphone} label="Campanhas Ativas" value={activeCampaigns} color="bg-amber-500/10 text-amber-500" />
       </div>
+
+      {healthData && (
+        <TooltipProvider delayDuration={150}>
+          <div className="rounded-xl border bg-card p-4 sm:p-5">
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                <h3 className="font-semibold text-sm">Saúde do Parceiro (últimos 90 dias)</h3>
+              </div>
+              {healthData.noConversionBadge && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className="gap-1 bg-amber-500/10 text-amber-400 border-amber-500/30 cursor-help"
+                    >
+                      <AlertTriangle className="w-3 h-3" /> Sem conversão
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    {healthData.totalLeads} leads nos últimos 90 dias e nenhum virou cotação.
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="rounded-lg border border-border/20 p-3 cursor-help">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                      <Users className="w-3 h-3 text-blue-400" /> Leads no período
+                    </div>
+                    <div className="text-2xl font-bold font-mono">{healthData.totalLeads}</div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top">Quantidade de leads indicados nos últimos 90 dias.</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="rounded-lg border border-border/20 p-3 cursor-help">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                      <TrendingUp className="w-3 h-3 text-amber-400" /> Lead → Cotação
+                    </div>
+                    <div className="text-2xl font-bold font-mono text-amber-400">
+                      {(healthData.conversionRate * 100).toFixed(0)}%
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-1">
+                      {healthData.leadsWithQuotation} de {healthData.totalLeads} leads
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Percentual de leads que viraram cotação nos últimos 90 dias.
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="rounded-lg border border-border/20 p-3 cursor-help">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                      <Trophy className="w-3 h-3 text-emerald-400" /> Lead → Win
+                    </div>
+                    <div className="text-2xl font-bold font-mono text-emerald-400">
+                      {(healthData.winRate * 100).toFixed(0)}%
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-1">
+                      {healthData.leadsWithWin} de {healthData.totalLeads} leads
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Percentual de leads que viraram cotação ganha (win) nos últimos 90 dias.
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        </TooltipProvider>
+      )}
 
       <Tabs defaultValue="painel" className="w-full">
         <TabsList className="h-10">

@@ -13,6 +13,7 @@ import type { AppRouter } from "../../../server/routers";
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type NotificationItem = RouterOutput["notification"]["list"][number];
 type AnuncianteNotificationItem = RouterOutput["notification"]["listForAnunciante"][number];
+type AssigneeNotificationItem = RouterOutput["notification"]["listForAssignee"][number];
 type RestauranteNotificationItem = RouterOutput["notification"]["listForRestaurante"][number];
 
 const EVENT_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
@@ -20,6 +21,8 @@ const EVENT_META: Record<string, { label: string; icon: React.ElementType; color
   stage_changed: { label: "Mudança de Estágio", icon: GitBranch, color: "text-blue-500" },
   quotation_created: { label: "Cotação Gerada", icon: FileText, color: "text-purple-500" },
   campaign_status: { label: "Status da Campanha", icon: Megaphone, color: "text-orange-500" },
+  lead_sla_warning: { label: "SLA — Lead parado", icon: Bell, color: "text-amber-500" },
+  lead_sla_reassign: { label: "SLA — Reatribuído", icon: BellRing, color: "text-red-500" },
 };
 
 const FILTER_OPTIONS = [
@@ -455,13 +458,138 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
   );
 }
 
+interface AssigneePanelProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export function AssigneeNotificationPanel({ open, onClose }: AssigneePanelProps) {
+  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+
+  const { data: notifications = [], refetch } = trpc.notification.listForAssignee.useQuery(
+    { limit: 50, offset: 0, unreadOnly: false },
+    { enabled: open, refetchInterval: open ? 30000 : false }
+  );
+
+  const markReadMutation = trpc.notification.markReadForAssignee.useMutation({
+    onSuccess: () => {
+      refetch();
+      queryClient.invalidateQueries({ queryKey: [["notification", "unreadCountForAssignee"]] });
+    },
+  });
+
+  const markAllReadMutation = trpc.notification.markAllReadForAssignee.useMutation({
+    onSuccess: () => {
+      refetch();
+      queryClient.invalidateQueries({ queryKey: [["notification", "unreadCountForAssignee"]] });
+      toast.success("Todas as notificações foram marcadas como lidas.");
+    },
+  });
+
+  if (!open) return null;
+
+  const handleNavigate = (n: AssigneeNotificationItem) => {
+    if (n.leadId) {
+      setLocation("/comercial/leads");
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      <div
+        className="absolute right-2 top-14 w-[380px] max-h-[calc(100vh-80px)] bg-card border border-border/30 rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/20 shrink-0">
+          <div className="flex items-center gap-2">
+            <BellRing className="w-4 h-4 text-primary" />
+            <span className="font-semibold text-sm">Meus leads</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-7 px-2"
+              onClick={() => markAllReadMutation.mutate()}
+              disabled={markAllReadMutation.isPending}
+            >
+              <CheckCheck className="w-3.5 h-3.5 mr-1" />
+              Marcar todas
+            </Button>
+            <button
+              onClick={onClose}
+              className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
+            >
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto flex-1">
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Bell className="w-8 h-8 mb-2 opacity-30" />
+              <p className="text-sm">Nenhuma notificação</p>
+            </div>
+          ) : (
+            <ul>
+              {notifications.map((n) => {
+                const meta = EVENT_META[n.eventType] ?? { label: n.eventType, icon: Bell, color: "text-muted-foreground" };
+                const Icon = meta.icon;
+                const isUnread = !n.readAt;
+                return (
+                  <li
+                    key={n.id}
+                    className={cn(
+                      "flex items-start gap-3 px-4 py-3 border-b border-border/10 transition-colors",
+                      isUnread && "bg-primary/5",
+                      n.leadId && "cursor-pointer hover:bg-accent/40"
+                    )}
+                    onClick={n.leadId ? () => handleNavigate(n) : undefined}
+                  >
+                    <div className={cn("mt-0.5 shrink-0", meta.color)}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{meta.label}</span>
+                      </div>
+                      <p className="text-xs text-foreground leading-snug">{n.message}</p>
+                      <span className="text-[10px] text-muted-foreground mt-0.5 block">{timeAgo(n.createdAt)}</span>
+                    </div>
+                    {isUnread && (
+                      <button
+                        className="shrink-0 mt-1 h-6 w-6 flex items-center justify-center rounded-md hover:bg-accent transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markReadMutation.mutate({ id: n.id });
+                        }}
+                        title="Marcar como lida"
+                      >
+                        <Check className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface NotificationBellProps {
   isAdmin: boolean;
   isAnunciante?: boolean;
   isRestaurante?: boolean;
+  isAssignee?: boolean;
 }
 
-export function NotificationBell({ isAdmin, isAnunciante, isRestaurante }: NotificationBellProps) {
+export function NotificationBell({ isAdmin, isAnunciante, isRestaurante, isAssignee }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const [filterType, setFilterType] = useState<"lead_created" | "stage_changed" | "quotation_created" | undefined>(undefined);
 
@@ -480,13 +608,20 @@ export function NotificationBell({ isAdmin, isAnunciante, isRestaurante }: Notif
     refetchInterval: 30000,
   });
 
+  const { data: assigneeCountData } = trpc.notification.unreadCountForAssignee.useQuery(undefined, {
+    enabled: !!isAssignee && !isAdmin && !isAnunciante && !isRestaurante,
+    refetchInterval: 30000,
+  });
+
   const count = isAdmin
     ? (adminCountData?.count ?? 0)
     : isAnunciante
       ? (anuncianteCountData?.count ?? 0)
-      : (restauranteCountData?.count ?? 0);
+      : isRestaurante
+        ? (restauranteCountData?.count ?? 0)
+        : (assigneeCountData?.count ?? 0);
 
-  if (!isAdmin && !isAnunciante && !isRestaurante) return null;
+  if (!isAdmin && !isAnunciante && !isRestaurante && !isAssignee) return null;
 
   return (
     <>
@@ -514,8 +649,13 @@ export function NotificationBell({ isAdmin, isAnunciante, isRestaurante }: Notif
           open={open}
           onClose={() => setOpen(false)}
         />
-      ) : (
+      ) : isRestaurante ? (
         <RestauranteNotificationPanel
+          open={open}
+          onClose={() => setOpen(false)}
+        />
+      ) : (
+        <AssigneeNotificationPanel
           open={open}
           onClose={() => setOpen(false)}
         />

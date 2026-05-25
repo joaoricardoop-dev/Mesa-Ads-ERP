@@ -12,6 +12,74 @@ async function getDatabase() {
   return d;
 }
 
+export type PartnerHealth = {
+  windowDays: number;
+  totalLeads: number;
+  leadsWithQuotation: number;
+  leadsWithWin: number;
+  conversionRate: number; // lead → quotation
+  winRate: number;        // lead → win
+  noConversionBadge: boolean;
+};
+
+// Métricas de saúde do parceiro nos últimos 90 dias. Bonificadas são
+// excluídas da contagem de cotações/wins (mesmo critério usado nos KPIs
+// financeiros).
+async function computePartnerHealth(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  partnerId: number,
+  windowDays = 90,
+): Promise<PartnerHealth> {
+  const row = await db.execute(sql`
+    WITH partner_leads AS (
+      SELECT id
+        FROM leads
+       WHERE "partnerId" = ${partnerId}
+         AND "createdAt" >= NOW() - (${windowDays} || ' days')::interval
+    ),
+    quoted AS (
+      SELECT DISTINCT pl.id AS lead_id
+        FROM partner_leads pl
+        JOIN quotations q ON q."leadId" = pl.id
+       WHERE COALESCE(q."isBonificada", false) = false
+    ),
+    won AS (
+      SELECT DISTINCT pl.id AS lead_id
+        FROM partner_leads pl
+        JOIN quotations q ON q."leadId" = pl.id
+       WHERE q."status" = 'win'
+         AND COALESCE(q."isBonificada", false) = false
+    )
+    SELECT
+      (SELECT COUNT(*) FROM partner_leads)::int AS total_leads,
+      (SELECT COUNT(*) FROM quoted)::int        AS quoted_leads,
+      (SELECT COUNT(*) FROM won)::int           AS won_leads
+  `);
+
+  const r = (row.rows[0] || {}) as {
+    total_leads?: number;
+    quoted_leads?: number;
+    won_leads?: number;
+  };
+  const totalLeads = Number(r.total_leads || 0);
+  const leadsWithQuotation = Number(r.quoted_leads || 0);
+  const leadsWithWin = Number(r.won_leads || 0);
+  const conversionRate = totalLeads > 0 ? leadsWithQuotation / totalLeads : 0;
+  const winRate = totalLeads > 0 ? leadsWithWin / totalLeads : 0;
+  // Badge "Sem conversão": >= 5 leads no período e nenhum virou cotação.
+  const noConversionBadge = totalLeads >= 5 && leadsWithQuotation === 0;
+
+  return {
+    windowDays,
+    totalLeads,
+    leadsWithQuotation,
+    leadsWithWin,
+    conversionRate,
+    winRate,
+    noConversionBadge,
+  };
+}
+
 export const partnerRouter = router({
   list: comercialProcedure
     .input(z.object({
@@ -39,14 +107,23 @@ export const partnerRouter = router({
           .select({ count: sql<number>`COUNT(*)` })
           .from(quotations)
           .where(eq(quotations.partnerId, p.id));
+        const health = await computePartnerHealth(db, p.id);
         return {
           ...p,
           leadsCount: Number(leadsCount[0]?.count || 0),
           quotationsCount: Number(quotationsCount[0]?.count || 0),
+          health,
         };
       }));
 
       return result;
+    }),
+
+  getHealth: comercialProcedure
+    .input(z.object({ partnerId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      return computePartnerHealth(db, input.partnerId);
     }),
 
   get: comercialProcedure

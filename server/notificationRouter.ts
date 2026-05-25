@@ -1,4 +1,4 @@
-import { adminProcedure, anuncianteProcedure, restauranteProcedure, router } from "./_core/trpc";
+import { adminProcedure, anuncianteProcedure, protectedProcedure, restauranteProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import { crmNotifications, leads, partners, clients, campaignRestaurants } from "../drizzle/schema";
@@ -200,6 +200,112 @@ export const notificationRouter = router({
         .update(crmNotifications)
         .set({ readAt: new Date() })
         .where(isNull(crmNotifications.readAt));
+      return { success: true };
+    }),
+
+  // Inbox por usuário responsável: traz notificações de leads onde
+  // `assignedTo = ctx.user.id`. Cobre SLA (lead_sla_warning /
+  // lead_sla_reassign), lead_created e stage_changed — usado pelo bell
+  // de notificações dos usuários internos não-admin (comercial, etc.).
+  listForAssignee: protectedProcedure
+    .input(z.object({
+      limit: z.number().int().min(1).max(100).default(50),
+      offset: z.number().int().min(0).default(0),
+      unreadOnly: z.boolean().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const db = await getDatabase();
+      const userId = ctx.user?.id;
+      if (!userId) return [];
+
+      const conditions = [
+        eq(leads.assignedTo, userId),
+      ];
+      if (input?.unreadOnly) conditions.push(isNull(crmNotifications.readAt));
+
+      const rows = await db
+        .select({
+          id: crmNotifications.id,
+          eventType: crmNotifications.eventType,
+          leadId: crmNotifications.leadId,
+          partnerId: crmNotifications.partnerId,
+          campaignId: crmNotifications.campaignId,
+          clientId: crmNotifications.clientId,
+          message: crmNotifications.message,
+          readAt: crmNotifications.readAt,
+          createdAt: crmNotifications.createdAt,
+          leadName: leads.name,
+          leadCompany: leads.company,
+          partnerName: partners.name,
+          clientName: clients.name,
+        })
+        .from(crmNotifications)
+        .innerJoin(leads, eq(crmNotifications.leadId, leads.id))
+        .leftJoin(partners, eq(crmNotifications.partnerId, partners.id))
+        .leftJoin(clients, eq(crmNotifications.clientId, clients.id))
+        .where(and(...conditions))
+        .orderBy(desc(crmNotifications.createdAt))
+        .limit(input?.limit ?? 50)
+        .offset(input?.offset ?? 0);
+
+      return rows;
+    }),
+
+  unreadCountForAssignee: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDatabase();
+      const userId = ctx.user?.id;
+      if (!userId) return { count: 0 };
+      const result = await db
+        .select({ id: crmNotifications.id })
+        .from(crmNotifications)
+        .innerJoin(leads, eq(crmNotifications.leadId, leads.id))
+        .where(and(eq(leads.assignedTo, userId), isNull(crmNotifications.readAt)));
+      return { count: result.length };
+    }),
+
+  markReadForAssignee: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDatabase();
+      const userId = ctx.user?.id;
+      if (!userId) throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Garante que a notificação realmente pertence a um lead
+      // atribuído a este usuário antes de marcar como lida.
+      const [match] = await db
+        .select({ id: crmNotifications.id })
+        .from(crmNotifications)
+        .innerJoin(leads, eq(crmNotifications.leadId, leads.id))
+        .where(and(eq(crmNotifications.id, input.id), eq(leads.assignedTo, userId)))
+        .limit(1);
+      if (!match) throw new TRPCError({ code: "FORBIDDEN" });
+
+      await db
+        .update(crmNotifications)
+        .set({ readAt: new Date() })
+        .where(and(eq(crmNotifications.id, input.id), isNull(crmNotifications.readAt)));
+      return { success: true };
+    }),
+
+  markAllReadForAssignee: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const db = await getDatabase();
+      const userId = ctx.user?.id;
+      if (!userId) throw new TRPCError({ code: "FORBIDDEN" });
+
+      const targets = await db
+        .select({ id: crmNotifications.id })
+        .from(crmNotifications)
+        .innerJoin(leads, eq(crmNotifications.leadId, leads.id))
+        .where(and(eq(leads.assignedTo, userId), isNull(crmNotifications.readAt)));
+
+      if (targets.length === 0) return { success: true };
+      const ids = targets.map((t) => t.id);
+      await db
+        .update(crmNotifications)
+        .set({ readAt: new Date() })
+        .where(sql`${crmNotifications.id} = ANY(${ids})`);
       return { success: true };
     }),
 
