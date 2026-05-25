@@ -2,6 +2,7 @@ import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices, seasonalMultipliers, campaignPhases, campaignItems } from "../drizzle/schema";
+import { LOSS_REASON_CODES } from "../shared/loss-reasons";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -10,6 +11,8 @@ import { buildCampaignName } from "./utils/campaignName";
 import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
 import { withUniqueRetry, describeDbError } from "./utils/uniqueNumberRetry";
 import { nextNumber } from "./utils/numberCounter";
+
+const SELF_SERVICE_USER_ID = "self_service";
 
 const MONTH_NAMES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -251,7 +254,6 @@ export const quotationRouter = router({
       includesProduction: z.boolean().optional(),
       notes: z.string().optional(),
       validUntil: z.string().optional(),
-      createdBy: z.string().optional(),
       isBonificada: z.boolean().optional(),
       hasPartnerDiscount: z.boolean().optional(),
       productId: z.number().optional().nullable(),
@@ -268,7 +270,7 @@ export const quotationRouter = router({
       customVipProviderId: z.number().int().nullable().optional(),
       agencyCommissionPercent: z.string().optional().nullable(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDatabase();
 
       if (!input.clientId && !input.leadId) {
@@ -344,7 +346,7 @@ export const quotationRouter = router({
         includesProduction: input.includesProduction,
         notes: input.notes,
         validUntil: input.validUntil,
-        createdBy: input.createdBy,
+        createdBy: ctx.user?.id ?? null,
         isBonificada: input.isBonificada ?? false,
         hasPartnerDiscount: input.hasPartnerDiscount ?? false,
         productId: input.productId ?? null,
@@ -403,7 +405,8 @@ export const quotationRouter = router({
       notes: z.string().optional(),
       validUntil: z.string().optional(),
       status: z.enum(["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]).optional(),
-      lossReason: z.string().optional(),
+      lossReason: z.enum(LOSS_REASON_CODES).optional(),
+      lossReasonNotes: z.string().optional().nullable(),
       isBonificada: z.boolean().optional(),
       hasPartnerDiscount: z.boolean().optional(),
       productId: z.number().nullable().optional(),
@@ -433,6 +436,19 @@ export const quotationRouter = router({
         const existingOS = await db.select({ id: serviceOrders.id }).from(serviceOrders).where(eq(serviceOrders.quotationId, id)).limit(1);
         if (existingOS[0]) {
           delete (data as any).status;
+        }
+      }
+
+      // Sprint 1: transição para perdida/expirada exige motivo (enum).
+      // Aceita também herdar o motivo já gravado anteriormente (defensivo
+      // para reabrir/refechar a mesma cotação).
+      if (data.status === "perdida" || data.status === "expirada") {
+        const effectiveReason = data.lossReason ?? existing[0].lossReason;
+        if (!effectiveReason) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Motivo da perda é obrigatório ao marcar como perdida ou expirada.",
+          });
         }
       }
 
@@ -623,13 +639,19 @@ export const quotationRouter = router({
   markLost: comercialProcedure
     .input(z.object({
       id: z.number(),
-      lossReason: z.string().optional(),
+      lossReason: z.enum(LOSS_REASON_CODES),
+      lossReasonNotes: z.string().optional().nullable(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
       const [updated] = await db
         .update(quotations)
-        .set({ status: "perdida", lossReason: input.lossReason, updatedAt: new Date() })
+        .set({
+          status: "perdida",
+          lossReason: input.lossReason,
+          lossReasonNotes: input.lossReasonNotes ?? null,
+          updatedAt: new Date(),
+        })
         .where(eq(quotations.id, input.id))
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
@@ -638,7 +660,7 @@ export const quotationRouter = router({
 
   duplicate: comercialProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDatabase();
 
       const original = await db.select().from(quotations).where(eq(quotations.id, input.id)).limit(1);
@@ -667,7 +689,7 @@ export const quotationRouter = router({
         includesProduction: original[0].includesProduction,
         notes: original[0].notes ? `[Cópia] ${original[0].notes}` : `[Cópia de ${original[0].quotationNumber}]`,
         validUntil: original[0].validUntil,
-        createdBy: original[0].createdBy,
+        createdBy: ctx.user?.id ?? null,
         isBonificada: original[0].isBonificada,
         productId: original[0].productId,
         status: "rascunho",
@@ -1365,7 +1387,9 @@ export const quotationRouter = router({
         source: input.source,
         isBonificada: false,
         hasPartnerDiscount: hasPartner,
-        createdBy: "self_service",
+        // Sprint 1: self-service (anunciante/parceiro) preserva o marker
+        // textual; canal interno via builder grava o user real.
+        createdBy: input.source === "internal" ? (ctx.user?.id ?? null) : SELF_SERVICE_USER_ID,
       };
 
       const [created] = await db.insert(quotations).values(insertValues).returning();

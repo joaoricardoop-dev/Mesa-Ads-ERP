@@ -527,6 +527,7 @@ export const quotations = pgTable("quotations", {
   validUntil: date("validUntil"),
   status: quotationStatusEnum("status").default("rascunho").notNull(),
   lossReason: text("lossReason"),
+  lossReasonNotes: text("lossReasonNotes"),
   publicToken: varchar("publicToken", { length: 64 }).unique(),
   signedAt: timestamp("signedAt"),
   signedBy: varchar("signedBy", { length: 255 }),

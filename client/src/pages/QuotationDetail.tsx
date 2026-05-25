@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LOSS_REASON_CODES, LOSS_REASON_LABELS, isLossReasonCode } from "@shared/loss-reasons";
 import {
   Dialog,
   DialogContent,
@@ -83,7 +84,8 @@ export default function QuotationDetail() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [lossOpen, setLossOpen] = useState(false);
-  const [lossReason, setLossReason] = useState("");
+  const [lossReason, setLossReason] = useState<string>("");
+  const [lossReasonNotes, setLossReasonNotes] = useState<string>("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [osDialogOpen, setOsDialogOpen] = useState(false);
   const [osForm, setOsForm] = useState({ description: "", paymentTerms: "" });
@@ -145,7 +147,14 @@ export default function QuotationDetail() {
   });
 
   const lossMutation = trpc.quotation.markLost.useMutation({
-    onSuccess: () => { utils.quotation.get.invalidate({ id: quotationId }); utils.quotation.list.invalidate(); setLossOpen(false); toast.success("Cotação marcada como perdida."); },
+    onSuccess: () => {
+      utils.quotation.get.invalidate({ id: quotationId });
+      utils.quotation.list.invalidate();
+      setLossOpen(false);
+      setLossReason("");
+      setLossReasonNotes("");
+      toast.success("Cotação marcada como perdida.");
+    },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
@@ -1357,16 +1366,42 @@ export default function QuotationDetail() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={lossOpen} onOpenChange={setLossOpen}>
+      <AlertDialog open={lossOpen} onOpenChange={(open) => { setLossOpen(open); if (!open) { setLossReason(""); setLossReasonNotes(""); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Marcar como Perdida</AlertDialogTitle>
-            <AlertDialogDescription>Deseja marcar esta cotação como perdida?</AlertDialogDescription>
+            <AlertDialogDescription>Escolha o motivo da perda. Essa informação alimenta o relatório de perdas comerciais.</AlertDialogDescription>
           </AlertDialogHeader>
-          <Textarea value={lossReason} onChange={(e) => setLossReason(e.target.value)} placeholder="Motivo da perda (opcional)" rows={3} className="bg-background border-border/30" />
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Motivo *</label>
+              <Select value={lossReason} onValueChange={setLossReason}>
+                <SelectTrigger className="bg-background border-border/30">
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LOSS_REASON_CODES.map((code) => (
+                    <SelectItem key={code} value={code}>{LOSS_REASON_LABELS[code]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Detalhe (opcional)</label>
+              <Textarea value={lossReasonNotes} onChange={(e) => setLossReasonNotes(e.target.value)} placeholder="Contexto adicional, concorrente, valor, etc." rows={3} className="bg-background border-border/30" />
+            </div>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => lossMutation.mutate({ id: quotationId, lossReason: lossReason || undefined })} className="bg-destructive hover:bg-destructive/90">
+            <AlertDialogAction
+              disabled={!isLossReasonCode(lossReason) || lossMutation.isPending}
+              onClick={() => {
+                if (isLossReasonCode(lossReason)) {
+                  lossMutation.mutate({ id: quotationId, lossReason, lossReasonNotes: lossReasonNotes.trim() || undefined });
+                }
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+            >
               Marcar Perdida
             </AlertDialogAction>
           </AlertDialogFooter>

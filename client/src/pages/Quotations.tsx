@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LOSS_REASON_CODES, LOSS_REASON_LABELS, isLossReasonCode } from "@shared/loss-reasons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -227,7 +228,8 @@ export default function Quotations() {
 
 
   const [lossDialogId, setLossDialogId] = useState<number | null>(null);
-  const [lossReason, setLossReason] = useState("");
+  const [lossReason, setLossReason] = useState<string>("");
+  const [lossReasonNotes, setLossReasonNotes] = useState<string>("");
   const [osDialogId, setOsDialogId] = useState<number | null>(null);
   const [osForm, setOsForm] = useState({ description: "", paymentTerms: "" });
   const [osBatchIds, setOsBatchIds] = useState<number[]>([]);
@@ -277,6 +279,7 @@ export default function Quotations() {
       utils.quotation.list.invalidate();
       setLossDialogId(null);
       setLossReason("");
+      setLossReasonNotes("");
       toast.success("Cotação marcada como perdida.");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -1517,27 +1520,50 @@ export default function Quotations() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={lossDialogId !== null} onOpenChange={() => setLossDialogId(null)}>
+      <AlertDialog open={lossDialogId !== null} onOpenChange={(open) => { if (!open) { setLossDialogId(null); setLossReason(""); setLossReasonNotes(""); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Marcar como Perdida</AlertDialogTitle>
             <AlertDialogDescription>
-              Deseja marcar esta cotação como perdida? Opcionalmente, informe o motivo.
+              Escolha o motivo da perda. Essa informação alimenta o relatório de perdas comerciais.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <Textarea
-            value={lossReason}
-            onChange={(e) => setLossReason(e.target.value)}
-            placeholder="Motivo da perda (opcional)"
-            className="bg-background border-border/30"
-            rows={3}
-          />
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Motivo *</label>
+              <Select value={lossReason} onValueChange={setLossReason}>
+                <SelectTrigger className="bg-background border-border/30">
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LOSS_REASON_CODES.map((code) => (
+                    <SelectItem key={code} value={code}>{LOSS_REASON_LABELS[code]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Detalhe (opcional)</label>
+              <Textarea
+                value={lossReasonNotes}
+                onChange={(e) => setLossReasonNotes(e.target.value)}
+                placeholder="Contexto adicional, concorrente, valor, etc."
+                className="bg-background border-border/30"
+                rows={3}
+              />
+            </div>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
+              disabled={!isLossReasonCode(lossReason) || lossMutation.isPending}
               onClick={() => {
-                if (lossDialogId) {
-                  lossMutation.mutate({ id: lossDialogId, lossReason: lossReason || undefined });
+                if (lossDialogId && isLossReasonCode(lossReason)) {
+                  lossMutation.mutate({
+                    id: lossDialogId,
+                    lossReason,
+                    lossReasonNotes: lossReasonNotes.trim() || undefined,
+                  });
                 }
               }}
               className="bg-destructive hover:bg-destructive/90"

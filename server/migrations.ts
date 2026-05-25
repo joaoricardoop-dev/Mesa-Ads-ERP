@@ -1470,6 +1470,28 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
          AND "status" = 'active';
     `,
   },
+  {
+    // Sprint 1 / Task #189 follow-up:
+    // (a) adiciona coluna lossReasonNotes (texto livre auxiliar; o motivo
+    //     em si vira enum aplicado no Zod/UI — schema continua flexível).
+    // (b) backfilla createdBy nas cotações órfãs a partir do lead vinculado
+    //     (leads.createdBy). Cotações sem leadId ficam com NULL — não há
+    //     fonte confiável de autoria. Idempotente: só atualiza linhas
+    //     onde createdBy ainda está NULL.
+    name: "sprint1_loss_reason_notes_and_createdby_backfill",
+    sql: `
+      ALTER TABLE "quotations"
+        ADD COLUMN IF NOT EXISTS "lossReasonNotes" text;
+
+      UPDATE "quotations" q
+         SET "createdBy" = l."createdBy",
+             "updatedAt" = NOW()
+        FROM "leads" l
+       WHERE q."leadId" = l.id
+         AND q."createdBy" IS NULL
+         AND l."createdBy" IS NOT NULL;
+    `,
+  },
 ];
 
 export async function runMigrations() {
