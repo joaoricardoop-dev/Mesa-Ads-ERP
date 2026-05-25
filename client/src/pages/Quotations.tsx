@@ -35,6 +35,14 @@ import {
 } from "@/components/ui/select";
 import { LOSS_REASON_CODES, LOSS_REASON_LABELS, isLossReasonCode } from "@shared/loss-reasons";
 import {
+  QUOTATION_AGE_WARNING_DAYS,
+  QUOTATION_AGE_DANGER_DAYS,
+  QUOTATION_AUTO_EXPIRE_DAYS,
+  ageRiskLevel,
+  isOpenQuotationStatus,
+} from "@shared/commercial-config";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -211,7 +219,7 @@ const STATUS_CONFIG: Record<QuotationStatus, { label: string; className: string 
   expirada: { label: "Expirada", className: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
 };
 
-type SortKey = "quotationNumber" | "clientName" | "totalValue" | "status" | "createdAt";
+type SortKey = "quotationNumber" | "clientName" | "totalValue" | "status" | "createdAt" | "age";
 type SortDir = "asc" | "desc";
 
 export default function Quotations() {
@@ -456,6 +464,13 @@ export default function Quotations() {
         return (a.status || "").localeCompare(b.status || "") * dir;
       case "createdAt":
         return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
+      case "age": {
+        // "Idade" = quantos dias desde a criação. Cotações mais velhas primeiro
+        // quando desc. Equivalente a ordenar por createdAt invertido.
+        const ageA = Date.now() - new Date(a.createdAt).getTime();
+        const ageB = Date.now() - new Date(b.createdAt).getTime();
+        return (ageA - ageB) * dir;
+      }
       default:
         return 0;
     }
@@ -553,6 +568,7 @@ export default function Quotations() {
               <TableHead className="text-xs text-muted-foreground font-medium hidden md:table-cell">VOLUME</TableHead>
               <SortHeader label="VALOR" col="totalValue" className="hidden lg:table-cell" />
               <TableHead className="text-xs text-muted-foreground font-medium hidden lg:table-cell">VALIDADE</TableHead>
+              <SortHeader label="IDADE" col="age" className="hidden md:table-cell" />
               <SortHeader label="STATUS" col="status" className="text-center" />
               <TableHead className="text-xs text-muted-foreground font-medium text-right">AÇÕES</TableHead>
             </TableRow>
@@ -560,13 +576,13 @@ export default function Quotations() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             ) : sorted.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   {search || statusFilter !== "all"
                     ? "Nenhuma cotação encontrada"
                     : 'Nenhuma cotação cadastrada. Clique em "Novo Orçamento" para começar.'}
@@ -672,6 +688,36 @@ export default function Quotations() {
                     ) : (
                       "—"
                     )}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm">
+                    {(() => {
+                      const ageDays = q.createdAt
+                        ? Math.floor((Date.now() - new Date(q.createdAt).getTime()) / 86400000)
+                        : 0;
+                      const risk = ageRiskLevel(ageDays, q.status);
+                      const isOpen = isOpenQuotationStatus(q.status);
+                      const className =
+                        risk === "danger"
+                          ? "bg-red-500/20 text-red-400 border-red-500/30"
+                          : risk === "warning"
+                            ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                            : "bg-muted text-muted-foreground border-border/30";
+                      const tooltip = isOpen
+                        ? `Amarelo > ${QUOTATION_AGE_WARNING_DAYS}d, vermelho > ${QUOTATION_AGE_DANGER_DAYS}d. Auto-expira em ${QUOTATION_AUTO_EXPIRE_DAYS}d.`
+                        : "Idade desde a criação (status fechado — sem risco).";
+                      return (
+                        <TooltipProvider delayDuration={150}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className={`${className} text-[10px]`}>
+                                {ageDays}d
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>{tooltip}</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-1">

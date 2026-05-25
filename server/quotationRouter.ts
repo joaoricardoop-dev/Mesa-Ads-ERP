@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getDb } from "./db";
 import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices, seasonalMultipliers, campaignPhases, campaignItems } from "../drizzle/schema";
 import { LOSS_REASON_CODES } from "../shared/loss-reasons";
+import { QUOTATION_DEFAULT_VALIDITY_DAYS, addDaysISO } from "../shared/commercial-config";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -331,6 +332,11 @@ export const quotationRouter = router({
       const quotationNumber = await generateQuotationNumber(db);
       const quotationName = generateQuotationName(entityName, input.coasterVolume ?? 0, productName);
 
+      // Sprint 2: validade default = hoje + N dias quando não informada.
+      const validUntil = input.validUntil && input.validUntil.trim() !== ""
+        ? input.validUntil
+        : addDaysISO(new Date(), QUOTATION_DEFAULT_VALIDITY_DAYS);
+
       const [created] = await db.insert(quotations).values({
         quotationNumber,
         quotationName,
@@ -345,7 +351,7 @@ export const quotationRouter = router({
         totalValue: input.totalValue,
         includesProduction: input.includesProduction,
         notes: input.notes,
-        validUntil: input.validUntil,
+        validUntil,
         createdBy: ctx.user?.id ?? null,
         isBonificada: input.isBonificada ?? false,
         hasPartnerDiscount: input.hasPartnerDiscount ?? false,

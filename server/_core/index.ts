@@ -16,6 +16,7 @@ import { runMigrations } from "../migrations";
 import { exchangeCode } from "../melhorEnvioService";
 import { validateLeadSlaFallbackOnBoot } from "./leadSlaConfig";
 import { startLeadSlaScheduler } from "../jobs/leadSlaScheduler";
+import { startQuotationScheduler } from "../quotationScheduler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -719,6 +720,10 @@ async function startServer() {
   server.listen(port, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  // Sprint 2 (Task #191): scheduler diário que auto-expira cotações abertas
+  // > 30d e cria notificação CRM 5d antes (idempotente).
+  startQuotationScheduler();
 
 }
 

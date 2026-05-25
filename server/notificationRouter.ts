@@ -137,12 +137,18 @@ export const notificationRouter = router({
       eventType: z.enum(["lead_created", "stage_changed", "quotation_created"]).optional(),
       unreadOnly: z.boolean().optional(),
     }).optional())
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = await getDatabase();
 
       const conditions = [];
       if (input?.eventType) conditions.push(eq(crmNotifications.eventType, input.eventType));
       if (input?.unreadOnly) conditions.push(isNull(crmNotifications.readAt));
+      // Sprint 2 / Task #191: notificações user-scoped (ex: aviso pré-expiração
+      // de cotação vai pro createdBy). NULL = broadcast (visível a todos os
+      // admins). Notificações com userId só aparecem pro dono.
+      conditions.push(
+        sql`(${crmNotifications.userId} IS NULL OR ${crmNotifications.userId} = ${ctx.user.id})`,
+      );
 
       const rows = await db
         .select({
@@ -173,33 +179,54 @@ export const notificationRouter = router({
     }),
 
   unreadCount: adminProcedure
-    .query(async () => {
+    .query(async ({ ctx }) => {
       const db = await getDatabase();
       const result = await db
         .select({ id: crmNotifications.id })
         .from(crmNotifications)
-        .where(isNull(crmNotifications.readAt));
+        .where(
+          and(
+            isNull(crmNotifications.readAt),
+            sql`(${crmNotifications.userId} IS NULL OR ${crmNotifications.userId} = ${ctx.user.id})`,
+          ),
+        );
       return { count: result.length };
     }),
 
   markRead: adminProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDatabase();
+      // Sprint 2 / Task #191: respeita escopo de dono — um admin não pode
+      // marcar como lida uma notificação privada de outro admin (que
+      // silenciaria alertas de SLA dele).
       await db
         .update(crmNotifications)
         .set({ readAt: new Date() })
-        .where(and(eq(crmNotifications.id, input.id), isNull(crmNotifications.readAt)));
+        .where(
+          and(
+            eq(crmNotifications.id, input.id),
+            isNull(crmNotifications.readAt),
+            sql`(${crmNotifications.userId} IS NULL OR ${crmNotifications.userId} = ${ctx.user.id})`,
+          ),
+        );
       return { success: true };
     }),
 
   markAllRead: adminProcedure
-    .mutation(async () => {
+    .mutation(async ({ ctx }) => {
       const db = await getDatabase();
+      // Mesmo escopo da listagem: só limpa o que o admin atual realmente vê
+      // (broadcasts globais + as notificações dele).
       await db
         .update(crmNotifications)
         .set({ readAt: new Date() })
-        .where(isNull(crmNotifications.readAt));
+        .where(
+          and(
+            isNull(crmNotifications.readAt),
+            sql`(${crmNotifications.userId} IS NULL OR ${crmNotifications.userId} = ${ctx.user.id})`,
+          ),
+        );
       return { success: true };
     }),
 

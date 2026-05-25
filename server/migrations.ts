@@ -1492,6 +1492,20 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
          AND l."createdBy" IS NOT NULL;
     `,
   },
+  {
+    // Sprint 2 / Task #191:
+    // Adiciona userId em crm_notifications para alertas direcionados (ex: aviso
+    // 5d antes da auto-expiração da cotação vai pro createdBy). NULL = visível
+    // a todos os admins (broadcast clássico). Index para filtrar rápido por
+    // dono na listagem.
+    name: "sprint2_crm_notifications_user_id",
+    sql: `
+      ALTER TABLE "crm_notifications"
+        ADD COLUMN IF NOT EXISTS "userId" varchar(255) REFERENCES "users"(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS "idx_crm_notifications_user_id"
+        ON "crm_notifications" ("userId");
+    `,
+  },
 ];
 
 export async function runMigrations() {

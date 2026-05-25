@@ -1191,6 +1191,7 @@ export const crmNotifications = pgTable("crm_notifications", {
   campaignId: integer("campaignId").references(() => campaigns.id, { onDelete: "cascade" }),
   clientId: integer("clientId").references(() => clients.id, { onDelete: "cascade" }),
   restaurantId: integer("restaurantId"),
+  userId: varchar("userId", { length: 255 }).references(() => users.id, { onDelete: "set null" }),
   message: text("message").notNull(),
   readAt: timestamp("readAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1201,6 +1202,7 @@ export const crmNotifications = pgTable("crm_notifications", {
   index("idx_crm_notifications_campaign_id").on(t.campaignId),
   index("idx_crm_notifications_client_id").on(t.clientId),
   index("idx_crm_notifications_restaurant_id").on(t.restaurantId),
+  index("idx_crm_notifications_user_id").on(t.userId),
 ]);
 
 export type CrmNotification = typeof crmNotifications.$inferSelect;
