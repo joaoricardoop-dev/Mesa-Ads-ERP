@@ -25,7 +25,7 @@ export type PartnerHealth = {
 // Métricas de saúde do parceiro nos últimos 90 dias. Bonificadas são
 // excluídas da contagem de cotações/wins (mesmo critério usado nos KPIs
 // financeiros).
-async function computePartnerHealth(
+export async function computePartnerHealth(
   db: Awaited<ReturnType<typeof getDatabase>>,
   partnerId: number,
   windowDays = 90,

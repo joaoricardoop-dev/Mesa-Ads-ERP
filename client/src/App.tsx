@@ -67,6 +67,7 @@ import ParceiroOnboarding from "./pages/ParceiroOnboarding";
 import ParceiroTabelaPrecos from "./pages/ParceiroTabelaPrecos";
 import ParceiroLeads from "./pages/ParceiroLeads";
 import BudgetCreator from "./pages/BudgetCreator";
+import ComercialDashboard from "./pages/ComercialDashboard";
 
 function AnuncianteRouter() {
   return (
@@ -105,6 +106,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/portal" component={AnunciantePortal} />
+      <Route path="/comercial/dashboard" component={ComercialDashboard} />
       <Route path="/comercial/simulador" component={Home} />
       <Route path="/comercial/tabela-precos" component={PriceTable} />
       <Route path="/comercial/orcamento" component={BudgetCreator} />

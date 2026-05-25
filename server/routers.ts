@@ -20,6 +20,7 @@ import { anunciantePortalRouter } from "./anunciantePortalRouter";
 import { seasonalMultiplierRouter } from "./seasonalMultiplierRouter";
 import { bankRouter } from "./bankRouter";
 import { opsRouter } from "./opsRouter";
+import { comercialDashboardRouter } from "./comercialDashboardRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, anuncianteProcedure, restauranteProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -103,6 +104,7 @@ export const appRouter = router({
   seasonalMultiplier: seasonalMultiplierRouter,
   bank: bankRouter,
   ops: opsRouter,
+  comercialDashboard: comercialDashboardRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
 

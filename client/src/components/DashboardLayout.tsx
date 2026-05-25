@@ -135,6 +135,7 @@ const NAV_ENTRIES: NavEntry[] = [
     icon: DollarSign,
     label: "Comercial",
     items: [
+      { icon: BarChart3, label: "Dashboard", path: "/comercial/dashboard" },
       { icon: Calculator, label: "Simulador", path: "/comercial/simulador" },
       { icon: FileText, label: "Orçamento", path: "/comercial/orcamento" },
       { icon: Megaphone, label: "Montar Campanha", path: "/comercial/montar-campanha" },
