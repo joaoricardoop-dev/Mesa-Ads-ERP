@@ -43,6 +43,9 @@ export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      pool.on("error", (err) => {
+        console.warn("[Database] Pool error (suprimido para evitar crash):", err?.message || err);
+      });
       _db = drizzle(pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
