@@ -1506,6 +1506,74 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
         ON "crm_notifications" ("userId");
     `,
   },
+  {
+    // Task #197 — Cronograma de pagamento configurável (cotação → campanha).
+    // Substitui a regra fixa "1 parcela por fase, vencimento = início+15d".
+    name: "task_197_billing_schedule_items",
+    sql: `
+      CREATE TABLE IF NOT EXISTS "billing_schedule_items" (
+        "id" serial PRIMARY KEY,
+        "ownerType" varchar(16) NOT NULL,
+        "ownerId" integer NOT NULL,
+        "sequence" integer NOT NULL,
+        "amount" decimal(12,2) NOT NULL,
+        "dueDate" date NOT NULL,
+        "notes" text,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      );
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'uq_billing_schedule_owner_seq'
+        ) THEN
+          ALTER TABLE "billing_schedule_items"
+            ADD CONSTRAINT "uq_billing_schedule_owner_seq"
+            UNIQUE ("ownerType", "ownerId", "sequence");
+        END IF;
+      END $$;
+      CREATE INDEX IF NOT EXISTS "idx_billing_schedule_owner"
+        ON "billing_schedule_items" ("ownerType", "ownerId");
+    `,
+  },
+  {
+    // Task #197 — backfill retroativo: cotações abertas (rascunho/enviada/ativa)
+    // e campanhas ativas sem schedule recebem a sugestão default (1 parcela,
+    // vencimento = periodStart+15d). Não toca em invoices já emitidas.
+    name: "task_197_billing_schedule_backfill",
+    sql: `
+      INSERT INTO "billing_schedule_items" ("ownerType","ownerId","sequence","amount","dueDate","notes")
+      SELECT 'quotation', q.id, 1,
+             COALESCE(q."totalValue", 0)::numeric(12,2),
+             COALESCE(q."periodStart", CURRENT_DATE) + INTERVAL '15 days',
+             'Parcela única (backfill)'
+        FROM "quotations" q
+       WHERE q.status IN ('rascunho','enviada','ativa')
+         AND COALESCE(q."isBonificada", false) = false
+         AND COALESCE(q."totalValue", 0)::numeric > 0
+         AND NOT EXISTS (
+           SELECT 1 FROM "billing_schedule_items" b
+            WHERE b."ownerType" = 'quotation' AND b."ownerId" = q.id
+         );
+
+      INSERT INTO "billing_schedule_items" ("ownerType","ownerId","sequence","amount","dueDate","notes")
+      SELECT 'campaign', c.id, ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY p.sequence),
+             COALESCE(
+               (SELECT SUM(COALESCE(ci."totalPrice", (ci.quantity * COALESCE(ci."unitPrice",0))::numeric))::numeric(12,2)
+                  FROM "campaign_items" ci WHERE ci."campaignPhaseId" = p.id),
+               0
+             )::numeric(12,2),
+             p."periodStart" + INTERVAL '15 days',
+             'Batch ' || p.sequence || ' (backfill)'
+        FROM "campaigns" c
+        JOIN "campaign_phases" p ON p."campaignId" = c.id
+       WHERE c.status IN ('active','producao','distribuicao','veiculacao')
+         AND COALESCE(c."isBonificada", false) = false
+         AND NOT EXISTS (
+           SELECT 1 FROM "billing_schedule_items" b
+            WHERE b."ownerType" = 'campaign' AND b."ownerId" = c.id
+         );
+    `,
+  },
 ];
 
 export async function runMigrations() {

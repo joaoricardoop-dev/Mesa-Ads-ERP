@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
+import { trpc } from "@/lib/trpc";
 
 import imgCoverCoaster from "@assets/Trailer_KpNOR6CH_1773789838816.png";
 import imgPinkCoasters from "@assets/ChatGPT_Image_11_de_mar._de_2026,_17_49_06_1773789838815.png";
@@ -75,6 +76,11 @@ function Step({ num, title, desc }: { num: string; title: string; desc: string }
 
 export default function ClientPresentation({ isOpen, onClose, quotation, quotationItems }: Props) {
   const [slide, setSlide] = useState(0);
+  const quotationId = (quotation as any).id as number | undefined;
+  const { data: billingSchedule } = trpc.billingSchedule.getForQuotation.useQuery(
+    { quotationId: quotationId! },
+    { enabled: isOpen && !!quotationId && !quotation.isBonificada },
+  );
 
   const clientName = quotation.clientName || quotation.leadName || "Cliente";
   const company = quotation.clientCompany || quotation.leadCompany || "";
@@ -359,10 +365,35 @@ export default function ClientPresentation({ isOpen, onClose, quotation, quotati
               <h2 className="text-4xl md:text-5xl font-black text-white leading-tight mb-10">
                 Transparência<br />em cada detalhe.
               </h2>
+              {billingSchedule && billingSchedule.length > 0 && (
+                <div className="mb-10 max-w-xl">
+                  <p className="text-xs font-bold tracking-[0.2em] uppercase mb-3 text-white/50">Cronograma de parcelas</p>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-white/40 text-xs border-b border-white/10">
+                        <th className="text-left py-1.5">#</th>
+                        <th className="text-left py-1.5">Vencimento</th>
+                        <th className="text-right py-1.5">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {billingSchedule.map((it: any) => (
+                        <tr key={it.sequence} className="border-b border-white/5">
+                          <td className="py-1.5 text-white font-mono">{it.sequence}</td>
+                          <td className="py-1.5 text-white">
+                            {(() => { try { return new Date(it.dueDate + "T00:00:00Z").toLocaleDateString("pt-BR", { timeZone: "UTC" }); } catch { return it.dueDate; } })()}
+                          </td>
+                          <td className="py-1.5 text-white text-right font-mono">{formatCurrency(parseFloat(it.amount))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-5">
                 {[
                   { label: "Veiculação", val: "Batches de 4 semanas padronizados" },
-                  { label: "Pagamento", val: "100% antes da veiculação" },
+                  { label: "Pagamento", val: billingSchedule && billingSchedule.length > 1 ? `${billingSchedule.length} parcelas conforme cronograma` : "100% antes da veiculação" },
                   { label: "Design", val: "5 dias após o faturamento" },
                   { label: "Produção", val: "20 dias após conclusão do design" },
                   { label: "Prova", val: "Fotos semanais de verificação" },

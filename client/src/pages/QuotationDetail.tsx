@@ -4,6 +4,7 @@ import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
 import { generateProposalPdf } from "@/lib/generate-proposal-pdf";
+import { BillingScheduleSection, ReadonlySchedule } from "@/components/billing/BillingScheduleSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -266,7 +267,9 @@ export default function QuotationDetail() {
           })
         : undefined;
 
+      const billingScheduleData = await utils.billingSchedule.getForQuotation.fetch({ quotationId }).catch(() => [] as any[]);
       generateProposalPdf({
+        billingSchedule: (billingScheduleData as any[]).map((b: any) => ({ sequence: b.sequence, amount: b.amount, dueDate: b.dueDate, notes: b.notes })),
         clientName: quotation.clientName || quotation.leadName || "Cliente",
         clientCompany: quotation.clientCompany || quotation.leadCompany || undefined,
         clientCnpj: (quotation as any).clientCnpj || undefined,
@@ -931,6 +934,28 @@ export default function QuotationDetail() {
                   {quotation.lossReason && (
                     <p className="text-xs text-muted-foreground">Motivo: {quotation.lossReason}</p>
                   )}
+                </div>
+              )}
+
+              {/* Task #197 — Condições de pagamento */}
+              {!quotation.isBonificada && ["rascunho", "enviada", "ativa"].includes(status) && (
+                <BillingScheduleSection
+                  mode="quotation"
+                  ownerId={quotationId}
+                  totalValue={quotation.totalValue || "0"}
+                  periodStart={(quotation as any).periodStart}
+                />
+              )}
+              {/* Read-only visibility para status terminais (os_gerada/win/etc). */}
+              {!quotation.isBonificada && !["rascunho", "enviada", "ativa"].includes(status) && (
+                <div className="bg-card border border-border/30 rounded-xl p-4 space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    Condições de pagamento
+                  </h3>
+                  <ReadonlySchedule
+                    items={(quotation as any).billingSchedule ?? []}
+                    total={quotation.totalValue || "0"}
+                  />
                 </div>
               )}
 

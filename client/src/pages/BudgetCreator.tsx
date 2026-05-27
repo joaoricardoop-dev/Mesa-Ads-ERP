@@ -880,6 +880,108 @@ function BudgetItemCard({ item, globalParams, onUpdate, onRemove, onAddTelasDual
 
 // ─── BudgetSummaryPanel ───────────────────────────────────────────────────────
 
+type DraftScheduleItem = { sequence: number; amount: string; dueDate: string; notes: string | null };
+
+function makeDefaultSchedule(total: number, parts: number): DraftScheduleItem[] {
+  if (!isFinite(total) || total <= 0 || parts <= 0) return [];
+  const cents = Math.round(total * 100);
+  const base = Math.floor(cents / parts);
+  const amounts: number[] = Array(parts).fill(base);
+  const remainder = cents - base * parts;
+  if (remainder > 0) amounts[amounts.length - 1] += remainder;
+  const today = new Date();
+  return amounts.map((c, i) => {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() + 15 + i * 30);
+    return {
+      sequence: i + 1,
+      amount: (c / 100).toFixed(2),
+      dueDate: d.toISOString().slice(0, 10),
+      notes: parts === 1 ? "Parcela única" : `Parcela ${i + 1}/${parts}`,
+    };
+  });
+}
+
+function PaymentTermsDraftEditor({
+  totalValue,
+  schedule,
+  onChange,
+}: {
+  totalValue: number;
+  schedule: DraftScheduleItem[];
+  onChange: (next: DraftScheduleItem[]) => void;
+}) {
+  const parts = schedule.length || 1;
+  const sum = schedule.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+  const diffCents = Math.abs(Math.round(sum * 100) - Math.round(totalValue * 100));
+  const balanced = diffCents <= 1;
+
+  useEffect(() => {
+    if (schedule.length === 0 && totalValue > 0) {
+      onChange(makeDefaultSchedule(totalValue, 1));
+    }
+  }, [schedule.length, totalValue]);
+
+  useEffect(() => {
+    if (schedule.length > 0 && totalValue > 0) {
+      const lastAmounts = schedule.map((s) => s.amount).join(",");
+      const next = makeDefaultSchedule(totalValue, schedule.length).map((n, i) => ({
+        ...n,
+        dueDate: schedule[i]?.dueDate ?? n.dueDate,
+        notes: schedule[i]?.notes ?? n.notes,
+      }));
+      const nextAmounts = next.map((s) => s.amount).join(",");
+      if (lastAmounts !== nextAmounts) onChange(next);
+    }
+  }, [totalValue]);
+
+  const setParts = (n: number) => {
+    const clamped = Math.max(1, Math.min(12, n));
+    onChange(makeDefaultSchedule(totalValue, clamped));
+  };
+
+  const updateItem = (idx: number, patch: Partial<DraftScheduleItem>) => {
+    onChange(schedule.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  };
+
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">Parcelas</Label>
+        <div className="flex items-center gap-1">
+          <Button type="button" variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => setParts(parts - 1)} disabled={parts <= 1}>−</Button>
+          <span className="font-mono w-6 text-center">{parts}×</span>
+          <Button type="button" variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => setParts(parts + 1)} disabled={parts >= 12}>+</Button>
+        </div>
+      </div>
+      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+        {schedule.map((it, i) => (
+          <div key={i} className="flex gap-1.5 items-center">
+            <span className="text-[10px] text-muted-foreground w-4">#{it.sequence}</span>
+            <Input
+              type="date"
+              value={it.dueDate}
+              onChange={(e) => updateItem(i, { dueDate: e.target.value })}
+              className="h-7 text-[11px] flex-1 min-w-0"
+            />
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={it.amount}
+              onChange={(e) => updateItem(i, { amount: e.target.value.replace(",", ".") })}
+              className="h-7 text-[11px] w-20 font-mono text-right"
+            />
+          </div>
+        ))}
+      </div>
+      <div className={`flex justify-between text-[11px] ${balanced ? "text-muted-foreground" : "text-red-500 font-semibold"}`}>
+        <span>Σ parcelas</span>
+        <span className="font-mono">{fmtBRL(sum)} {balanced ? "✓" : `(falta ${fmtBRL(totalValue - sum)})`}</span>
+      </div>
+    </div>
+  );
+}
+
 interface BudgetSummaryPanelProps {
   items: BudgetItemState[];
   globalParams: GlobalBudgetParams;
@@ -887,9 +989,11 @@ interface BudgetSummaryPanelProps {
   hasPartner: boolean;
   onGerarCotacao: () => void;
   isGenerating: boolean;
+  schedule: DraftScheduleItem[];
+  onScheduleChange: (next: DraftScheduleItem[]) => void;
 }
 
-function BudgetSummaryPanel({ items, globalParams, clientName, hasPartner, onGerarCotacao, isGenerating }: BudgetSummaryPanelProps) {
+function BudgetSummaryPanel({ items, globalParams, clientName, hasPartner, onGerarCotacao, isGenerating, schedule, onScheduleChange }: BudgetSummaryPanelProps) {
   const itemCalcs = useMemo(() => {
     return items
       .filter((item) => item.productId !== null)
@@ -1022,6 +1126,24 @@ function BudgetSummaryPanel({ items, globalParams, clientName, hasPartner, onGer
         </CardContent>
       </Card>
 
+      {/* Task #197 — Condições de pagamento (draft, persistido após criação) */}
+      {hasItems && !globalParams.isBonificada && (
+        <Card className="border border-border/40">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Condições de pagamento
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 space-y-2">
+            <PaymentTermsDraftEditor
+              totalValue={totals.totalFinal}
+              schedule={schedule}
+              onChange={onScheduleChange}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       <Button className="w-full" disabled={!hasItems || isGenerating} onClick={onGerarCotacao} size="lg">
         <Calculator className="h-4 w-4 mr-2" />
         {isGenerating ? "Gerando..." : "Gerar Cotação"}
@@ -1052,6 +1174,7 @@ export default function BudgetCreator() {
   const [items, setItems] = useState<BudgetItemState[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
+  const [schedule, setSchedule] = useState<DraftScheduleItem[]>([]);
 
   const { data: clientsData } = trpc.advertiser.list.useQuery();
   const clientsList = useMemo(() => (clientsData?.items ?? []) as ClientInfo[], [clientsData]);
@@ -1078,6 +1201,7 @@ export default function BudgetCreator() {
 
   const createQuotation = trpc.quotation.create.useMutation();
   const addItem = trpc.quotation.addItem.useMutation();
+  const setBillingSchedule = trpc.billingSchedule.setForQuotation.useMutation();
 
   const agencyBVPercent = useMemo(() => {
     const v = parseFloat(agencyCommissionPercent);
@@ -1284,6 +1408,22 @@ export default function BudgetCreator() {
         }
       }
 
+      // Task #197 — persiste cronograma customizado (se balanceado).
+      if (!isBonificada && schedule.length > 0) {
+        const sum = schedule.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+        const tv = parseFloat(totalValue);
+        if (Math.abs(Math.round(sum * 100) - Math.round(tv * 100)) <= 1 && (schedule.length > 1 || sum > 0)) {
+          try {
+            await setBillingSchedule.mutateAsync({
+              quotationId: quotation.id,
+              items: schedule.map((s) => ({ sequence: s.sequence, amount: s.amount, dueDate: s.dueDate, notes: s.notes })),
+            });
+          } catch (e: any) {
+            toast.warning(`Cotação criada, mas cronograma não foi salvo: ${e?.message || "erro"}`);
+          }
+        }
+      }
+
       toast.success("Cotação gerada com sucesso!");
       navigate(`/comercial/cotacoes/${quotation.id}`);
     } catch (err: any) {
@@ -1291,7 +1431,7 @@ export default function BudgetCreator() {
     } finally {
       setIsGenerating(false);
     }
-  }, [clientId, leadId, itemCalcs, customItems, totals, descontoManual, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate, agencyBVPercent, agencyCommissionPercent]);
+  }, [clientId, leadId, itemCalcs, customItems, totals, descontoManual, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate, agencyBVPercent, agencyCommissionPercent, schedule, setBillingSchedule]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -1449,6 +1589,8 @@ export default function BudgetCreator() {
             hasPartner={!!partnerId}
             onGerarCotacao={handleGerarCotacao}
             isGenerating={isGenerating}
+            schedule={schedule}
+            onScheduleChange={setSchedule}
           />
         </div>
       </div>

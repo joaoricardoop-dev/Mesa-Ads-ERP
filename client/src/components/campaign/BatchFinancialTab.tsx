@@ -5,6 +5,7 @@ import { BatchEconomicsOverride } from "./BatchEconomicsOverride";
 import { BatchDRE } from "./BatchDRE";
 import { BatchPayablesList } from "./BatchPayablesList";
 import { BatchInvoiceCard } from "./BatchInvoiceCard";
+import { BillingScheduleSection } from "@/components/billing/BillingScheduleSection";
 
 function KPI({
   label, value, icon, accent, warn,
@@ -28,6 +29,7 @@ export function BatchFinancialTab({
   campaignId: number;
   phaseId: number;
 }) {
+  const { data: campaignData } = trpc.campaign.get.useQuery({ id: campaignId });
   const { data, isLoading, refetch } = trpc.campaignPhase.getFinancials.useQuery(
     { phaseId },
     { enabled: phaseId > 0 },
@@ -78,6 +80,15 @@ export function BatchFinancialTab({
         onChange={() => refetch()}
       />
       <BatchDRE financials={data.financials} partner={data.partner} />
+      {campaignData && !campaignData.isBonificada && (
+        <BillingScheduleSection
+          mode="campaign"
+          ownerId={campaignId}
+          totalValue={(campaignData as any).quotationTotalValue || "0"}
+          periodStart={(campaignData as any).startDate}
+          defaultCollapsed
+        />
+      )}
       <BatchInvoiceCard
         invoice={data.invoice}
         phaseId={phaseId}

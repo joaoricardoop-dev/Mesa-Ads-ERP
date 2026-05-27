@@ -14,6 +14,8 @@ export interface QuotationSignPDFData {
   signerCpf: string;
   signedAt: string;
   signatureHash?: string;
+  /** Task #197 — cronograma de parcelas (opcional). */
+  billingSchedule?: Array<{ sequence: number; amount: string | number; dueDate: string }>;
 }
 
 export function generateQuotationSignPdf(data: QuotationSignPDFData) {
@@ -133,6 +135,47 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
   doc.setDrawColor(220, 220, 220);
   doc.line(margin, y, pageWidth - margin, y);
   y += 10;
+
+  // Task #197 — Condições de pagamento
+  if (data.billingSchedule && data.billingSchedule.length > 0) {
+    if (y > pageHeight - (40 + data.billingSchedule.length * 7)) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setTextColor(13, 13, 13);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("CONDIÇÕES DE PAGAMENTO", margin, y);
+    y += 8;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont("helvetica", "bold");
+    doc.text("#", margin, y);
+    doc.text("Vencimento", margin + 15, y);
+    doc.text("Valor", pageWidth - margin, y, { align: "right" });
+    y += 2;
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(60, 60, 60);
+    for (const r of data.billingSchedule) {
+      const due = r.dueDate.length >= 10 ? new Date(r.dueDate + "T00:00:00Z").toLocaleDateString("pt-BR", { timeZone: "UTC" }) : r.dueDate;
+      doc.text(String(r.sequence), margin, y);
+      doc.text(due, margin + 15, y);
+      doc.text(
+        `R$ ${parseFloat(String(r.amount)).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        pageWidth - margin,
+        y,
+        { align: "right" },
+      );
+      y += 6;
+    }
+    y += 6;
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 10;
+  }
 
   if (y > pageHeight - 60) {
     doc.addPage();

@@ -6,6 +6,14 @@ import { eq, inArray, asc } from "drizzle-orm";
 import { buildCampaignName } from "./utils/campaignName";
 import { withUniqueRetry, describeDbError, isUniqueViolation } from "./utils/uniqueNumberRetry";
 import { nextNumber } from "./utils/numberCounter";
+import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
+import {
+  ensureDefaultQuotationSchedule,
+  seedCampaignScheduleFromQuotation,
+  readBillingSchedule,
+} from "./billingScheduleRouter";
+import { scheduleMatchesTotal } from "../shared/billingSchedule";
+import { TRPCError } from "@trpc/server";
 
 async function getDatabase() {
   const d = await getDb();
@@ -103,6 +111,10 @@ export function setupPublicSigningRoutes(app: express.Express) {
         }
       }
 
+      // Task #197 — inclui cronograma de pagamento.
+      const { readBillingSchedule } = await import("./billingScheduleRouter");
+      const billingSchedule = await readBillingSchedule(db, "quotation", quotation[0].id);
+
       res.json({
         quotation: quotation[0],
         serviceOrder: {
@@ -117,6 +129,12 @@ export function setupPublicSigningRoutes(app: express.Express) {
         restaurants,
         batches: batchInfo,
         items,
+        billingSchedule: billingSchedule.map((b: any) => ({
+          sequence: b.sequence,
+          amount: b.amount,
+          dueDate: b.dueDate,
+          notes: b.notes,
+        })),
       });
     } catch (err: any) {
       console.error("Error fetching public quotation:", err);
@@ -210,6 +228,19 @@ export function setupPublicSigningRoutes(app: express.Express) {
 
       if (batchRecords.length === 0 || batchRecords.length !== batchIds.length) {
         return res.status(400).json({ error: "Um ou mais batches não encontrados" });
+      }
+
+      // Task #197 — valida cronograma de pagamento da cotação antes de
+       // converter em campanha (assinatura pública é equivalente a signOS).
+      if (!quotation[0].isBonificada) {
+        const sched = await readBillingSchedule(db, "quotation", quotation[0].id);
+        if (sched.length === 0) {
+          await ensureDefaultQuotationSchedule(db, quotation[0].id);
+        } else if (!scheduleMatchesTotal(sched, quotation[0].totalValue ?? "0")) {
+          return res.status(400).json({
+            error: "Soma das parcelas não bate com o valor da cotação. Ajuste as condições antes de assinar.",
+          });
+        }
       }
 
       const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
@@ -353,8 +384,8 @@ export function setupPublicSigningRoutes(app: express.Express) {
       );
 
       if (!isBonificada && campaignId > 0 && quotation[0].totalValue && parseFloat(quotation[0].totalValue) > 0) {
+        // Task #173 — fatura "emitida" cabeçalho (auditoria/recebimento).
         try {
-          // Task #173 — número atômico via number_counters (sem race).
           const invoiceNumber = await nextNumber(db, "invoice");
           const today = new Date().toISOString().split("T")[0];
           const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
@@ -370,6 +401,11 @@ export function setupPublicSigningRoutes(app: express.Express) {
         } catch (err) {
           console.warn("[publicSigning] Failed to auto-create invoice:", err);
         }
+
+        // Task #197 — herda cronograma configurado na cotação e gera as
+        // faturas "prevista" a partir dele (mesma lógica de signOS).
+        await seedCampaignScheduleFromQuotation(db, { quotationId: quotation[0].id, campaignId });
+        await scheduleInvoicesForCampaign(db, { id: campaignId, clientId: resolvedClientId });
       }
 
       res.json({

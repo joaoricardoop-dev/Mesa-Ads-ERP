@@ -80,6 +80,18 @@ export async function scheduleInvoicesForCampaign(
   campaign: { id: number; clientId: number },
   opts: { dueOffsetDays?: number; restrictToPhaseIds?: number[] } = {},
 ): Promise<{ created: number; skipped: number; total: number }> {
+  // Task #197 — prioriza billing_schedule_items (ownerType=campaign).
+  // Quando presente, ignora a regra fixa de 1 fatura por fase / +15d e
+  // cria uma "prevista" por parcela configurada. Fallback: comportamento
+  // legado abaixo (compatível com campanhas sem schedule custom).
+  try {
+    const { scheduleInvoicesFromBillingSchedule } = await import("../billingScheduleRouter");
+    const r = await scheduleInvoicesFromBillingSchedule(tx, campaign);
+    if (r.total > 0) return r;
+  } catch (err) {
+    console.warn("[scheduleInvoicesForCampaign] billing schedule fallback:", (err as Error)?.message);
+  }
+
   const dueOffsetDays = opts.dueOffsetDays ?? 15;
 
   const allPhases: PhaseForScheduling[] = await tx

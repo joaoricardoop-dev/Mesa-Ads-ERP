@@ -1455,4 +1455,26 @@ export const bankTransactions = pgTable("bank_transactions", {
 export type BankTransaction = typeof bankTransactions.$inferSelect;
 export type InsertBankTransaction = typeof bankTransactions.$inferInsert;
 
+// ─── Billing Schedule Items (Task #197) ─────────────────────────────────────
+// Parcelamento configurável de cotação (ownerType="quotation") e da campanha
+// resultante (ownerType="campaign"). Substitui o default automático
+// "1 parcela por fase, vencimento = periodStart+15d" quando presente.
+export const billingScheduleItems = pgTable("billing_schedule_items", {
+  id: serial("id").primaryKey(),
+  ownerType: varchar("ownerType", { length: 16 }).notNull(),
+  ownerId: integer("ownerId").notNull(),
+  sequence: integer("sequence").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  dueDate: date("dueDate").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  unique("uq_billing_schedule_owner_seq").on(t.ownerType, t.ownerId, t.sequence),
+  index("idx_billing_schedule_owner").on(t.ownerType, t.ownerId),
+]);
+
+export type BillingScheduleItem = typeof billingScheduleItems.$inferSelect;
+export type InsertBillingScheduleItem = typeof billingScheduleItems.$inferInsert;
+
 export * from "../shared/models/auth";

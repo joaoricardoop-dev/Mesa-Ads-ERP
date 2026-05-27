@@ -1,6 +1,7 @@
 import { systemRouter } from "./_core/systemRouter";
 import { financialRouter } from "./financialRouter";
 import { quotationRouter } from "./quotationRouter";
+import { billingScheduleRouter } from "./billingScheduleRouter";
 import { leadRouter } from "./leadRouter";
 import { contactRouter } from "./contactRouter";
 import { serviceOrderRouter } from "./serviceOrderRouter";
@@ -85,6 +86,7 @@ export const appRouter = router({
   system: systemRouter,
   financial: financialRouter,
   quotation: quotationRouter,
+  billingSchedule: billingScheduleRouter,
   lead: leadRouter,
   contact: contactRouter,
   serviceOrder: serviceOrderRouter,

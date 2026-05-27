@@ -61,6 +61,8 @@ interface ProposalPDFData {
   telasImpressions15s?: number;
   /** IRPJ rate for the product (decimal, e.g. 0.06). Defaults to 6% if not provided. */
   irpj?: number;
+  /** Task #197 — cronograma de parcelas (opcional). */
+  billingSchedule?: Array<{ sequence: number; amount: string | number; dueDate: string; notes?: string | null }>;
 }
 
 const FONT_NAME = "HostGrotesk";
@@ -753,6 +755,41 @@ export function generateProposalPdf(data: ProposalPDFData) {
     doc.line(margin + 10, y + 31, pageWidth - margin - 10, y + 31);
 
     y += 62;
+  }
+
+  // Task #197 — Condições de pagamento (cronograma de parcelas)
+  if (data.billingSchedule && data.billingSchedule.length > 0 && !isBonificada) {
+    const rows = data.billingSchedule;
+    const headerH = 14;
+    const rowH = 11;
+    const boxH = 8 + headerH + rows.length * rowH + 6;
+    y = checkPageBreak(doc, y, boxH + 20);
+    y = drawSectionTitle(doc, "CONDIÇÕES DE PAGAMENTO", y, margin);
+    doc.setFillColor(...LIGHT_GRAY);
+    doc.roundedRect(margin, y, contentWidth, boxH, 3, 3, "F");
+    doc.setTextColor(...GRAY);
+    doc.setFontSize(8);
+    doc.setFont(FONT_NAME, "bold");
+    doc.text("#", margin + 10, y + 12);
+    doc.text("VENCIMENTO", margin + 25, y + 12);
+    doc.text("VALOR", pageWidth - margin - 10, y + 12, { align: "right" });
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin + 10, y + 16, pageWidth - margin - 10, y + 16);
+    let ry = y + 12 + headerH;
+    doc.setFont(FONT_NAME, "normal");
+    doc.setFontSize(9);
+    for (const r of rows) {
+      doc.setTextColor(...GRAY);
+      doc.text(String(r.sequence), margin + 10, ry);
+      const due = r.dueDate.length >= 10 ? new Date(r.dueDate + "T00:00:00Z").toLocaleDateString("pt-BR", { timeZone: "UTC" }) : r.dueDate;
+      doc.text(due, margin + 25, ry);
+      doc.setTextColor(...DARK_GRAY);
+      doc.setFont(FONT_NAME, "bold");
+      doc.text(fmtCurrency(parseFloat(String(r.amount))), pageWidth - margin - 10, ry, { align: "right" });
+      doc.setFont(FONT_NAME, "normal");
+      ry += rowH;
+    }
+    y += boxH + 10;
   }
 
   if (discountPercent > 0) {

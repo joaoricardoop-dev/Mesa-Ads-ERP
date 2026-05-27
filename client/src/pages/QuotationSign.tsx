@@ -99,6 +99,7 @@ export default function QuotationSign() {
       signerCpf,
       signedAt: r.signedAt,
       signatureHash: r.signatureHash,
+      billingSchedule: (data as any).billingSchedule || undefined,
     });
   };
 
@@ -380,6 +381,33 @@ export default function QuotationSign() {
                     </div>
                   ))}
                 </div>
+              </div>
+              <div className="border-t border-[hsl(0,0%,14%)]" />
+            </>
+          )}
+
+          {(data as any).billingSchedule && (data as any).billingSchedule.length > 0 && (
+            <>
+              <div>
+                <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-3">Condições de pagamento</h3>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-[hsl(0,0%,50%)] text-xs border-b border-[hsl(0,0%,14%)]">
+                      <th className="text-left py-1.5">#</th>
+                      <th className="text-left py-1.5">Vencimento</th>
+                      <th className="text-right py-1.5">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {((data as any).billingSchedule as Array<{ sequence: number; amount: string; dueDate: string }>).map((it) => (
+                      <tr key={it.sequence} className="border-b border-[hsl(0,0%,10%)]">
+                        <td className="py-1.5 text-white font-mono">{it.sequence}</td>
+                        <td className="py-1.5 text-white">{formatDate(it.dueDate)}</td>
+                        <td className="py-1.5 text-white text-right font-mono">{formatCurrency(parseFloat(it.amount))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
               <div className="border-t border-[hsl(0,0%,14%)]" />
             </>

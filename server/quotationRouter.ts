@@ -10,6 +10,8 @@ import crypto from "crypto";
 import { createCrmNotification } from "./notificationRouter";
 import { buildCampaignName } from "./utils/campaignName";
 import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
+import { ensureDefaultQuotationSchedule, seedCampaignScheduleFromQuotation, readBillingSchedule } from "./billingScheduleRouter";
+import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { withUniqueRetry, describeDbError } from "./utils/uniqueNumberRetry";
 import { nextNumber } from "./utils/numberCounter";
 
@@ -238,7 +240,11 @@ export const quotationRouter = router({
         .where(eq(quotations.id, input.id))
         .limit(1);
       if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
-      return rows[0];
+      // Task #197 — embed billing schedule in the canonical quotation
+      // payload so consumers (proposta, PDF, internal detail) don't need
+      // a second roundtrip.
+      const billingSchedule = await readBillingSchedule(db, "quotation", rows[0].id);
+      return { ...rows[0], billingSchedule };
     }),
 
   create: comercialProcedure
@@ -369,6 +375,9 @@ export const quotationRouter = router({
         customVipProviderId: input.customVipProviderId ?? null,
         agencyCommissionPercent: input.agencyCommissionPercent ?? null,
       }).returning();
+
+      // Task #197 — auto-seed do cronograma default (1 parcela, +15d).
+      try { await ensureDefaultQuotationSchedule(db, created.id); } catch (e) { console.warn("[create] ensureDefaultQuotationSchedule:", (e as Error)?.message); }
 
       if (created.partnerId) {
         const [partner] = await db.select({ name: partners.name }).from(partners).where(eq(partners.id, created.partnerId)).limit(1);
@@ -506,6 +515,19 @@ export const quotationRouter = router({
       if (!quotation[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
       if (quotation[0].status === "win") throw new TRPCError({ code: "BAD_REQUEST", message: "Cotação já foi convertida" });
 
+      // Task #197 — valida cronograma antes de converter (apenas quando não bonificada).
+      if (!quotation[0].isBonificada) {
+        const sched = await readBillingSchedule(db, "quotation", quotation[0].id);
+        if (sched.length === 0) {
+          await ensureDefaultQuotationSchedule(db, quotation[0].id);
+        } else if (!scheduleMatchesTotal(sched, quotation[0].totalValue ?? "0")) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Soma das parcelas não bate com o valor da cotação. Ajuste as condições de pagamento antes de converter.",
+          });
+        }
+      }
+
       const [cliRow] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, quotation[0].clientId!)).limit(1);
       const campaignName = buildCampaignName(cliRow?.name, input.startDate);
 
@@ -629,9 +651,15 @@ export const quotationRouter = router({
 
       await autoCreateInvoice(db, { id: campaign.id, clientId: campaign.clientId }, { totalValue: quotation[0].totalValue, isBonificada: quotation[0].isBonificada });
 
-      // Garante cronograma de faturas previstas para todas as fases criadas
-      // a partir dos quotation_items (idempotente — pula fases já com fatura).
-      // Falha propaga: cotação não pode ser marcada como ganha sem cronograma.
+      // Task #197 — copia o schedule da cotação para a campanha antes de
+      // criar invoices prevista. Se cotação não tem schedule, sintetiza a
+      // partir das fases recém-criadas.
+      if (!quotation[0].isBonificada) {
+        await seedCampaignScheduleFromQuotation(db, { quotationId: quotation[0].id, campaignId: campaign.id });
+      }
+
+      // Garante cronograma de faturas previstas (prioriza billing_schedule_items;
+      // fallback para 1 fatura/fase). Idempotente.
       await scheduleInvoicesForCampaign(db, { id: campaign.id, clientId: campaign.clientId });
 
       await db
@@ -868,6 +896,19 @@ export const quotationRouter = router({
       if (!quotation[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
       if (quotation[0].status !== "os_gerada") throw new TRPCError({ code: "BAD_REQUEST", message: "Cotação precisa estar com OS gerada" });
 
+      // Task #197 — valida cronograma antes da assinatura.
+      if (!quotation[0].isBonificada) {
+        const sched = await readBillingSchedule(db, "quotation", quotation[0].id);
+        if (sched.length === 0) {
+          await ensureDefaultQuotationSchedule(db, quotation[0].id);
+        } else if (!scheduleMatchesTotal(sched, quotation[0].totalValue ?? "0")) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Soma das parcelas não bate com o valor da cotação. Ajuste as condições antes de assinar.",
+          });
+        }
+      }
+
       const allocatedRestaurants = await db
         .select()
         .from(quotationRestaurants)
@@ -986,9 +1027,13 @@ export const quotationRouter = router({
 
       await autoCreateInvoice(db, { id: campaign.id, clientId: campaign.clientId }, { totalValue: quotation[0].totalValue, isBonificada: quotation[0].isBonificada });
 
-      // Garante cronograma de faturas previstas para todas as fases da campanha
-      // gerada via OS assinada (idempotente — pula fases já com fatura).
-      // Falha propaga: assinatura de OS não pode concluir sem cronograma.
+      // Task #197 — herda o schedule configurado na cotação.
+      if (!quotation[0].isBonificada) {
+        await seedCampaignScheduleFromQuotation(db, { quotationId: quotation[0].id, campaignId: campaign.id });
+      }
+
+      // Garante cronograma de faturas previstas (prioriza billing_schedule_items
+      // quando definido; fallback para 1 fatura/fase). Idempotente.
       await scheduleInvoicesForCampaign(db, { id: campaign.id, clientId: campaign.clientId });
 
       await db
@@ -1399,6 +1444,9 @@ export const quotationRouter = router({
       };
 
       const [created] = await db.insert(quotations).values(insertValues).returning();
+
+      // Task #197 — auto-seed do schedule default (1 parcela).
+      try { await ensureDefaultQuotationSchedule(db, created.id); } catch (e) { console.warn("[createFromBuilder] ensureDefaultQuotationSchedule:", (e as Error)?.message); }
 
       for (const item of computedItems) {
         const ciclosDesc = item.cycles && item.cycleWeeks
