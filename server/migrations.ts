@@ -1445,6 +1445,44 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     `,
   },
   {
+    // Task #202 — Sentinel do banco de teste e2e. A tabela existe em TODOS
+    // os bancos (idempotente), mas a LINHA `(true)` só é inserida pelo
+    // módulo `server/_dev/devEndpoints.ts` quando ele é carregado (i.e.
+    // DEV_FIXTURES=1) E o host da DATABASE_URL atual não bate com nenhum
+    // padrão de produção conhecido. Cada endpoint /api/dev-* faz SELECT
+    // nessa linha antes de qualquer INSERT — se vier vazio (caso típico
+    // do banco de produção, que ninguém marcou) o endpoint responde 503.
+    // Última camada de defesa: mesmo que o bundle, NODE_ENV e DEV_FIXTURES
+    // vazem todos juntos, sem o sentinel o INSERT não acontece.
+    name: "create_e2e_test_db_sentinel_task_202",
+    sql: `CREATE TABLE IF NOT EXISTS "e2e_test_db_sentinel" ("allowed" boolean PRIMARY KEY);`,
+  },
+  {
+    // Task #202 — Segunda passada de limpeza retroativa. A migration
+    // `inactivate_leaked_e2e_records_task_189` rodou uma vez e marcou os
+    // registros existentes naquele momento como `inactive`. Depois disso,
+    // até esta task fechar o vazamento por construção, mais alguns ciclos
+    // de deploy injetaram novos parceiros/clientes/restaurantes "E2E ..."
+    // em produção. Inativamos esses novos da mesma forma (sem DELETE,
+    // p/ preservar trilha financeira de invoices reais já amarradas).
+    // Idempotente: só toca quem ainda está 'active'.
+    name: "inactivate_leaked_e2e_records_task_202",
+    sql: `
+      UPDATE "partners"
+         SET "status" = 'inactive', "updatedAt" = NOW()
+       WHERE "name" LIKE 'E2E Parceiro %'
+         AND "status" = 'active';
+      UPDATE "clients"
+         SET "status" = 'inactive', "updatedAt" = NOW()
+       WHERE ("name" LIKE 'E2E Client e2e-%' OR "name" LIKE 'E2E Client %')
+         AND "status" = 'active';
+      UPDATE "active_restaurants"
+         SET "status" = 'inactive', "updatedAt" = NOW()
+       WHERE "name" LIKE 'E2E Restaurante %'
+         AND "status" = 'active';
+    `,
+  },
+  {
     // Task #189 — Limpeza retroativa de registros E2E que vazaram para o
     // banco de produção via pre-deploy.sh (o script subia dev server com
     // DATABASE_URL=prod, então os endpoints /api/dev-ensure-parceiro e

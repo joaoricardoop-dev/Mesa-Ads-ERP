@@ -3,14 +3,24 @@
 # Falha imediatamente se algum teste quebrar para impedir que regressões cheguem
 # em produção.
 #
-# IMPORTANTE (Task #189): este script SOBE um dev server (NODE_ENV=development)
-# que expõe endpoints /api/dev-* capazes de fazer INSERT real no banco.
-# Antes da task #189 o script herdava DATABASE_URL do ambiente de build (=
-# prod), e cada deploy injetava lixo "E2E Parceiro <ts>" / "E2E Client e2e-<ts>"
-# diretamente na produção. Agora exigimos DATABASE_URL_TEST (banco Neon
-# dedicado, isolado) e redirecionamos o dev server para lá.
+# IMPORTANTE (Task #189 / #202): este script SOBE um dev server que expõe
+# endpoints /api/dev-* capazes de fazer INSERT real no banco. Defesas em
+# camadas (cada uma sozinha já segura o estrago):
+#   1. Os endpoints só ficam registrados se DEV_FIXTURES=1 (exportada aqui).
+#   2. O módulo `server/_dev/devEndpoints.ts` recusa inserir o sentinel se o
+#      host da DATABASE_URL bater com qualquer padrão de produção conhecido.
+#   3. Cada endpoint /api/dev-* faz SELECT no sentinel antes de qualquer
+#      INSERT — sem a linha (true), retorna 503.
+#   4. Este script (camada externa) parseia DATABASE_URL_TEST e DATABASE_URL
+#      por host:porta:database e aborta se baterem, mesmo com querystrings
+#      diferentes. Também aborta se DATABASE_URL_TEST cair num host listado
+#      como proibido.
 
 set -euo pipefail
+
+# Hosts/padrões considerados PRODUÇÃO. Mesma fonte de verdade que
+# `FORBIDDEN_HOST_PATTERNS` em `server/_dev/devEndpoints.ts`. Substring match.
+FORBIDDEN_HOST_PATTERNS=(".neon.tech")
 
 echo "=== Pre-deploy: instalando dependências ==="
 pnpm install --frozen-lockfile 2>/dev/null || pnpm install
@@ -21,12 +31,6 @@ pnpm exec playwright install chromium
 
 # ── Guard rail: resolve DATABASE_URL_TEST ─────────────────────────────────────
 # Sem isso, o dev server abaixo escreveria no DATABASE_URL herdado (= prod).
-# Falhamos cedo e barulhento — preferimos abortar o deploy a poluir produção.
-#
-# Estratégia: se o secret DATABASE_URL_TEST não estiver setado, montamos a URL
-# a partir dos secrets PG* (que apontam para o Postgres nativo Replit, isolado
-# do Neon prod). Isso dispensa qualquer configuração manual: os PG* são
-# provisionados automaticamente quando o projeto tem um banco Replit nativo.
 if [ -z "${DATABASE_URL_TEST:-}" ]; then
   if [ -n "${PGHOST:-}" ] && [ -n "${PGUSER:-}" ] && [ -n "${PGPASSWORD:-}" ] \
      && [ -n "${PGDATABASE:-}" ] && [ -n "${PGPORT:-}" ]; then
@@ -40,29 +44,62 @@ if [ -z "${DATABASE_URL_TEST:-}" ]; then
   fi
 fi
 
-if [ "${DATABASE_URL_TEST}" = "${DATABASE_URL:-}" ]; then
-  echo "ERRO: DATABASE_URL_TEST é igual a DATABASE_URL (banco de produção)." >&2
-  echo "Os dois precisam apontar para bancos físicos diferentes." >&2
+# Parseia uma URL postgres://... em "host:port:database" (lowercased).
+# Usamos Node (já presente como dependência do projeto) em vez de regex
+# bash p/ lidar corretamente com credenciais, querystrings e portas default.
+parse_hpd() {
+  node -e '
+    try {
+      const u = new URL(process.argv[1]);
+      const host = (u.hostname || "").toLowerCase();
+      const port = u.port || "5432";
+      const db = (u.pathname || "").replace(/^\//, "");
+      console.log(host + ":" + port + ":" + db);
+    } catch (e) { process.exit(2); }
+  ' "$1"
+}
+
+TEST_HPD=$(parse_hpd "${DATABASE_URL_TEST}" || true)
+LIVE_HPD=""
+if [ -n "${DATABASE_URL:-}" ]; then
+  LIVE_HPD=$(parse_hpd "${DATABASE_URL}" || true)
+fi
+
+if [ -z "${TEST_HPD}" ]; then
+  echo "ERRO: DATABASE_URL_TEST não pôde ser parseada como URL." >&2
   exit 1
 fi
 
+# Comparação por host:port:database (querystring irrelevante).
+if [ -n "${LIVE_HPD}" ] && [ "${TEST_HPD}" = "${LIVE_HPD}" ]; then
+  echo "ERRO: DATABASE_URL_TEST e DATABASE_URL apontam para o mesmo banco físico (${TEST_HPD})." >&2
+  echo "Os dois precisam ser bancos diferentes." >&2
+  exit 1
+fi
+
+# Defesa adicional: o host do test não pode bater com nenhum padrão de
+# produção, mesmo que não bata exatamente com a DATABASE_URL atual (caso
+# DATABASE_URL não esteja setada no momento do build, por exemplo).
+TEST_HOST="${TEST_HPD%%:*}"
+for pat in "${FORBIDDEN_HOST_PATTERNS[@]}"; do
+  if [[ "${TEST_HOST}" == *"${pat}"* ]]; then
+    echo "ERRO: host de DATABASE_URL_TEST ('${TEST_HOST}') bate com padrão de produção '${pat}'." >&2
+    echo "O banco de teste precisa rodar fora dos provedores de produção." >&2
+    exit 1
+  fi
+done
+
 echo ""
 echo "=== Pre-deploy: subindo dev server pra warm-up (banco de TESTE isolado) ==="
-# O cloud builder (cr-2-4, 2 vCPU, 4GB) leva 30–60s na primeira compilação
-# Vite. Sem warm-up, o primeiro spec paga esse custo dentro do timeout de
-# teste e estoura. Subimos o server agora, esperamos ele atender, batemos
-# uma rota crítica pra forçar a compilação, e só então rodamos a suite com
-# E2E_BASE_URL setado pra que o Playwright reuse o mesmo processo (e não
-# tente subir outro servidor).
-#
-# DATABASE_URL aqui é EXPORTADO só pro subprocess do dev server (e seus
-# filhos): a `runMigrations()` na inicialização do server vai criar o
-# schema no banco de teste se ainda não existir, e qualquer INSERT
-# subsequente dos endpoints /api/dev-* fica contido ali.
-# Exportamos DATABASE_URL_TEST junto pro processo filho para que o helper
-# assertSafeForDevSeed (server/_core/index.ts) tenha o sinal armado mesmo
-# quando a URL foi derivada dos PG* aqui (i.e. sem o secret explícito).
-NODE_ENV=development DATABASE_URL="${DATABASE_URL_TEST}" DATABASE_URL_TEST="${DATABASE_URL_TEST}" pnpm run dev > /tmp/pre-deploy-dev.log 2>&1 &
+# DATABASE_URL é EXPORTADO só pro subprocess do dev server: a `runMigrations()`
+# vai criar o schema no banco de teste na primeira inicialização. Setamos
+# DEV_FIXTURES=1 para registrar os endpoints /api/dev-* (sem essa flag o
+# módulo nem é importado, mesmo com NODE_ENV=development).
+NODE_ENV=development \
+  DEV_FIXTURES=1 \
+  DATABASE_URL="${DATABASE_URL_TEST}" \
+  DATABASE_URL_TEST="${DATABASE_URL_TEST}" \
+  pnpm run dev > /tmp/pre-deploy-dev.log 2>&1 &
 DEV_PID=$!
 trap "kill ${DEV_PID} 2>/dev/null || true" EXIT
 
@@ -84,16 +121,11 @@ if [ "${SERVER_READY}" -ne 1 ]; then
 fi
 
 echo "=== Pre-deploy: aquecendo bundle Vite (rotas críticas) ==="
-# Timeout generoso (120s) por curl — cold compile do bundle 5.8MB pode
-# levar bem mais que os 60s default de teste. Falha aqui não derruba o
-# pipeline (pior caso o primeiro spec paga o custo).
 curl -fs -o /dev/null --max-time 120 http://localhost:5000/ || true
 curl -fs -o /dev/null --max-time 120 http://localhost:5000/montar-campanha || true
 
 echo ""
 echo "=== Pre-deploy: rodando testes ponta-a-ponta (pnpm run test:e2e) ==="
-# E2E_BASE_URL faz o playwright.config pular o webServer e reusar o
-# processo já aquecido acima.
 E2E_BASE_URL=http://localhost:5000 pnpm run test:e2e
 
 echo ""
