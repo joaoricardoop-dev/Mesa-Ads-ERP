@@ -1583,7 +1583,82 @@ export async function runMigrations() {
     return;
   }
 
+  // Tracking table — sem isso o boot reaplica TODAS as ~80 migrations a cada
+  // start do container (mesmo as idempotentes pagam roundtrip + scan), o que
+  // empurra o startup acima do health-check de 60s do autoscale e mata o
+  // deploy antes do `server.listen()`. Com o tracking, só a PRIMEIRA boot
+  // após adicionar uma nova migration paga o custo dela.
+  await db.execute(sql.raw(`
+    CREATE TABLE IF NOT EXISTS "_applied_migrations" (
+      "name" varchar(255) PRIMARY KEY,
+      "appliedAt" timestamp DEFAULT now() NOT NULL
+    );
+  `));
+
+  // Advisory lock — evita que dois containers do autoscale subam simultânea-
+  // mente e tentem aplicar a mesma migration em paralelo (race que o tracker
+  // por si só não previne, já que ambos lêem snapshot vazio antes de inserir).
+  // O lock é liberado automaticamente ao final da sessão (connection close).
+  await db.execute(sql.raw(`SELECT pg_advisory_lock(72319811);`));
+
+  // Bootstrap retroativo — ambientes que já rodavam antes desse commit têm
+  // todas as migrations efetivamente aplicadas (DDL idempotente acumulada ao
+  // longo de meses), mas o tracker chega vazio. Sem esse bootstrap, o PRIMEIRO
+  // boot após esse commit re-rodaria tudo de novo — exatamente o cenário que
+  // estamos tentando evitar. Usamos a presença da tabela `quotations` (criada
+  // pelas migrations mais antigas) como sinal "DB já existia antes do tracker".
+  const trackerEmpty = await db.execute(sql.raw(
+    `SELECT COUNT(*)::int AS n FROM "_applied_migrations";`,
+  ));
+  const trackerRows: any[] = Array.isArray(trackerEmpty)
+    ? (trackerEmpty as any[])
+    : ((trackerEmpty as any)?.rows ?? []);
+  const trackerCount = Number(trackerRows[0]?.n ?? 0);
+
+  if (trackerCount === 0) {
+    const legacyCheck = await db.execute(sql.raw(`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'quotations'
+      ) AS exists;
+    `));
+    const legacyRows: any[] = Array.isArray(legacyCheck)
+      ? (legacyCheck as any[])
+      : ((legacyCheck as any)?.rows ?? []);
+    const isLegacyDb = legacyRows[0]?.exists === true;
+    if (isLegacyDb) {
+      console.log(
+        `[Migrations] Bootstrap: DB pré-existente detectado, marcando ${MIGRATIONS.length} migrations como aplicadas sem re-executar.`,
+      );
+      // Single statement — VALUES (...),(...) — é uma roundtrip só.
+      const values = MIGRATIONS
+        .map(m => `('${m.name.replace(/'/g, "''")}')`)
+        .join(",");
+      await db.execute(sql.raw(
+        `INSERT INTO "_applied_migrations" ("name") VALUES ${values} ON CONFLICT ("name") DO NOTHING;`,
+      ));
+    }
+  }
+
+  const appliedRows = await db.execute(sql.raw(
+    `SELECT "name" FROM "_applied_migrations";`,
+  ));
+  // drizzle .execute() retorna { rows: [...] } no neon-serverless e [...]
+  // direto em outros drivers; normalizamos.
+  const rowsArr: any[] = Array.isArray(appliedRows)
+    ? (appliedRows as any[])
+    : ((appliedRows as any)?.rows ?? []);
+  const applied = new Set<string>(rowsArr.map((r: any) => r.name));
+
+  let appliedCount = 0;
+  let skippedCount = 0;
+  const t0 = Date.now();
+
   for (const migration of MIGRATIONS) {
+    if (applied.has(migration.name)) {
+      skippedCount++;
+      continue;
+    }
     try {
       const chunks = Array.isArray(migration.sql)
         ? migration.sql
@@ -1591,6 +1666,10 @@ export async function runMigrations() {
       for (const chunk of chunks) {
         await db.execute(sql.raw(chunk));
       }
+      await db.execute(sql.raw(
+        `INSERT INTO "_applied_migrations" ("name") VALUES ('${migration.name.replace(/'/g, "''")}') ON CONFLICT ("name") DO NOTHING;`,
+      ));
+      appliedCount++;
       console.log(`[Migrations] Applied: ${migration.name}`);
     } catch (err: any) {
       const root = err?.cause ?? err;
@@ -1613,4 +1692,8 @@ export async function runMigrations() {
       );
     }
   }
+
+  console.log(
+    `[Migrations] done in ${Date.now() - t0}ms (applied=${appliedCount}, skipped=${skippedCount}, total=${MIGRATIONS.length})`,
+  );
 }
