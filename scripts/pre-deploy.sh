@@ -134,6 +134,10 @@ curl -fs -o /dev/null --max-time 120 http://localhost:5000/montar-campanha || tr
 
 echo ""
 echo "=== Pre-deploy: rodando testes ponta-a-ponta (pnpm run test:e2e) ==="
+# DATABASE_URL_TEST é exportado para que o spec `migrations-fresh-db.spec.ts`
+# (Task #212) crie o DB temporário no mesmo Postgres de teste isolado — e
+# nunca no banco de produção herdado em DATABASE_URL do build.
+export DATABASE_URL_TEST
 E2E_BASE_URL=http://localhost:5000 pnpm run test:e2e
 
 echo ""

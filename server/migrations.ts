@@ -102,13 +102,6 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "agencyCommissionPercent" numeric(5, 2);`,
   },
   {
-    // Task #186 — vincula projeto custom (sob medida) a um provedor VIP
-    // para permitir auto-materialização de AP `vip_repasse` da fatia custom
-    // em cotações mistas/puro-custom digitais.
-    name: "add_custom_vip_provider_to_quotations",
-    sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "customVipProviderId" integer REFERENCES "vip_providers"("id") ON DELETE SET NULL;`,
-  },
-  {
     name: "add_pricing_modes_to_products",
     sql: `DO $$ BEGIN CREATE TYPE "pricing_mode" AS ENUM ('cost_based', 'price_based'); EXCEPTION WHEN duplicate_object THEN null; END $$; DO $$ BEGIN CREATE TYPE "entry_type" AS ENUM ('tiers', 'fixed_quantities'); EXCEPTION WHEN duplicate_object THEN null; END $$; ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "pricingMode" "pricing_mode" DEFAULT 'cost_based' NOT NULL; ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "entryType" "entry_type" DEFAULT 'tiers' NOT NULL; ALTER TABLE "product_pricing_tiers" ADD COLUMN IF NOT EXISTS "precoBase" numeric(10, 2);`,
   },
@@ -286,6 +279,18 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       CREATE INDEX IF NOT EXISTS "idx_vip_providers_status" ON "vip_providers" ("status");
       CREATE INDEX IF NOT EXISTS "idx_vip_providers_cnpj" ON "vip_providers" ("cnpj");
     `,
+  },
+  {
+    // Task #186 — vincula projeto custom (sob medida) a um provedor VIP
+    // para permitir auto-materialização de AP `vip_repasse` da fatia custom
+    // em cotações mistas/puro-custom digitais.
+    // NOTE (Task #212): movido para DEPOIS de `create_vip_providers_table`
+    // porque o FK depende da tabela existir. Em prod isso já estava aplicado
+    // (tracker preserva por `name`, não por índice no array), mas em bancos
+    // fresh a ordem original quebrava — o ALTER falhava silencioso na 1ª
+    // execução e só convergia na 2ª.
+    name: "add_custom_vip_provider_to_quotations",
+    sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "customVipProviderId" integer REFERENCES "vip_providers"("id") ON DELETE SET NULL;`,
   },
   {
     name: "add_vip_provider_to_products",
