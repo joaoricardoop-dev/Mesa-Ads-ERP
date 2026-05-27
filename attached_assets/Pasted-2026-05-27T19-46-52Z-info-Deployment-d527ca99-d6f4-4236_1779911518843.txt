@@ -1,0 +1,115 @@
+2026-05-27T19:46:52Z info: Deployment: d527ca99-d6f4-4236-8fd5-909222745b3d
+2026-05-27T19:46:52Z info: Build: 90133d0a-92d6-4fd1-9ebd-870599f5106c
+2026-05-27T19:46:52Z info: Running Security Scan
+2026-05-27T19:47:08Z info: Security Scan Complete
+2026-05-27T19:47:12Z info: Installing packages
+--> pnpm install
+
+Lockfile is up to date, resolution step is skipped
+
+Already up to date
+
+
+   ╭──────────────────────────────────────────────────────────────────╮
+   │                                                                  │
+   │                Update available! 10.4.1 → 11.4.0.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v11.4.0   │
+   │                Run "pnpm add -g pnpm" to update.                 │
+   │                                                                  │
+   ╰──────────────────────────────────────────────────────────────────╯
+
+
+Done in 4s using pnpm v10.4.1
+
+2026-05-27T19:47:18Z info: Starting Build
+=== Pre-deploy: instalando dependências ===
+
+Lockfile is up to date, resolution step is skipped
+
+Already up to date
+
+Done in 1.8s using pnpm v10.4.1
+
+
+=== Pre-deploy: instalando o Chromium do Playwright ===
+
+
+=== Pre-deploy: subindo dev server pra warm-up (banco de TESTE isolado) ===
+
+=== Pre-deploy: aguardando dev server atender em :5000 ===
+
+ERRO: dev server não respondeu em 90s. Log:
+
+[Migrations] task_170_rollback_vitrine_catalog skipped or failed: {
+  "code": "42P01",
+  "message": "relation \"products\" does not exist",
+  "where": "PL/pgSQL function inline_code_block line 5 at SQL statement",
+  "wrappedMessage": "Failed query: "
+}
+[Migrations] task_173_number_counters_table_and_backfill skipped or failed: {
+  "code": "42P01",
+  "message": "relation \"campaigns\" does not exist",
+  "position": "794",
+  "wrappedMessage": "Failed query: "
+}
+[Migrations] Applied: create_e2e_test_db_sentinel_task_202
+[Migrations] inactivate_leaked_e2e_records_task_202 skipped or failed: {
+  "code": "42P01",
+  "message": "relation \"partners\" does not exist",
+  "position": "15",
+  "wrappedMessage": "Failed query: "
+}
+[Migrations] inactivate_leaked_e2e_records_task_189 skipped or failed: {
+  "code": "42P01",
+  "message": "relation \"partners\" does not exist",
+  "position": "15",
+  "wrappedMessage": "Failed query: "
+}
+[Migrations] sprint1_loss_reason_notes_and_createdby_backfill skipped or failed: {
+  "code": "42P01",
+  "message": "relation \"quotations\" does not exist",
+  "wrappedMessage": "Failed query: "
+}
+[Migrations] sprint2_crm_notifications_user_id skipped or failed: {
+  "code": "42P01",
+  "message": "relation \"crm_notifications\" does not exist",
+  "wrappedMessage": "Failed query: "
+}
+[Migrations] Applied: task_197_billing_schedule_items
+[Migrations] task_197_billing_schedule_backfill skipped or failed: {
+  "code": "42P01",
+  "message": "relation \"quotations\" does not exist",
+  "position": "327",
+  "wrappedMessage": "Failed query: "
+}
+[Migrations] done in 41176ms (applied=7, skipped=0, total=79)
+DrizzleQueryError: Failed query: select "id" from "users" where ("users"."is_active" = $1 and "users"."role" IN ($2, $3)) order by "users"."created_at" limit $4
+params: true,admin,comercial,1
+    at NeonPreparedQuery.queryWithCache (/home/runner/workspace/node_modules/.pnpm/drizzle-orm@0.44.7_@neondatabase+serverless@1.0.2_@types+pg@8.16.0_pg@8.18.0/node_modules/src/pg-core/session.ts:73:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async NeonPreparedQuery.execute (/home/runner/workspace/node_modules/.pnpm/drizzle-orm@0.44.7_@neondatabase+serverless@1.0.2_@types+pg@8.16.0_pg@8.18.0/node_modules/src/neon-serverless/session.ts:152:18)
+    ... 2 lines matching cause stack trace ...
+    at async startServer (/home/runner/workspace/server/_core/index.ts:42:3) {
+  query: 'select "id" from "users" where ("users"."is_active" = $1 and "users"."role" IN ($2, $3)) order by "users"."created_at" limit $4',
+  params: [ true, 'admin', 'comercial', 1 ],
+  cause: error: relation "users" does not exist
+      at file:///home/runner/workspace/node_modules/.pnpm/@neondatabase+serverless@1.0.2/node_modules/@neondatabase/serverless/index.mjs:1087:33
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/drizzle-orm@0.44.7_@neondatabase+serverless@1.0.2_@types+pg@8.16.0_pg@8.18.0/node_modules/src/neon-serverless/session.ts:153:11)
+      at async NeonPreparedQuery.queryWithCache (/home/runner/workspace/node_modules/.pnpm/drizzle-orm@0.44.7_@neondatabase+serverless@1.0.2_@types+pg@8.16.0_pg@8.18.0/node_modules/src/pg-core/session.ts:71:12)
+      at async NeonPreparedQuery.execute (/home/runner/workspace/node_modules/.pnpm/drizzle-orm@0.44.7_@neondatabase+serverless@1.0.2_@types+pg@8.16.0_pg@8.18.0/node_modules/src/neon-serverless/session.ts:152:18)
+      at async resolveLeadSlaFallbackUserId (/home/runner/workspace/server/_core/leadSlaConfig.ts:43:22)
+      at async validateLeadSlaFallbackOnBoot (/home/runner/workspace/server/_core/leadSlaConfig.ts:67:14)
+      at async startServer (/home/runner/workspace/server/_core/index.ts:42:3) {
+    length: 104,
+    severity: 'ERROR',
+    code: '42P01',
+    detail: undefined,
+    hint: undefined,
+    position: '18',
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefi
