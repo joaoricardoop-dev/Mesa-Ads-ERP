@@ -10,10 +10,10 @@ interface PageContainerProps {
 export default function PageContainer({ title, description, actions, children, className, noPadding }: PageContainerProps) {
   return (
     <div className={`h-full flex flex-col min-h-0 ${className || ""}`}>
-      <div className="flex-shrink-0 border-b border-border/30 bg-card/30 px-4 lg:px-6 py-3">
+      <div className="flex-shrink-0 border-b border-border bg-card/60 backdrop-blur-sm px-4 lg:px-6 py-3">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-lg font-semibold tracking-tight truncate">{title}</h1>
+            <h1 className="font-display text-lg font-semibold tracking-tight truncate">{title}</h1>
             {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
           </div>
           {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}

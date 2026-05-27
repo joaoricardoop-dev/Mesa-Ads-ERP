@@ -228,11 +228,18 @@ export default function ComponentsShowcase() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <main className="container max-w-6xl mx-auto">
-        <div className="space-y-2 justify-between flex">
-          <h2 className="text-3xl font-bold tracking-tight mb-6">
-            Shadcn/ui Component Library
-          </h2>
+      <main className="container max-w-6xl mx-auto py-8">
+        <div className="space-y-2 justify-between flex items-start mb-8">
+          <div className="space-y-2">
+            <p className="label-mono">Mesa.ads · Design System · Fase 1</p>
+            <h2 className="font-display text-4xl font-semibold tracking-tight">
+              Fundação do tema <span className="font-serif-display text-primary">claro</span>
+            </h2>
+            <p className="text-muted-foreground text-sm max-w-xl">
+              Primitives shadcn rebrandados com a identidade Mesa.ads — paleta neon, hairlines,
+              acentos magenta/amber, mono uppercase em labels. Compare claro e escuro lado a lado.
+            </p>
+          </div>
           <Button variant="outline" size="icon" onClick={toggleTheme}>
             {theme === "light" ? (
               <Moon className="h-5 w-5" />
