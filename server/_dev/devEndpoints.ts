@@ -6,11 +6,23 @@ import { sql } from "drizzle-orm";
 // e os endpoints /api/dev-* recusam servir — defesa em profundidade
 // contra um dev server bootado contra o banco errado.
 //
-// Fonte de verdade: Neon (`*.neon.tech`) é o provedor do banco de
-// produção; o banco de teste roda no Postgres nativo Replit (host
-// diferente, normalmente `helium`/regional). Qualquer host contendo
-// algum dos padrões abaixo é tratado como prod.
-const FORBIDDEN_HOST_PATTERNS = [".neon.tech"];
+// Configurável via env var `PROD_DB_HOSTS` (CSV de substrings). Quando
+// definida, usa só ela (override total). Quando ausente, fallback
+// histórico para `.neon.tech` — válido só se o banco de teste rodar
+// fora do Neon (ex.: Postgres nativo Replit `helium`). Se o teste
+// também é Neon (caso comum: branch dedicado ou projeto Neon separado
+// pra E2E), seta `PROD_DB_HOSTS=<substring-unica-do-host-prod>` (ex.:
+// "empty-scene-ae775drh") pra distinguir.
+function getForbiddenPatterns(): string[] {
+  const raw = process.env.PROD_DB_HOSTS;
+  if (raw && raw.trim().length > 0) {
+    return raw
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s.length > 0);
+  }
+  return [".neon.tech"];
+}
 
 function hostOf(connStr: string | undefined): string | null {
   if (!connStr) return null;
@@ -23,7 +35,7 @@ function hostOf(connStr: string | undefined): string | null {
 
 function isProductionHost(host: string | null): boolean {
   if (!host) return false;
-  return FORBIDDEN_HOST_PATTERNS.some((p) => host.includes(p));
+  return getForbiddenPatterns().some((p) => host.includes(p));
 }
 
 /**

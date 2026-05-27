@@ -18,9 +18,17 @@
 
 set -euo pipefail
 
-# Hosts/padrões considerados PRODUÇÃO. Mesma fonte de verdade que
-# `FORBIDDEN_HOST_PATTERNS` em `server/_dev/devEndpoints.ts`. Substring match.
-FORBIDDEN_HOST_PATTERNS=(".neon.tech")
+# Hosts/padrões considerados PRODUÇÃO (substring match). Mesma fonte de
+# verdade que `getForbiddenPatterns()` em `server/_dev/devEndpoints.ts`.
+# Configurável via env var `PROD_DB_HOSTS` (CSV); fallback histórico é
+# `.neon.tech` — só serve quando o banco de teste roda fora do Neon
+# (ex.: Postgres nativo Replit). Se o teste também é Neon, seta
+# `PROD_DB_HOSTS=<substring-unica-do-host-prod>` pra distinguir.
+if [ -n "${PROD_DB_HOSTS:-}" ]; then
+  IFS=',' read -ra FORBIDDEN_HOST_PATTERNS <<< "${PROD_DB_HOSTS}"
+else
+  FORBIDDEN_HOST_PATTERNS=(".neon.tech")
+fi
 
 echo "=== Pre-deploy: instalando dependências ==="
 pnpm install --frozen-lockfile 2>/dev/null || pnpm install

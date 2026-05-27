@@ -72,6 +72,7 @@ publicDir = "dist/public"
 [userenv]
 
 [userenv.shared]
+DATABASE_URL_TEST = "postgresql://neondb_owner:npg_8cE5rlCQFoLv@ep-plain-scene-ac4c6c1v.sa-east-1.aws.neon.tech/neondb?sslmode=require"
 
 [userenv.development]
 CLERK_PUBLISHABLE_KEY = "pk_test_bm90ZWQtYW50LTQyLmNsZXJrLmFjY291bnRzLmRldiQ"
@@ -83,6 +84,7 @@ CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsubWVzYWFkcy5jb20uYnIk"
 CLERK_SECRET_KEY = "sk_live_MlqEZFFvkV3WYMp9EL4gQVhGNPr8nKXd03aw8LQphH"
 VITE_CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsubWVzYWFkcy5jb20uYnIk"
 CLERK_WEBHOOK_SECRET = "whsec_v91SgUcKvFXGEc+f9HU08d28jnjtKLrI"
+PROD_DB_HOSTS = "empty-scene-ae775drh"
 
 [postMerge]
 path = "scripts/post-merge.sh"
