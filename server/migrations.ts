@@ -1,5 +1,83 @@
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
+import { readdir, readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+const DRIZZLE_DIR = resolve(process.cwd(), "drizzle");
+
+/**
+ * Aplica os SQLs do diretório `drizzle/` (gerados pelo `drizzle-kit
+ * generate`) em ordem alfabética. Usado APENAS quando o boot detecta
+ * um banco completamente fresh (sem `users` e sem `quotations`).
+ *
+ * Os arquivos do drizzle-kit já vêm idempotentes: `CREATE TABLE IF NOT
+ * EXISTS`, `DO $$ ... EXCEPTION WHEN duplicate_object ... END $$` para
+ * tipos, etc. Por isso podemos executar cada arquivo como um único bloco
+ * sem split de statements (statements `DO $$ ... $$` quebrariam um split
+ * naive em `;`).
+ *
+ * Marca cada arquivo aplicado no tracker com o prefixo `drizzle:` para
+ * não conflitar com o namespace das migrations custom em MIGRATIONS[].
+ */
+async function applyDrizzleBaseSchema(db: any) {
+  let files: string[];
+  try {
+    files = (await readdir(DRIZZLE_DIR))
+      .filter(f => f.endsWith(".sql"))
+      .sort();
+  } catch (err: any) {
+    console.warn(
+      `[Migrations] Diretório drizzle/ não encontrado em ${DRIZZLE_DIR} — pulando bootstrap de schema base.`,
+      err?.message,
+    );
+    return;
+  }
+
+  if (files.length === 0) {
+    console.warn("[Migrations] Nenhum arquivo .sql em drizzle/ — pulando bootstrap de schema base.");
+    return;
+  }
+
+  console.log(
+    `[Migrations] Banco fresh detectado — aplicando ${files.length} arquivos do schema base (drizzle/).`,
+  );
+
+  for (const file of files) {
+    const trackerKey = `drizzle:${file}`;
+    const raw = await readFile(resolve(DRIZZLE_DIR, file), "utf-8");
+    // drizzle-kit usa `--> statement-breakpoint` como separador opcional;
+    // tratamos cada bloco separadamente, mas como os SQLs gerados são
+    // idempotentes (CREATE TABLE IF NOT EXISTS etc), executar o arquivo
+    // inteiro de uma vez também funcionaria. Splittamos só para isolar
+    // falhas pontuais (ex: enum novo num arquivo antigo).
+    const blocks = raw
+      .split("--> statement-breakpoint")
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    let ok = 0;
+    let failed = 0;
+    for (const block of blocks) {
+      try {
+        await db.execute(sql.raw(block));
+        ok++;
+      } catch (err: any) {
+        failed++;
+        const root = err?.cause ?? err;
+        console.warn(
+          `[Migrations] Drizzle ${file}: bloco ignorado (${root?.code ?? "?"}): ${root?.message?.split("\n")[0]}`,
+        );
+      }
+    }
+
+    await db.execute(sql.raw(
+      `INSERT INTO "_applied_migrations" ("name") VALUES ('${trackerKey.replace(/'/g, "''")}') ON CONFLICT ("name") DO NOTHING;`,
+    ));
+    console.log(
+      `[Migrations] Drizzle aplicado: ${file} (${ok} ok, ${failed} ignorado)`,
+    );
+  }
+}
 
 export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
   {
@@ -1639,21 +1717,50 @@ export async function runMigrations() {
   // O lock é liberado automaticamente ao final da sessão (connection close).
   await db.execute(sql.raw(`SELECT pg_advisory_lock(72319811);`));
 
+  // Fresh DB detection — sinal CONSERVADOR: zero tabelas de negócio chave.
+  // Tanto `users` quanto `quotations` precisam estar ausentes. Prod tem
+  // dezenas dessas tabelas; esse predicado nunca casa por engano em prod.
+  // Quando casa (banco realmente vazio, ex: novo Neon de teste), aplicamos
+  // o schema base do `drizzle/` ANTES das migrations custom — porque as
+  // customs assumem que `users`, `quotations`, `campaigns`, `partners` etc
+  // já existem (foram criadas historicamente via `drizzle-kit migrate`
+  // antes do runner custom existir).
+  const freshCheck = await db.execute(sql.raw(`
+    SELECT
+      EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='users') AS has_users,
+      EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='quotations') AS has_quotations;
+  `));
+  const freshRows: any[] = Array.isArray(freshCheck)
+    ? (freshCheck as any[])
+    : ((freshCheck as any)?.rows ?? []);
+  const isFreshDb = !freshRows[0]?.has_users && !freshRows[0]?.has_quotations;
+
+  let justBootstrappedFresh = false;
+  if (isFreshDb) {
+    await applyDrizzleBaseSchema(db);
+    justBootstrappedFresh = true;
+  }
+
   // Bootstrap retroativo — ambientes que já rodavam antes desse commit têm
   // todas as migrations efetivamente aplicadas (DDL idempotente acumulada ao
   // longo de meses), mas o tracker chega vazio. Sem esse bootstrap, o PRIMEIRO
   // boot após esse commit re-rodaria tudo de novo — exatamente o cenário que
   // estamos tentando evitar. Usamos a presença da tabela `quotations` (criada
   // pelas migrations mais antigas) como sinal "DB já existia antes do tracker".
+  //
+  // CRÍTICO: NÃO disparar esse bootstrap quando acabamos de aplicar o schema
+  // base fresh acima. Nesse caso, `quotations` AGORA existe, mas as customs
+  // PRECISAM rodar (adicionam colunas/índices posteriores ao 0000). Pulamos
+  // via `justBootstrappedFresh`.
   const trackerEmpty = await db.execute(sql.raw(
-    `SELECT COUNT(*)::int AS n FROM "_applied_migrations";`,
+    `SELECT COUNT(*)::int AS n FROM "_applied_migrations" WHERE "name" NOT LIKE 'drizzle:%';`,
   ));
   const trackerRows: any[] = Array.isArray(trackerEmpty)
     ? (trackerEmpty as any[])
     : ((trackerEmpty as any)?.rows ?? []);
   const trackerCount = Number(trackerRows[0]?.n ?? 0);
 
-  if (trackerCount === 0) {
+  if (trackerCount === 0 && !justBootstrappedFresh) {
     const legacyCheck = await db.execute(sql.raw(`
       SELECT EXISTS (
         SELECT 1 FROM information_schema.tables
