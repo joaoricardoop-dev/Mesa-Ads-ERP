@@ -1,0 +1,112 @@
+026-05-27 12:12:01.10
+16702858
+System
+starting up user application
+2026-05-27 12:12:01.12
+16702858
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-05-27 12:12:01.14
+16702858
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-05-27 12:12:02.81
+16702858
+User
+> mesa-ads-simulator@1.0.0 start
+2026-05-27 12:12:02.81
+16702858
+User
+> NODE_ENV=production node dist/index.js
+2026-05-27 12:12:07.55
+16702858
+User
+[Migrations] Applied: add_quotation_period_start
+2026-05-27 12:12:07.61
+16702858
+User
+[Migrations] Applied: add_billing_mode_to_partners
+2026-05-27 12:12:07.65
+16702858
+User
+[Migrations] Applied: add_custom_product_quotation_columns
+2026-05-27 12:12:07.68
+16702858
+User
+[Migrations] Applied: add_agency_commission_to_quotations
+2026-05-27 12:12:07.71
+16702858
+User
+[Migrations] Applied: add_custom_vip_provider_to_quotations
+2026-05-27 12:12:07.75
+16702858
+User
+[Migrations] Applied: add_pricing_modes_to_products
+2026-05-27 12:12:07.79
+16702858
+User
+[Migrations] Applied: add_visible_to_partners_to_products
+2026-05-27 12:12:07.82
+16702858
+User
+[Migrations] Applied: add_new_product_type_enum_values
+2026-05-27 12:12:07.86
+16702858
+User
+[Migrations] Applied: add_pipeline_campaign_statuses
+2026-05-27 12:12:07.90
+16702858
+User
+[Migrations] Applied: add_sla_stage_timestamps_and_freight_tracking
+2026-05-27 12:12:07.94
+16702858
+User
+[Migrations] Applied: add_product_discount_price_tiers
+2026-05-27 12:12:07.97
+16702858
+User
+[Migrations] Applied: add_service_order_trackings_table
+2026-05-27 12:12:08.01
+16702858
+User
+[Migrations] Applied: add_integration_tokens_table
+2026-05-27 12:12:08.04
+16702858
+User
+[Migrations] Applied: add_user_name_to_campaign_history
+2026-05-27 12:12:08.08
+16702858
+User
+[Migrations] Applied: add_lat_lng_to_active_restaurants
+2026-05-27 12:12:08.11
+16702858
+User
+[Migrations] Applied: add_freight_cost_to_campaigns
+2026-05-27 12:12:08.15
+16702858
+User
+[Migrations] Applied: add_partner_id_to_clients
+2026-05-27 12:12:08.18
+16702858
+User
+[Migrations] Applied: add_show_agency_pricing_to_clients
+2026-05-27 12:12:08.21
+16702858
+User
+[Migrations] Applied: add_visible_to_advertisers_to_products
+2026-05-27 12:12:08.25
+16702858
+User
+[Migrations] Applied: add_campaign_reports_tables
+2026-05-27 12:12:56.40
+16702858
+User
+[QuotationScheduler] run done — expired=0 warnings=0
+2026-05-27 12:37:49.94
+16702858
+User
+[Clerk] suprimindo 307 em / — limpando cookies e renderizando SPA como deslogado
+2026-05-27 14:41:32.70
+16702858
+User
+[Clerk] suprimindo 307 em /producao — limpando cookies e renderizando SPA como deslogado
