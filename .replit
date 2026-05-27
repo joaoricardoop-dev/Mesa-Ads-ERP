@@ -76,6 +76,7 @@ publicDir = "dist/public"
 [userenv.development]
 CLERK_PUBLISHABLE_KEY = "pk_test_bm90ZWQtYW50LTQyLmNsZXJrLmFjY291bnRzLmRldiQ"
 VITE_CLERK_PUBLISHABLE_KEY = "pk_test_bm90ZWQtYW50LTQyLmNsZXJrLmFjY291bnRzLmRldiQ"
+CLERK_SECRET_KEY = "sk_test_ko7pDQJAB2gvinwrTxyvrnHmb3ZhUBMruM0fgBrZEa"
 
 [userenv.production]
 CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsubWVzYWFkcy5jb20uYnIk"
