@@ -194,10 +194,18 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
         const rows = await db.select({ id: clients.id }).from(clients).limit(1);
         clientId = rows[0]?.id ?? null;
       }
+      // Banco de teste recém-criado pode estar 100% vazio (sem clients).
+      // Cria um cliente seed E2E em vez de falhar — mesmo padrão usado em
+      // /api/dev-ensure-restaurante. Mantém o setup do Playwright robusto
+      // contra cenário fresh-DB (Task #210).
       if (clientId == null) {
-        return res
-          .status(412)
-          .json({ message: "Nenhum cliente cadastrado para vincular ao anunciante de teste." });
+        const [created] = await db
+          .insert(clients)
+          .values({
+            name: `E2E Cliente Seed ${Date.now()}`,
+          })
+          .returning({ id: clients.id });
+        clientId = created.id;
       }
 
       const id = `e2e-anunciante-${Date.now()}`;

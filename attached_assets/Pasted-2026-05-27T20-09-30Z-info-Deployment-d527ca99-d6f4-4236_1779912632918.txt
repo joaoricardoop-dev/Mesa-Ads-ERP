@@ -1,0 +1,94 @@
+2026-05-27T20:09:30Z info: Deployment: d527ca99-d6f4-4236-8fd5-909222745b3d
+2026-05-27T20:09:30Z info: Build: fe2d499c-0913-46bf-a580-1c144746c030
+2026-05-27T20:09:30Z info: Running Security Scan
+2026-05-27T20:09:47Z info: Security Scan Complete
+2026-05-27T20:09:51Z info: Installing packages
+--> pnpm install
+
+--> pnpm install
+
+
+   ╭──────────────────────────────────────────────────────────────────╮
+   │                                                                  │
+   │                Update available! 10.4.1 → 11.4.0.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v11.4.0   │
+   │                Run "pnpm add -g pnpm" to update.                 │
+   │                                                                  │
+   ╰──────────────────────────────────────────────────────────────────╯
+
+
+Lockfile is up to date, resolution step is skipped
+
+Lockfile is up to date, resolution step is skipped
+
+Already up to date
+
+Already up to date
+
+Done in 3.6s using pnpm v10.4.1
+
+Done in 3.6s using pnpm v10.4.1
+
+2026-05-27T20:09:56Z info: Starting Build
+=== Pre-deploy: instalando dependências ===
+
+Lockfile is up to date, resolution step is skipped
+
+Already up to date
+
+Done in 1.4s using pnpm v10.4.1
+
+
+=== Pre-deploy: instalando o Chromium do Playwright ===
+
+
+=== Pre-deploy: subindo dev server pra warm-up (banco de TESTE isolado) ===
+
+=== Pre-deploy: aguardando dev server atender em :5000 ===
+
+Dev server respondeu após 8s
+
+=== Pre-deploy: aquecendo bundle Vite (rotas críticas) ===
+
+
+=== Pre-deploy: rodando testes ponta-a-ponta (pnpm run test:e2e) ===
+
+
+> mesa-ads-simulator@1.0.0 test:e2e /home/runner/workspace
+> playwright test
+
+
+
+Running 14 tests using 4 workers
+
+  ✘   1 [setup] › e2e/global.setup.ts:12:1 › authenticate as anunciante (1.7s)
+
+  1) [setup] › e2e/global.setup.ts:12:1 › authenticate as anunciante ───────────────────────────────
+
+    Error: dev-ensure-anunciante falhou: 412 {"message":"Nenhum cliente cadastrado para vincular ao anunciante de teste."}
+
+    expect(received).toBeTruthy()
+
+    Received: false
+
+      27 |     ensureRes.ok(),
+      28 |     `dev-ensure-anunciante falhou: ${ensureRes.status()} ${await ensureRes.text()}`,
+    > 29 |   ).toBeTruthy();
+         |     ^
+      30 |   const { user } = (await ensureRes.json()) as {
+      31 |     user: { id: string; clientId: number | null };
+      32 |     created: boolean;
+        at /home/runner/workspace/e2e/global.setup.ts:29:5
+
+    Error Context: test-results/global.setup.ts-authenticate-as-anunciante-setup/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/global.setup.ts-authenticate-as-anunciante-setup/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/global.setup.ts-authenticate-as-anunciante-setup/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ELIFECYCLE  Command failed with exit code 1.
