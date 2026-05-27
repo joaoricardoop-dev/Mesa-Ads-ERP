@@ -26,16 +26,21 @@ async function applyDrizzleBaseSchema(db: any) {
       .filter(f => f.endsWith(".sql"))
       .sort();
   } catch (err: any) {
-    console.warn(
-      `[Migrations] Diretório drizzle/ não encontrado em ${DRIZZLE_DIR} — pulando bootstrap de schema base.`,
-      err?.message,
+    throw new Error(
+      `[Migrations] FATAL: banco fresh detectado, mas diretório drizzle/ não encontrado em ${DRIZZLE_DIR}. ` +
+      `O bundle de deploy provavelmente não inclui o diretório drizzle/ — verifique scripts/pre-deploy.sh, ` +
+      `o passo de build e se drizzle/ está sendo copiado junto com dist/. ` +
+      `Abortando boot para evitar falhas silenciosas em cascata nas migrations custom. ` +
+      `Causa raiz: ${err?.message ?? err}`,
     );
-    return;
   }
 
   if (files.length === 0) {
-    console.warn("[Migrations] Nenhum arquivo .sql em drizzle/ — pulando bootstrap de schema base.");
-    return;
+    throw new Error(
+      `[Migrations] FATAL: banco fresh detectado, mas diretório drizzle/ em ${DRIZZLE_DIR} está vazio (nenhum .sql). ` +
+      `O bundle de deploy provavelmente está mispackaged — verifique scripts/pre-deploy.sh e o passo de build. ` +
+      `Abortando boot para evitar falhas silenciosas em cascata nas migrations custom.`,
+    );
   }
 
   console.log(
