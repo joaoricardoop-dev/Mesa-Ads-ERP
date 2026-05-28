@@ -344,10 +344,26 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
       // (sentinel + DEV_FIXTURES gate), então não há risco de vazar
       // detalhes em prod. Sem isso, Playwright só vê "500: Erro ao
       // garantir..." e debug fica cego.
+      // Drizzle envolve o erro do pg em DrizzleError com `cause` apontando
+      // pro erro original (que tem .code, .detail, .column do Postgres).
+      // Sem expor a cause, ficamos só com "Failed query: ..." sem código pg.
       const detail = error instanceof Error ? error.message : String(error);
+      const cause = (error as { cause?: unknown })?.cause;
+      const causeDetail =
+        cause && typeof cause === "object"
+          ? {
+              message: (cause as Error).message,
+              code: (cause as { code?: string }).code,
+              detail: (cause as { detail?: string }).detail,
+              column: (cause as { column?: string }).column,
+              table: (cause as { table?: string }).table,
+              constraint: (cause as { constraint?: string }).constraint,
+            }
+          : String(cause ?? "");
       res.status(500).json({
         message: "Erro ao garantir restaurante de teste.",
         detail,
+        cause: causeDetail,
       });
     }
   });
