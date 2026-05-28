@@ -250,7 +250,10 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
       if (!(await sentinelAllows(res))) return;
       const { authStorage } = await import("../replit_integrations/auth");
       const { getDb } = await import("../db");
-      const { activeRestaurants } = await import("../../drizzle/schema");
+      const { activeRestaurants, products, productLocations } = await import(
+        "../../drizzle/schema"
+      );
+      const { eq, and } = await import("drizzle-orm");
       const db = await getDb();
       if (!db) return res.status(500).json({ message: "Database not available." });
 
@@ -286,6 +289,45 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
         restaurantId = created.id;
       }
 
+      // Garante ≥1 produto visível a anunciantes + product_location ligando
+      // ao restaurante. listAvailableLocations (usado pelo wizard de
+      // /montar-campanha) cruza product_locations × products onde
+      // visibleToAdvertisers=true. Em banco fresh (Task #210), ambas as
+      // tabelas nascem vazias e o builder-locais spec falhava por zero cards.
+      let productId: number | null = null;
+      const visibleProducts = await db
+        .select({ id: products.id })
+        .from(products)
+        .where(and(eq(products.isActive, true), eq(products.visibleToAdvertisers, true)))
+        .limit(1);
+      productId = visibleProducts[0]?.id ?? null;
+      if (productId == null) {
+        const [createdProduct] = await db
+          .insert(products)
+          .values({
+            name: `E2E Produto Bolacha ${Date.now()}`,
+            tipo: "impressos",
+            isActive: true,
+            visibleToAdvertisers: true,
+          })
+          .returning({ id: products.id });
+        productId = createdProduct.id;
+      }
+
+      const existingLink = await db
+        .select({ id: productLocations.id })
+        .from(productLocations)
+        .where(
+          and(
+            eq(productLocations.productId, productId),
+            eq(productLocations.restaurantId, restaurantId),
+          ),
+        )
+        .limit(1);
+      if (existingLink.length === 0) {
+        await db.insert(productLocations).values({ productId, restaurantId });
+      }
+
       const id = `e2e-restaurante-${Date.now()}`;
       const user = await authStorage.upsertUser({
         id,
@@ -298,7 +340,7 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
         onboardingComplete: true,
       });
       const { passwordHash: _, ...safe } = user;
-      res.json({ user: safe, restaurantId, created: true });
+      res.json({ user: safe, restaurantId, productId, created: true });
     } catch (error) {
       console.error("Dev ensure restaurante error:", error);
       res.status(500).json({ message: "Erro ao garantir restaurante de teste." });
