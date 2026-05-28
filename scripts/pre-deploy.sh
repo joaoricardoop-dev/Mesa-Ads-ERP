@@ -182,7 +182,19 @@ echo "=== Pre-deploy: rodando testes ponta-a-ponta (pnpm run test:e2e) ==="
 # (Task #212) crie o DB temporário no mesmo Postgres de teste isolado — e
 # nunca no banco de produção herdado em DATABASE_URL do build.
 export DATABASE_URL_TEST
+# `|| true` desabilita o set -e desta linha pra capturar o exit code.
+set +e
 E2E_BASE_URL=http://localhost:5000 pnpm run test:e2e
+E2E_EXIT=$?
+set -e
+
+if [ "${E2E_EXIT}" -ne 0 ]; then
+  echo ""
+  echo "=== E2E falhou — dump do log do dev server (stderr inclui console.error) ==="
+  cat /tmp/pre-deploy-dev.log 2>/dev/null || true
+  echo "=== fim do log do dev server ==="
+  exit "${E2E_EXIT}"
+fi
 
 echo ""
 echo "=== Pre-deploy: testes ponta-a-ponta passaram ✓ ==="

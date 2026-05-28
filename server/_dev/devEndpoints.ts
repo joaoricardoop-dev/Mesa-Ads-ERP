@@ -340,7 +340,15 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
       res.json({ user: safe, restaurantId, productId, created: true });
     } catch (error) {
       console.error("Dev ensure restaurante error:", error);
-      res.status(500).json({ message: "Erro ao garantir restaurante de teste." });
+      // Surfacar mensagem real do erro no body — endpoint é dev-only
+      // (sentinel + DEV_FIXTURES gate), então não há risco de vazar
+      // detalhes em prod. Sem isso, Playwright só vê "500: Erro ao
+      // garantir..." e debug fica cego.
+      const detail = error instanceof Error ? error.message : String(error);
+      res.status(500).json({
+        message: "Erro ao garantir restaurante de teste.",
+        detail,
+      });
     }
   });
 

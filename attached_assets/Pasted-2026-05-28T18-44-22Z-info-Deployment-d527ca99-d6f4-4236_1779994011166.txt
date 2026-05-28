@@ -1,0 +1,410 @@
+2026-05-28T18:44:22Z info: Deployment: d527ca99-d6f4-4236-8fd5-909222745b3d
+2026-05-28T18:44:22Z info: Build: 7ce911ee-5561-4f61-9216-e86f51aabbe0
+2026-05-28T18:44:23Z info: Running Security Scan
+2026-05-28T18:44:40Z info: Security Scan Complete
+2026-05-28T18:44:43Z info: Installing packages
+--> pnpm install
+
+
+   ╭──────────────────────────────────────────────────────────────────╮
+   │                                                                  │
+   │                Update available! 10.4.1 → 11.4.0.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v11.4.0   │
+   │                Run "pnpm add -g pnpm" to update.                 │
+   │                                                                  │
+   ╰──────────────────────────────────────────────────────────────────╯
+
+
+Lockfile is up to date, resolution step is skipped
+
+Already up to date
+
+Done in 3.7s using pnpm v10.4.1
+
+2026-05-28T18:44:50Z info: Starting Build
+=== Pre-deploy: instalando dependências ===
+
+Lockfile is up to date, resolution step is skipped
+
+Already up to date
+
+Done in 2s using pnpm v10.4.1
+
+
+=== Pre-deploy: instalando o Chromium do Playwright ===
+
+
+=== Pre-deploy: subindo dev server (banco de TESTE isolado) ===
+
+Dev server PID=220, aguardando atender em :5000...
+
+Dev server respondeu após 5s
+
+=== Pre-deploy: aquecendo bundle Vite (rotas críticas) ===
+
+
+=== Pre-deploy: rodando testes ponta-a-ponta (pnpm run test:e2e) ===
+
+
+> mesa-ads-simulator@1.0.0 test:e2e /home/runner/workspace
+> playwright test
+
+
+
+Running 14 tests using 4 workers
+
+[e2e setup] dev-ensure-restaurante falhou (não-fatal p/ specs não-builder): 500 {"message":"Erro ao garantir restaurante de teste."}
+
+[e2e setup] dev-ensure-restaurante falhou (não-fatal p/ specs não-builder): 500 {"message":"Erro ao garantir restaurante de teste."}
+
+  ✓   1 [setup] › e2e/global.setup.ts:12:1 › authenticate as anunciante (4.0s)
+
+  -   2 [chromium] › e2e/checkout-aberto.spec.ts:22:3 › checkout aberto em /montar-campanha › visitante deslogado vê o hero e a lista de produtos
+
+  -   3 [chromium] › e2e/checkout-aberto.spec.ts:43:3 › checkout aberto em /montar-campanha › escolha do produto é preservada após reload
+  -   4 [chromium] › e2e/checkout-aberto.spec.ts:77:3 › checkout aberto em /montar-campanha › parceiro/interno cai no seletor de cliente ao abrir o wizard
+  -   5 [chromium] › e2e/checkout-wizard.spec.ts:217:3 › checkout wizard ponta-a-ponta › anunciante percorre o wizard até a cotação criada
+
+  -   6 [chromium] › e2e/checkout-wizard.spec.ts:242:3 › checkout wizard ponta-a-ponta › usuário interno seleciona um cliente no ClientPicker e percorre o wizard
+
+  ✓   8 [chromium] › e2e/finance-audit-trail.spec.ts:31:3 › finance — auditoria de fatura › create + update gera entradas de audit com diff (5.2s)
+
+  ✓  10 [chromium] › e2e/finance-dre-dual.spec.ts:29:3 › finance — DRE dual (competência vs caixa) › competência reconhece pelo issueDate, caixa pelo paymentDate (7.6s)
+  ✓   7 [chromium] › e2e/finance-bank-reconciliation.spec.ts:50:3 › finance — reconciliação bancária › emit → import CSV → reconcile → invoice paga + payables coerentes + DSO (7.8s)
+
+  ✘  13 [chromium] › e2e/finance-restaurant-portal.spec.ts:38:3 › finance — portal restaurante › admin marca pagamento → restaurante vê como paga via myCommissions (996ms)
+(node:679) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+  ✓  11 [chromium] › e2e/finance-invoice-lifecycle.spec.ts:37:3 › finance — ciclo de vida de fatura › emitir fatura, gerar payables, marcar paga e refletir no DSO (5.3s)
+
+[Migrations] Banco fresh detectado — aplicando 27 arquivos do schema base (drizzle/).
+
+  ✘   9 [chromium] › e2e/builder-locais.spec.ts:18:3 › builder /montar-campanha — passo LOCAIS › lista pelo menos 1 local no período padrão e atualiza ao trocar datas (14.0s)
+
+  ✓  12 [chromium] › e2e/finance-partner-portal.spec.ts:43:3 › finance — portal parceiro (comissão por competência) › comissão de parceiro materializa após pagamento da invoice (8.3s)
+
+[Migrations] Drizzle aplicado: 0000_nasty_james_howlett.sql (117 ok, 0 ignorado)
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "cnpj" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "razaoSocial" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "address" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "addressNumber" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "neighborhood" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "city" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "state" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "cep" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "instagram" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "convertedToId" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "convertedToType" of relation "leads" already exists
+
+[Migrations] Drizzle aplicado: 0001_special_quentin_quire.sql (0 ok, 11 ignorado)
+
+[Migrations] Drizzle 0002_bouncy_wolfsbane.sql: bloco ignorado (42701): column "leadId" of relation "quotations" already exists
+
+[Migrations] Drizzle aplicado: 0002_bouncy_wolfsbane.sql (22 ok, 1 ignorado)
+
+[Migrations] Drizzle aplicado: 0003_luxuriant_surge.sql (10 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0004_flashy_wendell_rand.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0005_premium_impossible_man.sql (7 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0006_add_logo_url.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle 0007_dapper_starbolt.sql: bloco ignorado (42701): column "logoUrl" of relation "active_restaurants" already exists
+
+[Migrations] Drizzle aplicado: 0007_dapper_starbolt.sql (1 ok, 1 ignorado)
+
+[Migrations] Drizzle aplicado: 0008_add_products_and_quotation_productid.sql (5 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0009_add_productid_campaigns_service_orders.sql (4 ok, 0 ignorado)
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42P07): relation "product_pricing_tiers" already exists
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42P07): relation "products" already exists
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42701): column "productId" of relation "campaigns" already exists
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42701): column "productId" of relation "quotations" already exists
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42701): column "productId" of relation "service_orders" already exists
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42P07): relation "idx_product_pricing_tiers_product_id" already exists
+
+[Migrations] Drizzle aplicado: 0010_high_darkstar.sql (15 ok, 6 ignorado)
+
+[Migrations] Drizzle aplicado: 0011_colossal_golden_guardian.sql (21 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0012_adorable_speedball.sql (3 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0013_chunky_obadiah_stane.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0014_wooden_lilith.sql (4 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0015_users_partner_fk.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0016_crm_notifications.sql (6 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0017_pricing_modes.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0018_partner_product_visibility.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0019_billing_mode.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0019_custom_product_quotations.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0020_product_impression_formula.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0020_quotation_period_start.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0021_bolacha_tier_1000_margem_4979.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0022_product_discount_price_tiers.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0023_campaign_notifications.sql (6 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0024_product_impression_formula.sql (5 ok, 0 ignorado)
+
+[Migrations] Applied: add_quotation_period_start
+
+[Migrations] Applied: add_billing_mode_to_partners
+
+[Migrations] Applied: add_custom_product_quotation_columns
+
+[Migrations] Applied: add_agency_commission_to_quotations
+
+[Migrations] Applied: add_pricing_modes_to_products
+
+[Migrations] Applied: add_visible_to_partners_to_products
+
+[Migrations] Applied: add_new_product_type_enum_values
+
+[Migrations] Applied: add_pipeline_campaign_statuses
+
+[Migrations] Applied: add_sla_stage_timestamps_and_freight_tracking
+
+[Migrations] Applied: add_product_discount_price_tiers
+
+[Migrations] Applied: add_service_order_trackings_table
+
+[Migrations] Applied: add_integration_tokens_table
+
+[Migrations] Applied: add_user_name_to_campaign_history
+
+[Migrations] Applied: add_lat_lng_to_active_restaurants
+
+[Migrations] Applied: add_freight_cost_to_campaigns
+
+[Migrations] Applied: add_partner_id_to_clients
+
+[Migrations] Applied: add_show_agency_pricing_to_clients
+
+[Migrations] Applied: add_visible_to_advertisers_to_products
+
+[Migrations] Applied: add_campaign_reports_tables
+
+[Migrations] Applied: add_campaign_id_and_client_id_to_crm_notifications
+
+[Migrations] Applied: add_source_to_quotations
+
+[Migrations] Applied: add_unique_constraint_operational_costs_campaign_id
+
+[Migrations] Applied: create_media_kit_settings
+
+[Migrations] Applied: add_pdf_url_to_media_kit_settings
+
+[Migrations] Applied: add_impression_formula_and_distribution_type_to_products
+
+[Migrations] Applied: add_workflow_template_to_products
+
+[Migrations] Applied: add_impression_detail_columns_to_products
+
+[Migrations] Applied: add_camelcase_impression_columns_to_products
+
+[Migrations] Applied: add_assigned_to_campaigns
+
+[Migrations] Applied: add_billing_type_and_withheld_tax_to_invoices
+
+[Migrations] Applied: add_partner_id_to_campaigns
+
+[Migrations] Applied: add_is_bonificada_to_campaigns
+
+[Migrations] Applied: create_accounts_payable_table
+
+[Migrations] Applied: add_supplier_id_to_accounts_payable
+
+[Migrations] Applied: enforce_campaign_id_not_null_accounts_payable
+
+[Migrations] Applied: drop_recipient_name_from_accounts_payable
+
+[Migrations] Applied: add_janelas_digitais_to_product_type_enum
+
+[Migrations] Applied: create_vip_providers_table
+
+[Migrations] Applied: add_custom_vip_provider_to_quotations
+
+[Migrations] Applied: add_vip_provider_to_products
+
+[Migrations] Applied: extend_accounts_payable_recipient_for_vip
+
+[Migrations] Applied: add_iss_fields_to_invoices
+
+[Migrations] Applied: create_campaign_phases_and_items
+
+[Migrations] Applied: add_phase_item_fks_to_financial_tables
+
+[Migrations] Applied: backfill_campaign_phases_and_items
+
+[Migrations] Applied: backfill_campaign_phases_v2
+
+[Migrations] Applied: backfill_campaign_items_from_quotation_v3
+
+[Migrations] Applied: add_campaign_phase_id_to_service_orders
+
+[Migrations] Applied: add_batch_timeline_columns
+
+[Migrations] Applied: rename_campaigns_lote_to_batch
+
+[Migrations] Applied: rename_campaigns_to_lote_format
+
+[Migrations] Applied: add_agency_bv_to_campaigns
+
+[Migrations] Applied: add_utm_tracking_to_clients
+
+[Migrations] Applied: marketplace_v2_schema_base
+
+[Migrations] Applied: marketplace_v2_schema_adjustments
+
+[Migrations] Applied: finrefac_01_glossary_comments
+
+[Migrations] Applied: finrefac_01_rename_vip_provider_commission_to_repasse
+
+[Migrations] Applied: finrefac_02_accounts_payable_ledger_columns
+
+[Migrations] Applied: finrefac_02_accounts_payable_backfill_from_restaurant_payments
+
+[Migrations] Applied: finrefac_02_create_restaurant_payments_view
+
+[Migrations] Applied: finrefac_02_accounts_payable_lossless_fixes
+
+[Migrations] Applied: finrefac_03_accounts_payable_natural_key_indexes
+
+[Migrations] Applied: marketplace_v2_quotation_items_share_columns
+
+[Migrations] Applied: finrefac_05_financial_audit_log
+
+[Migrations] Applied: add_users_preferences_jsonb
+
+[Migrations] Applied: add_restaurant_id_to_crm_notifications
+
+[Migrations] Applied: add_received_date_to_invoices
+
+[Migrations] Applied: finrefac_06_bank_reconciliation
+
+[Migrations] Applied: task_148_batch_financial_overrides_and_bv_rename
+
+[Migrations] Applied: task_165_backfill_product_locations_for_rede_products
+
+[Migrations] Applied: task_170_rollback_vitrine_catalog
+
+[Migrations] Applied: task_173_number_counters_table_and_backfill
+
+[Migrations] Applied: create_e2e_test_db_sentinel_task_202
+
+[Migrations] Applied: inactivate_leaked_e2e_records_task_202
+
+[Migrations] Applied: inactivate_leaked_e2e_records_task_189
+
+[Migrations] Applied: sprint1_loss_reason_notes_and_createdby_backfill
+
+[Migrations] Applied: sprint2_crm_notifications_user_id
+
+[Migrations] Applied: task_197_billing_schedule_items
+
+[Migrations] Applied: task_197_billing_schedule_backfill
+
+[Migrations] done in 23073ms (applied=79, skipped=0, total=79)
+
+[Migrations] done in 0ms (applied=0, skipped=79, total=79)
+
+  ✓  14 [chromium] › e2e/migrations-fresh-db.spec.ts:67:3 › runMigrations bootstrap em banco fresh (Task #212) › aplica schema completo num banco zerado e é idempotente em re-execução (1.3m)
+
+  2 failed
+    [chromium] › e2e/builder-locais.spec.ts:18:3 › builder /montar-campanha — passo LOCAIS › lista pelo menos 1 local no período padrão e atualiza ao trocar datas 
+    [chromium] › e2e/finance-restaurant-portal.spec.ts:38:3 › finance — portal restaurante › admin marca pagamento → restaurante vê como paga via myCommissions 
+  5 skipped
+  7 passed (1.6m)
+
+  2) [chromium] › e2e/finance-restaurant-portal.spec.ts:38:3 › finance — portal restaurante › admin marca pagamento → restaurante vê como paga via myCommissions 
+
+    Error: /api/dev-ensure-restaurante failed: 500 {"message":"Erro ao garantir restaurante de teste."}
+
+       at _finance-helpers.ts:33
+
+      31 |   const res = await request.post(url, { data: body });
+      32 |   if (!res.ok()) {
+    > 33 |     throw new Error(`${url} failed: ${res.status()} ${await res.text()}`);
+         |           ^
+      34 |   }
+      35 |   return (await res.json()) as T;
+      36 | }
+        at devEnsure (/home/runner/workspace/e2e/_finance-helpers.ts:33:11)
+        at /home/runner/workspace/e2e/finance-restaurant-portal.spec.ts:43:21
+
+    Error Context: test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  2) [chromium] › e2e/finance-restaurant-portal.spec.ts:38:3 › finance — portal restaurante › admin marca pagamento → restaurante vê como paga via myCommissions 
+
+    Error: /api/dev-ensure-restaurante failed: 500 {"message":"Erro ao garantir restaurante de teste."}
+
+       at _finance-helpers.ts:33
+
+      31 |   const res = await request.post(url, { data: body });
+      32 |   if (!res.ok()) {
+    > 33 |     throw new Error(`${url} failed: ${res.status()} ${await res.text()}`);
+         |           ^
+      34 |   }
+      35 |   return (await res.json()) as T;
+      36 | }
+        at devEnsure (/home/runner/workspace/e2e/_finance-helpers.ts:33:11)
+        at /home/runner/workspace/e2e/finance-restaurant-portal.spec.ts:43:21
+
+    Error Context: test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ELIFECYCLE  Command failed with exit code 1.
