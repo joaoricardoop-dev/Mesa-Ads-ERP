@@ -139,30 +139,34 @@ export default function Onboarding({ userName }: OnboardingProps) {
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.03]"
-            style={{ background: "radial-gradient(circle, #27d803 0%, transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, #00e640 0%, transparent 70%)" }}
           />
         </div>
 
         <div className="relative w-full max-w-md px-6 py-12">
           <div className="text-center mb-8">
             <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-6" />
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#27d803]/10 border border-[#27d803]/30 mb-4">
-              <ShoppingCart className="w-3.5 h-3.5 text-[#27d803]" />
-              <span className="text-[11px] font-medium text-[#27d803] uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00e640]/10 border border-[#00e640]/30 mb-4">
+              <ShoppingCart className="w-3.5 h-3.5 text-[#00e640]" />
+              <span className="text-[11px] font-medium text-[#00e640] uppercase tracking-wider">
                 continuar montagem
               </span>
             </div>
-            <h1 className="text-2xl font-bold text-white mb-1">
-              {userName ? `Olá, ${userName}!` : "Quase lá!"}
+            <h1 className="font-display text-3xl sm:text-4xl tracking-[-0.03em] leading-[1.02] text-white mb-2">
+              {userName ? (
+                <>Olá, <span className="font-serif-italic-accent text-[#00e640]">{userName}</span>!</>
+              ) : (
+                <>Quase <span className="font-serif-italic-accent text-[#00e640]">lá</span></>
+              )}
             </h1>
-            <p className="text-sm text-[hsl(0,0%,55%)]">
+            <p className="text-sm text-[hsl(0,0%,55%)] max-w-sm mx-auto">
               Só precisamos do nome da sua empresa para continuar a campanha.
             </p>
           </div>
 
           <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-xl p-6">
             <div className="flex items-center gap-3 mb-5">
-              <Building2 className="w-5 h-5 text-[#27d803]" />
+              <Building2 className="w-5 h-5 text-[#00e640]" />
               <div>
                 <h2 className="text-sm font-semibold text-white">Sua empresa</h2>
                 <p className="text-xs text-[hsl(0,0%,45%)]">Você pode completar os outros dados depois</p>
@@ -196,7 +200,7 @@ export default function Onboarding({ userName }: OnboardingProps) {
             <Button
               onClick={handleCheckoutFinish}
               disabled={completeMutation.isPending || !form.name.trim()}
-              className="w-full mt-6 bg-[#27d803] hover:bg-[#22c003] text-black font-medium"
+              className="w-full mt-6 bg-[#00e640] hover:bg-[#00c238] text-black font-medium"
               data-testid="button-checkout-onboarding-continue"
             >
               {completeMutation.isPending ? (
@@ -231,18 +235,25 @@ export default function Onboarding({ userName }: OnboardingProps) {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.03]"
-          style={{ background: "radial-gradient(circle, #27d803 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, #00e640 0%, transparent 70%)" }}
         />
       </div>
 
       <div className="relative w-full max-w-lg px-6 py-12">
         <div className="text-center mb-8">
           <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-white mb-1">
-            {userName ? `Olá, ${userName}!` : "Bem-vindo!"}
+          <p className="label-mono text-[10px] text-[#00e640]/90 mb-3">
+            Cadastro · Anunciante
+          </p>
+          <h1 className="font-display text-3xl sm:text-4xl tracking-[-0.03em] leading-[1.02] text-white mb-2">
+            {userName ? (
+              <>Olá, <span className="font-serif-italic-accent text-[#00e640]">{userName}</span></>
+            ) : (
+              <>Bem-<span className="font-serif-italic-accent text-[#00e640]">vindo</span></>
+            )}
           </h1>
-          <p className="text-sm text-[hsl(0,0%,50%)]">
-            Complete seu cadastro para acessar o portal do anunciante
+          <p className="text-sm text-[hsl(0,0%,55%)] max-w-sm mx-auto">
+            Complete seu cadastro para acessar o portal do anunciante.
           </p>
         </div>
 
@@ -250,14 +261,14 @@ export default function Onboarding({ userName }: OnboardingProps) {
           {steps.map((s, i) => (
             <div key={i} className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                i < step ? "bg-[#27d803] text-black" :
-                i === step ? "bg-[#27d803]/20 text-[#27d803] ring-2 ring-[#27d803]/50" :
+                i < step ? "bg-[#00e640] text-black" :
+                i === step ? "bg-[#00e640]/20 text-[#00e640] ring-2 ring-[#00e640]/50" :
                 "bg-[hsl(0,0%,11%)] text-[hsl(0,0%,40%)]"
               }`}>
                 {i < step ? <Check className="w-4 h-4" /> : i + 1}
               </div>
               {i < steps.length - 1 && (
-                <div className={`w-12 h-0.5 ${i < step ? "bg-[#27d803]" : "bg-[hsl(0,0%,14%)]"}`} />
+                <div className={`w-12 h-0.5 ${i < step ? "bg-[#00e640]" : "bg-[hsl(0,0%,14%)]"}`} />
               )}
             </div>
           ))}
@@ -265,7 +276,7 @@ export default function Onboarding({ userName }: OnboardingProps) {
 
         <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-xl p-6">
           <div className="flex items-center gap-3 mb-5">
-            {(() => { const Icon = steps[step].icon; return <Icon className="w-5 h-5 text-[#27d803]" />; })()}
+            {(() => { const Icon = steps[step].icon; return <Icon className="w-5 h-5 text-[#00e640]" />; })()}
             <div>
               <h2 className="text-sm font-semibold text-white">{steps[step].title}</h2>
               <p className="text-xs text-[hsl(0,0%,45%)]">{steps[step].subtitle}</p>
@@ -374,7 +385,7 @@ export default function Onboarding({ userName }: OnboardingProps) {
                 size="sm"
                 onClick={() => setStep(step + 1)}
                 disabled={!canAdvance()}
-                className="bg-[#27d803] hover:bg-[#22c003] text-black font-medium"
+                className="bg-[#00e640] hover:bg-[#00c238] text-black font-medium"
               >
                 Próximo
                 <ChevronRight className="w-4 h-4 ml-1" />
@@ -384,7 +395,7 @@ export default function Onboarding({ userName }: OnboardingProps) {
                 size="sm"
                 onClick={handleFinish}
                 disabled={completeMutation.isPending || !form.name.trim()}
-                className="bg-[#27d803] hover:bg-[#22c003] text-black font-medium"
+                className="bg-[#00e640] hover:bg-[#00c238] text-black font-medium"
               >
                 {completeMutation.isPending ? (
                   <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Salvando...</>

@@ -279,75 +279,101 @@
   background: var(--muted-foreground);
 }
 
-/* ─── Landing Page Styles ─── */
+/* ─── Mesa.ads editorial public surfaces (landing + onboardings + sign) ───
+   Tokens consolidated with the Mesa.ads design system (Fase 4).
+   Brand neon: #00e640 (dark contexts), magenta accent: #ff2e8a.
+   Typography: Bricolage Grotesque (display), Instrument Serif (italic accents).
+*/
 .landing-page {
-  --lp-bg: hsl(0 0% 4%);
-  --lp-fg: hsl(0 0% 95%);
-  --lp-card: hsl(0 0% 7%);
-  --lp-border: hsl(0 0% 14%);
-  --lp-muted: hsl(0 0% 50%);
-  --lp-secondary: hsl(0 0% 11%);
-  --lp-brand: hsl(110 97% 43%);
-  --lp-brand-fg: hsl(0 0% 100%);
-  font-family: "Outfit", sans-serif;
+  --lp-bg: #040405;
+  --lp-fg: #f5f5f3;
+  --lp-card: #0a0a0c;
+  --lp-border: rgba(255, 255, 255, 0.08);
+  --lp-muted: #a6a6aa;
+  --lp-secondary: #141416;
+  --lp-brand: #00e640;
+  --lp-brand-fg: #040405;
+  font-family: "Bricolage Grotesque Variable", "Bricolage Grotesque", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   background: var(--lp-bg);
   color: var(--lp-fg);
 }
 
 .landing-page .section-label {
   color: var(--lp-brand);
-  font-family: "Outfit", sans-serif;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   font-weight: 600;
-  font-size: 0.75rem;
-  letter-spacing: 0.3em;
+  font-size: 0.7rem;
+  letter-spacing: 0.32em;
   text-transform: uppercase;
 }
 
 .landing-page .section-title {
-  font-family: "Outfit", sans-serif;
+  font-family: "Bricolage Grotesque Variable", "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
   font-weight: 800;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
 }
 
 .landing-page .card-glass {
-  background: hsl(0 0% 11% / 0.8);
+  background: rgba(20, 20, 22, 0.7);
   border: 1px solid var(--lp-border);
   border-radius: 1rem;
+  backdrop-filter: blur(8px);
 }
 
 .landing-page .stat-value {
-  font-family: "Outfit", sans-serif;
+  font-family: "Bricolage Grotesque Variable", "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
   font-weight: 900;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
 .text-gradient-brand {
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  background-image: linear-gradient(135deg, hsl(110 97% 43%), hsl(130 80% 50%));
+  background-image: linear-gradient(135deg, #00e640 0%, #b8f1ff 100%);
 }
 
 .bg-brand {
-  background: hsl(110 97% 43%);
+  background-color: #00e640;
+  color: #040405;
+}
+
+.text-brand {
+  color: #00e640;
+}
+
+.border-brand {
+  border-color: #00e640;
+}
+
+.ring-brand {
+  --tw-ring-color: #00e640;
 }
 
 .hero-overlay {
   background: linear-gradient(
     180deg,
-    hsl(0 0% 4% / 0.4) 0%,
-    hsl(0 0% 4% / 0.75) 50%,
-    hsl(0 0% 4% / 1) 100%
+    rgba(4, 4, 5, 0.4) 0%,
+    rgba(4, 4, 5, 0.78) 55%,
+    rgba(4, 4, 5, 1) 100%
   );
 }
 
 .glow {
-  box-shadow: 0 0 60px -10px hsl(110 97% 43% / 0.4);
+  box-shadow: 0 0 60px -10px rgba(0, 230, 64, 0.45);
 }
 
 .font-display-landing {
-  font-family: "Outfit", sans-serif;
+  font-family: "Bricolage Grotesque Variable", "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.font-serif-italic-accent {
+  font-family: "Instrument Serif", ui-serif, Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 /* Tabular numbers for financial data */

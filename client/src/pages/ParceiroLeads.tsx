@@ -698,10 +698,12 @@ export default function ParceiroLeads() {
     <div className="p-6 max-w-7xl mx-auto space-y-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="w-6 h-6 text-primary" /> Meus Leads
+          <p className="label-mono text-[10px] text-primary/90 mb-1">Parceiro · Pipeline</p>
+          <h1 className="font-display text-2xl sm:text-3xl md:text-4xl tracking-[-0.03em] leading-[1.02] flex items-center gap-2">
+            <Users className="w-7 h-7 text-primary" />
+            Meus <span className="font-serif-italic-accent text-primary">Leads</span>
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="text-sm text-muted-foreground mt-1">
             {leads.length} {leads.length === 1 ? "lead indicado" : "leads indicados"}
           </p>
         </div>

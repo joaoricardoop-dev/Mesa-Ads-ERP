@@ -144,13 +144,13 @@ export default function QuotationSign() {
   };
 
   const inputClass =
-    "w-full mt-1 px-3 py-2 bg-[hsl(0,0%,11%)] border border-[hsl(0,0%,18%)] text-white rounded-lg text-sm placeholder:text-[hsl(0,0%,35%)] focus:outline-none focus:ring-2 focus:ring-[#27d803]/40 focus:border-[#27d803]/60";
+    "w-full mt-1 px-3 py-2 bg-[hsl(0,0%,11%)] border border-[hsl(0,0%,18%)] text-white rounded-lg text-sm placeholder:text-[hsl(0,0%,35%)] focus:outline-none focus:ring-2 focus:ring-[#00e640]/40 focus:border-[#00e640]/60";
 
   if (loading) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "hsl(0 0% 4%)" }}>
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-[#27d803] animate-spin" />
+          <Loader2 className="w-8 h-8 text-[#00e640] animate-spin" />
           <p className="text-sm text-[hsl(0,0%,50%)]">Carregando...</p>
         </div>
       </div>
@@ -183,8 +183,8 @@ export default function QuotationSign() {
         <div className="relative w-full max-w-md px-6 text-center">
           <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-8" />
           <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-xl p-8">
-            <div className="w-16 h-16 rounded-full bg-[#27d803]/10 flex items-center justify-center mx-auto mb-5">
-              <CheckCircle2 className="w-8 h-8 text-[#27d803]" />
+            <div className="w-16 h-16 rounded-full bg-[#00e640]/10 flex items-center justify-center mx-auto mb-5">
+              <CheckCircle2 className="w-8 h-8 text-[#00e640]" />
             </div>
             <h2 className="text-xl font-bold text-white mb-2">Já assinada</h2>
             <p className="text-sm text-[hsl(0,0%,50%)] leading-relaxed">
@@ -205,14 +205,14 @@ export default function QuotationSign() {
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.05]"
-            style={{ background: "radial-gradient(circle, #27d803 0%, transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, #00e640 0%, transparent 70%)" }}
           />
         </div>
         <div className="relative w-full max-w-md px-6 text-center">
           <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-8" />
           <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-xl p-8">
-            <div className="w-16 h-16 rounded-full bg-[#27d803]/10 flex items-center justify-center mx-auto mb-5">
-              <CheckCircle2 className="w-8 h-8 text-[#27d803]" />
+            <div className="w-16 h-16 rounded-full bg-[#00e640]/10 flex items-center justify-center mx-auto mb-5">
+              <CheckCircle2 className="w-8 h-8 text-[#00e640]" />
             </div>
             <h2 className="text-xl font-bold text-white mb-2">Assinatura realizada!</h2>
             <p className="text-sm text-[hsl(0,0%,50%)] mb-6 leading-relaxed">
@@ -220,7 +220,7 @@ export default function QuotationSign() {
             </p>
             <button
               onClick={() => downloadPdf()}
-              className="inline-flex items-center justify-center gap-2 w-full h-10 bg-[#27d803] hover:bg-[#22c003] text-black font-semibold rounded-lg text-sm transition-colors"
+              className="inline-flex items-center justify-center gap-2 w-full h-10 bg-[#00e640] hover:bg-[#00c238] text-black font-semibold rounded-lg text-sm transition-colors"
             >
               <FileDown className="w-4 h-4" />
               Baixar PDF novamente
@@ -244,22 +244,27 @@ export default function QuotationSign() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.03]"
-          style={{ background: "radial-gradient(circle, #27d803 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, #00e640 0%, transparent 70%)" }}
         />
       </div>
 
       <div className="relative w-full max-w-lg px-6">
         <div className="text-center mb-8">
           <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-white mb-1">Ordem de Serviço</h1>
-          <p className="text-sm text-[hsl(0,0%,50%)]">
-            Revise os dados e assine digitalmente
+          <p className="label-mono text-[10px] text-[#00e640]/90 mb-3">
+            Assinatura digital
+          </p>
+          <h1 className="font-display text-3xl sm:text-4xl tracking-[-0.03em] leading-[1.02] text-white mb-2">
+            Ordem de <span className="font-serif-italic-accent text-[#00e640]">Serviço</span>
+          </h1>
+          <p className="text-sm text-[hsl(0,0%,55%)] max-w-sm mx-auto">
+            Revise os dados e assine digitalmente.
           </p>
         </div>
 
         <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-xl p-6 space-y-6">
           <div>
-            <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-3">Dados da Cotação</h3>
+            <h3 className="text-xs font-semibold text-[#00e640] uppercase tracking-wider mb-3">Dados da Cotação</h3>
             <div className="space-y-2 text-sm">
               {so && (
                 <div className="flex justify-between">
@@ -289,7 +294,7 @@ export default function QuotationSign() {
           {data.items && data.items.length > 0 ? (
             <>
               <div>
-                <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-3">Produtos do Orçamento</h3>
+                <h3 className="text-xs font-semibold text-[#00e640] uppercase tracking-wider mb-3">Produtos do Orçamento</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -336,7 +341,7 @@ export default function QuotationSign() {
             </>
           ) : (
             <div>
-              <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-3">Financeiro</h3>
+              <h3 className="text-xs font-semibold text-[#00e640] uppercase tracking-wider mb-3">Financeiro</h3>
               <div className="flex justify-between text-sm">
                 <span className="text-[hsl(0,0%,50%)]">Valor Total</span>
                 <span className="text-white font-bold text-lg">
@@ -351,7 +356,7 @@ export default function QuotationSign() {
           {(so?.periodStart || q?.periodStart) && (
             <>
               <div>
-                <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-3">Período</h3>
+                <h3 className="text-xs font-semibold text-[#00e640] uppercase tracking-wider mb-3">Período</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-[hsl(0,0%,50%)]">Início</span>
@@ -370,13 +375,13 @@ export default function QuotationSign() {
           {data.restaurants && data.restaurants.length > 0 && (
             <>
               <div>
-                <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-3">
+                <h3 className="text-xs font-semibold text-[#00e640] uppercase tracking-wider mb-3">
                   Locais ({data.restaurants.length})
                 </h3>
                 <div className="space-y-1.5">
                   {data.restaurants.map((r: any, i: number) => (
                     <div key={i} className="flex items-center gap-2 text-sm">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#27d803]" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#00e640]" />
                       <span className="text-white">{r.name || r.restaurantName || "-"}</span>
                     </div>
                   ))}
@@ -389,7 +394,7 @@ export default function QuotationSign() {
           {(data as any).billingSchedule && (data as any).billingSchedule.length > 0 && (
             <>
               <div>
-                <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-3">Condições de pagamento</h3>
+                <h3 className="text-xs font-semibold text-[#00e640] uppercase tracking-wider mb-3">Condições de pagamento</h3>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-[hsl(0,0%,50%)] text-xs border-b border-[hsl(0,0%,14%)]">
@@ -414,7 +419,7 @@ export default function QuotationSign() {
           )}
 
           <div>
-            <h3 className="text-xs font-semibold text-[#27d803] uppercase tracking-wider mb-4">Assinatura Digital</h3>
+            <h3 className="text-xs font-semibold text-[#00e640] uppercase tracking-wider mb-4">Assinatura Digital</h3>
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-[hsl(0,0%,55%)] font-medium">Nome Completo *</label>
@@ -441,7 +446,7 @@ export default function QuotationSign() {
                 <div
                   className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                     accepted
-                      ? "bg-[#27d803] border-[#27d803]"
+                      ? "bg-[#00e640] border-[#00e640]"
                       : "border-[hsl(0,0%,30%)] group-hover:border-[hsl(0,0%,45%)]"
                   }`}
                   onClick={() => setAccepted(!accepted)}
@@ -467,7 +472,7 @@ export default function QuotationSign() {
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="w-full h-11 bg-[#27d803] hover:bg-[#22c003] disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+                className="w-full h-11 bg-[#00e640] hover:bg-[#00c238] disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <>

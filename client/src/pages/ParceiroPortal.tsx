@@ -221,11 +221,14 @@ export default function ParceiroPortal() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <div className="p-3 rounded-xl bg-primary/10">
+        <div className="p-3 rounded-xl bg-primary/10 ring-1 ring-primary/20">
           <Handshake className="w-6 h-6 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold">Portal do Parceiro</h1>
+          <p className="label-mono text-[10px] text-primary/90 mb-1">Portal · Parceiro</p>
+          <h1 className="font-display text-2xl sm:text-3xl md:text-4xl tracking-[-0.03em] leading-[1.02]">
+            Portal do <span className="font-serif-italic-accent text-primary">Parceiro</span>
+          </h1>
           {dashboard?.partner && (
             <div className="flex flex-wrap items-center gap-2 mt-0.5">
               <p className="text-sm text-muted-foreground">

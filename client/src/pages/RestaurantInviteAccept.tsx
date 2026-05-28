@@ -139,7 +139,7 @@ export default function RestaurantInviteAccept() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: "hsl(0 0% 4%)" }}>
         <div className="flex flex-col items-center gap-4">
           <img src="/logo-white.png" alt="mesa.ads" className="h-8 mb-2" />
-          <Loader2 className="w-8 h-8 animate-spin" style={{ color: "#27d803" }} />
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: "#00e640" }} />
           <p className="text-sm" style={{ color: "hsl(0 0% 50%)" }}>Carregando convite...</p>
         </div>
       </div>
@@ -198,7 +198,7 @@ export default function RestaurantInviteAccept() {
             <a
               href="/"
               className="inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-sm text-black transition-opacity hover:opacity-90"
-              style={{ background: "#27d803" }}
+              style={{ background: "#00e640" }}
             >
               Entrar na plataforma
               <ArrowRight className="w-4 h-4" />
@@ -221,18 +221,21 @@ export default function RestaurantInviteAccept() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full opacity-[0.05]"
-          style={{ background: "radial-gradient(ellipse, #27d803 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(ellipse, #00e640 0%, transparent 70%)" }}
         />
       </div>
 
       <div className="relative max-w-2xl mx-auto px-6 py-12">
         <div className="text-center mb-10">
           <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-6" />
-          <h1 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: "hsl(0 0% 95%)" }}>
-            Convite de Parceria
+          <p className="label-mono text-[10px] text-[#00e640]/90 mb-3">
+            Convite · Restaurante
+          </p>
+          <h1 className="font-display text-3xl md:text-4xl tracking-[-0.03em] leading-[1.02] mb-2" style={{ color: "#f5f5f3" }}>
+            Convite de <span className="font-serif-italic-accent text-[#00e640]">Parceria</span>
           </h1>
-          <p className="text-sm" style={{ color: "hsl(0 0% 50%)" }}>
-            Revise os dados e aceite os termos para criar sua conta
+          <p className="text-sm max-w-md mx-auto" style={{ color: "#a6a6aa" }}>
+            Revise os dados e aceite os termos para criar sua conta.
           </p>
         </div>
 
@@ -242,7 +245,7 @@ export default function RestaurantInviteAccept() {
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "hsl(0 0% 11%)" }}>
-              <Building2 className="w-5 h-5" style={{ color: "#27d803" }} />
+              <Building2 className="w-5 h-5" style={{ color: "#00e640" }} />
             </div>
             <div>
               <h2 className="font-semibold" style={{ color: "hsl(0 0% 95%)" }}>Dados do Estabelecimento</h2>
@@ -268,7 +271,7 @@ export default function RestaurantInviteAccept() {
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "hsl(0 0% 11%)" }}>
-              <FileText className="w-5 h-5" style={{ color: "#27d803" }} />
+              <FileText className="w-5 h-5" style={{ color: "#00e640" }} />
             </div>
             <div>
               <h2 className="font-semibold" style={{ color: "hsl(0 0% 95%)" }}>Termos de Parceria</h2>
@@ -291,10 +294,10 @@ export default function RestaurantInviteAccept() {
               type="checkbox"
               checked={termsAccepted}
               onChange={(e) => setTermsAccepted(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded accent-[#27d803]"
+              className="mt-0.5 w-4 h-4 rounded accent-[#00e640]"
             />
             <span className="text-sm" style={{ color: "hsl(0 0% 70%)" }}>
-              Li e aceito os <span className="font-semibold" style={{ color: "#27d803" }}>Termos de Parceria</span> acima
+              Li e aceito os <span className="font-semibold" style={{ color: "#00e640" }}>Termos de Parceria</span> acima
             </span>
           </label>
         </div>
@@ -306,7 +309,7 @@ export default function RestaurantInviteAccept() {
           >
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "hsl(0 0% 11%)" }}>
-                <User className="w-5 h-5" style={{ color: "#27d803" }} />
+                <User className="w-5 h-5" style={{ color: "#00e640" }} />
               </div>
               <div>
                 <h2 className="font-semibold" style={{ color: "hsl(0 0% 95%)" }}>Dados do Responsável</h2>
@@ -326,7 +329,7 @@ export default function RestaurantInviteAccept() {
                   onChange={(e) => setAcceptedByName(e.target.value)}
                   placeholder="Nome completo"
                   required
-                  className="w-full h-10 pl-10 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#27d803]"
+                  className="w-full h-10 pl-10 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00e640]"
                   style={{ background: "hsl(0 0% 11%)", border: "1px solid hsl(0 0% 18%)", color: "hsl(0 0% 95%)" }}
                 />
               </FormField>
@@ -342,7 +345,7 @@ export default function RestaurantInviteAccept() {
                   onChange={(e) => setAcceptedByCpf(formatCpf(e.target.value))}
                   placeholder="000.000.000-00"
                   required
-                  className="w-full h-10 pl-10 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#27d803]"
+                  className="w-full h-10 pl-10 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00e640]"
                   style={{ background: "hsl(0 0% 11%)", border: "1px solid hsl(0 0% 18%)", color: "hsl(0 0% 95%)" }}
                 />
               </FormField>
@@ -358,7 +361,7 @@ export default function RestaurantInviteAccept() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="seu@email.com"
                   required
-                  className="w-full h-10 pl-10 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#27d803]"
+                  className="w-full h-10 pl-10 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00e640]"
                   style={{ background: "hsl(0 0% 11%)", border: "1px solid hsl(0 0% 18%)", color: "hsl(0 0% 95%)" }}
                 />
               </FormField>
@@ -376,7 +379,7 @@ export default function RestaurantInviteAccept() {
                     placeholder="Mínimo 6 caracteres"
                     required
                     minLength={6}
-                    className="w-full h-10 pl-10 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#27d803]"
+                    className="w-full h-10 pl-10 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00e640]"
                     style={{ background: "hsl(0 0% 11%)", border: "1px solid hsl(0 0% 18%)", color: "hsl(0 0% 95%)" }}
                   />
                   <button
@@ -396,7 +399,7 @@ export default function RestaurantInviteAccept() {
             type="submit"
             disabled={submitting || !termsAccepted || !acceptedByName || !acceptedByCpf || !email || !password}
             className="w-full py-3.5 rounded-xl font-bold text-sm text-black transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            style={{ background: "#27d803" }}
+            style={{ background: "#00e640" }}
           >
             {submitting ? (
               <>
@@ -446,7 +449,7 @@ function FormField({
   return (
     <div>
       <label className="text-xs font-semibold block mb-1.5" style={{ color: "hsl(0 0% 50%)" }}>
-        {label} {required && <span style={{ color: "#27d803" }}>*</span>}
+        {label} {required && <span style={{ color: "#00e640" }}>*</span>}
       </label>
       <div className="relative">
         <div className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(0 0% 40%)" }}>

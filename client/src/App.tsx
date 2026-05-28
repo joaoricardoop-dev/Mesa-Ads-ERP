@@ -163,23 +163,44 @@ function Router() {
 }
 
 const clerkAppearance = {
+  variables: {
+    fontFamily:
+      '"DM Sans", "DM Sans Variable", ui-sans-serif, system-ui, sans-serif',
+    colorPrimary: "#00e640",
+    colorBackground: "#0a0a0c",
+    colorText: "#f5f5f3",
+    colorTextSecondary: "#a6a6aa",
+    colorInputBackground: "#141416",
+    colorInputText: "#f5f5f3",
+    colorDanger: "#ff2e8a",
+    borderRadius: "0.75rem",
+  },
   elements: {
     rootBox: "mx-auto",
-    card: "bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] shadow-2xl",
-    headerTitle: "text-[hsl(0,0%,95%)]",
-    headerSubtitle: "text-[hsl(0,0%,50%)]",
-    formFieldLabel: "text-[hsl(0,0%,50%)]",
-    formFieldInput: "bg-[hsl(0,0%,11%)] border-[hsl(0,0%,18%)] text-[hsl(0,0%,95%)]",
-    formButtonPrimary: "bg-[#27d803] hover:bg-[#22c003] text-black",
+    card: "bg-[#0a0a0c] border border-white/8 shadow-2xl rounded-2xl",
+    headerTitle:
+      "text-[#f5f5f3] font-display tracking-tight text-2xl font-semibold",
+    headerSubtitle: "text-[#a6a6aa] text-sm",
+    formFieldLabel:
+      "text-[#a6a6aa] label-mono text-[10px] tracking-[0.18em]",
+    formFieldInput:
+      "bg-[#141416] border-white/8 text-[#f5f5f3] rounded-lg focus:border-[#00e640]/60 focus:ring-1 focus:ring-[#00e640]/40",
+    formButtonPrimary:
+      "bg-[#00e640] hover:bg-[#00c238] text-[#040405] font-semibold tracking-tight rounded-lg shadow-[0_0_0_1px_rgba(0,230,64,0.4)] transition-all",
     footer: "hidden",
     footerAction: "hidden",
     footerActionLink: "hidden",
-    socialButtonsBlockButton: "border-[hsl(0,0%,18%)] text-[hsl(0,0%,70%)]",
-    dividerLine: "bg-[hsl(0,0%,14%)]",
-    dividerText: "text-[hsl(0,0%,40%)]",
-    identityPreview: "bg-[hsl(0,0%,11%)]",
-    identityPreviewText: "text-[hsl(0,0%,95%)]",
-    identityPreviewEditButton: "text-[#27d803]",
+    socialButtonsBlockButton:
+      "border-white/8 text-[#f5f5f3]/85 hover:bg-white/[0.04] rounded-lg",
+    socialButtonsBlockButtonText: "text-[#f5f5f3]/85 font-medium",
+    dividerLine: "bg-white/8",
+    dividerText: "text-[#a6a6aa] label-mono text-[10px]",
+    identityPreview: "bg-[#141416] border-white/8 rounded-lg",
+    identityPreviewText: "text-[#f5f5f3]",
+    identityPreviewEditButton: "text-[#00e640] hover:text-[#00c238]",
+    formFieldInputShowPasswordButton: "text-[#a6a6aa]",
+    otpCodeFieldInput:
+      "bg-[#141416] border-white/8 text-[#f5f5f3] rounded-lg focus:border-[#00e640]/60",
   },
 };
 
@@ -302,15 +323,56 @@ function ClerkLoginPage() {
   })();
 
   return (
-    <div className="h-screen w-full flex items-center justify-center" style={{ background: "hsl(0 0% 4%)" }}>
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#040405] text-[#f5f5f3] relative overflow-hidden px-6 py-10">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.07]"
-          style={{ background: "radial-gradient(circle, #27d803 0%, transparent 70%)" }}
+          className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[720px] h-[720px] rounded-full opacity-[0.10] blur-[2px]"
+          style={{ background: "radial-gradient(circle, #00e640 0%, transparent 65%)" }}
+        />
+        <div
+          className="absolute bottom-[-200px] right-[-160px] w-[480px] h-[480px] rounded-full opacity-[0.08]"
+          style={{ background: "radial-gradient(circle, #ff2e8a 0%, transparent 70%)" }}
+        />
+        <div
+          className="absolute inset-0 opacity-[0.025] mix-blend-overlay"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.6'/></svg>\")",
+          }}
         />
       </div>
-      <div className="relative flex flex-col items-center">
-        <img src="/logo-white.png" alt="mesa.ads" className="h-10 mb-8" />
+
+      <div className="relative flex flex-col items-center w-full max-w-md">
+        <img src="/logo-white.png" alt="mesa.ads" className="h-9 mb-8 opacity-95" />
+
+        <div className="text-center mb-8 space-y-3">
+          <p className="label-mono text-[10px] text-[#00e640]/90">
+            Plataforma Mesa.ads
+          </p>
+          <h1 className="font-display text-4xl sm:text-5xl font-semibold leading-[0.95] tracking-[-0.03em] text-[#f5f5f3]">
+            {mode === "signin" ? (
+              <>
+                Bem-vindo de{" "}
+                <span className="font-serif-italic-accent text-[#00e640]">
+                  volta
+                </span>
+              </>
+            ) : (
+              <>
+                Crie sua{" "}
+                <span className="font-serif-italic-accent text-[#00e640]">
+                  conta
+                </span>
+              </>
+            )}
+          </h1>
+          <p className="text-sm text-[#a6a6aa]">
+            {mode === "signin"
+              ? "Acesse sua área para gerenciar campanhas, parceiros e finanças."
+              : "Comece a anunciar em bolachas pelo Brasil em minutos."}
+          </p>
+        </div>
+
         {mode === "signin" ? (
           <SignIn
             appearance={clerkAppearance}
@@ -326,28 +388,30 @@ function ClerkLoginPage() {
             fallbackRedirectUrl={redirectTo}
           />
         )}
+
         <button
           onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          className="mt-4 text-sm"
-          style={{ color: "hsl(0 0% 50%)" }}
+          className="mt-6 text-sm text-[#a6a6aa] hover:text-[#f5f5f3] transition-colors"
         >
           {mode === "signin" ? (
-            <>Não tem uma conta? <span className="text-[#27d803] hover:underline cursor-pointer">Criar conta</span></>
+            <>Não tem uma conta? <span className="text-[#00e640] hover:underline cursor-pointer font-medium">Criar conta</span></>
           ) : (
-            <>Já tem uma conta? <span className="text-[#27d803] hover:underline cursor-pointer">Entrar</span></>
+            <>Já tem uma conta? <span className="text-[#00e640] hover:underline cursor-pointer font-medium">Entrar</span></>
           )}
         </button>
+
         <a
           href="/parceiro"
-          className="mt-4 text-sm block"
-          style={{ color: "hsl(0 0% 50%)" }}
+          className="mt-3 text-sm block text-[#a6a6aa] hover:text-[#f5f5f3] transition-colors text-center"
         >
-          É um local parceiro? <span className="text-[#27d803] hover:underline cursor-pointer">Cadastre-se aqui</span>
+          É um local parceiro? <span className="text-[#00e640] hover:underline cursor-pointer font-medium">Cadastre-se aqui</span>
         </a>
-        <p className="text-center mt-4 text-[11px]" style={{ color: "hsl(0 0% 30%)" }}>
-          mesa.ads &copy; {new Date().getFullYear()} &mdash; Plataforma de gestão
+
+        <p className="text-center mt-8 label-mono text-[10px] text-[#a6a6aa]/60">
+          mesa.ads · {new Date().getFullYear()} · Plataforma de gestão
         </p>
       </div>
+
       {import.meta.env.DEV && <DevLoginButton />}
     </div>
   );
@@ -406,12 +470,12 @@ function AuthenticatedApp() {
         </div>
         <div className="relative flex flex-col items-center max-w-md px-6 text-center">
           <img src="/logo-white.png" alt="mesa.ads" className="h-10 mb-8" />
-          <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-2xl p-8 shadow-2xl w-full">
-            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-5">
-              <ShieldX className="w-8 h-8 text-red-400" />
+          <div className="bg-[#0a0a0c] border border-white/8 rounded-2xl p-8 shadow-2xl w-full">
+            <div className="w-16 h-16 rounded-full bg-[#ff2e8a]/10 ring-1 ring-[#ff2e8a]/30 flex items-center justify-center mx-auto mb-5">
+              <ShieldX className="w-8 h-8 text-[#ff2e8a]" />
             </div>
-            <h2 className="text-xl font-bold text-[hsl(0,0%,95%)] mb-2">
-              Acesso não autorizado
+            <h2 className="font-display text-2xl tracking-tight text-[#f5f5f3] mb-2">
+              Acesso <span className="font-serif-italic-accent text-[#ff2e8a]">não</span> autorizado
             </h2>
             <p className="text-sm text-[hsl(0,0%,50%)] mb-2 leading-relaxed">
               {clerkUser?.primaryEmailAddress?.emailAddress ? (

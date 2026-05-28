@@ -340,9 +340,10 @@ export default function RestaurantePortal() {
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Portal do Local</h1>
-            <p className="text-muted-foreground">
-              Bem-vindo, {user?.firstName || restaurant.contactName || restaurant.name}
+            <p className="label-mono text-[10px] text-primary/90 mb-1.5">Portal · Local parceiro</p>
+            <h1 className="font-display text-2xl sm:text-3xl md:text-4xl tracking-[-0.03em] leading-[1.02]">{restaurant.name}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              Bem-<span className="font-serif-italic-accent text-primary">vindo</span>, {user?.firstName || restaurant.contactName || restaurant.name}
             </p>
           </div>
           <div className="flex items-center gap-2">

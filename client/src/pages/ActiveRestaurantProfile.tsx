@@ -369,7 +369,7 @@ export default function ActiveRestaurantProfile() {
               <RestaurantAvatar name={restaurant.name} logoUrl={restaurant.logoUrl} size="md" />
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-bold tracking-tight">{restaurant.name}</h1>
+                  <h1 className="font-display text-xl sm:text-2xl tracking-[-0.02em] leading-[1.05]">{restaurant.name}</h1>
                   <Badge variant="outline" className={restaurant.status === "active" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-muted text-muted-foreground"}>
                     {restaurant.status === "active" ? "Ativo" : "Inativo"}
                   </Badge>

@@ -120,7 +120,7 @@ function EmailLoginModal({ open, onClose }: { open: boolean; onClose: () => void
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-10 pl-10 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#27d803]"
+                  className="w-full h-10 pl-10 pr-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00e640]"
                   style={{ background: "hsl(0 0% 11%)", border: "1px solid hsl(0 0% 18%)", color: "hsl(0 0% 95%)" }}
                   placeholder="seu@email.com"
                   autoFocus
@@ -135,7 +135,7 @@ function EmailLoginModal({ open, onClose }: { open: boolean; onClose: () => void
                   type={showPw ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-10 pl-10 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#27d803]"
+                  className="w-full h-10 pl-10 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00e640]"
                   style={{ background: "hsl(0 0% 11%)", border: "1px solid hsl(0 0% 18%)", color: "hsl(0 0% 95%)" }}
                   placeholder="Sua senha"
                 />
@@ -342,7 +342,7 @@ function Idea() {
           ].map((item, i) => (
             <Reveal key={item.label} delay={0.1 + i * 0.1}>
               <div className="card-glass p-8 h-full transition-colors duration-300" style={{ cursor: "default" }}>
-                <span className="font-display-landing font-extrabold text-sm tracking-wider" style={{ color: "#27d803" }}>
+                <span className="font-display-landing font-extrabold text-sm tracking-wider" style={{ color: "#00e640" }}>
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <h3 className="font-display-landing font-bold text-xl mt-3 mb-2" style={{ color: "hsl(0 0% 95%)" }}>{item.label}</h3>
@@ -379,7 +379,7 @@ function Problem() {
           {items.map((item, i) => (
             <Reveal key={i} delay={i * 0.08}>
               <div className="card-glass p-8 h-full group transition-colors duration-300">
-                <item.icon className="w-8 h-8 mb-5 opacity-80 group-hover:opacity-100 transition-opacity" style={{ color: "#27d803" }} />
+                <item.icon className="w-8 h-8 mb-5 opacity-80 group-hover:opacity-100 transition-opacity" style={{ color: "#00e640" }} />
                 <h3 className="font-display-landing font-bold text-xl mb-2" style={{ color: "hsl(0 0% 95%)" }}>{item.title}</h3>
                 <p className="text-sm leading-relaxed" style={{ color: "hsl(0 0% 50%)" }}>{item.text}</p>
               </div>
@@ -423,7 +423,7 @@ function Solution() {
                 <span className="block font-display-landing text-6xl font-black select-none" style={{ color: "hsl(0 0% 95% / 0.04)" }}>
                   0{i + 1}
                 </span>
-                <f.icon className="w-7 h-7 mb-4 opacity-80" style={{ color: "#27d803" }} />
+                <f.icon className="w-7 h-7 mb-4 opacity-80" style={{ color: "#00e640" }} />
                 <h3 className="font-display-landing font-bold text-xl mb-3" style={{ color: "hsl(0 0% 95%)" }}>{f.title}</h3>
                 <p className="text-sm leading-relaxed" style={{ color: "hsl(0 0% 50%)" }}>{f.desc}</p>
               </div>
@@ -473,7 +473,7 @@ function Market() {
               A mídia OOH atinge <span className="font-semibold" style={{ color: "hsl(0 0% 95%)" }}>89% da população brasileira</span>,
               e o segmento cresceu para representar mais que o dobro do valor de uma década atrás.
               O meio físico segue forte — sobretudo em campanhas com foco em{" "}
-              <span className="font-semibold" style={{ color: "#27d803" }}>presença local</span>.
+              <span className="font-semibold" style={{ color: "#00e640" }}>presença local</span>.
             </p>
           </div>
         </Reveal>

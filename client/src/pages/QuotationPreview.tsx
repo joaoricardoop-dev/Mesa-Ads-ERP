@@ -347,17 +347,18 @@ export default function QuotationPreview() {
                 <ArrowLeft className="w-4 h-4" />
               </Button>
               <div>
-                <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
+                <p className="label-mono text-[10px] text-primary/90 mb-1">Comercial · Cotação</p>
+                <h1 className="font-display text-xl sm:text-2xl tracking-[-0.02em] leading-[1.05] flex items-center gap-2">
                   <FileText className="w-5 h-5 text-primary" />
-                  Preview da Cotação
+                  Preview da <span className="font-serif-italic-accent text-primary">Cotação</span>
                   {selectedProduct && (
-                    <Badge variant="outline" className="text-xs font-normal bg-blue-500/10 text-blue-400 border-blue-500/20">
+                    <Badge variant="outline" className="text-xs font-normal bg-primary/10 text-primary border-primary/20">
                       {selectedProduct.name}
                     </Badge>
                   )}
                 </h1>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Revise os valores do simulador antes de criar a cotação
+                <p className="text-xs text-muted-foreground mt-1">
+                  Revise os valores do simulador antes de criar a cotação.
                 </p>
               </div>
             </div>

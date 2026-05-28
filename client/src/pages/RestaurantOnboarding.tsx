@@ -409,14 +409,14 @@ export default function RestaurantOnboarding() {
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.05]"
-            style={{ background: "radial-gradient(circle, #27d803 0%, transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, #00e640 0%, transparent 70%)" }}
           />
         </div>
         <div className="relative w-full max-w-md px-6 text-center">
           <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-8" />
           <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-xl p-8">
-            <div className="w-16 h-16 rounded-full bg-[#27d803]/10 flex items-center justify-center mx-auto mb-5">
-              <CheckCircle2 className="w-8 h-8 text-[#27d803]" />
+            <div className="w-16 h-16 rounded-full bg-[#00e640]/10 flex items-center justify-center mx-auto mb-5">
+              <CheckCircle2 className="w-8 h-8 text-[#00e640]" />
             </div>
             <h2 className="text-xl font-bold text-white mb-2">Cadastro realizado!</h2>
             <p className="text-sm text-[hsl(0,0%,50%)] mb-6 leading-relaxed">
@@ -424,7 +424,7 @@ export default function RestaurantOnboarding() {
             </p>
             <a
               href="/"
-              className="inline-flex items-center justify-center w-full h-10 bg-[#27d803] hover:bg-[#22c003] text-black font-semibold rounded-lg text-sm transition-colors"
+              className="inline-flex items-center justify-center w-full h-10 bg-[#00e640] hover:bg-[#00c238] text-black font-semibold rounded-lg text-sm transition-colors"
             >
               Entrar na plataforma
             </a>
@@ -442,16 +442,21 @@ export default function RestaurantOnboarding() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.03]"
-          style={{ background: "radial-gradient(circle, #27d803 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, #00e640 0%, transparent 70%)" }}
         />
       </div>
 
       <div className="relative w-full max-w-lg px-6">
         <div className="text-center mb-8">
           <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-white mb-1">Cadastro de Local Parceiro</h1>
-          <p className="text-sm text-[hsl(0,0%,50%)]">
-            Preencha os dados abaixo para ingressar na rede mesa.ads
+          <p className="label-mono text-[10px] text-[#00e640]/90 mb-3">
+            Cadastro · Local parceiro
+          </p>
+          <h1 className="font-display text-3xl sm:text-4xl tracking-[-0.03em] leading-[1.02] text-white mb-2">
+            Cadastro de Local <span className="font-serif-italic-accent text-[#00e640]">Parceiro</span>
+          </h1>
+          <p className="text-sm text-[hsl(0,0%,55%)] max-w-md mx-auto">
+            Preencha os dados abaixo para ingressar na rede mesa.ads.
           </p>
         </div>
 
@@ -459,14 +464,14 @@ export default function RestaurantOnboarding() {
           {steps.map((s, i) => (
             <div key={i} className="flex items-center gap-1">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                i < step ? "bg-[#27d803] text-black" :
-                i === step ? "bg-[#27d803]/20 text-[#27d803] ring-2 ring-[#27d803]/50" :
+                i < step ? "bg-[#00e640] text-black" :
+                i === step ? "bg-[#00e640]/20 text-[#00e640] ring-2 ring-[#00e640]/50" :
                 "bg-[hsl(0,0%,11%)] text-[hsl(0,0%,40%)]"
               }`}>
                 {i < step ? <Check className="w-4 h-4" /> : i + 1}
               </div>
               {i < steps.length - 1 && (
-                <div className={`w-6 sm:w-10 h-0.5 ${i < step ? "bg-[#27d803]" : "bg-[hsl(0,0%,14%)]"}`} />
+                <div className={`w-6 sm:w-10 h-0.5 ${i < step ? "bg-[#00e640]" : "bg-[hsl(0,0%,14%)]"}`} />
               )}
             </div>
           ))}
@@ -474,14 +479,14 @@ export default function RestaurantOnboarding() {
 
         <div className="w-full h-1 rounded-full bg-[hsl(0,0%,11%)] mb-6">
           <div
-            className="h-full rounded-full bg-[#27d803] transition-all duration-500"
+            className="h-full rounded-full bg-[#00e640] transition-all duration-500"
             style={{ width: `${((step + 1) / steps.length) * 100}%` }}
           />
         </div>
 
         <div className="bg-[hsl(0,0%,7%)] border border-[hsl(0,0%,14%)] rounded-xl p-6">
           <div className="flex items-center gap-3 mb-5">
-            {(() => { const Icon = steps[step].icon; return <Icon className="w-5 h-5 text-[#27d803]" />; })()}
+            {(() => { const Icon = steps[step].icon; return <Icon className="w-5 h-5 text-[#00e640]" />; })()}
             <div>
               <h2 className="text-sm font-semibold text-white">{steps[step].title}</h2>
               <p className="text-xs text-[hsl(0,0%,45%)]">{steps[step].subtitle}</p>
@@ -693,7 +698,7 @@ export default function RestaurantOnboarding() {
                       key={day}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
                         form.busyDays.includes(day)
-                          ? "bg-[#27d803]/20 text-[#27d803] border border-[#27d803]/30"
+                          ? "bg-[#00e640]/20 text-[#00e640] border border-[#00e640]/30"
                           : "bg-[hsl(0,0%,11%)] text-[hsl(0,0%,55%)] border border-[hsl(0,0%,18%)]"
                       }`}
                     >
@@ -821,7 +826,7 @@ export default function RestaurantOnboarding() {
                         className="mt-0.5"
                       />
                       <span className="text-sm text-[hsl(0,0%,70%)]">
-                        Li e aceito <span className="text-[#27d803] font-medium">{tmpl.title}</span>
+                        Li e aceito <span className="text-[#00e640] font-medium">{tmpl.title}</span>
                       </span>
                     </label>
                   </div>
@@ -904,7 +909,7 @@ export default function RestaurantOnboarding() {
                   setStep(step + 1);
                 }}
                 disabled={!canAdvance()}
-                className="flex items-center gap-1 px-4 py-2 bg-[#27d803] hover:bg-[#22c003] text-black font-medium text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1 px-4 py-2 bg-[#00e640] hover:bg-[#00c238] text-black font-medium text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Próximo
                 <ChevronRight className="w-4 h-4" />
@@ -913,7 +918,7 @@ export default function RestaurantOnboarding() {
               <button
                 onClick={handleSubmit}
                 disabled={loading || !canAdvance()}
-                className="flex items-center gap-1.5 px-4 py-2 bg-[#27d803] hover:bg-[#22c003] text-black font-medium text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#00e640] hover:bg-[#00c238] text-black font-medium text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Processando...</>

@@ -249,9 +249,12 @@ export default function ParceiroTabelaPrecos() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Tabela de Preços</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Preços calculados com sua comissão comercial aplicada
+          <p className="label-mono text-[10px] text-primary/90 mb-1">Parceiro · Catálogo</p>
+          <h1 className="font-display text-2xl sm:text-3xl md:text-4xl tracking-[-0.03em] leading-[1.02]">
+            Tabela de <span className="font-serif-italic-accent text-primary">Preços</span>
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Preços calculados com sua comissão comercial aplicada.
           </p>
         </div>
       </div>

@@ -47,7 +47,7 @@ export default function ParceiroOnboarding({ userName, userEmail, userLastName, 
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.03]"
-          style={{ background: "radial-gradient(circle, #27d803 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, #00e640 0%, transparent 70%)" }}
         />
       </div>
 
@@ -55,12 +55,19 @@ export default function ParceiroOnboarding({ userName, userEmail, userLastName, 
         <div className="text-center mb-8">
           <img src="/logo-white.png" alt="mesa.ads" className="h-8 mx-auto mb-6" />
           <div className="flex items-center justify-center mb-4">
-            <div className="p-4 rounded-2xl bg-[#27d803]/10">
-              <Handshake className="w-10 h-10 text-[#27d803]" />
+            <div className="p-4 rounded-2xl bg-[#00e640]/10">
+              <Handshake className="w-10 h-10 text-[#00e640]" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">
-            {userName ? `Olá, ${userName}!` : "Bem-vindo!"}
+          <p className="label-mono text-[10px] text-[#00e640]/90 mb-3">
+            Portal · Parceiro
+          </p>
+          <h1 className="font-display text-3xl sm:text-4xl tracking-[-0.03em] leading-[1.02] text-white mb-2">
+            {userName ? (
+              <>Olá, <span className="font-serif-italic-accent text-[#00e640]">{userName}</span></>
+            ) : (
+              <>Bem-<span className="font-serif-italic-accent text-[#00e640]">vindo</span></>
+            )}
           </h1>
           <p className="text-sm leading-relaxed" style={{ color: "hsl(0 0% 50%)" }}>
             Você foi convidado para o Portal do Parceiro da mesa.ads.
@@ -126,7 +133,7 @@ export default function ParceiroOnboarding({ userName, userEmail, userLastName, 
         </div>
 
         <Button
-          className="w-full bg-[#27d803] hover:bg-[#22c003] text-black font-semibold h-11"
+          className="w-full bg-[#00e640] hover:bg-[#00c238] text-black font-semibold h-11"
           onClick={handleSubmit}
           disabled={completeMutation.isPending}
         >

@@ -1224,9 +1224,11 @@ export default function AnunciantePortal() {
 
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6 pb-4 sm:pb-6 border-b">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 sm:mb-2">Portal do Anunciante</p>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">{profile.company || profile.name}</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1">Olá, {user?.firstName || profile.name}</p>
+            <p className="label-mono text-[10px] text-primary/90 mb-1 sm:mb-2">Portal · Anunciante</p>
+            <h1 className="font-display text-2xl sm:text-3xl md:text-4xl tracking-[-0.03em] leading-[1.02]">{profile.company || profile.name}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              Olá, <span className="font-serif-italic-accent text-primary">{user?.firstName || profile.name}</span>
+            </p>
             <div className="mt-3 flex items-center gap-2 flex-wrap">
               <Button
                 onClick={() => setBuilderOpen(true)}
