@@ -112,19 +112,31 @@ DEV_PID=$!
 trap "kill ${DEV_PID} 2>/dev/null || true" EXIT
 
 echo "=== Pre-deploy: aguardando dev server atender em :5000 ==="
+# 180s: cloud builder (2 vCPU) com tsx watch + 79 customs + 27 drizzle
+# em cold-start passa de 90s ocasionalmente (Neon serverless round-trip
+# ~100ms × ~200 statements + bundle Vite). 180s dá folga sem mascarar
+# trava real.
 SERVER_READY=0
-for i in $(seq 1 90); do
+WAIT_SECS=180
+for i in $(seq 1 ${WAIT_SECS}); do
   if curl -fs -o /dev/null --max-time 3 http://localhost:5000/; then
     SERVER_READY=1
     echo "Dev server respondeu após ${i}s"
     break
   fi
+  # A cada 30s, mostra as últimas 5 linhas do log do dev pra diagnosticar
+  # cold-start travado em vez de só esperar em silêncio.
+  if [ $((i % 30)) -eq 0 ]; then
+    echo "--- ainda esperando (${i}s/${WAIT_SECS}s), últimas linhas do dev server: ---"
+    tail -n 5 /tmp/pre-deploy-dev.log 2>/dev/null || true
+    echo "--- fim do snapshot ---"
+  fi
   sleep 1
 done
 
 if [ "${SERVER_READY}" -ne 1 ]; then
-  echo "ERRO: dev server não respondeu em 90s. Log:" >&2
-  tail -n 80 /tmp/pre-deploy-dev.log >&2 || true
+  echo "ERRO: dev server não respondeu em ${WAIT_SECS}s. Log completo:" >&2
+  cat /tmp/pre-deploy-dev.log >&2 || true
   exit 1
 fi
 
