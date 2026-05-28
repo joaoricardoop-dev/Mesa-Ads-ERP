@@ -103,11 +103,17 @@ echo "=== Pre-deploy: subindo dev server pra warm-up (banco de TESTE isolado) ==
 # vai criar o schema no banco de teste na primeira inicialização. Setamos
 # DEV_FIXTURES=1 para registrar os endpoints /api/dev-* (sem essa flag o
 # módulo nem é importado, mesmo com NODE_ENV=development).
+#
+# IMPORTANTE: chamamos `tsx` direto em vez de `pnpm run dev` (que usa
+# `tsx watch`). No cloud builder o `tsx watch` ficava 180s totalmente
+# mudo — o setup recursivo de fs.watchers em node_modules em container
+# com FS cold trava sem dar erro. `tsx` puro boota em segundos. Pre-deploy
+# não precisa de hot-reload.
 NODE_ENV=development \
   DEV_FIXTURES=1 \
   DATABASE_URL="${DATABASE_URL_TEST}" \
   DATABASE_URL_TEST="${DATABASE_URL_TEST}" \
-  pnpm run dev > /tmp/pre-deploy-dev.log 2>&1 &
+  pnpm exec tsx server/_core/index.ts > /tmp/pre-deploy-dev.log 2>&1 &
 DEV_PID=$!
 trap "kill ${DEV_PID} 2>/dev/null || true" EXIT
 
