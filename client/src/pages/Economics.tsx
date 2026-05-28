@@ -24,6 +24,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import PageContainer from "@/components/PageContainer";
+import MetricCard, { SectionLabel } from "@/components/MetricCard";
 import { formatCurrency, formatCompact, formatPercent } from "@/lib/format";
 import {
   TrendingUp,
@@ -134,75 +135,46 @@ export default function Economics() {
     >
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        <div className="bg-card border border-border/30 rounded-lg p-4 col-span-1">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-muted-foreground">Campanhas</p>
-            <Megaphone className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <p className="text-2xl font-bold font-mono">{totals.campaignCount}</p>
-        </div>
-        <div className="bg-card border border-border/30 rounded-lg p-4 col-span-1">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-muted-foreground">Locais</p>
-            <Store className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <p className="text-2xl font-bold font-mono">
-            {totals.restaurantCount}
-          </p>
-        </div>
-        <div className="bg-card border border-primary/30 rounded-lg p-4 col-span-1">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-muted-foreground">Faturamento</p>
-            <DollarSign className="w-4 h-4 text-primary" />
-          </div>
-          <p className="text-xl font-bold font-mono text-primary">
-            {formatCompact(totals.revenue)}
-          </p>
-        </div>
-        <div className="bg-card border border-border/30 rounded-lg p-4 col-span-1">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-muted-foreground">Comissão Rest.</p>
-            <ArrowDownRight className="w-4 h-4 text-orange-400" />
-          </div>
-          <p className="text-xl font-bold font-mono text-orange-400">
-            {formatCompact(totals.commission)}
-          </p>
-        </div>
-        <div className="bg-card border border-border/30 rounded-lg p-4 col-span-1">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-muted-foreground">Produção</p>
-            <ArrowDownRight className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <p className="text-xl font-bold font-mono">
-            {formatCompact(totals.production)}
-          </p>
-        </div>
-        <div className="bg-card border border-primary/30 rounded-lg p-4 col-span-1">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-muted-foreground">Lucro Mesa Ads</p>
-            <TrendingUp className="w-4 h-4 text-primary" />
-          </div>
-          <p className="text-xl font-bold font-mono text-primary">
-            {formatCompact(totals.profit)}
-          </p>
-        </div>
-        <div className="bg-card border border-border/30 rounded-lg p-4 col-span-1">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-muted-foreground">Margem</p>
-            <ArrowUpRight className="w-4 h-4 text-primary" />
-          </div>
-          <p
-            className={`text-xl font-bold font-mono ${
+      <div className="space-y-3">
+        <SectionLabel icon={BarChart3}>Resumo do Mês</SectionLabel>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+          <MetricCard label="Campanhas" value={totals.campaignCount} icon={Megaphone} />
+          <MetricCard label="Locais" value={totals.restaurantCount} icon={Store} />
+          <MetricCard
+            label="Faturamento"
+            value={formatCompact(totals.revenue)}
+            icon={DollarSign}
+            tone="positive"
+          />
+          <MetricCard
+            label="Comissão Rest."
+            value={formatCompact(totals.commission)}
+            icon={ArrowDownRight}
+            tone="accent"
+          />
+          <MetricCard
+            label="Produção"
+            value={formatCompact(totals.production)}
+            icon={ArrowDownRight}
+          />
+          <MetricCard
+            label="Lucro Mesa Ads"
+            value={formatCompact(totals.profit)}
+            icon={TrendingUp}
+            tone="positive"
+          />
+          <MetricCard
+            label="Margem"
+            value={formatPercent(totals.margin)}
+            icon={ArrowUpRight}
+            tone={
               totals.margin >= 40
-                ? "text-primary"
+                ? "positive"
                 : totals.margin >= 20
-                ? "text-yellow-400"
-                : "text-destructive"
-            }`}
-          >
-            {formatPercent(totals.margin)}
-          </p>
+                ? "warning"
+                : "negative"
+            }
+          />
         </div>
       </div>
 

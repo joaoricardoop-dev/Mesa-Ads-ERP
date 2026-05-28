@@ -14,6 +14,8 @@ import {
   ResponsiveContainer, Legend, ComposedChart, Area,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { chartColors, chartTooltipStyle, chartAxisTick } from "@/lib/chart-theme";
+import MetricCard from "@/components/MetricCard";
 
 function fmtDate(d: string | null | undefined): string {
   if (!d) return "—";
@@ -138,7 +140,7 @@ export default function FinancialDashboard() {
   }
   if (receivables > invoicedThisMonth * 2 && invoicedThisMonth > 0) alerts.push({ type: "info", title: "Volume alto a receber", desc: `${formatCurrency(receivables)} em faturas abertas — acompanhe os vencimentos.` });
 
-  const chartStyle = { backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" };
+  const chartStyle = chartTooltipStyle;
 
   const grossMarginOk = (currMonth?.grossMargin || 0) >= 0.3;
 
@@ -160,66 +162,55 @@ export default function FinancialDashboard() {
       {activeTab === "Executivo" && (
         <div className="space-y-8">
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-violet-500/10 via-card to-card p-6">
-              <div className="flex items-center gap-2 mb-1">
-                <Receipt className="w-4 h-4 text-violet-400" />
-                <span className="text-xs text-muted-foreground font-medium">Receita Total</span>
-              </div>
-              <div className="flex items-end gap-3 mb-1">
-                <span className="text-3xl font-bold tracking-tight">{formatCurrency(invoicedThisMonth)}</span>
-                <GrowthIndicator value={growth?.invoiced} />
-              </div>
-              <p className="text-xs text-muted-foreground/60">
-                faturamento bruto do mês · vs mês anterior: {formatCurrency(prevMonthData?.invoiced || 0)}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-border/20 bg-gradient-to-br from-red-500/10 via-card to-card p-6">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingDown className="w-4 h-4 text-red-400" />
-                <span className="text-xs text-muted-foreground font-medium">Custos</span>
-              </div>
-              <span className="text-3xl font-bold tracking-tight">{formatCurrency(data?.totalCosts || 0)}</span>
-              <p className="text-xs text-muted-foreground/60 mt-1">produção + frete + comissões/repasses</p>
-            </div>
-
-            <div className={`rounded-2xl border border-border/20 p-6 ${grossMarginOk ? "bg-gradient-to-br from-emerald-500/10 via-card to-card" : "bg-gradient-to-br from-amber-500/10 via-card to-card"}`}>
-              <div className="flex items-center gap-2 mb-1">
-                <Percent className="w-4 h-4" style={{ color: grossMarginOk ? "rgb(52 211 153)" : "rgb(251 191 36)" }} />
-                <span className="text-xs text-muted-foreground font-medium">Margem</span>
-              </div>
-              <span className="text-3xl font-bold tracking-tight">{fmtPct(currMonth?.grossMargin)}</span>
-              <p className="text-xs text-muted-foreground/60 mt-1">Lucro: {formatCurrency(currMonth?.grossProfit || 0)}</p>
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <MetricCard
+              label="Receita Total"
+              value={
+                <span className="flex items-end gap-3">
+                  {formatCurrency(invoicedThisMonth)}
+                  <GrowthIndicator value={growth?.invoiced} />
+                </span>
+              }
+              sub={`faturamento bruto do mês · vs mês anterior: ${formatCurrency(prevMonthData?.invoiced || 0)}`}
+              icon={Receipt}
+              tone="neutral"
+              emphasis="hero"
+            />
+            <MetricCard
+              label="Custos"
+              value={formatCurrency(data?.totalCosts || 0)}
+              sub="produção + frete + comissões/repasses"
+              icon={TrendingDown}
+              tone="negative"
+              emphasis="hero"
+            />
+            <MetricCard
+              label="Margem"
+              value={fmtPct(currMonth?.grossMargin)}
+              sub={`Lucro: ${formatCurrency(currMonth?.grossProfit || 0)}`}
+              icon={Percent}
+              tone={grossMarginOk ? "positive" : "warning"}
+              emphasis="hero"
+            />
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: "A Receber", value: formatCurrency(receivables), sub: `${data?.receivablesCount || 0} faturas`, icon: Clock, accent: "amber", path: "/financeiro/faturamento" },
-              { label: "Inadimplente", value: formatCurrency(overdue), sub: `${data?.overdueCount || 0} vencidas`, icon: AlertTriangle, accent: overdue > 0 ? "red" : "zinc", path: "/financeiro/faturamento" },
-              { label: "Contas a Pagar", value: formatCurrency(pendingRp), sub: `${data?.pendingRestaurantCount || 0} pendentes`, icon: HandCoins, accent: pendingRp > 0 ? "orange" : "zinc", path: "/financeiro/contas-pagar" },
-              { label: "Campanhas Ativas", value: String(activeCampaigns), sub: "em execução", icon: Target, accent: "blue", path: "/campanhas" },
-            ].map(item => {
-              const accentColors: Record<string, string> = {
-                amber: "text-amber-400", red: "text-red-400", orange: "text-orange-400", blue: "text-blue-400", zinc: "text-muted-foreground",
-              };
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => navigate(item.path)}
-                  className="group text-left rounded-xl border border-border/20 bg-card hover:bg-white/[0.03] transition-all p-4"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <item.icon className={`w-4 h-4 ${accentColors[item.accent]}`} />
-                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />
-                  </div>
-                  <p className="text-lg font-bold tracking-tight">{item.value}</p>
-                  <p className="text-[11px] text-muted-foreground">{item.label}</p>
-                  <p className="text-[10px] text-muted-foreground/50">{item.sub}</p>
-                </button>
-              );
-            })}
+              { label: "A Receber", value: formatCurrency(receivables), sub: `${data?.receivablesCount || 0} faturas`, icon: Clock, tone: "warning" as const, path: "/financeiro/faturamento" },
+              { label: "Inadimplente", value: formatCurrency(overdue), sub: `${data?.overdueCount || 0} vencidas`, icon: AlertTriangle, tone: (overdue > 0 ? "negative" : "default") as "negative" | "default", path: "/financeiro/faturamento" },
+              { label: "Contas a Pagar", value: formatCurrency(pendingRp), sub: `${data?.pendingRestaurantCount || 0} pendentes`, icon: HandCoins, tone: (pendingRp > 0 ? "accent" : "default") as "accent" | "default", path: "/financeiro/contas-pagar" },
+              { label: "Campanhas Ativas", value: String(activeCampaigns), sub: "em execução", icon: Target, tone: "neutral" as const, path: "/campanhas" },
+            ].map(item => (
+              <MetricCard
+                key={item.label}
+                label={item.label}
+                value={item.value}
+                sub={item.sub}
+                icon={item.icon}
+                tone={item.tone}
+                onClick={() => navigate(item.path)}
+              />
+            ))}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -232,13 +223,13 @@ export default function FinancialDashboard() {
               {(data?.monthlyData || []).some(d => d.invoiced > 0 || d.received > 0) ? (
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={(data?.monthlyData || []).map(m => ({ month: monthLabel(m.month), Faturado: m.invoiced, Recebido: m.received }))} barCategoryGap="30%" barGap={6}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.2} />
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
-                    <Tooltip formatter={(v: number, n: string) => [formatCurrency(v), n]} contentStyle={chartStyle} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                    <XAxis dataKey="month" tick={chartAxisTick} stroke={chartColors.axis} />
+                    <YAxis tick={chartAxisTick} stroke={chartColors.axis} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
+                    <Tooltip formatter={(v: number, n: string) => [formatCurrency(v), n]} contentStyle={chartStyle} cursor={{ fill: "var(--muted)", opacity: 0.4 }} />
                     <Legend wrapperStyle={{ fontSize: "11px" }} />
-                    <Bar dataKey="Faturado" fill="hsl(262,83%,58%)" radius={[4,4,0,0]} />
-                    <Bar dataKey="Recebido" fill="hsl(152,70%,45%)" radius={[4,4,0,0]} />
+                    <Bar dataKey="Faturado" fill={chartColors.neutral} radius={[6,6,0,0]} />
+                    <Bar dataKey="Recebido" fill={chartColors.positive} radius={[6,6,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -253,10 +244,10 @@ export default function FinancialDashboard() {
               </div>
               <div className="space-y-4 flex-1">
                 {[
-                  { key: "paga", label: "Pagas", color: "bg-emerald-400", tc: "text-emerald-400" },
-                  { key: "emitida", label: "Em aberto", color: "bg-amber-400", tc: "text-amber-400" },
-                  { key: "vencida_calc", label: "Vencidas", color: "bg-red-400", tc: "text-red-400", isOverdue: true },
-                  { key: "cancelada", label: "Canceladas", color: "bg-zinc-500", tc: "text-zinc-500" },
+                  { key: "paga", label: "Pagas", color: "bg-[color:var(--chart-1)]", tc: "text-[color:var(--chart-1)]" },
+                  { key: "emitida", label: "Em aberto", color: "bg-[color:var(--chart-3)]", tc: "text-[color:var(--chart-3)]" },
+                  { key: "vencida_calc", label: "Vencidas", color: "bg-[color:var(--chart-4)]", tc: "text-[color:var(--chart-4)]", isOverdue: true },
+                  { key: "cancelada", label: "Canceladas", color: "bg-muted-foreground/40", tc: "text-muted-foreground" },
                 ].map(item => {
                   const d = item.isOverdue
                     ? { count: data?.overdueCount || 0, total: overdue }
@@ -288,9 +279,9 @@ export default function FinancialDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {alerts.map((a, i) => {
                   const cfg = {
-                    warn: { border: "border-amber-500/20", bg: "bg-amber-500/5", icon: AlertTriangle, color: "text-amber-400" },
-                    danger: { border: "border-red-500/20", bg: "bg-red-500/5", icon: AlertCircle, color: "text-red-400" },
-                    info: { border: "border-blue-500/20", bg: "bg-blue-500/5", icon: Info, color: "text-blue-400" },
+                    warn: { border: "border-[color:var(--chart-3)]/30", bg: "bg-[color:var(--chart-3)]/10", icon: AlertTriangle, color: "text-[color:var(--chart-3)]" },
+                    danger: { border: "border-[color:var(--chart-4)]/30", bg: "bg-[color:var(--chart-4)]/10", icon: AlertCircle, color: "text-[color:var(--chart-4)]" },
+                    info: { border: "border-[color:var(--chart-2)]/30", bg: "bg-[color:var(--chart-2)]/10", icon: Info, color: "text-[color:var(--chart-2)]" },
                   }[a.type];
                   return (
                     <div key={i} className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${cfg.border} ${cfg.bg}`}>
@@ -353,11 +344,11 @@ export default function FinancialDashboard() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: "Faturamento", desc: "Emitir e gerenciar", icon: Receipt, accent: "text-violet-400", bg: "bg-violet-500/10", path: "/financeiro/faturamento", badge: data?.receivablesCount },
-                  { label: "Pagamentos", desc: "Comissões restaurantes", icon: HandCoins, accent: "text-orange-400", bg: "bg-orange-500/10", path: "/financeiro/pagamentos", badge: data?.pendingRestaurantCount },
-                  { label: "Custos", desc: "Produção e frete", icon: TrendingDown, accent: "text-blue-400", bg: "bg-blue-500/10", path: "/financeiro/custos", badge: null },
-                  { label: "Relatórios", desc: "Análise por período", icon: BarChart3, accent: "text-emerald-400", bg: "bg-emerald-500/10", path: "/financeiro/relatorios", badge: null },
-                  { label: "BV Parceiros", desc: "Relatório de comissão", icon: Users, accent: "text-purple-400", bg: "bg-purple-500/10", path: "/financeiro/comissao-parceiros", badge: null },
+                  { label: "Faturamento", desc: "Emitir e gerenciar", icon: Receipt, accent: "text-[color:var(--chart-2)]", bg: "bg-[color:var(--chart-2)]/12", path: "/financeiro/faturamento", badge: data?.receivablesCount },
+                  { label: "Pagamentos", desc: "Comissões restaurantes", icon: HandCoins, accent: "text-[color:var(--chart-5)]", bg: "bg-[color:var(--chart-5)]/12", path: "/financeiro/pagamentos", badge: data?.pendingRestaurantCount },
+                  { label: "Custos", desc: "Produção e frete", icon: TrendingDown, accent: "text-[color:var(--chart-4)]", bg: "bg-[color:var(--chart-4)]/12", path: "/financeiro/custos", badge: null },
+                  { label: "Relatórios", desc: "Análise por período", icon: BarChart3, accent: "text-[color:var(--chart-1)]", bg: "bg-[color:var(--chart-1)]/12", path: "/financeiro/relatorios", badge: null },
+                  { label: "BV Parceiros", desc: "Relatório de comissão", icon: Users, accent: "text-[color:var(--chart-3)]", bg: "bg-[color:var(--chart-3)]/12", path: "/financeiro/comissao-parceiros", badge: null },
                 ].map(item => (
                   <button key={item.label} onClick={() => navigate(item.path)} className="relative flex flex-col gap-3 p-4 rounded-xl border border-border/10 hover:bg-white/[0.03] hover:border-border/30 transition-all text-left group">
                     {item.badge ? <span className="absolute top-3 right-3 bg-primary text-primary-foreground text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{item.badge}</span> : null}
@@ -639,14 +630,20 @@ export default function FinancialDashboard() {
             {monthlySeries.some(d => d.Faturado > 0 || d.Recebido > 0) ? (
               <ResponsiveContainer width="100%" height={280}>
                 <ComposedChart data={monthlySeries}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.15} />
-                  <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
-                  <Tooltip formatter={(v: number, n: string) => [formatCurrency(v), n]} contentStyle={chartStyle} />
+                  <defs>
+                    <linearGradient id="grad-faturado" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={chartColors.neutral} stopOpacity={0.28} />
+                      <stop offset="100%" stopColor={chartColors.neutral} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
+                  <XAxis dataKey="month" tick={chartAxisTick} stroke={chartColors.axis} />
+                  <YAxis tick={chartAxisTick} stroke={chartColors.axis} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
+                  <Tooltip formatter={(v: number, n: string) => [formatCurrency(v), n]} contentStyle={chartStyle} cursor={{ stroke: chartColors.grid }} />
                   <Legend wrapperStyle={{ fontSize: "11px" }} />
-                  <Area type="monotone" dataKey="Faturado" fill="hsl(262,83%,58%,0.12)" stroke="hsl(262,83%,58%)" strokeWidth={2} />
-                  <Line type="monotone" dataKey="Recebido" stroke="hsl(152,70%,45%)" strokeWidth={2} dot={{ r: 3 }} />
-                  <Bar dataKey="Com. Rest." fill="hsl(25,90%,55%)" radius={[3,3,0,0]} opacity={0.6} />
+                  <Area type="monotone" dataKey="Faturado" fill="url(#grad-faturado)" stroke={chartColors.neutral} strokeWidth={2} />
+                  <Line type="monotone" dataKey="Recebido" stroke={chartColors.positive} strokeWidth={2.5} dot={{ r: 3, fill: chartColors.positive }} />
+                  <Bar dataKey="Com. Rest." fill={chartColors.accent} radius={[4,4,0,0]} opacity={0.75} />
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (

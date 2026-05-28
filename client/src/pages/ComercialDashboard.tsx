@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/format";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
+import { chartColors, chartTooltipStyle, chartAxisTick } from "@/lib/chart-theme";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -24,6 +25,7 @@ import {
   QUOTATION_AGE_DANGER_DAYS,
   ageRiskLevel,
 } from "@shared/commercial-config";
+import MetricCard from "@/components/MetricCard";
 
 type PeriodDays = 30 | 90 | 180;
 
@@ -44,20 +46,15 @@ function KpiCard({ label, value, sub, icon: Icon, accent = "default" }: {
   icon?: any;
   accent?: "default" | "success" | "danger" | "warning";
 }) {
-  const accentClass =
-    accent === "success" ? "text-emerald-400" :
-    accent === "danger" ? "text-red-400" :
-    accent === "warning" ? "text-amber-400" :
-    "text-foreground";
+  const toneMap = { default: "default", success: "positive", danger: "negative", warning: "warning" } as const;
   return (
-    <div className="rounded-xl border border-border/30 bg-card p-4">
-      <div className="flex items-center gap-2 mb-1.5">
-        {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground" />}
-        <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{label}</span>
-      </div>
-      <div className={`text-2xl font-bold tracking-tight ${accentClass}`}>{value}</div>
-      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
-    </div>
+    <MetricCard
+      label={label}
+      value={value}
+      sub={sub}
+      icon={Icon}
+      tone={toneMap[accent]}
+    />
   );
 }
 
@@ -156,16 +153,17 @@ function LossReasonsTab({ days }: { days: PeriodDays }) {
             <div className="h-72 mb-6">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} layout="vertical" margin={{ left: 60, right: 16, top: 8, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-                  <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={150} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
+                  <XAxis type="number" tick={chartAxisTick} stroke={chartColors.axis} />
+                  <YAxis type="category" dataKey="name" tick={chartAxisTick} stroke={chartColors.axis} width={150} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                    contentStyle={chartTooltipStyle}
+                    cursor={{ fill: "var(--muted)", opacity: 0.4 }}
                     formatter={(value: any, name: string) => name === "Valor" ? formatCurrency(Number(value)) : value}
                   />
-                  <Bar dataKey="Valor" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]}>
+                  <Bar dataKey="Valor" fill={chartColors.negative} radius={[0, 6, 6, 0]}>
                     {chartData.map((_, i) => (
-                      <Cell key={i} fill="hsl(var(--primary))" />
+                      <Cell key={i} fill={chartColors.negative} fillOpacity={0.85} />
                     ))}
                   </Bar>
                 </BarChart>

@@ -22,6 +22,7 @@ import {
 import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import MetricCard, { SectionLabel } from "@/components/MetricCard";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -66,12 +67,12 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const PIPELINE_STAGES = [
-  { label: "Briefing", key: "briefing", color: "bg-sky-500" },
-  { label: "Design", key: "design", color: "bg-purple-500" },
-  { label: "Aprovação", key: "aprovacao", color: "bg-pink-500" },
-  { label: "Produção", key: "producao", color: "bg-amber-500" },
-  { label: "Distribuição", key: "distribuicao", color: "bg-teal-500" },
-  { label: "Veiculação", key: "veiculacao", color: "bg-emerald-500" },
+  { label: "Briefing", key: "briefing", color: "bg-[color:var(--chart-2)]" },
+  { label: "Design", key: "design", color: "bg-[color:var(--chart-2)]" },
+  { label: "Aprovação", key: "aprovacao", color: "bg-[color:var(--chart-3)]" },
+  { label: "Produção", key: "producao", color: "bg-[color:var(--chart-3)]" },
+  { label: "Distribuição", key: "distribuicao", color: "bg-[color:var(--chart-5)]" },
+  { label: "Veiculação", key: "veiculacao", color: "bg-[color:var(--chart-1)]" },
 ];
 
 function formatRelativeDate(d: string | Date): string {
@@ -242,72 +243,60 @@ export default function Dashboard() {
     navigate(`/campanhas?filter=${filter}`);
   }
 
-  const kpiCards = [
-    { label: "Ativas", value: kpis.ativas, sub: "não arquivadas", icon: Package, color: "", filter: "all" },
-    { label: "Pré-prod", value: kpis.preProducao, sub: "briefing → aprovação", icon: Layers, color: kpis.preProducao > 0 ? "text-violet-400" : "", filter: "pre-producao" },
-    { label: "Produção", value: kpis.producao, sub: "produção + distribuição", icon: Printer, color: kpis.producao > 0 ? "text-amber-400" : "", filter: "producao" },
-    { label: "Veiculação", value: kpis.veiculacao, sub: "campanhas ao vivo", icon: Radio, color: kpis.veiculacao > 0 ? "text-emerald-400" : "", filter: "veiculacao" },
-    { label: "Atrasadas", value: kpis.atrasadas, sub: "prazo de fim vencido", icon: AlertTriangle, color: kpis.atrasadas > 0 ? "text-red-400" : "", filter: "atrasadas" },
-    { label: "Risco SLA", value: kpis.riscoSla, sub: "pré-prod ≥ 3 dias", icon: Timer, color: kpis.riscoSla > 0 ? "text-amber-400" : "", filter: "risco-sla" },
+  const kpiCards: Array<{ label: string; value: number; sub: string; icon: any; tone: "default" | "positive" | "negative" | "warning" | "neutral" | "accent"; filter: string }> = [
+    { label: "Ativas", value: kpis.ativas, sub: "não arquivadas", icon: Package, tone: "default", filter: "all" },
+    { label: "Pré-prod", value: kpis.preProducao, sub: "briefing → aprovação", icon: Layers, tone: kpis.preProducao > 0 ? "neutral" : "default", filter: "pre-producao" },
+    { label: "Produção", value: kpis.producao, sub: "produção + distribuição", icon: Printer, tone: kpis.producao > 0 ? "warning" : "default", filter: "producao" },
+    { label: "Veiculação", value: kpis.veiculacao, sub: "campanhas ao vivo", icon: Radio, tone: kpis.veiculacao > 0 ? "positive" : "default", filter: "veiculacao" },
+    { label: "Atrasadas", value: kpis.atrasadas, sub: "prazo de fim vencido", icon: AlertTriangle, tone: kpis.atrasadas > 0 ? "negative" : "default", filter: "atrasadas" },
+    { label: "Risco SLA", value: kpis.riscoSla, sub: "pré-prod ≥ 3 dias", icon: Timer, tone: kpis.riscoSla > 0 ? "warning" : "default", filter: "risco-sla" },
   ];
 
   return (
     <PageContainer title="Dashboard" description="Gestão de campanhas · Mesa Ads">
 
       {/* ── KPIs de Campanha ── */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Activity className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Visão Geral de Campanhas</span>
-        </div>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {kpiCards.map(({ label, value, sub, icon: Icon, color, filter }) => (
-            <button
+      <div className="space-y-3">
+        <SectionLabel icon={Activity}>Visão Geral de Campanhas</SectionLabel>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {kpiCards.map(({ label, value, sub, icon: Icon, tone, filter }) => (
+            <MetricCard
               key={label}
+              label={label}
+              value={isLoading ? "—" : value}
+              sub={sub}
+              icon={Icon}
+              tone={tone}
               onClick={() => goToCampaigns(filter)}
-              className="bg-card border border-border/30 rounded-lg px-3 py-2 flex flex-col gap-1 hover:border-border/70 hover:shadow-sm transition-all text-left group"
-              title={`Ver campanhas: ${label}`}
-            >
-              <div className={`flex items-center gap-1.5 ${color || "text-muted-foreground"}`}>
-                <Icon className="w-3 h-3" />
-                <span className="text-[10px] uppercase tracking-wide">{label}</span>
-                <ChevronRight className="w-2.5 h-2.5 ml-auto opacity-0 group-hover:opacity-60 transition-opacity" />
-              </div>
-              <p className={`text-2xl font-bold leading-none ${color || ""}`}>{isLoading ? "—" : value}</p>
-              <p className="text-[9px] text-muted-foreground/60">{sub}</p>
-            </button>
+            />
           ))}
         </div>
       </div>
 
       {/* ── Faturamento ── */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Faturamento</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <div className="bg-card border border-border/30 rounded-xl p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Faturamento Mensal Projetado</p>
-            <p className="text-2xl font-bold font-mono text-emerald-400">
-              {isLoading ? "—" : formatCurrency(billing.monthlyTotal)}
-            </p>
-            <p className="text-[10px] text-muted-foreground mt-1">soma de todas as campanhas ativas</p>
-          </div>
-          <div className="bg-card border border-border/30 rounded-xl p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Faturamento em Veiculação</p>
-            <p className="text-2xl font-bold font-mono text-sky-400">
-              {isLoading ? "—" : formatCurrency(billing.activeMontly)}
-            </p>
-            <p className="text-[10px] text-muted-foreground mt-1">produção + distribuição + veiculação</p>
-          </div>
-          <div className="bg-card border border-border/30 rounded-xl p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Total em Carteira (contratos)</p>
-            <p className="text-2xl font-bold font-mono">
-              {isLoading ? "—" : formatCurrency(billing.contractTotal)}
-            </p>
-            <p className="text-[10px] text-muted-foreground mt-1">valor total dos contratos vigentes</p>
-          </div>
+      <div className="space-y-3">
+        <SectionLabel icon={TrendingUp}>Faturamento</SectionLabel>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <MetricCard
+            label="Mensal projetado"
+            value={isLoading ? "—" : formatCurrency(billing.monthlyTotal)}
+            sub="soma de todas as campanhas ativas"
+            tone="positive"
+            emphasis="hero"
+          />
+          <MetricCard
+            label="Em veiculação"
+            value={isLoading ? "—" : formatCurrency(billing.activeMontly)}
+            sub="produção + distribuição + veiculação"
+            tone="neutral"
+            emphasis="hero"
+          />
+          <MetricCard
+            label="Carteira (contratos)"
+            value={isLoading ? "—" : formatCurrency(billing.contractTotal)}
+            sub="valor total dos contratos vigentes"
+            emphasis="hero"
+          />
         </div>
       </div>
 

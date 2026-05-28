@@ -51,15 +51,20 @@ const CHART_COLORS_LIGHT = {
 };
 
 const CHART_COLORS = {
-  emerald: "#34d399",
-  blue: "#60a5fa",
-  amber: "#fbbf24",
-  red: "#f87171",
-  purple: "#a78bfa",
-  orange: "#fb923c",
+  emerald: "var(--chart-1)",
+  blue: "var(--chart-2)",
+  amber: "var(--chart-3)",
+  red: "var(--chart-4)",
+  purple: "var(--chart-5)",
+  orange: "var(--chart-5)",
 };
 
-const PIE_COLORS = ["#fb923c", "#3b82f6", "#fbbf24", "#ef4444"];
+const PIE_COLORS = [
+  "var(--chart-5)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+];
 
 function CustomTooltip({ active, payload, label, formatter, tooltipBg, tooltipBorder }: any) {
   if (!active || !payload?.length) return null;
