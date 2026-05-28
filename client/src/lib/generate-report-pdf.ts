@@ -1,14 +1,19 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { HOST_GROTESK_REGULAR, HOST_GROTESK_BOLD, LOGO_WHITE_BASE64 } from "./pdf-assets";
-
-const FONT_NAME = "HostGrotesk";
-const GREEN = [39, 216, 3] as const;
-const BLACK = [13, 13, 13] as const;
-const DARK_GRAY = [60, 60, 60] as const;
-const GRAY = [100, 100, 100] as const;
-const LIGHT_GRAY = [240, 240, 240] as const;
-const WHITE = [255, 255, 255] as const;
+import {
+  PDF_FONT as FONT_NAME,
+  GREEN,
+  BLACK,
+  WHITE,
+  DARK_GRAY,
+  GRAY,
+  LIGHT_GRAY,
+  registerPdfFonts,
+  drawPdfHeader,
+  drawPdfSectionTitle,
+  drawPdfInfoRow,
+  pdfCheckPageBreak,
+} from "./pdf-branding";
 
 export interface ReportPDFData {
   campaignName: string;
@@ -32,13 +37,7 @@ export interface ReportPDFData {
   publishedAt?: string | null;
 }
 
-function registerFonts(doc: jsPDF) {
-  doc.addFileToVFS("HostGrotesk-Regular.ttf", HOST_GROTESK_REGULAR);
-  doc.addFont("HostGrotesk-Regular.ttf", FONT_NAME, "normal");
-  doc.addFileToVFS("HostGrotesk-Bold.ttf", HOST_GROTESK_BOLD);
-  doc.addFont("HostGrotesk-Bold.ttf", FONT_NAME, "bold");
-  doc.setFont(FONT_NAME, "normal");
-}
+const registerFonts = registerPdfFonts;
 
 function fmtNumber(val: number): string {
   return val.toLocaleString("pt-BR");
@@ -53,68 +52,18 @@ function fmtDate(d: string): string {
   }
 }
 
-function drawHeader(doc: jsPDF, pageWidth: number, margin: number) {
-  doc.setFillColor(...BLACK);
-  doc.rect(0, 0, pageWidth, 42, "F");
-
-  doc.setFillColor(...GREEN);
-  doc.rect(0, 42, pageWidth, 2, "F");
-
-  try {
-    const logoWidth = 40;
-    const logoHeight = logoWidth / 4.254;
-    doc.addImage(LOGO_WHITE_BASE64, "PNG", margin, 14, logoWidth, logoHeight);
-  } catch {
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(22);
-    doc.setFont(FONT_NAME, "bold");
-    doc.text("mesa", margin, 24);
-    const mesaWidth = doc.getTextWidth("mesa");
-    doc.setTextColor(...GREEN);
-    doc.text(".ads", margin + mesaWidth, 24);
-  }
-
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(9);
-  doc.setFont(FONT_NAME, "normal");
-  doc.text("RELATÓRIO DE CAMPANHA", margin, 34);
-
+function drawHeader(doc: jsPDF, _pageWidth: number, margin: number) {
   const today = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-  doc.setTextColor(200, 200, 200);
-  doc.setFontSize(8);
-  doc.text(today, pageWidth - margin, 34, { align: "right" });
+  drawPdfHeader(doc, { eyebrow: "RELATÓRIO DE CAMPANHA", meta: today, margin });
 }
 
-function drawSectionTitle(doc: jsPDF, title: string, y: number, margin: number): number {
-  doc.setTextColor(...BLACK);
-  doc.setFontSize(12);
-  doc.setFont(FONT_NAME, "bold");
-  doc.text(title, margin, y);
-  y += 3;
-  doc.setDrawColor(220, 220, 220);
-  doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y);
-  return y + 8;
-}
+const drawSectionTitle = drawPdfSectionTitle;
 
 function drawInfoRow(doc: jsPDF, label: string, value: string, y: number, margin: number): number {
-  doc.setTextColor(...GRAY);
-  doc.setFontSize(9);
-  doc.setFont(FONT_NAME, "bold");
-  doc.text(label, margin, y);
-  doc.setFont(FONT_NAME, "normal");
-  doc.setTextColor(...DARK_GRAY);
-  doc.text(value, margin + 45, y);
-  return y + 6;
+  return drawPdfInfoRow(doc, label, value, y, margin, 45);
 }
 
-function checkPageBreak(doc: jsPDF, y: number, needed: number): number {
-  const pageHeight = doc.internal.pageSize.getHeight();
-  if (y + needed > pageHeight - 30) {
-    doc.addPage();
-    return 25;
-  }
-  return y;
-}
+const checkPageBreak = pdfCheckPageBreak;
 
 function getTypeLabel(reportType: string): string {
   if (reportType === "telas") return "Telas / Digital";

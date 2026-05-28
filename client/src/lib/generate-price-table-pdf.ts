@@ -73,7 +73,7 @@ const FREIGHT_TABLE = [
 
 const WEEKS = [4, 8, 12, 16];
 
-const BRAND_GREEN = [39, 216, 3] as const;
+const BRAND_GREEN = [0, 194, 56] as const;
 const DARK_BG = [13, 13, 13] as const;
 const CARD_BG = [24, 24, 24] as const;
 const HEADER_BG = [30, 30, 30] as const;

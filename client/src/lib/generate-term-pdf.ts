@@ -1,4 +1,10 @@
 import jsPDF from "jspdf";
+import {
+  PDF_FONT as FONT_NAME,
+  PDF_COLORS,
+  registerPdfFonts,
+  drawPdfHeader,
+} from "./pdf-branding";
 
 interface TermPDFData {
   title: string;
@@ -81,31 +87,12 @@ function stripHtml(html: string): string {
 
 export function generateTermPdf(data: TermPDFData) {
   const doc = new jsPDF();
+  registerPdfFonts(doc);
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
   const contentWidth = pageWidth - margin * 2;
 
-  doc.setFillColor(13, 13, 13);
-  doc.rect(0, 0, pageWidth, 42, "F");
-
-  doc.setFillColor(39, 216, 3);
-  doc.rect(0, 42, pageWidth, 2, "F");
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(22);
-  doc.setFont("helvetica", "bold");
-  doc.text("mesa", margin, 24);
-  const mesaWidth = doc.getTextWidth("mesa");
-  doc.setTextColor(39, 216, 3);
-  doc.text(".ads", margin + mesaWidth, 24);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text("TERMO DE ACEITE", margin, 34);
-
-  doc.setTextColor(100, 100, 100);
-  doc.setFontSize(8);
   const dateStr = new Date(data.signedAt).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "long",
@@ -113,13 +100,14 @@ export function generateTermPdf(data: TermPDFData) {
     hour: "2-digit",
     minute: "2-digit",
   });
-  doc.text(dateStr, pageWidth - margin, 34, { align: "right" });
+
+  drawPdfHeader(doc, { eyebrow: "TERMO DE ACEITE", meta: dateStr, margin });
 
   let y = 56;
 
-  doc.setTextColor(13, 13, 13);
+  doc.setTextColor(...PDF_COLORS.ink);
   doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(FONT_NAME, "bold");
   const titleLines = doc.splitTextToSize(data.title, contentWidth);
   doc.text(titleLines, margin, y);
   y += titleLines.length * 7 + 6;
@@ -130,7 +118,7 @@ export function generateTermPdf(data: TermPDFData) {
 
   const textContent = stripHtml(data.content);
   doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(FONT_NAME, "normal");
   doc.setTextColor(40, 40, 40);
 
   const wrappedLines = doc.splitTextToSize(textContent, contentWidth);
@@ -150,19 +138,19 @@ export function generateTermPdf(data: TermPDFData) {
     y = 20;
   }
 
-  doc.setDrawColor(39, 216, 3);
+  doc.setDrawColor(...PDF_COLORS.neon);
   doc.setLineWidth(0.5);
   doc.line(margin, y, pageWidth - margin, y);
   y += 10;
 
   doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(13, 13, 13);
+  doc.setFont(FONT_NAME, "bold");
+  doc.setTextColor(...PDF_COLORS.ink);
   doc.text("DADOS DO SIGNATÁRIO", margin, y);
   y += 8;
 
   doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(FONT_NAME, "normal");
   doc.setTextColor(60, 60, 60);
 
   const signerRows = [
@@ -173,9 +161,9 @@ export function generateTermPdf(data: TermPDFData) {
   ];
 
   for (const [label, value] of signerRows) {
-    doc.setFont("helvetica", "bold");
+    doc.setFont(FONT_NAME, "bold");
     doc.text(label, margin, y);
-    doc.setFont("helvetica", "normal");
+    doc.setFont(FONT_NAME, "normal");
     doc.text(value, margin + 25, y);
     y += 6;
   }
@@ -192,7 +180,7 @@ export function generateTermPdf(data: TermPDFData) {
   }
 
   doc.setFontSize(7);
-  doc.setTextColor(39, 216, 3);
+  doc.setTextColor(...PDF_COLORS.neon);
   doc.text("mesa.ads", pageWidth - margin, footerY, { align: "right" });
 
   const fileName = `termo_${data.title.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}_${new Date(data.signedAt).toISOString().split("T")[0]}.pdf`;

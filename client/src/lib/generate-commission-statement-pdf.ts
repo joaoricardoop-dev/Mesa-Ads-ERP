@@ -1,14 +1,20 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { HOST_GROTESK_REGULAR, HOST_GROTESK_BOLD, LOGO_WHITE_BASE64 } from "./pdf-assets";
+import {
+  PDF_FONT as FONT_NAME,
+  GREEN,
+  BLACK,
+  WHITE,
+  DARK_GRAY,
+  GRAY,
+  LIGHT_GRAY,
+  registerPdfFonts,
+  drawPdfHeader,
+  drawPdfSectionTitle,
+  pdfCheckPageBreak,
+} from "./pdf-branding";
 
-const FONT_NAME = "HostGrotesk";
-const GREEN = [39, 216, 3] as const;
-const BLACK = [13, 13, 13] as const;
-const DARK_GRAY = [60, 60, 60] as const;
-const GRAY = [100, 100, 100] as const;
-const LIGHT_GRAY = [240, 240, 240] as const;
-const WHITE = [255, 255, 255] as const;
+void GREEN;
 
 export interface CommissionStatementPayment {
   id: number;
@@ -159,13 +165,7 @@ export function buildCommissionStatementData(
   };
 }
 
-function registerFonts(doc: jsPDF) {
-  doc.addFileToVFS("HostGrotesk-Regular.ttf", HOST_GROTESK_REGULAR);
-  doc.addFont("HostGrotesk-Regular.ttf", FONT_NAME, "normal");
-  doc.addFileToVFS("HostGrotesk-Bold.ttf", HOST_GROTESK_BOLD);
-  doc.addFont("HostGrotesk-Bold.ttf", FONT_NAME, "bold");
-  doc.setFont(FONT_NAME, "normal");
-}
+const registerFonts = registerPdfFonts;
 
 function fmtCurrency(val: number): string {
   return `R$ ${val.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -193,56 +193,15 @@ function fmtStatus(s: string | null | undefined): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function drawHeader(doc: jsPDF, pageWidth: number, margin: number) {
-  doc.setFillColor(...BLACK);
-  doc.rect(0, 0, pageWidth, 42, "F");
-
-  doc.setFillColor(...GREEN);
-  doc.rect(0, 42, pageWidth, 2, "F");
-
-  try {
-    const logoWidth = 40;
-    const logoHeight = logoWidth / 4.254;
-    doc.addImage(LOGO_WHITE_BASE64, "PNG", margin, 14, logoWidth, logoHeight);
-  } catch {
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(22);
-    doc.setFont(FONT_NAME, "bold");
-    doc.text("mesa", margin, 24);
-    const mesaWidth = doc.getTextWidth("mesa");
-    doc.setTextColor(...GREEN);
-    doc.text(".ads", margin + mesaWidth, 24);
-  }
-
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(9);
-  doc.setFont(FONT_NAME, "normal");
-  doc.text("EXTRATO DE COMISSÕES", margin, 34);
-
+function drawHeader(doc: jsPDF, _pageWidth: number, margin: number) {
   const today = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-  doc.setTextColor(200, 200, 200);
-  doc.setFontSize(8);
-  doc.text(`Emitido em ${today}`, pageWidth - margin, 34, { align: "right" });
+  drawPdfHeader(doc, { eyebrow: "EXTRATO DE COMISSÕES", meta: `Emitido em ${today}`, margin });
 }
 
-function drawSectionTitle(doc: jsPDF, title: string, y: number, margin: number): number {
-  doc.setTextColor(...BLACK);
-  doc.setFontSize(11);
-  doc.setFont(FONT_NAME, "bold");
-  doc.text(title, margin, y);
-  y += 2.5;
-  doc.setDrawColor(220, 220, 220);
-  doc.line(margin, y, doc.internal.pageSize.getWidth() - margin, y);
-  return y + 7;
-}
+const drawSectionTitle = drawPdfSectionTitle;
 
 function checkPageBreak(doc: jsPDF, y: number, needed: number): number {
-  const pageHeight = doc.internal.pageSize.getHeight();
-  if (y + needed > pageHeight - 25) {
-    doc.addPage();
-    return 60;
-  }
-  return y;
+  return pdfCheckPageBreak(doc, y, needed, 60);
 }
 
 type LastAutoTable = { lastAutoTable?: { finalY?: number } };

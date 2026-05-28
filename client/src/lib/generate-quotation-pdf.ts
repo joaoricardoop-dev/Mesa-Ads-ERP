@@ -1,4 +1,11 @@
 import jsPDF from "jspdf";
+import {
+  PDF_FONT as FONT_NAME,
+  PDF_COLORS,
+  registerPdfFonts,
+  drawPdfHeader,
+  drawPdfFooter,
+} from "./pdf-branding";
 
 export interface QuotationSignPDFData {
   orderNumber: string;
@@ -20,38 +27,24 @@ export interface QuotationSignPDFData {
 
 export function generateQuotationSignPdf(data: QuotationSignPDFData) {
   const doc = new jsPDF();
+  registerPdfFonts(doc);
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
   const contentWidth = pageWidth - margin * 2;
+  void contentWidth;
 
-  doc.setFillColor(13, 13, 13);
-  doc.rect(0, 0, pageWidth, 42, "F");
-
-  doc.setFillColor(39, 216, 3);
-  doc.rect(0, 42, pageWidth, 2, "F");
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(22);
-  doc.setFont("helvetica", "bold");
-  doc.text("mesa", margin, 24);
-  const mesaWidth = doc.getTextWidth("mesa");
-  doc.setTextColor(39, 216, 3);
-  doc.text(".ads", margin + mesaWidth, 24);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text("ORDEM DE SERVIÇO", margin, 34);
-
-  doc.setTextColor(200, 200, 200);
-  doc.setFontSize(9);
-  doc.text(`OS #${data.orderNumber}`, pageWidth - margin, 34, { align: "right" });
+  drawPdfHeader(doc, {
+    eyebrow: "ORDEM DE SERVIÇO",
+    meta: `OS #${data.orderNumber}`,
+    margin,
+  });
 
   let y = 56;
 
-  doc.setTextColor(13, 13, 13);
+  doc.setTextColor(...PDF_COLORS.ink);
   doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(FONT_NAME, "bold");
   doc.text("DETALHES DA COTAÇÃO", margin, y);
   y += 10;
 
@@ -69,9 +62,9 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
   }
 
   for (const [label, value] of quotationRows) {
-    doc.setFont("helvetica", "bold");
+    doc.setFont(FONT_NAME, "bold");
     doc.text(label, margin, y);
-    doc.setFont("helvetica", "normal");
+    doc.setFont(FONT_NAME, "normal");
     const labelWidth = doc.getTextWidth(label) + 3;
     const valueLines = doc.splitTextToSize(value, contentWidth - labelWidth);
     doc.text(valueLines, margin + labelWidth, y);
@@ -83,17 +76,17 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
   doc.line(margin, y, pageWidth - margin, y);
   y += 10;
 
-  doc.setTextColor(13, 13, 13);
+  doc.setTextColor(...PDF_COLORS.ink);
   doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(FONT_NAME, "bold");
   doc.text("FINANCEIRO", margin, y);
   y += 8;
 
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(FONT_NAME, "bold");
   doc.text("Valor Total:", margin, y);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(FONT_NAME, "normal");
   doc.text(
     `R$ ${data.totalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     margin + 25,
@@ -105,9 +98,9 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
   doc.line(margin, y, pageWidth - margin, y);
   y += 10;
 
-  doc.setTextColor(13, 13, 13);
+  doc.setTextColor(...PDF_COLORS.ink);
   doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(FONT_NAME, "bold");
   doc.text("PERÍODO", margin, y);
   y += 8;
 
@@ -122,13 +115,13 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
     }
   };
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont(FONT_NAME, "bold");
   doc.text("Início:", margin, y);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(FONT_NAME, "normal");
   doc.text(formatDate(data.periodStart), margin + 18, y);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(FONT_NAME, "bold");
   doc.text("Fim:", margin + 60, y);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(FONT_NAME, "normal");
   doc.text(formatDate(data.periodEnd), margin + 72, y);
   y += 10;
 
@@ -142,14 +135,14 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
       doc.addPage();
       y = 20;
     }
-    doc.setTextColor(13, 13, 13);
+    doc.setTextColor(...PDF_COLORS.ink);
     doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
+    doc.setFont(FONT_NAME, "bold");
     doc.text("CONDIÇÕES DE PAGAMENTO", margin, y);
     y += 8;
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
-    doc.setFont("helvetica", "bold");
+    doc.setFont(FONT_NAME, "bold");
     doc.text("#", margin, y);
     doc.text("Vencimento", margin + 15, y);
     doc.text("Valor", pageWidth - margin, y, { align: "right" });
@@ -157,7 +150,7 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
     doc.setDrawColor(220, 220, 220);
     doc.line(margin, y, pageWidth - margin, y);
     y += 5;
-    doc.setFont("helvetica", "normal");
+    doc.setFont(FONT_NAME, "normal");
     doc.setTextColor(60, 60, 60);
     for (const r of data.billingSchedule) {
       const due = r.dueDate.length >= 10 ? new Date(r.dueDate + "T00:00:00Z").toLocaleDateString("pt-BR", { timeZone: "UTC" }) : r.dueDate;
@@ -182,14 +175,14 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
     y = 20;
   }
 
-  doc.setDrawColor(39, 216, 3);
+  doc.setDrawColor(...PDF_COLORS.neon);
   doc.setLineWidth(0.5);
   doc.line(margin, y, pageWidth - margin, y);
   y += 10;
 
   doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(13, 13, 13);
+  doc.setFont(FONT_NAME, "bold");
+  doc.setTextColor(...PDF_COLORS.ink);
   doc.text("DADOS DO SIGNATÁRIO", margin, y);
   y += 8;
 
@@ -211,9 +204,9 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
   ];
 
   for (const [label, value] of signerRows) {
-    doc.setFont("helvetica", "bold");
+    doc.setFont(FONT_NAME, "bold");
     doc.text(label, margin, y);
-    doc.setFont("helvetica", "normal");
+    doc.setFont(FONT_NAME, "normal");
     doc.text(value, margin + 25, y);
     y += 6;
   }
@@ -230,7 +223,7 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
   }
 
   doc.setFontSize(7);
-  doc.setTextColor(39, 216, 3);
+  doc.setTextColor(...PDF_COLORS.neon);
   doc.text("mesa.ads", pageWidth - margin, footerY, { align: "right" });
 
   const fileName = `OS_${data.orderNumber}_cotacao_${data.quotationNumber}_${new Date(data.signedAt).toISOString().split("T")[0]}.pdf`;

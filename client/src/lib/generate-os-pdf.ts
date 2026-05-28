@@ -1,5 +1,11 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  PDF_FONT as FONT_NAME,
+  PDF_COLORS,
+  registerPdfFonts,
+  drawPdfHeader,
+} from "./pdf-branding";
 
 const TYPE_SUBTITLE: Record<string, string> = {
   anunciante:  "ORDEM DE SERVIÇO — ANUNCIANTE",
@@ -29,37 +35,23 @@ export function generateOSPdf(data: OSPDFData) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
+  registerPdfFonts(doc);
   const subtitle = (data.type && TYPE_SUBTITLE[data.type]) || TYPE_SUBTITLE.anunciante;
 
-  doc.setFillColor(13, 13, 13);
-  doc.rect(0, 0, pageWidth, 40, "F");
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(20);
-  doc.setFont("helvetica", "bold");
-  doc.text("Mesa", 20, 22);
-  doc.setTextColor(255, 102, 0);
-  doc.text("Ads", 44, 22);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(10);
-  doc.text(subtitle, 20, 32);
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text(data.orderNumber, pageWidth - 20, 22, { align: "right" });
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Ref: ${data.quotationNumber}`, pageWidth - 20, 30, { align: "right" });
+  drawPdfHeader(doc, {
+    eyebrow: subtitle,
+    meta: `${data.orderNumber}  ·  Ref: ${data.quotationNumber}`,
+    margin: 20,
+  });
 
   let y = 55;
   doc.setTextColor(0, 0, 0);
 
   doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(FONT_NAME, "bold");
   doc.text("DADOS DO ANUNCIANTE", 20, y);
   y += 8;
-  doc.setFont("helvetica", "normal");
+  doc.setFont(FONT_NAME, "normal");
   doc.setFontSize(9);
   doc.text(`Nome: ${data.clientName}`, 20, y);
   y += 6;
@@ -69,11 +61,11 @@ export function generateOSPdf(data: OSPDFData) {
   }
 
   y += 4;
-  doc.setFont("helvetica", "bold");
+  doc.setFont(FONT_NAME, "bold");
   doc.setFontSize(10);
   doc.text("DETALHES DA CAMPANHA", 20, y);
   y += 8;
-  doc.setFont("helvetica", "normal");
+  doc.setFont(FONT_NAME, "normal");
   doc.setFontSize(9);
   doc.text(`Volume: ${data.coasterVolume.toLocaleString("pt-BR")} bolachas`, 20, y);
   y += 6;
@@ -97,7 +89,7 @@ export function generateOSPdf(data: OSPDFData) {
 
   if (data.restaurants.length > 0) {
     y += 6;
-    doc.setFont("helvetica", "bold");
+    doc.setFont(FONT_NAME, "bold");
     doc.setFontSize(10);
     doc.text("ALOCAÇÃO DE RESTAURANTES", 20, y);
     y += 4;
@@ -112,7 +104,7 @@ export function generateOSPdf(data: OSPDFData) {
       ]),
       foot: [["", "TOTAL", data.restaurants.reduce((s, r) => s + r.coasterQuantity, 0).toLocaleString("pt-BR")]],
       theme: "grid",
-      headStyles: { fillColor: [13, 13, 13], fontSize: 8 },
+      headStyles: { fillColor: [...PDF_COLORS.ink] as [number,number,number], fontSize: 8 },
       bodyStyles: { fontSize: 8 },
       footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontSize: 8, fontStyle: "bold" },
       margin: { left: 20, right: 20 },
@@ -127,7 +119,7 @@ export function generateOSPdf(data: OSPDFData) {
   doc.line(pageWidth - 90, y, pageWidth - 20, y);
   y += 6;
   doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(FONT_NAME, "normal");
   doc.text("Anunciante", 55, y, { align: "center" });
   doc.text("Mesa Ads", pageWidth - 55, y, { align: "center" });
 
