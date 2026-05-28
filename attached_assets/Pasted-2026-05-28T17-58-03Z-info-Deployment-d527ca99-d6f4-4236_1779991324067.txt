@@ -1,0 +1,841 @@
+2026-05-28T17:58:03Z info: Deployment: d527ca99-d6f4-4236-8fd5-909222745b3d
+2026-05-28T17:58:03Z info: Build: 3b9ca5c0-d8ae-44d4-be46-1b476ce0b568
+2026-05-28T17:58:04Z info: Running Security Scan
+2026-05-28T17:59:16Z info: Security Scan Complete
+2026-05-28T17:59:19Z info: Installing packages
+--> pnpm install
+
+--> pnpm install
+
+
+   ╭──────────────────────────────────────────────────────────────────╮
+   │                                                                  │
+   │                Update available! 10.4.1 → 11.4.0.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v11.4.0   │
+   │                Run "pnpm add -g pnpm" to update.                 │
+   │                                                                  │
+   ╰──────────────────────────────────────────────────────────────────╯
+
+
+
+   ╭──────────────────────────────────────────────────────────────────╮
+   │                                                                  │
+   │                Update available! 10.4.1 → 11.4.0.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v11.4.0   │
+   │                Run "pnpm add -g pnpm" to update.                 │
+   │                                                                  │
+   ╰──────────────────────────────────────────────────────────────────╯
+
+
+Lockfile is up to date, resolution step is skipped
+
+Lockfile is up to date, resolution step is skipped
+
+Already up to date
+
+Already up to date
+
+Done in 3.8s using pnpm v10.4.1
+
+Done in 3.8s using pnpm v10.4.1
+
+2026-05-28T17:59:25Z info: Starting Build
+=== Pre-deploy: instalando dependências ===
+
+Lockfile is up to date, resolution step is skipped
+
+Already up to date
+
+Done in 1.5s using pnpm v10.4.1
+
+
+=== Pre-deploy: instalando o Chromium do Playwright ===
+
+
+=== Pre-deploy: subindo dev server pra warm-up (banco de TESTE isolado) ===
+
+=== Pre-deploy: aguardando dev server atender em :5000 ===
+
+Dev server respondeu após 7s
+
+=== Pre-deploy: aquecendo bundle Vite (rotas críticas) ===
+
+=== Pre-deploy: rodando testes ponta-a-ponta (pnpm run test:e2e) ===
+
+
+> mesa-ads-simulator@1.0.0 test:e2e /home/runner/workspace
+> playwright test
+
+
+
+Running 14 tests using 4 workers
+
+  ✓   1 [setup] › e2e/global.setup.ts:12:1 › authenticate as anunciante (2.3s)
+
+  -   2 [chromium] › e2e/checkout-aberto.spec.ts:22:3 › checkout aberto em /montar-campanha › visitante deslogado vê o hero e a lista de produtos
+
+  -   3 [chromium] › e2e/checkout-aberto.spec.ts:43:3 › checkout aberto em /montar-campanha › escolha do produto é preservada após reload
+  -   4 [chromium] › e2e/checkout-aberto.spec.ts:77:3 › checkout aberto em /montar-campanha › parceiro/interno cai no seletor de cliente ao abrir o wizard
+  -   5 [chromium] › e2e/checkout-wizard.spec.ts:217:3 › checkout wizard ponta-a-ponta › anunciante percorre o wizard até a cotação criada
+
+  -   6 [chromium] › e2e/checkout-wizard.spec.ts:242:3 › checkout wizard ponta-a-ponta › usuário interno seleciona um cliente no ClientPicker e percorre o wizard
+
+  ✘   9 [chromium] › e2e/finance-audit-trail.spec.ts:31:3 › finance — auditoria de fatura › create + update gera entradas de audit com diff (1.6s)
+
+  ✘   7 [chromium] › e2e/finance-dre-dual.spec.ts:29:3 › finance — DRE dual (competência vs caixa) › competência reconhece pelo issueDate, caixa pelo paymentDate (1.6s)
+
+  ✘  10 [chromium] › e2e/finance-bank-reconciliation.spec.ts:50:3 › finance — reconciliação bancária › emit → import CSV → reconcile → invoice paga + payables coerentes + DSO (2.5s)
+
+  ✘  12 [chromium] › e2e/finance-invoice-lifecycle.spec.ts:37:3 › finance — ciclo de vida de fatura › emitir fatura, gerar payables, marcar paga e refletir no DSO (1.1s)
+
+(node:872) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+  ✘  13 [chromium] › e2e/finance-restaurant-portal.spec.ts:38:3 › finance — portal restaurante › admin marca pagamento → restaurante vê como paga via myCommissions (1.2s)
+
+  ✘  11 [chromium] › e2e/finance-partner-portal.spec.ts:43:3 › finance — portal parceiro (comissão por competência) › comissão de parceiro materializa após pagamento da invoice (4.4s)
+
+[Migrations] Banco fresh detectado — aplicando 27 arquivos do schema base (drizzle/).
+
+  ✘   8 [chromium] › e2e/builder-locais.spec.ts:18:3 › builder /montar-campanha — passo LOCAIS › lista pelo menos 1 local no período padrão e atualiza ao trocar datas (13.2s)
+
+[Migrations] Drizzle aplicado: 0000_nasty_james_howlett.sql (117 ok, 0 ignorado)
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "cnpj" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "razaoSocial" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "address" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "addressNumber" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "neighborhood" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "city" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "state" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "cep" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "instagram" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "convertedToId" of relation "leads" already exists
+
+[Migrations] Drizzle 0001_special_quentin_quire.sql: bloco ignorado (42701): column "convertedToType" of relation "leads" already exists
+
+[Migrations] Drizzle aplicado: 0001_special_quentin_quire.sql (0 ok, 11 ignorado)
+
+[Migrations] Drizzle 0002_bouncy_wolfsbane.sql: bloco ignorado (42701): column "leadId" of relation "quotations" already exists
+
+[Migrations] Drizzle aplicado: 0002_bouncy_wolfsbane.sql (22 ok, 1 ignorado)
+
+[Migrations] Drizzle aplicado: 0003_luxuriant_surge.sql (10 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0004_flashy_wendell_rand.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0005_premium_impossible_man.sql (7 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0006_add_logo_url.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle 0007_dapper_starbolt.sql: bloco ignorado (42701): column "logoUrl" of relation "active_restaurants" already exists
+
+[Migrations] Drizzle aplicado: 0007_dapper_starbolt.sql (1 ok, 1 ignorado)
+
+[Migrations] Drizzle aplicado: 0008_add_products_and_quotation_productid.sql (5 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0009_add_productid_campaigns_service_orders.sql (4 ok, 0 ignorado)
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42P07): relation "product_pricing_tiers" already exists
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42P07): relation "products" already exists
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42701): column "productId" of relation "campaigns" already exists
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42701): column "productId" of relation "quotations" already exists
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42701): column "productId" of relation "service_orders" already exists
+
+[Migrations] Drizzle 0010_high_darkstar.sql: bloco ignorado (42P07): relation "idx_product_pricing_tiers_product_id" already exists
+
+[Migrations] Drizzle aplicado: 0010_high_darkstar.sql (15 ok, 6 ignorado)
+
+[Migrations] Drizzle aplicado: 0011_colossal_golden_guardian.sql (21 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0012_adorable_speedball.sql (3 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0013_chunky_obadiah_stane.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0014_wooden_lilith.sql (4 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0015_users_partner_fk.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0016_crm_notifications.sql (6 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0017_pricing_modes.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0018_partner_product_visibility.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0019_billing_mode.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0019_custom_product_quotations.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0020_product_impression_formula.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0020_quotation_period_start.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0021_bolacha_tier_1000_margem_4979.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0022_product_discount_price_tiers.sql (1 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0023_campaign_notifications.sql (6 ok, 0 ignorado)
+
+[Migrations] Drizzle aplicado: 0024_product_impression_formula.sql (5 ok, 0 ignorado)
+
+[Migrations] Applied: add_quotation_period_start
+
+[Migrations] Applied: add_billing_mode_to_partners
+
+[Migrations] Applied: add_custom_product_quotation_columns
+
+[Migrations] Applied: add_agency_commission_to_quotations
+
+[Migrations] Applied: add_pricing_modes_to_products
+
+[Migrations] Applied: add_visible_to_partners_to_products
+
+[Migrations] Applied: add_new_product_type_enum_values
+
+[Migrations] Applied: add_pipeline_campaign_statuses
+
+[Migrations] Applied: add_sla_stage_timestamps_and_freight_tracking
+
+[Migrations] Applied: add_product_discount_price_tiers
+
+[Migrations] Applied: add_service_order_trackings_table
+
+[Migrations] Applied: add_integration_tokens_table
+
+[Migrations] Applied: add_user_name_to_campaign_history
+
+[Migrations] Applied: add_lat_lng_to_active_restaurants
+
+[Migrations] Applied: add_freight_cost_to_campaigns
+
+[Migrations] Applied: add_partner_id_to_clients
+
+[Migrations] Applied: add_show_agency_pricing_to_clients
+
+[Migrations] Applied: add_visible_to_advertisers_to_products
+
+[Migrations] Applied: add_campaign_reports_tables
+
+[Migrations] Applied: add_campaign_id_and_client_id_to_crm_notifications
+
+[Migrations] Applied: add_source_to_quotations
+
+[Migrations] Applied: add_unique_constraint_operational_costs_campaign_id
+
+[Migrations] Applied: create_media_kit_settings
+
+[Migrations] Applied: add_pdf_url_to_media_kit_settings
+
+[Migrations] Applied: add_impression_formula_and_distribution_type_to_products
+
+[Migrations] Applied: add_workflow_template_to_products
+
+[Migrations] Applied: add_impression_detail_columns_to_products
+
+[Migrations] Applied: add_camelcase_impression_columns_to_products
+
+[Migrations] Applied: add_assigned_to_campaigns
+
+[Migrations] Applied: add_billing_type_and_withheld_tax_to_invoices
+
+[Migrations] Applied: add_partner_id_to_campaigns
+
+[Migrations] Applied: add_is_bonificada_to_campaigns
+
+[Migrations] Applied: create_accounts_payable_table
+
+[Migrations] Applied: add_supplier_id_to_accounts_payable
+
+[Migrations] Applied: enforce_campaign_id_not_null_accounts_payable
+
+[Migrations] Applied: drop_recipient_name_from_accounts_payable
+
+[Migrations] Applied: add_janelas_digitais_to_product_type_enum
+
+[Migrations] Applied: create_vip_providers_table
+
+[Migrations] Applied: add_custom_vip_provider_to_quotations
+
+[Migrations] Applied: add_vip_provider_to_products
+
+[Migrations] Applied: extend_accounts_payable_recipient_for_vip
+
+[Migrations] Applied: add_iss_fields_to_invoices
+
+[Migrations] Applied: create_campaign_phases_and_items
+
+[Migrations] Applied: add_phase_item_fks_to_financial_tables
+
+[Migrations] Applied: backfill_campaign_phases_and_items
+
+[Migrations] Applied: backfill_campaign_phases_v2
+
+[Migrations] Applied: backfill_campaign_items_from_quotation_v3
+
+[Migrations] Applied: add_campaign_phase_id_to_service_orders
+
+[Migrations] Applied: add_batch_timeline_columns
+
+[Migrations] Applied: rename_campaigns_lote_to_batch
+
+[Migrations] Applied: rename_campaigns_to_lote_format
+
+[Migrations] Applied: add_agency_bv_to_campaigns
+
+[Migrations] Applied: add_utm_tracking_to_clients
+
+[Migrations] Applied: marketplace_v2_schema_base
+
+[Migrations] Applied: marketplace_v2_schema_adjustments
+
+[Migrations] Applied: finrefac_01_glossary_comments
+
+[Migrations] Applied: finrefac_01_rename_vip_provider_commission_to_repasse
+
+[Migrations] Applied: finrefac_02_accounts_payable_ledger_columns
+
+[Migrations] Applied: finrefac_02_accounts_payable_backfill_from_restaurant_payments
+
+[Migrations] Applied: finrefac_02_create_restaurant_payments_view
+
+[Migrations] Applied: finrefac_02_accounts_payable_lossless_fixes
+
+[Migrations] Applied: finrefac_03_accounts_payable_natural_key_indexes
+
+[task-212] falha ao dropar DB temporário mesa_ads_fresh_4fe01a26a221: error: database "mesa_ads_fresh_4fe01a26a221" is being accessed by other users
+    at /home/runner/workspace/node_modules/.pnpm/pg@8.18.0/node_modules/pg/lib/client.js:624:17
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at file:///home/runner/workspace/e2e/migrations-fresh-db.spec.ts:59:7
+    at /home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/testInfo.js:320:11
+    at TimeoutManager.withRunnable (/home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/timeoutManager.js:75:14)
+    at TestInfoImpl._runWithTimeout (/home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/testInfo.js:318:7)
+    at FixtureRunner.resolveParametersAndRunFunction (/home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/fixtureRunner.js:232:5)
+    at /home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/workerMain.js:445:13
+    at TestInfoImpl._runAsStep (/home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/testInfo.js:309:7)
+    at WorkerMain._runAllHooksForSuite (/home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/workerMain.js:440:9)
+    at WorkerMain._runAfterAllHooksForSuite (/home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/workerMain.js:470:5)
+    at /home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/workerMain.js:356:13
+    at TestInfoImpl._runAsStep (/home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/testInfo.js:309:7)
+    at WorkerMain._runTest (/home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/workerMain.js:334:5)
+    at WorkerMain.runTestGroup (/home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/worker/workerMain.js:203:9)
+    at process.<anonymous> (/home/runner/workspace/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/lib/common/process.js:73:22) {
+  length: 173,
+  severity: 'ERROR',
+  code: '55006',
+  detail: 'There is 1 other session using the database.',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'dbcommands.c',
+  line: '1707',
+  routine: 'dropdb'
+}
+
+  ✘  14 [chromium] › e2e/migrations-fresh-db.spec.ts:67:3 › runMigrations bootstrap em banco fresh (Task #212) › aplica schema completo num banco zerado e é idempotente em re-execução (1.0m)
+
+  1) [chromium] › e2e/builder-locais.spec.ts:18:3 › builder /montar-campanha — passo LOCAIS › lista pelo menos 1 local no período padrão e atualiza ao trocar datas 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('[data-testid^=\'local-card-\']').first()
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 10000ms
+      - waiting for locator('[data-testid^=\'local-card-\']').first()
+
+
+      33 |     // Pelo menos 1 card de local visível com o período padrão
+      34 |     const cards = page.locator("[data-testid^='local-card-']");
+    > 35 |     await expect(cards.first()).toBeVisible({ timeout: 10_000 });
+         |                                 ^
+      36 |     const initialCount = await cards.count();
+      37 |     expect(initialCount).toBeGreaterThan(0);
+      38 |
+        at /home/runner/workspace/e2e/builder-locais.spec.ts:35:33
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/builder-locais-builder-mon-b0cb3--e-atualiza-ao-trocar-datas-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/builder-locais-builder-mon-b0cb3--e-atualiza-ao-trocar-datas-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/builder-locais-builder-mon-b0cb3--e-atualiza-ao-trocar-datas-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/builder-locais-builder-mon-b0cb3--e-atualiza-ao-trocar-datas-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  2) [chromium] › e2e/finance-audit-trail.spec.ts:31:3 › finance — auditoria de fatura › create + update gera entradas de audit com diff 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:813:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.createInvoice"}}}}
+
+       at _finance-helpers.ts:144
+
+      142 |   const body = await res.text();
+      143 |   if (!res.ok()) {
+    > 144 |     throw new Error(`trpc mutation ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      145 |   }
+      146 |   const parsed = JSON.parse(body);
+      147 |   if (parsed.error) {
+        at trpcMutation (/home/runner/workspace/e2e/_finance-helpers.ts:144:11)
+        at /home/runner/workspace/e2e/finance-audit-trail.spec.ts:48:21
+
+    Error Context: test-results/finance-audit-trail-financ-b7d0e--entradas-de-audit-com-diff-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-audit-trail-financ-b7d0e--entradas-de-audit-com-diff-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-audit-trail-financ-b7d0e--entradas-de-audit-com-diff-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  3) [chromium] › e2e/finance-bank-reconciliation.spec.ts:50:3 › finance — reconciliação bancária › emit → import CSV → reconcile → invoice paga + payables coerentes + DSO 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:813:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.createInvoice"}}}}
+
+       at _finance-helpers.ts:144
+
+      142 |   const body = await res.text();
+      143 |   if (!res.ok()) {
+    > 144 |     throw new Error(`trpc mutation ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      145 |   }
+      146 |   const parsed = JSON.parse(body);
+      147 |   if (parsed.error) {
+        at trpcMutation (/home/runner/workspace/e2e/_finance-helpers.ts:144:11)
+        at /home/runner/workspace/e2e/finance-bank-reconciliation.spec.ts:74:21
+
+    Error Context: test-results/finance-bank-reconciliatio-14d13-paga-payables-coerentes-DSO-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-bank-reconciliatio-14d13-paga-payables-coerentes-DSO-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-bank-reconciliatio-14d13-paga-payables-coerentes-DSO-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  4) [chromium] › e2e/finance-dre-dual.spec.ts:29:3 › finance — DRE dual (competência vs caixa) › competência reconhece pelo issueDate, caixa pelo paymentDate 
+
+    Error: trpc query financial.dre failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:2531:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.dre"}}}}
+
+       at _finance-helpers.ts:124
+
+      122 |   const body = await res.text();
+      123 |   if (!res.ok()) {
+    > 124 |     throw new Error(`trpc query ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      125 |   }
+      126 |   const parsed = JSON.parse(body);
+      127 |   if (parsed.error) {
+        at trpcQuery (/home/runner/workspace/e2e/_finance-helpers.ts:124:11)
+        at /home/runner/workspace/e2e/finance-dre-dual.spec.ts:50:27
+
+    Error Context: test-results/finance-dre-dual-finance-—-f530c-Date-caixa-pelo-paymentDate-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-dre-dual-finance-—-f530c-Date-caixa-pelo-paymentDate-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-dre-dual-finance-—-f530c-Date-caixa-pelo-paymentDate-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  5) [chromium] › e2e/finance-invoice-lifecycle.spec.ts:37:3 › finance — ciclo de vida de fatura › emitir fatura, gerar payables, marcar paga e refletir no DSO 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:813:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.createInvoice"}}}}
+
+       at _finance-helpers.ts:144
+
+      142 |   const body = await res.text();
+      143 |   if (!res.ok()) {
+    > 144 |     throw new Error(`trpc mutation ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      145 |   }
+      146 |   const parsed = JSON.parse(body);
+      147 |   if (parsed.error) {
+        at trpcMutation (/home/runner/workspace/e2e/_finance-helpers.ts:144:11)
+        at /home/runner/workspace/e2e/finance-invoice-lifecycle.spec.ts:54:21
+
+    Error Context: test-results/finance-invoice-lifecycle--ab4a2-rcar-paga-e-refletir-no-DSO-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-invoice-lifecycle--ab4a2-rcar-paga-e-refletir-no-DSO-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-invoice-lifecycle--ab4a2-rcar-paga-e-refletir-no-DSO-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › e2e/finance-partner-portal.spec.ts:43:3 › finance — portal parceiro (comissão por competência) › comissão de parceiro materializa após pagamento da invoice 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n
+  7) [chromium] › e2e/finance-restaurant-portal.spec.ts:38:3 › finance — portal restaurante › admin marca pagamento → restaurante vê como paga via myCommissions 
+
+    Error: /api/dev-ensure-restaurante failed: 500 {"message":"Erro ao garantir restaurante de teste."}
+
+       at _finance-helpers.ts:33
+
+      31 |   const res = await request.post(url, { data: body });
+      32 |   if (!res.ok()) {
+    > 33 |     throw new Error(`${url} failed: ${res.status()} ${await res.text()}`);
+         |           ^
+      34 |   }
+      35 |   return (await res.json()) as T;
+      36 | }
+        at devEnsure (/home/runner/workspace/e2e/_finance-helpers.ts:33:11)
+        at /home/runner/workspace/e2e/finance-restaurant-portal.spec.ts:43:21
+
+    Error Context: test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  8) [chromium] › e2e/migrations-fresh-db.spec.ts:67:3 › runMigrations bootstrap em banco fresh (Task #212) › aplica schema completo num banco zerado e é idempotente em re-execução 
+
+    Test timeout of 60000ms exceeded.
+
+    Error Context: test-results/migrations-fresh-db-runMig-76aba--idempotente-em-re-execução-chromium/error-context.md
+
+    Error Context: test-results/migrations-fresh-db-runMig-76aba--idempotente-em-re-execução-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/migrations-fresh-db-runMig-76aba--idempotente-em-re-execução-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/migrations-fresh-db-runMig-76aba--idempotente-em-re-execução-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  8 failed
+    [chromium] › e2e/builder-locais.spec.ts:18:3 › builder /montar-campanha — passo LOCAIS › lista pelo menos 1 local no período padrão e atualiza ao trocar datas 
+    [chromium] › e2e/finance-audit-trail.spec.ts:31:3 › finance — auditoria de fatura › create + update gera entradas de audit com diff 
+    [chromium] › e2e/finance-bank-reconciliation.spec.ts:50:3 › finance — reconciliação bancária › emit → import CSV → reconcile → invoice paga + payables coerentes + DSO 
+    [chromium] › e2e/finance-dre-dual.spec.ts:29:3 › finance — DRE dual (competência vs caixa) › competência reconhece pelo issueDate, caixa pelo paymentDate 
+    [chromium] › e2e/finance-invoice-lifecycle.spec.ts:37:3 › finance — ciclo de vida de fatura › emitir fatura, gerar payables, marcar paga e refletir no DSO 
+    [chromium] › e2e/finance-partner-portal.spec.ts:43:3 › finance — portal parceiro (comissão por competência) › comissão de parceiro materializa após pagamento da invoice 
+    [chromium] › e2e/finance-restaurant-portal.spec.ts:38:3 › finance — portal restaurante › admin marca pagamento → restaurante vê como paga via myCommissions 
+    [chromium] › e2e/migrations-fresh-db.spec.ts:67:3 › runMigrations bootstrap em banco fresh (Task #212) › aplica schema completo num banco zerado e é idempotente em re-execução 
+  5 skipped
+  1 passed (1.4m)
+
+  2) [chromium] › e2e/finance-audit-trail.spec.ts:31:3 › finance — auditoria de fatura › create + update gera entradas de audit com diff 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:813:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.createInvoice"}}}}
+
+       at _finance-helpers.ts:144
+
+      142 |   const body = await res.text();
+      143 |   if (!res.ok()) {
+    > 144 |     throw new Error(`trpc mutation ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      145 |   }
+      146 |   const parsed = JSON.parse(body);
+      147 |   if (parsed.error) {
+        at trpcMutation (/home/runner/workspace/e2e/_finance-helpers.ts:144:11)
+        at /home/runner/workspace/e2e/finance-audit-trail.spec.ts:48:21
+
+    Error Context: test-results/finance-audit-trail-financ-b7d0e--entradas-de-audit-com-diff-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-audit-trail-financ-b7d0e--entradas-de-audit-com-diff-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-audit-trail-financ-b7d0e--entradas-de-audit-com-diff-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  3) [chromium] › e2e/finance-bank-reconciliation.spec.ts:50:3 › finance — reconciliação bancária › emit → import CSV → reconcile → invoice paga + payables coerentes + DSO 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:813:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.createInvoice"}}}}
+
+       at _finance-helpers.ts:144
+
+      142 |   const body = await res.text();
+      143 |   if (!res.ok()) {
+    > 144 |     throw new Error(`trpc mutation ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      145 |   }
+      146 |   const parsed = JSON.parse(body);
+      147 |   if (parsed.error) {
+        at trpcMutation (/home/runner/workspace/e2e/_finance-helpers.ts:144:11)
+        at /home/runner/workspace/e2e/finance-bank-reconciliation.spec.ts:74:21
+
+    Error Context: test-results/finance-bank-reconciliatio-14d13-paga-payables-coerentes-DSO-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-bank-reconciliatio-14d13-paga-payables-coerentes-DSO-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-bank-reconciliatio-14d13-paga-payables-coerentes-DSO-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  4) [chromium] › e2e/finance-dre-dual.spec.ts:29:3 › finance — DRE dual (competência vs caixa) › competência reconhece pelo issueDate, caixa pelo paymentDate 
+
+    Error: trpc query financial.dre failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:2531:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.dre"}}}}
+
+       at _finance-helpers.ts:124
+
+      122 |   const body = await res.text();
+      123 |   if (!res.ok()) {
+    > 124 |     throw new Error(`trpc query ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      125 |   }
+      126 |   const parsed = JSON.parse(body);
+      127 |   if (parsed.error) {
+        at trpcQuery (/home/runner/workspace/e2e/_finance-helpers.ts:124:11)
+        at /home/runner/workspace/e2e/finance-dre-dual.spec.ts:50:27
+
+    Error Context: test-results/finance-dre-dual-finance-—-f530c-Date-caixa-pelo-paymentDate-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-dre-dual-finance-—-f530c-Date-caixa-pelo-paymentDate-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-dre-dual-finance-—-f530c-Date-caixa-pelo-paymentDate-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  5) [chromium] › e2e/finance-invoice-lifecycle.spec.ts:37:3 › finance — ciclo de vida de fatura › emitir fatura, gerar payables, marcar paga e refletir no DSO 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:813:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.createInvoice"}}}}
+
+       at _finance-helpers.ts:144
+
+      142 |   const body = await res.text();
+      143 |   if (!res.ok()) {
+    > 144 |     throw new Error(`trpc mutation ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      145 |   }
+      146 |   const parsed = JSON.parse(body);
+      147 |   if (parsed.error) {
+        at trpcMutation (/home/runner/workspace/e2e/_finance-helpers.ts:144:11)
+        at /home/runner/workspace/e2e/finance-invoice-lifecycle.spec.ts:54:21
+
+    Error Context: test-results/finance-invoice-lifecycle--ab4a2-rcar-paga-e-refletir-no-DSO-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-invoice-lifecycle--ab4a2-rcar-paga-e-refletir-no-DSO-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-invoice-lifecycle--ab4a2-rcar-paga-e-refletir-no-DSO-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › e2e/finance-partner-portal.spec.ts:43:3 › finance — portal parceiro (comissão por competência) › comissão de parceiro materializa após pagamento da invoice 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n
+  7) [chromium] › e2e/finance-restaurant-portal.spec.ts:38:3 › finance — portal restaurante › admin marca pagamento → restaurante vê como paga via myCommissions 
+
+    Error: /api/dev-ensure-restaurante failed: 500 {"message":"Erro ao garantir restaurante de teste."}
+
+       at _finance-helpers.ts:33
+
+      31 |   const res = await request.post(url, { data: body });
+      32 |   if (!res.ok()) {
+    > 33 |     throw new Error(`${url} failed: ${res.status()} ${await res.text()}`);
+         |           ^
+      34 |   }
+      35 |   return (await res.json()) as T;
+      36 | }
+        at devEnsure (/home/runner/workspace/e2e/_finance-helpers.ts:33:11)
+        at /home/runner/workspace/e2e/finance-restaurant-portal.spec.ts:43:21
+
+    Error Context: test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  2) [chromium] › e2e/finance-audit-trail.spec.ts:31:3 › finance — auditoria de fatura › create + update gera entradas de audit com diff 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:813:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.createInvoice"}}}}
+
+       at _finance-helpers.ts:144
+
+      142 |   const body = await res.text();
+      143 |   if (!res.ok()) {
+    > 144 |     throw new Error(`trpc mutation ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      145 |   }
+      146 |   const parsed = JSON.parse(body);
+      147 |   if (parsed.error) {
+        at trpcMutation (/home/runner/workspace/e2e/_finance-helpers.ts:144:11)
+        at /home/runner/workspace/e2e/finance-audit-trail.spec.ts:48:21
+
+    Error Context: test-results/finance-audit-trail-financ-b7d0e--entradas-de-audit-com-diff-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-audit-trail-financ-b7d0e--entradas-de-audit-com-diff-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-audit-trail-financ-b7d0e--entradas-de-audit-com-diff-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  3) [chromium] › e2e/finance-bank-reconciliation.spec.ts:50:3 › finance — reconciliação bancária › emit → import CSV → reconcile → invoice paga + payables coerentes + DSO 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:813:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.createInvoice"}}}}
+
+       at _finance-helpers.ts:144
+
+      142 |   const body = await res.text();
+      143 |   if (!res.ok()) {
+    > 144 |     throw new Error(`trpc mutation ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      145 |   }
+      146 |   const parsed = JSON.parse(body);
+      147 |   if (parsed.error) {
+        at trpcMutation (/home/runner/workspace/e2e/_finance-helpers.ts:144:11)
+        at /home/runner/workspace/e2e/finance-bank-reconciliation.spec.ts:74:21
+
+    Error Context: test-results/finance-bank-reconciliatio-14d13-paga-payables-coerentes-DSO-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-bank-reconciliatio-14d13-paga-payables-coerentes-DSO-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-bank-reconciliatio-14d13-paga-payables-coerentes-DSO-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  4) [chromium] › e2e/finance-dre-dual.spec.ts:29:3 › finance — DRE dual (competência vs caixa) › competência reconhece pelo issueDate, caixa pelo paymentDate 
+
+    Error: trpc query financial.dre failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:2531:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.dre"}}}}
+
+       at _finance-helpers.ts:124
+
+      122 |   const body = await res.text();
+      123 |   if (!res.ok()) {
+    > 124 |     throw new Error(`trpc query ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      125 |   }
+      126 |   const parsed = JSON.parse(body);
+      127 |   if (parsed.error) {
+        at trpcQuery (/home/runner/workspace/e2e/_finance-helpers.ts:124:11)
+        at /home/runner/workspace/e2e/finance-dre-dual.spec.ts:50:27
+
+    Error Context: test-results/finance-dre-dual-finance-—-f530c-Date-caixa-pelo-paymentDate-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-dre-dual-finance-—-f530c-Date-caixa-pelo-paymentDate-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-dre-dual-finance-—-f530c-Date-caixa-pelo-paymentDate-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  5) [chromium] › e2e/finance-invoice-lifecycle.spec.ts:37:3 › finance — ciclo de vida de fatura › emitir fatura, gerar payables, marcar paga e refletir no DSO 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n    at requireFinancialAccess (/home/runner/workspace/server/financialRouter.ts:34:11)\n    at <anonymous> (/home/runner/workspace/server/financialRouter.ts:813:7)\n    at resolveMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:576:28)\n    at callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:26)\n    at Object.next (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:655:16)\n    at inputValidatorMiddleware (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/middleware.ts:210:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async callRecursive (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:642:20)\n    at async procedure (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/procedureBuilder.ts:682:20)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:373:31)\n    at async resolveResponse (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:402:31)\n    at async <anonymous> (/home/runner/workspace/node_modules/.pnpm/@trpc+server@11.10.0_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)","path":"financial.createInvoice"}}}}
+
+       at _finance-helpers.ts:144
+
+      142 |   const body = await res.text();
+      143 |   if (!res.ok()) {
+    > 144 |     throw new Error(`trpc mutation ${procedure} failed: ${res.status()} ${body}`);
+          |           ^
+      145 |   }
+      146 |   const parsed = JSON.parse(body);
+      147 |   if (parsed.error) {
+        at trpcMutation (/home/runner/workspace/e2e/_finance-helpers.ts:144:11)
+        at /home/runner/workspace/e2e/finance-invoice-lifecycle.spec.ts:54:21
+
+    Error Context: test-results/finance-invoice-lifecycle--ab4a2-rcar-paga-e-refletir-no-DSO-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-invoice-lifecycle--ab4a2-rcar-paga-e-refletir-no-DSO-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-invoice-lifecycle--ab4a2-rcar-paga-e-refletir-no-DSO-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › e2e/finance-partner-portal.spec.ts:43:3 › finance — portal parceiro (comissão por competência) › comissão de parceiro materializa após pagamento da invoice 
+
+    Error: trpc mutation financial.createInvoice failed: 403 {"error":{"json":{"message":"Acesso restrito ao módulo financeiro","code":-32003,"data":{"code":"FORBIDDEN","httpStatus":403,"stack":"TRPCError: Acesso restrito ao módulo financeiro\n
+  7) [chromium] › e2e/finance-restaurant-portal.spec.ts:38:3 › finance — portal restaurante › admin marca pagamento → restaurante vê como paga via myCommissions 
+
+    Error: /api/dev-ensure-restaurante failed: 500 {"message":"Erro ao garantir restaurante de teste."}
+
+       at _finance-helpers.ts:33
+
+      31 |   const res = await request.post(url, { data: body });
+      32 |   if (!res.ok()) {
+    > 33 |     throw new Error(`${url} failed: ${res.status()} ${await res.text()}`);
+         |           ^
+      34 |   }
+      35 |   return (await res.json()) as T;
+      36 | }
+        at devEnsure (/home/runner/workspace/e2e/_finance-helpers.ts:33:11)
+        at /home/runner/workspace/e2e/finance-restaurant-portal.spec.ts:43:21
+
+    Error Context: test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/finance-restaurant-portal--4c391-como-paga-via-myCommissions-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ELIFECYCLE  Command failed with exit code 1.

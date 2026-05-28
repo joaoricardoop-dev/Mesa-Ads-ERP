@@ -40,5 +40,16 @@ setup("authenticate as anunciante", async ({ request }) => {
     `dev-login falhou para ${user.id}: ${loginRes.status()} ${await loginRes.text()}`,
   ).toBeTruthy();
 
+  // Garante ≥1 active_restaurant no banco fresh (Task #210). O spec
+  // builder-locais navega como anunciante e espera ver pelo menos 1
+  // card em /montar-campanha; sem seed, listAvailableLocations devolve
+  // vazio e o teste falha por locator-not-found.
+  const restRes = await request.post("/api/dev-ensure-restaurante", { data: {} });
+  if (!restRes.ok()) {
+    console.warn(
+      `[e2e setup] dev-ensure-restaurante falhou (não-fatal p/ specs não-builder): ${restRes.status()} ${await restRes.text()}`,
+    );
+  }
+
   await request.storageState({ path: ANUNCIANTE_AUTH_FILE });
 });

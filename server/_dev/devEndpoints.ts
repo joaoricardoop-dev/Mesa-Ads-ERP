@@ -132,7 +132,25 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
       const targetId = req.body?.userId;
       let user = targetId
         ? allUsers.find((u) => u.id === targetId)
-        : allUsers.find((u) => u.role === "admin") || allUsers[0];
+        : allUsers.find((u) => u.role === "admin") || null;
+      // Em banco fresh (Task #210), o único usuário pode ser o anunciante
+      // do setup E2E. Antes caía em allUsers[0] (anunciante) e os finance
+      // specs recebiam 403 em financial.* (requireFinancialAccess exige
+      // admin/financeiro/manager). Sem userId explícito e sem nenhum
+      // admin existente, auto-cria um admin E2E — gateado por sentinel.
+      if (!user && !targetId) {
+        if (!(await sentinelAllows(res))) return;
+        const id = `e2e-admin-${Date.now()}`;
+        user = await authStorage.upsertUser({
+          id,
+          email: `${id}@e2e.test`,
+          firstName: "E2E",
+          lastName: "Admin",
+          role: "admin",
+          isActive: true,
+          onboardingComplete: true,
+        });
+      }
       if (!user) {
         return res.status(404).json({ message: "Nenhum usuário encontrado no banco." });
       }
@@ -243,11 +261,24 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
         restaurantId = rows[0]?.id ?? null;
       }
       if (restaurantId == null) {
+        // active_restaurants tem ~10 colunas NOT NULL sem default (address,
+        // neighborhood, contactName/Role, whatsapp, tableCount, seatCount,
+        // monthlyCustomers). Em banco fresh (Task #210) NENHUMA linha existe
+        // pra herdar valores, então o INSERT minimalista do dev-ensure
+        // quebrava com 500. Preenche valores plausíveis pra E2E.
         const [created] = await db
           .insert(activeRestaurants)
           .values({
             name: `E2E Restaurante ${Date.now()}`,
             status: "active",
+            address: "Rua E2E Teste, 100",
+            neighborhood: "Centro",
+            contactName: "E2E Contato",
+            contactRole: "Gerente",
+            whatsapp: "11999999999",
+            tableCount: 20,
+            seatCount: 80,
+            monthlyCustomers: 5000,
             city: "São Paulo",
             state: "SP",
           })

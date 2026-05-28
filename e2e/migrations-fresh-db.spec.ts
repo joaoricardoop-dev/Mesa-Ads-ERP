@@ -65,6 +65,13 @@ test.describe("runMigrations bootstrap em banco fresh (Task #212)", () => {
   });
 
   test("aplica schema completo num banco zerado e é idempotente em re-execução", async () => {
+    // Rodar 27 arquivos Drizzle + 79 migrations customizadas contra um
+    // banco recém-criado no cluster Neon de teste passa do timeout
+    // default de 60s (cada round-trip serverless ~100ms × ~200 statements
+    // × 2 execuções p/ verificar idempotência). 180s dá folga sem mascarar
+    // regressão real de performance.
+    test.setTimeout(180_000);
+
     // Aponta o getDb() (neon-serverless Pool) para o banco temporário antes
     // de importar o módulo de migrations. O cache `_db` em server/db.ts ainda
     // está null neste worker do Playwright, então a primeira chamada a getDb()
