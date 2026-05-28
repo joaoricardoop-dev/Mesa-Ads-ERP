@@ -104,24 +104,28 @@ echo "=== Pre-deploy: subindo dev server (banco de TESTE isolado) ==="
 # DEV_FIXTURES=1 para registrar os endpoints /api/dev-* (sem essa flag o
 # módulo nem é importado, mesmo com NODE_ENV=development).
 #
-# IMPORTANTE — buffering:
+# IMPORTANTE — buffering e PTY:
 #   Node em stdout não-TTY (= redirecionado pra arquivo) usa block-buffer
-#   (~64KB). Logs do boot (`runMigrations`, `Server running on ...`) ficam
-#   presos no buffer e nunca aparecem no log — explica os 180s de silêncio
-#   dos deploys anteriores. `stdbuf -oL -eL` força line-buffering: cada
-#   `\n` flusha imediatamente, então o log do arquivo reflete o real-time.
+#   ~64KB com write() direto via libuv. `stdbuf` (que opera na libc) NÃO
+#   tem efeito em Node — daí 180s de silêncio nos deploys anteriores
+#   mesmo com `stdbuf -oL`. A única forma de forçar line-buffering em
+#   Node sem mudar código é alocar um pseudo-TTY com `script` (util-linux).
+#   `-q` suprime o header "Script started", `-f` flush após cada write,
+#   `-e` propaga exit code do filho.
 #
 # IMPORTANTE — tsx watch:
 #   `pnpm run dev` usa `tsx watch`, que no cloud builder com FS cold tenta
-#   recursar `node_modules` pra setar fs.watchers e pode travar. Pre-deploy
-#   não precisa de hot-reload, então chamamos `tsx` puro.
-NODE_ENV=development \
+#   recursar `node_modules` pra setar fs.watchers. Pre-deploy não precisa
+#   de hot-reload, então chamamos `tsx` puro.
+script -qfec "NODE_ENV=development \
   DEV_FIXTURES=1 \
-  DATABASE_URL="${DATABASE_URL_TEST}" \
-  DATABASE_URL_TEST="${DATABASE_URL_TEST}" \
-  stdbuf -oL -eL pnpm exec tsx server/_core/index.ts > /tmp/pre-deploy-dev.log 2>&1 &
+  DATABASE_URL='${DATABASE_URL_TEST}' \
+  DATABASE_URL_TEST='${DATABASE_URL_TEST}' \
+  pnpm exec tsx server/_core/index.ts" /tmp/pre-deploy-dev.log > /dev/null 2>&1 &
 DEV_PID=$!
-trap "kill ${DEV_PID} 2>/dev/null || true" EXIT
+# Mata o grupo inteiro (script + filhos) na saída — kill -PID negativo
+# só funciona pra grupos, então usamos pkill -P como fallback.
+trap "pkill -P ${DEV_PID} 2>/dev/null; kill ${DEV_PID} 2>/dev/null || true" EXIT
 
 echo "Dev server PID=${DEV_PID}, aguardando atender em :5000..."
 
