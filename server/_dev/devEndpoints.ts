@@ -314,19 +314,16 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
         productId = createdProduct.id;
       }
 
-      const existingLink = await db
-        .select({ id: productLocations.id })
-        .from(productLocations)
-        .where(
-          and(
-            eq(productLocations.productId, productId),
-            eq(productLocations.restaurantId, restaurantId),
-          ),
-        )
-        .limit(1);
-      if (existingLink.length === 0) {
-        await db.insert(productLocations).values({ productId, restaurantId });
-      }
+      // ON CONFLICT DO NOTHING: Playwright roda 4 workers em paralelo e dois
+      // podem ambos achar a linha ausente e tentar inserir o mesmo
+      // (productId, restaurantId), violando o unique constraint
+      // `uq_product_location` → 500. Idempotência via DB resolve a race.
+      await db
+        .insert(productLocations)
+        .values({ productId, restaurantId })
+        .onConflictDoNothing({
+          target: [productLocations.productId, productLocations.restaurantId],
+        });
 
       const id = `e2e-restaurante-${Date.now()}`;
       const user = await authStorage.upsertUser({
