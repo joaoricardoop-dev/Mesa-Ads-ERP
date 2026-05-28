@@ -117,11 +117,16 @@ echo "=== Pre-deploy: subindo dev server (banco de TESTE isolado) ==="
 #   `pnpm run dev` usa `tsx watch`, que no cloud builder com FS cold tenta
 #   recursar `node_modules` pra setar fs.watchers. Pre-deploy não precisa
 #   de hot-reload, então chamamos `tsx` puro.
-script -qfec "NODE_ENV=development \
+# Marcador ANTES do tsx: se este `[pre-deploy] launching tsx` não
+# aparece no /tmp/pre-deploy-dev.log, o problema é o próprio `script`
+# (PTY não está flushando). Se aparece e nada mais, o problema é
+# tsx cold-start travando antes de carregar server/_core/index.ts.
+script -qfec "echo '[pre-deploy] launching tsx at '\$(date -u +%FT%TZ) && \
+  NODE_ENV=development \
   DEV_FIXTURES=1 \
   DATABASE_URL='${DATABASE_URL_TEST}' \
   DATABASE_URL_TEST='${DATABASE_URL_TEST}' \
-  pnpm exec tsx server/_core/index.ts" /tmp/pre-deploy-dev.log > /dev/null 2>&1 &
+  exec pnpm exec tsx server/_core/index.ts" /tmp/pre-deploy-dev.log > /dev/null 2>&1 &
 DEV_PID=$!
 # Mata o grupo inteiro (script + filhos) na saída — kill -PID negativo
 # só funciona pra grupos, então usamos pkill -P como fallback.
@@ -156,8 +161,12 @@ for i in $(seq 1 ${WAIT_SECS}); do
     cat /tmp/pre-deploy-dev.log >&2 || true
     exit 1
   fi
-  # A cada 15s, dump das últimas 20 linhas pra diagnosticar travada.
-  if [ $((i % 15)) -eq 0 ]; then
+  # Snapshot a cada 5s nos primeiros 30s (pra ver `[pre-deploy] launching
+  # tsx` + `[boot] entry loaded` rapidamente), depois a cada 15s.
+  SNAP=0
+  if [ "$i" -le 30 ] && [ $((i % 5)) -eq 0 ]; then SNAP=1; fi
+  if [ "$i" -gt 30 ] && [ $((i % 15)) -eq 0 ]; then SNAP=1; fi
+  if [ "${SNAP}" -eq 1 ]; then
     echo "--- ainda esperando (${i}s/${WAIT_SECS}s), últimas linhas do dev server: ---"
     tail -n 20 /tmp/pre-deploy-dev.log 2>/dev/null || true
     echo "--- (processo $(kill -0 ${DEV_PID} 2>/dev/null && echo VIVO || echo MORTO)) fim do snapshot ---"

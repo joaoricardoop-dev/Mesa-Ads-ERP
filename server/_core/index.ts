@@ -1,3 +1,7 @@
+// Marker síncrono ANTES de qualquer import pra confirmar no log do
+// pre-deploy que tsx carregou o arquivo. Se este log não aparece,
+// o problema é tsx/esbuild cold-start, não código nosso.
+process.stdout.write(`[boot] entry loaded at ${new Date().toISOString()} (pid=${process.pid})\n`);
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
