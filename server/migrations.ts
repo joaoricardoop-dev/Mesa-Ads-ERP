@@ -1700,6 +1700,38 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
          );
     `,
   },
+  {
+    // Reconcilia a tabela `products` com o schema atual em
+    // `drizzle/schema.ts`. Em DBs que vieram do drizzle/0008 (que cria
+    // products com colunas mínimas), o drizzle/0010 (que recria com
+    // todas as colunas) foi pulado por "relation already exists", e
+    // colunas como `defaultQtyPerLocation`, `unitLabel`, `irpj`,
+    // `comRestaurante`, `loopDurationSeconds`, etc. nunca chegaram a
+    // existir — quebrando qualquer INSERT vindo do drizzle ORM (que
+    // sempre lista todas as colunas do schema). Tudo `IF NOT EXISTS`
+    // pra ser no-op em DBs que já estão corretos.
+    name: "task_213_reconcile_products_table_with_schema",
+    sql: `
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "description" text;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "unitLabel" varchar(50) DEFAULT 'unidade' NOT NULL;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "unitLabelPlural" varchar(50) DEFAULT 'unidades' NOT NULL;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "temDistribuicaoPorLocal" boolean DEFAULT true NOT NULL;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "defaultQtyPerLocation" integer DEFAULT 500;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "defaultSemanas" integer DEFAULT 12;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "imagemUrl" text;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "irpj" numeric(5, 2) DEFAULT '6.00';
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "comRestaurante" numeric(5, 2) DEFAULT '15.00';
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "comComercial" numeric(5, 2) DEFAULT '10.00';
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "attentionFactor" numeric(4, 2) DEFAULT '1.00' NOT NULL;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "frequencyParam" numeric(8, 2) DEFAULT '1.00';
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "defaultPessoasPorMesa" numeric(4, 2) DEFAULT '3.00' NOT NULL;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "loopDurationSeconds" integer DEFAULT 30 NOT NULL;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "frequenciaAparicoes" numeric(4, 2) DEFAULT '1.00' NOT NULL;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "isActive" boolean DEFAULT true NOT NULL;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "createdAt" timestamp DEFAULT now() NOT NULL;
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "updatedAt" timestamp DEFAULT now() NOT NULL;
+    `,
+  },
 ];
 
 export async function runMigrations() {
