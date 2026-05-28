@@ -10,8 +10,8 @@ interface SectionProps {
 
 export default function Section({ title, icon: Icon, description, children, className }: SectionProps) {
   return (
-    <div className={`bg-card border border-border/30 rounded-xl ${className || ""}`}>
-      <div className="px-4 lg:px-5 py-3 border-b border-border/20">
+    <div className={`bg-card border border-border/40 rounded-xl ${className || ""}`}>
+      <div className="px-4 lg:px-5 py-3 border-b border-border/30">
         <div className="flex items-center gap-2.5">
           {Icon && (
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -19,7 +19,7 @@ export default function Section({ title, icon: Icon, description, children, clas
             </div>
           )}
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold">{title}</h3>
+            <h3 className="font-display text-sm font-semibold tracking-tight">{title}</h3>
             {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
           </div>
         </div>
