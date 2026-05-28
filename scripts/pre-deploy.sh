@@ -98,30 +98,46 @@ for pat in "${FORBIDDEN_HOST_PATTERNS[@]}"; do
 done
 
 echo ""
-echo "=== Pre-deploy: subindo dev server pra warm-up (banco de TESTE isolado) ==="
+echo "=== Pre-deploy: subindo dev server (banco de TESTE isolado) ==="
 # DATABASE_URL é EXPORTADO só pro subprocess do dev server: a `runMigrations()`
 # vai criar o schema no banco de teste na primeira inicialização. Setamos
 # DEV_FIXTURES=1 para registrar os endpoints /api/dev-* (sem essa flag o
 # módulo nem é importado, mesmo com NODE_ENV=development).
 #
-# IMPORTANTE: chamamos `tsx` direto em vez de `pnpm run dev` (que usa
-# `tsx watch`). No cloud builder o `tsx watch` ficava 180s totalmente
-# mudo — o setup recursivo de fs.watchers em node_modules em container
-# com FS cold trava sem dar erro. `tsx` puro boota em segundos. Pre-deploy
-# não precisa de hot-reload.
+# IMPORTANTE — buffering:
+#   Node em stdout não-TTY (= redirecionado pra arquivo) usa block-buffer
+#   (~64KB). Logs do boot (`runMigrations`, `Server running on ...`) ficam
+#   presos no buffer e nunca aparecem no log — explica os 180s de silêncio
+#   dos deploys anteriores. `stdbuf -oL -eL` força line-buffering: cada
+#   `\n` flusha imediatamente, então o log do arquivo reflete o real-time.
+#
+# IMPORTANTE — tsx watch:
+#   `pnpm run dev` usa `tsx watch`, que no cloud builder com FS cold tenta
+#   recursar `node_modules` pra setar fs.watchers e pode travar. Pre-deploy
+#   não precisa de hot-reload, então chamamos `tsx` puro.
 NODE_ENV=development \
   DEV_FIXTURES=1 \
   DATABASE_URL="${DATABASE_URL_TEST}" \
   DATABASE_URL_TEST="${DATABASE_URL_TEST}" \
-  pnpm exec tsx server/_core/index.ts > /tmp/pre-deploy-dev.log 2>&1 &
+  stdbuf -oL -eL pnpm exec tsx server/_core/index.ts > /tmp/pre-deploy-dev.log 2>&1 &
 DEV_PID=$!
 trap "kill ${DEV_PID} 2>/dev/null || true" EXIT
 
-echo "=== Pre-deploy: aguardando dev server atender em :5000 ==="
-# 180s: cloud builder (2 vCPU) com tsx watch + 79 customs + 27 drizzle
-# em cold-start passa de 90s ocasionalmente (Neon serverless round-trip
-# ~100ms × ~200 statements + bundle Vite). 180s dá folga sem mascarar
-# trava real.
+echo "Dev server PID=${DEV_PID}, aguardando atender em :5000..."
+
+# Verifica de cara que o processo ainda está vivo (se `pnpm exec tsx` falhou
+# pra encontrar tsx ou crashou no `import`, o `&` não capturou — precisamos
+# checar `kill -0`).
+sleep 2
+if ! kill -0 "${DEV_PID}" 2>/dev/null; then
+  echo "ERRO: dev server morreu em <2s. Log:" >&2
+  cat /tmp/pre-deploy-dev.log >&2 || true
+  exit 1
+fi
+
+# Cold-start em cloud builder (2 vCPU, Neon serverless RT ~100ms, ~200
+# statements de migration, bundle Vite no boot via `setupVite`) chega
+# perto de 2min em pior caso. 180s dá folga.
 SERVER_READY=0
 WAIT_SECS=180
 for i in $(seq 1 ${WAIT_SECS}); do
@@ -130,12 +146,17 @@ for i in $(seq 1 ${WAIT_SECS}); do
     echo "Dev server respondeu após ${i}s"
     break
   fi
-  # A cada 30s, mostra as últimas 5 linhas do log do dev pra diagnosticar
-  # cold-start travado em vez de só esperar em silêncio.
-  if [ $((i % 30)) -eq 0 ]; then
+  # Detecta morte do processo (crash silencioso) sem esperar timeout completo.
+  if ! kill -0 "${DEV_PID}" 2>/dev/null; then
+    echo "ERRO: dev server morreu após ${i}s. Log completo:" >&2
+    cat /tmp/pre-deploy-dev.log >&2 || true
+    exit 1
+  fi
+  # A cada 15s, dump das últimas 20 linhas pra diagnosticar travada.
+  if [ $((i % 15)) -eq 0 ]; then
     echo "--- ainda esperando (${i}s/${WAIT_SECS}s), últimas linhas do dev server: ---"
-    tail -n 5 /tmp/pre-deploy-dev.log 2>/dev/null || true
-    echo "--- fim do snapshot ---"
+    tail -n 20 /tmp/pre-deploy-dev.log 2>/dev/null || true
+    echo "--- (processo $(kill -0 ${DEV_PID} 2>/dev/null && echo VIVO || echo MORTO)) fim do snapshot ---"
   fi
   sleep 1
 done
@@ -143,6 +164,7 @@ done
 if [ "${SERVER_READY}" -ne 1 ]; then
   echo "ERRO: dev server não respondeu em ${WAIT_SECS}s. Log completo:" >&2
   cat /tmp/pre-deploy-dev.log >&2 || true
+  echo "--- estado do processo: $(kill -0 ${DEV_PID} 2>/dev/null && echo VIVO || echo MORTO) ---" >&2
   exit 1
 fi
 
