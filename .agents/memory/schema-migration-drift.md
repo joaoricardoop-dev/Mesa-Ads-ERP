@@ -23,7 +23,10 @@ migration.
 
 **How to apply:** When you add/rename a column in `schema.ts`, append a
 reconcile migration. Precedent: `task_213_reconcile_products_table_with_schema`
-and `task_221_reconcile_quotations_table_with_schema`. To detect drift, diff
-`information_schema.columns` of a fresh `runMigrations()` DB against the
-schema-complete dev DB — any "missing in fresh" column is an un-migrated schema
-edit waiting to 500.
+and `task_221_reconcile_quotations_table_with_schema`. Drift is now caught
+automatically: the e2e spec `e2e/migrations-fresh-db.spec.ts` builds a fresh DB
+via `runMigrations()` and diffs `information_schema.columns` against every
+column declared in `drizzle/schema.ts` (via Drizzle introspection —
+`getTableColumns`/`getTableName`). Any column in `schema.ts` but missing from
+the fresh DB fails the test naming the exact `table.column`. Run it with
+`pnpm exec playwright test e2e/migrations-fresh-db.spec.ts`.
