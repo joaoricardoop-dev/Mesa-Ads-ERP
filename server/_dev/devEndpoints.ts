@@ -616,6 +616,162 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
     }
   });
 
+  // Task #218 — semeia uma cotação assinável com BV embutido (totalValue >
+  // soma dos itens brutos) e um cronograma de vencimentos LEGADO incoerente
+  // (parcelas vencendo antes do início do período). Usado pelo e2e
+  // public-signing-coerencia.spec.ts pra validar que a tela pública nunca
+  // mostra preços/vencimentos divergentes: o auto-heal do GET reconcilia os
+  // vencimentos e o front-end escala os itens para fechar com o total geral.
+  app.post("/api/dev-seed-signable-quotation", async (_req, res) => {
+    try {
+      if (!(await sentinelAllows(res))) return;
+      const { getDb } = await import("../db");
+      const {
+        clients,
+        products,
+        quotations,
+        quotationItems,
+        serviceOrders,
+        campaignBatches,
+        billingScheduleItems,
+      } = await import("../../drizzle/schema");
+      const db = await getDb();
+      if (!db) return res.status(500).json({ message: "Database not available." });
+
+      const stamp = Date.now();
+
+      // ISO YYYY-MM-DD helper (offset em dias a partir de hoje, UTC).
+      const isoDay = (offsetDays: number): string => {
+        const d = new Date();
+        d.setUTCDate(d.getUTCDate() + offsetDays);
+        return d.toISOString().slice(0, 10);
+      };
+
+      // Cliente
+      const [client] = await db
+        .insert(clients)
+        .values({ name: `E2E Cliente Assinatura ${stamp}` })
+        .returning({ id: clients.id });
+
+      // Produto com rótulo de unidade no plural
+      const [product] = await db
+        .insert(products)
+        .values({
+          name: `E2E Bolacha Premium ${stamp}`,
+          tipo: "impressos",
+          isActive: true,
+          visibleToAdvertisers: true,
+          unitLabelPlural: "bolachas",
+        })
+        .returning({ id: products.id });
+
+      // Período no futuro — qualquer vencimento legado antes disso é incoerente.
+      const periodStart = isoDay(40);
+      const periodEnd = isoDay(68);
+
+      // Batch (período) — necessário pro batchSelectionJson da OS.
+      const [batch] = await db
+        .insert(campaignBatches)
+        .values({
+          year: new Date().getUTCFullYear(),
+          batchNumber: 1,
+          label: `E2E Batch ${stamp}`,
+          startDate: periodStart,
+          endDate: periodEnd,
+          isActive: true,
+        })
+        .returning({ id: campaignBatches.id });
+
+      // Cotação: totalValue (4800) já traz BV/comissão de agência embutido —
+      // diverge da soma dos itens brutos (4000) → fator de escala 1.2.
+      const publicToken = `e2e-token-${stamp}-${Math.random().toString(36).slice(2, 10)}`;
+      const [quotation] = await db
+        .insert(quotations)
+        .values({
+          quotationNumber: `E2E-${stamp}`,
+          quotationName: `E2E Cotação BV ${stamp}`,
+          clientId: client.id,
+          productId: product.id,
+          status: "os_gerada",
+          totalValue: "4800.00",
+          agencyCommissionPercent: "20",
+          periodStart,
+          publicToken,
+        })
+        .returning({ id: quotations.id });
+
+      // Itens BRUTOS: soma = 4000.00 (≠ totalValue 4800.00).
+      await db.insert(quotationItems).values([
+        {
+          quotationId: quotation.id,
+          productId: product.id,
+          quantity: 2000,
+          unitPrice: "1.5000",
+          totalPrice: "3000.00",
+        },
+        {
+          quotationId: quotation.id,
+          productId: product.id,
+          quantity: 1000,
+          unitPrice: "1.0000",
+          totalPrice: "1000.00",
+        },
+      ]);
+
+      // OS vinculada com período no futuro + batch selecionado.
+      const [os] = await db
+        .insert(serviceOrders)
+        .values({
+          orderNumber: `E2E-OS-${stamp}`,
+          type: "anunciante",
+          clientId: client.id,
+          quotationId: quotation.id,
+          description: `E2E OS Assinatura ${stamp}`,
+          periodStart,
+          periodEnd,
+          totalValue: "4800.00",
+          status: "rascunho",
+          batchSelectionJson: JSON.stringify([batch.id]),
+          productId: product.id,
+        })
+        .returning({ id: serviceOrders.id });
+
+      // Cronograma LEGADO incoerente: parcelas vencendo antes do período.
+      // Σ parcelas = 4800.00 (bate com totalValue), mas vencimentos são
+      // anteriores ao início (today-10 e today+20 < periodStart today+40).
+      await db.insert(billingScheduleItems).values([
+        {
+          ownerType: "quotation",
+          ownerId: quotation.id,
+          sequence: 1,
+          amount: "2400.00",
+          dueDate: isoDay(-10),
+        },
+        {
+          ownerType: "quotation",
+          ownerId: quotation.id,
+          sequence: 2,
+          amount: "2400.00",
+          dueDate: isoDay(20),
+        },
+      ]);
+
+      res.json({
+        token: publicToken,
+        quotationId: quotation.id,
+        serviceOrderId: os.id,
+        clientId: client.id,
+        productId: product.id,
+        periodStart,
+        totalValue: "4800.00",
+      });
+    } catch (error) {
+      console.error("Dev seed signable quotation error:", error);
+      const detail = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ message: "Erro ao semear cotação assinável de teste.", detail });
+    }
+  });
+
   app.post("/api/dev-delete-user", async (req, res) => {
     try {
       if (!(await sentinelAllows(res))) return;

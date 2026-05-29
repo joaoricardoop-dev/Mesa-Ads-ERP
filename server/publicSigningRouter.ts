@@ -11,6 +11,7 @@ import {
   ensureDefaultQuotationSchedule,
   seedCampaignScheduleFromQuotation,
   readBillingSchedule,
+  reconcileQuotationScheduleDueDates,
 } from "./billingScheduleRouter";
 import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { TRPCError } from "@trpc/server";
@@ -111,8 +112,21 @@ export function setupPublicSigningRoutes(app: express.Express) {
         }
       }
 
+      // Task #218 — auto-heal de vencimentos legados incoerentes: se alguma
+      // parcela vence antes do início do período exibido (OS ou cotação),
+      // desloca o cronograma para acompanhar o período. Idempotente/no-op
+      // quando já coerente.
+      try {
+        await reconcileQuotationScheduleDueDates(
+          db,
+          quotation[0].id,
+          os[0].periodStart ?? (quotation[0] as any).periodStart ?? null,
+        );
+      } catch (e) {
+        console.warn("[public-signing] reconcileQuotationScheduleDueDates:", (e as Error)?.message);
+      }
+
       // Task #197 — inclui cronograma de pagamento.
-      const { readBillingSchedule } = await import("./billingScheduleRouter");
       const billingSchedule = await readBillingSchedule(db, "quotation", quotation[0].id);
 
       res.json({

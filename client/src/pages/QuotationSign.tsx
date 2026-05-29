@@ -239,6 +239,63 @@ export default function QuotationSign() {
   const q = data.quotation;
   const so = data.serviceOrder;
 
+  // Task #218 — o total geral (q.totalValue) já vem com BV/comissão de agência
+  // embutido, mas os preços/un e totais por linha em quotation_items são
+  // brutos. Derivamos um fator de escala (total final ÷ soma dos brutos) e o
+  // aplicamos a cada item para que: preço/un × qtd = total da linha, e a soma
+  // das linhas feche exatamente com o total geral exibido no rodapé.
+  const grandTotal = parseFloat(q?.totalValue || q?.value || "0");
+  const scaledItems = (() => {
+    const items = data.items || [];
+    const qtys = items.map((it) => it.quantity || 0);
+    const rawTotals = items.map((it) => (it.totalPrice ? parseFloat(it.totalPrice) : 0));
+    const rawUnits = items.map((it) => (it.unitPrice ? parseFloat(it.unitPrice) : 0));
+    const grandCents = Math.round(grandTotal * 100);
+
+    // Pesos para distribuir o total geral entre as linhas, em ordem de
+    // preferência: totalPrice bruto → unitPrice×qtd → distribuição uniforme.
+    // Garante que Σ(linhas) === total geral mesmo em dados legados onde os
+    // totais por item estejam zerados/ausentes (evita a tela pública mostrar
+    // soma das linhas diferente do total exibido no rodapé).
+    let weights = rawTotals;
+    let weightSum = weights.reduce((s, v) => s + v, 0);
+    if (!(weightSum > 0)) {
+      weights = items.map((_, i) => rawUnits[i] * qtys[i]);
+      weightSum = weights.reduce((s, v) => s + v, 0);
+    }
+    if (!(weightSum > 0) && items.length > 0) {
+      weights = items.map(() => 1);
+      weightSum = items.length;
+    }
+
+    const distribute = grandTotal > 0 && weightSum > 0;
+    const cents = distribute
+      ? weights.map((w) => Math.round((w / weightSum) * grandCents))
+      : rawTotals.map((r) => Math.round(r * 100));
+    if (distribute) {
+      // Joga a sobra/falta de arredondamento na última linha com peso > 0.
+      const diff = grandCents - cents.reduce((s, v) => s + v, 0);
+      if (diff !== 0) {
+        for (let i = cents.length - 1; i >= 0; i--) {
+          if (weights[i] > 0) {
+            cents[i] += diff;
+            break;
+          }
+        }
+      }
+    }
+
+    return items.map((it, i) => {
+      const lineTotal = cents[i] / 100;
+      const qty = it.quantity || 0;
+      const rawUnit = it.unitPrice ? parseFloat(it.unitPrice) : null;
+      // Deriva o preço/un do total final da linha para garantir consistência
+      // (un × qtd = total). Mantém o bruto se não houver quantidade.
+      const unit = qty > 0 ? lineTotal / qty : rawUnit;
+      return { ...it, scaledUnit: unit, scaledTotal: lineTotal };
+    });
+  })();
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center py-12" style={{ background: "hsl(0 0% 4%)" }}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -306,17 +363,19 @@ export default function QuotationSign() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.items.map((item, i) => (
-                        <tr key={i} className="border-b border-[hsl(0,0%,10%)]">
+                      {scaledItems.map((item, i) => (
+                        <tr key={i} className="border-b border-[hsl(0,0%,10%)]" data-testid={`linha-item-${i}`}>
                           <td className="py-2 text-white font-medium pr-3">{item.productName || "-"}</td>
-                          <td className="py-2 text-white text-right whitespace-nowrap">
+                          <td className="py-2 text-white text-right whitespace-nowrap" data-testid={`item-qtd-${i}`}>
                             {item.quantity.toLocaleString("pt-BR")} {item.unitLabelPlural || "unidades"}
                           </td>
-                          <td className="py-2 text-[hsl(0,0%,60%)] text-right whitespace-nowrap">
-                            {item.unitPrice ? formatCurrency(parseFloat(item.unitPrice)) : "-"}
+                          <td className="py-2 text-[hsl(0,0%,60%)] text-right whitespace-nowrap" data-testid={`item-unitario-${i}`}>
+                            {item.scaledUnit != null
+                              ? `R$ ${item.scaledUnit.toLocaleString("pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`
+                              : "-"}
                           </td>
-                          <td className="py-2 text-white text-right whitespace-nowrap">
-                            {item.totalPrice ? formatCurrency(parseFloat(item.totalPrice)) : "-"}
+                          <td className="py-2 text-white text-right whitespace-nowrap" data-testid={`item-total-${i}`}>
+                            {item.scaledTotal != null ? formatCurrency(item.scaledTotal) : "-"}
                           </td>
                         </tr>
                       ))}
@@ -330,7 +389,7 @@ export default function QuotationSign() {
                           {data.items.reduce((s, it) => s + it.quantity, 0).toLocaleString("pt-BR")} quantidade total
                         </td>
                         <td />
-                        <td className="pt-2 text-right text-white font-bold text-base">
+                        <td className="pt-2 text-right text-white font-bold text-base" data-testid="grand-total">
                           {formatCurrency(parseFloat(q?.totalValue || q?.value || "0"))}
                         </td>
                       </tr>
@@ -360,7 +419,7 @@ export default function QuotationSign() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-[hsl(0,0%,50%)]">Início</span>
-                    <span className="text-white font-medium">{formatDate(so?.periodStart || q?.periodStart)}</span>
+                    <span className="text-white font-medium" data-testid="periodo-inicio">{formatDate(so?.periodStart || q?.periodStart)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[hsl(0,0%,50%)]">Fim</span>
@@ -405,10 +464,10 @@ export default function QuotationSign() {
                   </thead>
                   <tbody>
                     {((data as any).billingSchedule as Array<{ sequence: number; amount: string; dueDate: string }>).map((it) => (
-                      <tr key={it.sequence} className="border-b border-[hsl(0,0%,10%)]">
+                      <tr key={it.sequence} className="border-b border-[hsl(0,0%,10%)]" data-testid={`parcela-${it.sequence}`}>
                         <td className="py-1.5 text-white font-mono">{it.sequence}</td>
-                        <td className="py-1.5 text-white">{formatDate(it.dueDate)}</td>
-                        <td className="py-1.5 text-white text-right font-mono">{formatCurrency(parseFloat(it.amount))}</td>
+                        <td className="py-1.5 text-white" data-testid={`parcela-venc-${it.sequence}`}>{formatDate(it.dueDate)}</td>
+                        <td className="py-1.5 text-white text-right font-mono" data-testid={`parcela-valor-${it.sequence}`}>{formatCurrency(parseFloat(it.amount))}</td>
                       </tr>
                     ))}
                   </tbody>

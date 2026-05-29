@@ -10,7 +10,7 @@ import crypto from "crypto";
 import { createCrmNotification } from "./notificationRouter";
 import { buildCampaignName } from "./utils/campaignName";
 import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
-import { ensureDefaultQuotationSchedule, seedCampaignScheduleFromQuotation, readBillingSchedule } from "./billingScheduleRouter";
+import { ensureDefaultQuotationSchedule, seedCampaignScheduleFromQuotation, readBillingSchedule, reconcileQuotationScheduleDueDates } from "./billingScheduleRouter";
 import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { withUniqueRetry, describeDbError } from "./utils/uniqueNumberRetry";
 import { nextNumber } from "./utils/numberCounter";
@@ -780,6 +780,14 @@ export const quotationRouter = router({
         .set({ status: "os_gerada", updatedAt: new Date() })
         .where(eq(quotations.id, input.id));
 
+      // Task #218 — reconcilia vencimentos para acompanhar o período da OS,
+      // evitando que a tela pública mostre vencimento anterior ao início.
+      try {
+        await reconcileQuotationScheduleDueDates(db, input.id, input.periodStart ?? quotation[0].periodStart);
+      } catch (e) {
+        console.warn("[generateOS] reconcileQuotationScheduleDueDates:", (e as Error)?.message);
+      }
+
       return { quotationId: input.id, serviceOrderId: os.id, orderNumber };
     }),
 
@@ -875,6 +883,15 @@ export const quotationRouter = router({
           status: "enviada",
           updatedAt: new Date(),
         }).where(eq(serviceOrders.id, os[0].id));
+      }
+
+      // Task #218 — o link público exibe o período dos batches selecionados;
+      // reconcilia os vencimentos da cotação para acompanhar esse início e não
+      // mostrar parcela com vencimento anterior ao começo do período.
+      try {
+        await reconcileQuotationScheduleDueDates(db, input.quotationId, batchRecords[0].startDate);
+      } catch (e) {
+        console.warn("[generateSigningLink] reconcileQuotationScheduleDueDates:", (e as Error)?.message);
       }
 
       const { appUrl } = await import("./_core/appUrl");

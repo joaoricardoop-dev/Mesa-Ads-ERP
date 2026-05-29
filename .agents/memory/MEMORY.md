@@ -1,0 +1,2 @@
+- [Silent try/catch swallows import errors](silent-catch-import-errors.md) — warn-only try/catch around helpers hides ReferenceError from missing imports; only real-path e2e catches it.
+- [Public signing coherence rules](public-signing-coherence.md) — public quotation/OS screens must never show divergent prices/due dates; final price (BV embedded) is the base.

@@ -18,6 +18,7 @@ import {
   sumSchedule,
   type BillingScheduleSuggestion,
   addDaysIso,
+  DEFAULT_DUE_OFFSET_DAYS,
 } from "../shared/billingSchedule";
 import { recordAudit } from "./finance/audit";
 
@@ -145,6 +146,54 @@ export async function ensureDefaultQuotationSchedule(
   });
   if (suggestion.length === 0) return;
   await replaceBillingSchedule(db, "quotation", quotationId, suggestion);
+}
+
+/**
+ * Task #218 — Reconcilia os vencimentos do schedule de uma cotação para
+ * acompanhar um novo `periodStart`, preservando a quantidade de parcelas, os
+ * valores e o espaçamento relativo entre elas. Só atua quando algum
+ * vencimento está incoerente (anterior ao início do período), deslocando todas
+ * as parcelas pelo mesmo delta de dias para que a primeira parcela vença em
+ * `periodStart + DEFAULT_DUE_OFFSET_DAYS`. Idempotente: se todos os
+ * vencimentos já são coerentes, é no-op (não mexe em schedules customizados
+ * que já estão alinhados ao período).
+ */
+export async function reconcileQuotationScheduleDueDates(
+  db: any,
+  quotationId: number,
+  periodStart: string | null | undefined,
+): Promise<{ reconciled: boolean }> {
+  if (!periodStart || periodStart.length < 10) return { reconciled: false };
+  const existing = await readBillingSchedule(db, "quotation", quotationId);
+  if (existing.length === 0) return { reconciled: false };
+
+  // Só reconcilia se houver vencimento anterior ao início do período.
+  const hasIncoherent = existing.some((r: any) => r.dueDate < periodStart);
+  if (!hasIncoherent) return { reconciled: false };
+
+  const sorted = [...existing].sort((a: any, b: any) => a.sequence - b.sequence);
+  // Âncora no vencimento MAIS CEDO (não no menor sequence). Sequence e ordem
+  // cronológica podem divergir em schedules customizados; deslocar pelo delta
+  // do menor sequence deixaria outra parcela ainda antes do início. Anchorar
+  // no mínimo garante que TODAS as parcelas fiquem >= periodStart após o shift.
+  const earliestDue = existing.reduce(
+    (min: string, r: any) => (r.dueDate < min ? r.dueDate : min),
+    existing[0].dueDate as string,
+  );
+  const targetEarliestDue = addDaysIso(periodStart, DEFAULT_DUE_OFFSET_DAYS);
+  const deltaDays = Math.round(
+    (Date.parse(`${targetEarliestDue}T00:00:00Z`) - Date.parse(`${earliestDue}T00:00:00Z`)) / 86_400_000,
+  );
+  if (deltaDays === 0) return { reconciled: false };
+
+  const items = sorted.map((r: any) => ({
+    sequence: r.sequence,
+    amount: r.amount,
+    dueDate: addDaysIso(r.dueDate, deltaDays),
+    notes: r.notes,
+  }));
+  await replaceBillingSchedule(db, "quotation", quotationId, items);
+  return { reconciled: true };
 }
 
 /**
