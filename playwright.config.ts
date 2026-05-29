@@ -1,4 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
+import { resolveTestDatabaseUrl } from "./e2e/test-db";
+
+// Quando rodamos contra um servidor já de pé (E2E_BASE_URL setado, ex.:
+// scripts/pre-deploy.sh), o próprio script já resolveu/validou o banco de
+// teste e exportou DATABASE_URL apontando para ele — então não gerenciamos
+// `webServer` aqui. Quando rodamos standalone (`pnpm run test:e2e`), nós
+// subimos o dev server e PRECISAMOS garantir que ele aponte para o banco de
+// teste isolado, nunca para a produção. `resolveTestDatabaseUrl()` valida a
+// configuração e lança um erro claro (host de produção, banco igual ao de
+// produção, ou configuração ausente) antes de qualquer teste rodar.
+const useExternalServer = !!process.env.E2E_BASE_URL;
+const testDatabaseUrl = resolveTestDatabaseUrl();
 
 export default defineConfig({
   testDir: "./e2e",
@@ -12,7 +24,7 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: process.env.E2E_BASE_URL
+  webServer: useExternalServer
     ? undefined
     : {
         command: "pnpm run dev",
@@ -21,6 +33,15 @@ export default defineConfig({
         timeout: 120_000,
         stdout: "ignore",
         stderr: "pipe",
+        // Força o dev server da suíte a usar o banco de teste isolado em vez
+        // da DATABASE_URL herdada do ambiente (que em produção/build seria o
+        // banco de produção). DEV_FIXTURES=1 registra os endpoints /api/dev-*.
+        env: {
+          ...process.env,
+          DATABASE_URL: testDatabaseUrl,
+          DATABASE_URL_TEST: testDatabaseUrl,
+          DEV_FIXTURES: "1",
+        },
       },
   projects: [
     // Roda uma única vez antes da suite: aquece o servidor + grava o
