@@ -90,5 +90,8 @@ Roda com `pnpm run test:e2e`. CI requer **todas as specs sem skip**.
 
 ## Deploy
 
-`scripts/pre-deploy.sh` roda os testes Playwright antes do build de
-produção. Falha em qualquer spec aborta o deploy.
+O build de deploy roda apenas `npm run build` (sem testes, sem subir
+dev server, sem tocar em banco). Os testes E2E foram **desacoplados do
+deploy** (Task #219): rode `scripts/pre-deploy.sh` (ou `pnpm run
+test:e2e`) MANUALMENTE antes de publicar para validar as specs Playwright
+contra o banco de teste isolado.

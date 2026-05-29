@@ -1,7 +1,10 @@
 #!/bin/bash
-# Roda os testes ponta-a-ponta (Playwright) antes de qualquer build de deploy.
-# Falha imediatamente se algum teste quebrar para impedir que regressões cheguem
-# em produção.
+# Ferramenta MANUAL de validação ponta-a-ponta (Playwright).
+#
+# DESACOPLADO DO DEPLOY (Task #219): este script NÃO é mais invocado pelo build
+# de deploy (que agora roda apenas `npm run build`). Rode-o sob demanda ANTES de
+# publicar para validar o checkout aberto e a coerência da tela de assinatura.
+# Falha imediatamente (exit ≠ 0) se algum teste quebrar.
 #
 # IMPORTANTE (Task #189 / #202): este script SOBE um dev server que expõe
 # endpoints /api/dev-* capazes de fazer INSERT real no banco. Defesas em
