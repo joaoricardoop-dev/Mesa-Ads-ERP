@@ -1732,6 +1732,20 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "updatedAt" timestamp DEFAULT now() NOT NULL;
     `,
   },
+  {
+    // Reconcilia `quotations` com o schema atual em `drizzle/schema.ts`.
+    // A coluna `manualDiscountPercent` foi adicionada ao schema.ts mas nunca
+    // ganhou um arquivo base do drizzle nem uma migration custom — então
+    // qualquer banco construído só por `runMigrations()` (ex.: o banco de
+    // teste E2E isolado) ficava sem ela. Como o drizzle ORM SEMPRE lista
+    // todas as colunas do schema no INSERT, isso quebrava com 500 qualquer
+    // insert em `quotations` vindo do ORM (ex.: o seed assinável dos testes).
+    // `IF NOT EXISTS` torna isto um no-op em DBs que já têm a coluna.
+    name: "task_221_reconcile_quotations_table_with_schema",
+    sql: `
+      ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "manualDiscountPercent" numeric(5, 2) DEFAULT '0';
+    `,
+  },
 ];
 
 export async function runMigrations() {

@@ -1,2 +1,3 @@
 - [Silent try/catch swallows import errors](silent-catch-import-errors.md) — warn-only try/catch around helpers hides ReferenceError from missing imports; only real-path e2e catches it.
 - [Public signing coherence rules](public-signing-coherence.md) — public quotation/OS screens must never show divergent prices/due dates; final price (BV embedded) is the base.
+- [Schema.ts vs runMigrations drift](schema-migration-drift.md) — new schema.ts columns need a custom migration too, else fresh/E2E DBs 500 on any ORM insert.
