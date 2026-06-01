@@ -3,6 +3,7 @@ import { financialRouter } from "./financialRouter";
 import { quotationRouter } from "./quotationRouter";
 import { billingScheduleRouter } from "./billingScheduleRouter";
 import { leadRouter } from "./leadRouter";
+import { opportunityRouter } from "./opportunityRouter";
 import { contactRouter } from "./contactRouter";
 import { serviceOrderRouter } from "./serviceOrderRouter";
 import { termRouter } from "./termRouter";
@@ -88,6 +89,7 @@ export const appRouter = router({
   quotation: quotationRouter,
   billingSchedule: billingScheduleRouter,
   lead: leadRouter,
+  opportunity: opportunityRouter,
   contact: contactRouter,
   serviceOrder: serviceOrderRouter,
   term: termRouter,

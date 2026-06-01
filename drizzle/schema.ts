@@ -556,6 +556,9 @@ export const quotations = pgTable("quotations", {
   customVipProviderId: integer("customVipProviderId").references(() => vipProviders.id, { onDelete: "set null" }),
   agencyCommissionPercent: decimal("agencyCommissionPercent", { precision: 5, scale: 2 }),
   source: varchar("source", { length: 50 }).default("internal"),
+  // Task #226 — vincula a cotação à oportunidade de origem (quando gerada
+  // a partir de uma oportunidade ganha no funil de Oportunidades).
+  opportunityId: integer("opportunityId").references((): any => opportunities.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -657,6 +660,20 @@ export const leads = pgTable("leads", {
   convertedToId: integer("convertedToId"),
   convertedToType: varchar("convertedToType", { length: 50 }),
   partnerId: integer("partnerId").references(() => partners.id, { onDelete: "set null" }),
+  // ── BANT + agendamento (pré-vendas/SDR — Task #226 fundação) ──────────
+  cargo: varchar("cargo", { length: 120 }),
+  decisionRole: varchar("decisionRole", { length: 30 }),
+  produtoInteresse: varchar("produtoInteresse", { length: 120 }),
+  praca: varchar("praca", { length: 20 }),
+  budgetEstimado: decimal("budgetEstimado", { precision: 12, scale: 2 }),
+  timing: varchar("timing", { length: 60 }),
+  objecoes: text("objecoes"),
+  meetingScheduledAt: timestamp("meetingScheduledAt"),
+  meetingLink: varchar("meetingLink", { length: 500 }),
+  disqualifyReason: varchar("disqualifyReason", { length: 40 }),
+  // ── Farming ────────────────────────────────────────────────────────────
+  farmingStatus: varchar("farmingStatus", { length: 20 }),
+  farmingTags: text("farmingTags"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -667,6 +684,40 @@ export const leads = pgTable("leads", {
 
 export type Lead = typeof leads.$inferSelect;
 export type InsertLead = typeof leads.$inferInsert;
+
+// ─── Opportunities (negócios do anunciante — Task #226) ──────────────────────
+// Um anunciante pode ter várias oportunidades simultâneas. Funil próprio
+// (qualificada → reuniao_realizada → proposta → negociacao → ganha → perdida),
+// independente do funil de leads. `stage` é varchar livre (sem enum).
+
+export const opportunities = pgTable("opportunities", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  clientId: integer("clientId").references(() => clients.id, { onDelete: "set null" }),
+  leadId: integer("leadId").references(() => leads.id, { onDelete: "set null" }),
+  stage: varchar("stage", { length: 50 }).default("qualificada").notNull(),
+  estimatedValue: decimal("estimatedValue", { precision: 12, scale: 2 }),
+  expectedCloseDate: date("expectedCloseDate"),
+  ownerId: varchar("ownerId", { length: 255 }),
+  opportunityType: varchar("opportunityType", { length: 20 }),
+  revenueType: varchar("revenueType", { length: 20 }),
+  praca: varchar("praca", { length: 20 }),
+  lossReason: text("lossReason"),
+  source: varchar("source", { length: 50 }),
+  farmingStatus: varchar("farmingStatus", { length: 20 }),
+  farmingTags: text("farmingTags"),
+  partnerId: integer("partnerId").references(() => partners.id, { onDelete: "set null" }),
+  createdBy: varchar("createdBy", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_opportunities_stage").on(t.stage),
+  index("idx_opportunities_client_id").on(t.clientId),
+  index("idx_opportunities_owner_id").on(t.ownerId),
+]);
+
+export type Opportunity = typeof opportunities.$inferSelect;
+export type InsertOpportunity = typeof opportunities.$inferInsert;
 
 // ─── Lead Interactions ───────────────────────────────────────────────────────
 

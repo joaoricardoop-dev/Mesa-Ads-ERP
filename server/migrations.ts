@@ -1746,6 +1746,61 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "manualDiscountPercent" numeric(5, 2) DEFAULT '0';
     `,
   },
+  {
+    // Task #226 — fundação CRM: tabela `opportunities` (funil de negócios do
+    // anunciante, vários por cliente). `stage` é varchar livre (sem enum).
+    name: "task_226_create_opportunities_table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS "opportunities" (
+        "id" SERIAL PRIMARY KEY NOT NULL,
+        "title" VARCHAR(255) NOT NULL,
+        "clientId" INTEGER REFERENCES "clients"("id") ON DELETE SET NULL,
+        "leadId" INTEGER REFERENCES "leads"("id") ON DELETE SET NULL,
+        "stage" VARCHAR(50) NOT NULL DEFAULT 'qualificada',
+        "estimatedValue" NUMERIC(12,2),
+        "expectedCloseDate" DATE,
+        "ownerId" VARCHAR(255),
+        "opportunityType" VARCHAR(20),
+        "revenueType" VARCHAR(20),
+        "praca" VARCHAR(20),
+        "lossReason" TEXT,
+        "source" VARCHAR(50),
+        "farmingStatus" VARCHAR(20),
+        "farmingTags" TEXT,
+        "partnerId" INTEGER REFERENCES "partners"("id") ON DELETE SET NULL,
+        "createdBy" VARCHAR(255),
+        "createdAt" TIMESTAMP DEFAULT NOW() NOT NULL,
+        "updatedAt" TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_opportunities_stage" ON "opportunities" ("stage");
+      CREATE INDEX IF NOT EXISTS "idx_opportunities_client_id" ON "opportunities" ("clientId");
+      CREATE INDEX IF NOT EXISTS "idx_opportunities_owner_id" ON "opportunities" ("ownerId");
+    `,
+  },
+  {
+    // Task #226 — liga a cotação à oportunidade de origem.
+    name: "task_226_add_opportunity_id_to_quotations",
+    sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "opportunityId" INTEGER REFERENCES "opportunities"("id") ON DELETE SET NULL;`,
+  },
+  {
+    // Task #226 — campos BANT + agendamento + farming em `leads` (usados
+    // pelas próximas tarefas da série; adicionados já na fundação).
+    name: "task_226_add_bant_farming_fields_to_leads",
+    sql: `
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "cargo" VARCHAR(120);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "decisionRole" VARCHAR(30);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "produtoInteresse" VARCHAR(120);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "praca" VARCHAR(20);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "budgetEstimado" NUMERIC(12,2);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "timing" VARCHAR(60);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "objecoes" TEXT;
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "meetingScheduledAt" TIMESTAMP;
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "meetingLink" VARCHAR(500);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "disqualifyReason" VARCHAR(40);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "farmingStatus" VARCHAR(20);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "farmingTags" TEXT;
+    `,
+  },
 ];
 
 export async function runMigrations() {

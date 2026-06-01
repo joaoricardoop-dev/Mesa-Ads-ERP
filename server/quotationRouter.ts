@@ -251,6 +251,7 @@ export const quotationRouter = router({
     .input(z.object({
       clientId: z.number().optional(),
       leadId: z.number().optional(),
+      opportunityId: z.number().optional(),
       coasterVolume: z.number().int().min(0),
       manualDiscountPercent: z.string().optional(),
       networkProfile: z.string().optional(),
@@ -348,6 +349,7 @@ export const quotationRouter = router({
         quotationName,
         clientId: input.clientId ?? null,
         leadId: input.leadId ?? null,
+        opportunityId: input.opportunityId ?? null,
         coasterVolume: input.coasterVolume ?? 0,
         manualDiscountPercent: input.manualDiscountPercent ?? "0",
         networkProfile: input.networkProfile,

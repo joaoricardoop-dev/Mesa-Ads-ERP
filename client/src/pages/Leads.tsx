@@ -59,8 +59,10 @@ import {
   LayoutGrid,
   List,
   ArrowUpDown,
+  Briefcase,
 } from "lucide-react";
 import { toast } from "sonner";
+import OpportunitiesBoard from "./OpportunitiesBoard";
 
 const STAGES = [
   { key: "novo", label: "Novo", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
@@ -263,7 +265,7 @@ function formatCnpj(cnpj: string): string {
 
 export default function Leads() {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<LeadType>("anunciante");
+  const [activeTab, setActiveTab] = useState<LeadType | "oportunidades">("anunciante");
   const [createOpen, setCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState<"cnpj" | "form">("form");
   const [cnpjInput, setCnpjInput] = useState("");
@@ -297,7 +299,10 @@ export default function Leads() {
 
   const utils = trpc.useUtils();
 
-  const leadsQuery = trpc.lead.list.useQuery({ type: activeTab });
+  const leadsQuery = trpc.lead.list.useQuery(
+    { type: activeTab as LeadType },
+    { enabled: activeTab !== "oportunidades" },
+  );
   const leads = leadsQuery.data ?? [];
 
   const selectedLead = trpc.lead.get.useQuery(
@@ -651,7 +656,7 @@ export default function Leads() {
   }
 
   function openCreateDialog() {
-    const newForm = { ...emptyForm, type: activeTab };
+    const newForm = { ...emptyForm, type: activeTab as LeadType };
     setFormData(newForm);
     setCnpjInput("");
     setCnpjFetched(false);
@@ -1174,13 +1179,15 @@ export default function Leads() {
       title="Leads"
       description="CRM e pipeline de vendas"
       actions={
-        <Button size="sm" onClick={openCreateDialog}>
-          <Plus className="w-4 h-4 mr-1" />
-          Novo Lead
-        </Button>
+        activeTab !== "oportunidades" ? (
+          <Button size="sm" onClick={openCreateDialog}>
+            <Plus className="w-4 h-4 mr-1" />
+            Novo Lead
+          </Button>
+        ) : null
       }
     >
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeadType)}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeadType | "oportunidades")}>
         <div className="flex items-center justify-between gap-2">
           <TabsList>
             <TabsTrigger value="anunciante" className="gap-1.5">
@@ -1191,30 +1198,36 @@ export default function Leads() {
               <UtensilsCrossed className="w-3.5 h-3.5" />
               Locais
             </TabsTrigger>
+            <TabsTrigger value="oportunidades" className="gap-1.5">
+              <Briefcase className="w-3.5 h-3.5" />
+              Oportunidades
+            </TabsTrigger>
           </TabsList>
 
-          <div className="flex items-center rounded-md border border-border overflow-hidden">
-            <button
-              onClick={() => setViewMode("kanban")}
-              className={`flex items-center gap-1.5 px-2.5 h-8 text-xs transition-colors ${viewMode === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-              title="Visão Kanban"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Kanban</span>
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`flex items-center gap-1.5 px-2.5 h-8 text-xs transition-colors border-l border-border ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-              title="Visão em Lista"
-            >
-              <List className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Lista</span>
-            </button>
-          </div>
+          {activeTab !== "oportunidades" && (
+            <div className="flex items-center rounded-md border border-border overflow-hidden">
+              <button
+                onClick={() => setViewMode("kanban")}
+                className={`flex items-center gap-1.5 px-2.5 h-8 text-xs transition-colors ${viewMode === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                title="Visão Kanban"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Kanban</span>
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`flex items-center gap-1.5 px-2.5 h-8 text-xs transition-colors border-l border-border ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                title="Visão em Lista"
+              >
+                <List className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Lista</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <TabsContent value={activeTab} className="mt-4">
-          {viewMode === "list" ? renderListView() : (
+          {activeTab === "oportunidades" ? <OpportunitiesBoard /> : viewMode === "list" ? renderListView() : (
           <div className="overflow-x-auto pb-4 -mx-2 px-2">
             <div className="inline-flex gap-3">
               {leadsByStage.map((column) => {
