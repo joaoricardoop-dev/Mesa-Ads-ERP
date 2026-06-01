@@ -1,0 +1,184 @@
+O usuário pediu o prompt por escrito no chat e não quer nada no repo. Vou remover o arquivo que criei (resolvendo também o aviso de arquivo não rastreado) e colar o prompt aqui.
+
+Removido — o repo está limpo. Aqui está o prompt completo por escrito:
+
+---
+
+# Prompt para o Replit — Reestruturação do CRM (Funis, Farming, Contatos, Export, Notificações)
+
+## Objetivo
+
+A aba **Leads** (`client/src/pages/Leads.tsx`) hoje é genérica demais: uma única tabela `leads` com `type` (anunciante|restaurante) usa **os mesmos 7 estágios** (`novo → contato → qualificado → proposta → negociacao → ganho → perdido`) para motions de venda completamente diferentes, e o registro é centrado na empresa, não no negócio.
+
+Reestruture o CRM em **cinco abas** dentro de `Leads.tsx`:
+
+```
+Pré-vendas (SDR) | Oportunidades | Locais | Farming | Contatos
+```
+
+Não quebre os fluxos existentes que dependem de `leads`/`quotations` (cotações, conversão para `activeRestaurant`, notificações de parceiro). `stage` é uma `varchar` livre (`drizzle/schema.ts:486`) — cada funil usa seu próprio conjunto de chaves, sem migração de enum.
+
+---
+
+## 1. Funil de Oportunidades (anunciante) — TABELA NOVA
+
+### Schema (`drizzle/schema.ts`)
+Criar tabela `opportunities`:
+
+```ts
+export const opportunities = pgTable("opportunities", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
+  leadId: integer("lead_id").references(() => leads.id, { onDelete: "set null" }),
+  stage: varchar("stage", { length: 50 }).default("qualificada").notNull(),
+  estimatedValue: decimal("estimated_value", { precision: 12, scale: 2 }),
+  expectedCloseDate: date("expected_close_date"),
+  ownerId: varchar("owner_id", { length: 255 }), // FK users (closer)
+  opportunityType: varchar("opportunity_type", { length: 20 }), // new|upsell|renewal
+  revenueType: varchar("revenue_type", { length: 20 }),         // mrr|oneshot
+  praca: varchar("praca", { length: 20 }),                      // manaus|rio|ambas
+  lossReason: text("loss_reason"),
+  source: varchar("source", { length: 50 }),
+  farmingStatus: varchar("farming_status", { length: 20 }),     // ativo|pausado|null
+  farmingTags: text("farming_tags"),
+  partnerId: integer("partner_id").references(() => partners.id, { onDelete: "set null" }),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_opportunities_stage").on(t.stage),
+  index("idx_opportunities_client_id").on(t.clientId),
+  index("idx_opportunities_owner_id").on(t.ownerId),
+]);
+export type Opportunity = typeof opportunities.$inferSelect;
+export type InsertOpportunity = typeof opportunities.$inferInsert;
+```
+
+Adicionar em `quotations`: `opportunityId: integer("opportunity_id").references(() => opportunities.id, { onDelete: "set null" })`.
+
+Rodar `npm run db:push`.
+
+### Estágios (frontend, constante)
+`qualificada → reuniao_realizada → proposta → negociacao → ganha → perdida`
+
+### Backend — `server/opportunityRouter.ts` (novo)
+Espelhar `server/leadRouter.ts` (mesmos padrões de `getDatabase`, `comercialProcedure`, joins com users/clients/partners): `list` (filtros stage/ownerId/clientId/farmingStatus), `get`, `create`, `update`, `changeStage` (registra interação + notificação como em `leadRouter.changeStage`), `delete`, `exportCsv` (ver seção 6). Registrar em `server/routers.ts`.
+
+### Frontend
+Aba "Oportunidades" em `Leads.tsx` com o mesmo board kanban já usado (reaproveitar o componente de coluna/drag atual), sobre os 6 estágios. O mesmo anunciante pode ter várias oportunidades simultâneas. Ao marcar `ganha`, permitir gerar `quotation` ligada por `opportunityId`.
+
+---
+
+## 2. Funil de Pré-vendas (SDR) — leads `type=anunciante`
+
+### Estágios (frontend, constante)
+`novo → em_cadencia → conectado → qualificacao_bant → reuniao_agendada → qualificado_handoff → desqualificado`
+
+### Campos novos em `leads` (`drizzle/schema.ts`)
+```ts
+cargo: varchar("cargo", { length: 120 }),
+decisionRole: varchar("decision_role", { length: 30 }),   // decisor|influenciador
+produtoInteresse: varchar("produto_interesse", { length: 120 }),
+praca: varchar("praca", { length: 20 }),                  // manaus|rio|ambas
+budgetEstimado: decimal("budget_estimado", { precision: 12, scale: 2 }),
+timing: varchar("timing", { length: 60 }),
+objecoes: text("objecoes"),
+meetingScheduledAt: timestamp("meeting_scheduled_at"),
+meetingLink: varchar("meeting_link", { length: 500 }),
+disqualifyReason: varchar("disqualify_reason", { length: 40 }), // sem_budget|sem_autoridade|timing|sem_fit
+farmingStatus: varchar("farming_status", { length: 20 }),
+farmingTags: text("farming_tags"),
+```
+Expandir as opções de `origin` no frontend: `cold_wa`, `linkedin`, `inbound_ig`, `qr_sala_vip` (além das existentes).
+
+### Handoff (SDR → closer)
+No estágio `qualificado_handoff`, botão **"Passar para o closer"**:
+1. Cria uma `opportunity` (stage `qualificada`) copiando dados do lead: `clientId`, `leadId`, `title` = `company || name`, `praca`, `opportunityType`, `source`, `ownerId` (closer selecionado).
+2. Marca o lead: `convertedToType="opportunity"`, `convertedToId=opportunity.id`.
+3. Dispara notificações (ver seção 7).
+
+### Frontend
+Aba "Pré-vendas" com kanban nos estágios SDR. Formulário de lead ganha os campos BANT (cargo, decisor/influenciador, produto, praça, budget, timing, objeções, reunião data/hora/link). Campo de motivo ao mover para `desqualificado`.
+
+---
+
+## 3. Funil de Locais — leads `type=restaurante`, estágios novos
+
+### Estágios (frontend, constante)
+`novo_mapeado → contato_inicial → visita_agendada → visita_realizada → negociacao → contrato_assinado → ativo_rede / perdido`
+
+`ativo_rede` mantém o fluxo de conversão atual para `activeRestaurant` (dialog em `Leads.tsx` ~684-722). Apenas renomear/expandir os estágios; não mexer na conversão.
+
+### Frontend
+Aba "Locais" com kanban nos estágios de venue.
+
+---
+
+## 4. Aba Farming (marcação manual)
+
+Escopo enxuto: **só marcação manual + tags**, sem cadências automáticas nem envio.
+- Já adicionados `farmingStatus`/`farmingTags` em `leads` e `opportunities`.
+- Botões nos cards dos outros funis: "Marcar para farming" / "Remover do farming" (set `farmingStatus`).
+- Aba "Farming": lista unificada de leads + oportunidades com `farmingStatus=ativo`, filtrável por tag/canal pretendido, com o botão de **Export CSV** (seção 6) para gerar o segmento de disparo na ferramenta externa (RD Station / WhatsApp).
+
+---
+
+## 5. Contatos unificados (tabela `contacts` já existe)
+
+**Problema:** os campos `contactName/contactPhone/contactEmail/contactWhatsApp` ficam inline na linha de `leads` e NÃO populam `contacts` (que já tem FKs `clientId/restaurantId/leadId`, `name/email/phone/role/isPrimary`).
+
+**Fazer:**
+1. Em `leadRouter.create`/`update` e `opportunityRouter.create`/`update`: **upsert** em `contacts` sempre que houver dados de contato — linkar por `leadId`/`clientId`. Marcar `isPrimary=true` no primeiro contato do vínculo. Mesma lógica nos fluxos de `clientRouter` e onboarding de restaurante.
+2. **Backfill:** migração única que varre `leads` existentes com contato preenchido e cria os `contacts` correspondentes (idempotente — não duplicar se já existir mesmo email/phone no vínculo).
+3. Aba "Contatos" em `Leads.tsx`: diretório unificado lendo de `contactRouter` (estender com `listAll` + busca + filtro por tipo de vínculo: anunciante/local/oportunidade), com Export CSV.
+
+---
+
+## 6. Export CSV por filtro de data
+
+- Em `leadRouter`, `opportunityRouter` e `contactRouter`: procedure `exportCsv` que aceita `{ dateFrom?, dateTo?, ...filtros }` sobre `createdAt` e retorna os registros (ou uma string CSV pronta).
+- Frontend: botão "Exportar CSV" em cada aba, com seletor de intervalo de datas. Gerar/baixar o CSV com as colunas relevantes do funil/contatos.
+
+---
+
+## 7. Notificações no handoff SDR → closer (app + email)
+
+Disparar quando o lead é qualificado e passado para o closer (na ação de handoff da seção 2).
+
+### In-app (infra existe)
+Reusar `createCrmNotification` (`server/notificationRouter.ts:17`) com `eventType="lead_qualified_handoff"`, mensagem "Lead {empresa} qualificado por {SDR} → atribuído a {closer}", linkando `leadId`/`clientId`. **Estender o enum** de `notificationRouter.list` (linha 86) para incluir `lead_qualified_handoff`. O sino da UI já consome `list`/`unreadCount`.
+
+### Email (não existe infra — adicionar)
+- Adicionar **Resend**: `npm i resend`, env `RESEND_API_KEY`. Criar `server/email.ts` com `sendEmail({ to, subject, html })`, tudo em try/catch.
+- No handoff: enviar email ao **closer** (email vindo de `users` via `ownerId`), com resumo do BANT (cargo, budget, timing, produto, objeções) + link da reunião. Opcional: cópia ao SDR.
+- **Degradação graciosa:** se `RESEND_API_KEY` não estiver setada, logar e seguir apenas com a notificação in-app (não bloquear o handoff).
+
+---
+
+## Arquivos a tocar (resumo)
+
+- `drizzle/schema.ts` — nova `opportunities`; campos BANT + farming em `leads`; `opportunityId` em `quotations`; `npm run db:push`
+- `server/opportunityRouter.ts` (novo), `server/email.ts` (novo), `server/routers.ts` (registrar)
+- `server/leadRouter.ts` — handoff, upsert de contatos, export, estágios por tipo
+- `server/notificationRouter.ts` — evento `lead_qualified_handoff` (helper + enum de `list`)
+- `server/contactRouter.ts` — `listAll`, busca/filtro, export
+- `client/src/pages/Leads.tsx` — 5 abas, 3 conjuntos de estágios, farming, export, formulário BANT, handoff
+- `client/src/pages/ParceiroLeads.tsx` — alinhar estágios (espelho)
+
+## Critérios de aceite
+
+1. **Pré-vendas:** criar lead anunciante → mover até `qualificado_handoff` → "Passar para o closer" cria oportunidade em `qualificada`.
+2. **Oportunidades:** o mesmo anunciante aparece em 2 oportunidades simultâneas; ganhar uma gera cotação ligada por `opportunityId`.
+3. **Locais:** estágios de venue (visita, contrato) presentes; `ativo_rede` converte em `activeRestaurant` pelo fluxo atual.
+4. **Farming:** marcar lead "para farming" → aparece na aba Farming; exportar segmento CSV.
+5. **Contatos:** qualquer contato inputado em lead/oportunidade/cliente aparece na aba Contatos; backfill traz os antigos sem duplicar.
+6. **Export CSV:** filtro de data retorna apenas registros no intervalo.
+7. **Handoff:** notificação in-app no sino do closer **e** email enviado (ou só in-app se `RESEND_API_KEY` ausente).
+
+## Restrições
+
+- Não renomear tabelas do banco; só adicionar colunas/tabelas via schema + `npm run db:push`.
+- Não usar React Router (o projeto usa Wouter). Não criar Context API para dados remotos (usar tRPC + React Query).
+- Reaproveitar componentes de kanban/board e padrões já existentes em `Leads.tsx`.
+- Manter os fluxos atuais de cotação, conversão de restaurante e notificações de parceiro funcionando.
