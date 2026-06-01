@@ -1801,6 +1801,20 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "farmingTags" TEXT;
     `,
   },
+  {
+    // Task #228 — funil de Locais (restaurantes). Mapeia os estágios genéricos
+    // legados dos leads type=restaurante para o novo conjunto de estágios de
+    // ponto de venda, sem perder registros. Estágios já compartilhados
+    // (negociacao/perdido) ficam intactos. Idempotente: após rodar, os estágios
+    // de origem não existem mais para restaurantes.
+    name: "task_228_map_restaurante_leads_to_venue_stages",
+    sql: `
+      UPDATE "leads" SET "stage" = 'novo_mapeado' WHERE "type" = 'restaurante' AND "stage" = 'novo';
+      UPDATE "leads" SET "stage" = 'contato_inicial' WHERE "type" = 'restaurante' AND "stage" IN ('contato', 'qualificado');
+      UPDATE "leads" SET "stage" = 'negociacao' WHERE "type" = 'restaurante' AND "stage" = 'proposta';
+      UPDATE "leads" SET "stage" = 'ativo_rede' WHERE "type" = 'restaurante' AND "stage" = 'ganho';
+    `,
+  },
 ];
 
 export async function runMigrations() {

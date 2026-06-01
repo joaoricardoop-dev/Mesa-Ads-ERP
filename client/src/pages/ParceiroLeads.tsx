@@ -45,14 +45,18 @@ type PriceDiscountTier = PriceTableProduct["discountTiers"][number];
 type LeadDetailQuotation = LeadDetail["quotations"][number];
 type StageHistoryItem = LeadDetail["stageHistory"][number];
 
+// Leads indicados por parceiros são sempre do tipo "anunciante", então o
+// pipeline do parceiro espelha o funil de Pré-vendas (SDR) usado internamente
+// (Task #227/#228). Estágios legados (ganho/contato/etc.) ainda renderizam via
+// fallback em getStageConfig para não sumir leads antigos.
 const STAGES = [
   { key: "novo", label: "Novo", color: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
-  { key: "contato", label: "Contato", color: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" },
-  { key: "qualificado", label: "Qualificado", color: "bg-purple-500/10 text-purple-400 border-purple-500/30" },
-  { key: "proposta", label: "Proposta", color: "bg-orange-500/10 text-orange-400 border-orange-500/30" },
-  { key: "negociacao", label: "Negociação", color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30" },
-  { key: "ganho", label: "Ganho", color: "bg-green-500/10 text-green-400 border-green-500/30" },
-  { key: "perdido", label: "Perdido", color: "bg-red-500/10 text-red-400 border-red-500/30" },
+  { key: "em_cadencia", label: "Em cadência", color: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" },
+  { key: "conectado", label: "Conectado", color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30" },
+  { key: "qualificacao_bant", label: "Qualificação BANT", color: "bg-purple-500/10 text-purple-400 border-purple-500/30" },
+  { key: "reuniao_agendada", label: "Reunião agendada", color: "bg-orange-500/10 text-orange-400 border-orange-500/30" },
+  { key: "qualificado_handoff", label: "Qualificado (handoff)", color: "bg-green-500/10 text-green-400 border-green-500/30" },
+  { key: "desqualificado", label: "Desqualificado", color: "bg-red-500/10 text-red-400 border-red-500/30" },
 ] as const;
 
 type StageKey = (typeof STAGES)[number]["key"];
@@ -764,7 +768,7 @@ export default function ParceiroLeads() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
           {STAGES.filter((s) => {
             if (stageFilter !== "all") return s.key === stageFilter;
-            return (leadsByStage[s.key]?.length ?? 0) > 0 || ["novo", "contato", "qualificado"].includes(s.key);
+            return (leadsByStage[s.key]?.length ?? 0) > 0 || ["novo", "em_cadencia", "conectado"].includes(s.key);
           }).map((stage) => (
             <div key={stage.key} className="space-y-2">
               <div className="flex items-center justify-between px-1">

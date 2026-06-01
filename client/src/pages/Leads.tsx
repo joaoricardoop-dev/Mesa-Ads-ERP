@@ -85,10 +85,22 @@ const SDR_STAGES = [
   { key: "desqualificado", label: "Desqualificado", color: "bg-red-500/10 text-red-500 border-red-500/20" },
 ] as const;
 
-const ALL_STAGES = [...STAGES, ...SDR_STAGES];
+// Funil de Locais (venue / ponto de venda) — leads do tipo restaurante (Task #228).
+const VENUE_STAGES = [
+  { key: "novo_mapeado", label: "Novo mapeado", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+  { key: "contato_inicial", label: "Contato inicial", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" },
+  { key: "visita_agendada", label: "Visita agendada", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
+  { key: "visita_realizada", label: "Visita realizada", color: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20" },
+  { key: "negociacao", label: "Negociação", color: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20" },
+  { key: "contrato_assinado", label: "Contrato assinado", color: "bg-teal-500/10 text-teal-500 border-teal-500/20" },
+  { key: "ativo_rede", label: "Ativo na rede", color: "bg-green-500/10 text-green-500 border-green-500/20" },
+  { key: "perdido", label: "Perdido", color: "bg-red-500/10 text-red-500 border-red-500/20" },
+] as const;
+
+const ALL_STAGES = [...STAGES, ...SDR_STAGES, ...VENUE_STAGES];
 
 function stagesForType(type: string | null | undefined) {
-  return type === "restaurante" ? STAGES : SDR_STAGES;
+  return type === "restaurante" ? VENUE_STAGES : SDR_STAGES;
 }
 
 // Remove campos BANT vazios para não violar os enums/decimais do backend.
@@ -496,7 +508,7 @@ export default function Leads() {
       if (selectedLeadId) {
         markLeadConverted.mutate({
           id: selectedLeadId,
-          stage: "ganho",
+          stage: "ativo_rede",
           convertedToId: data.id,
           convertedToType: "restaurante",
         });
@@ -626,6 +638,7 @@ export default function Leads() {
       return;
     }
     const payload: any = sanitizeLeadPayload({ ...formData, type: activeTab });
+    payload.stage = stagesForType(activeTab)[0].key;
     if (formData.clientId) {
       payload.clientId = formData.clientId;
       if (!payload.opportunityType) payload.opportunityType = "upsell";
@@ -663,6 +676,18 @@ export default function Leads() {
       setHandoffCloserId("");
       setHandoffLeadId(leadId);
       return;
+    }
+    // Mover um local para "Ativo na rede" dispara o fluxo de conversão para
+    // activeRestaurant (em vez de só gravar o estágio). Se já convertido, segue
+    // gravando normalmente.
+    if (stage === "ativo_rede") {
+      const lead = leads.find((l) => l.id === leadId);
+      if (lead && lead.type === "restaurante" && lead.convertedToId == null) {
+        prefillConvertForm(lead);
+        setSelectedLeadId(leadId);
+        setConvertOpen(true);
+        return;
+      }
     }
     changeStageMutation.mutate({ id: leadId, stage });
   }
@@ -766,9 +791,7 @@ export default function Leads() {
     setCreateOpen(true);
   }
 
-  function handleConvertRestaurant() {
-    if (!selectedLead.data) return;
-    const lead = selectedLead.data;
+  function prefillConvertForm(lead: any) {
     const fullAddress = [lead.address, lead.addressNumber].filter(Boolean).join(", ");
     setConvertForm({
       ...emptyConvertRestaurantForm,
@@ -780,6 +803,11 @@ export default function Leads() {
       whatsapp: lead.contactWhatsApp || "",
       email: lead.contactEmail || "",
     });
+  }
+
+  function handleConvertRestaurant() {
+    if (!selectedLead.data) return;
+    prefillConvertForm(selectedLead.data);
     setConvertOpen(true);
   }
 
@@ -870,7 +898,7 @@ export default function Leads() {
     }));
   };
 
-  const boardStages = activeTab === "restaurante" ? STAGES : SDR_STAGES;
+  const boardStages = activeTab === "restaurante" ? VENUE_STAGES : SDR_STAGES;
 
   const leadsByStage = boardStages.map((stage) => ({
     ...stage,
@@ -970,7 +998,7 @@ export default function Leads() {
                 </tr>
               )}
               {sortedLeads.map((lead) => {
-                const stage = STAGES.find((s) => s.key === lead.stage);
+                const stage = ALL_STAGES.find((s) => s.key === lead.stage);
                 const isSelected = lead.id === selectedLeadId;
                 return (
                   <tr
@@ -1450,7 +1478,7 @@ export default function Leads() {
                 const isCollapsed = collapsedStages.includes(column.key);
                 const isFirstCol = colIdx === 0;
                 const isLastCol = colIdx === boardStages.length - 1;
-                const isTerminalCol = ["ganho", "perdido", "qualificado_handoff", "desqualificado"].includes(column.key);
+                const isTerminalCol = ["ganho", "perdido", "qualificado_handoff", "desqualificado", "ativo_rede"].includes(column.key);
                 const toggleCollapse = () => setCollapsedStages((prev) =>
                   prev.includes(column.key) ? prev.filter((s) => s !== column.key) : [...prev, column.key]
                 );
