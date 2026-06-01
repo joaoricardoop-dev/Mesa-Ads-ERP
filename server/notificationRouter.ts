@@ -134,7 +134,7 @@ export const notificationRouter = router({
     .input(z.object({
       limit: z.number().int().min(1).max(100).default(50),
       offset: z.number().int().min(0).default(0),
-      eventType: z.enum(["lead_created", "stage_changed", "quotation_created"]).optional(),
+      eventType: z.enum(["lead_created", "stage_changed", "quotation_created", "lead_qualified_handoff"]).optional(),
       unreadOnly: z.boolean().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {

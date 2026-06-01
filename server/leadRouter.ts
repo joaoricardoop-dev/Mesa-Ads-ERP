@@ -1,11 +1,12 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { leads, leadInteractions, clients, partners } from "../drizzle/schema";
+import { leads, leadInteractions, clients, partners, opportunities } from "../drizzle/schema";
 import { users } from "../shared/models/auth";
 import { eq, desc, and, ne, sql, or, ilike } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
+import { sendEmail } from "./email";
 
 async function getDatabase() {
   const d = await getDb();
@@ -98,9 +99,19 @@ export const leadRouter = router({
       revenueType: z.enum(["mrr", "oneshot"]).optional(),
       clientId: z.number().optional(),
       partnerId: z.number().nullable().optional(),
+      cargo: z.string().optional(),
+      decisionRole: z.enum(["decisor", "influenciador"]).optional(),
+      produtoInteresse: z.string().optional(),
+      praca: z.enum(["manaus", "rio", "ambas"]).optional(),
+      budgetEstimado: z.string().optional(),
+      timing: z.string().optional(),
+      objecoes: z.string().optional(),
+      meetingScheduledAt: z.string().optional(),
+      meetingLink: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDatabase();
+      const { meetingScheduledAt, ...restInput } = input;
 
       let autoClientId = input.clientId;
       let autoOpportunityType = input.opportunityType;
@@ -141,7 +152,8 @@ export const leadRouter = router({
       }
 
       const [created] = await db.insert(leads).values({
-        ...input,
+        ...restInput,
+        meetingScheduledAt: meetingScheduledAt ? new Date(meetingScheduledAt) : null,
         clientId: autoClientId,
         opportunityType: autoOpportunityType,
         createdBy: ctx.user?.id || null,
@@ -194,13 +206,29 @@ export const leadRouter = router({
       partnerId: z.number().nullable().optional(),
       convertedToId: z.number().optional(),
       convertedToType: z.string().optional(),
+      cargo: z.string().nullable().optional(),
+      decisionRole: z.enum(["decisor", "influenciador"]).nullable().optional(),
+      produtoInteresse: z.string().nullable().optional(),
+      praca: z.enum(["manaus", "rio", "ambas"]).nullable().optional(),
+      budgetEstimado: z.string().nullable().optional(),
+      timing: z.string().nullable().optional(),
+      objecoes: z.string().nullable().optional(),
+      meetingScheduledAt: z.string().nullable().optional(),
+      meetingLink: z.string().nullable().optional(),
+      disqualifyReason: z.enum(["sem_budget", "sem_autoridade", "timing", "sem_fit"]).nullable().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
-      const { id, ...data } = input;
+      const { id, meetingScheduledAt, ...data } = input;
       const [updated] = await db
         .update(leads)
-        .set({ ...data, updatedAt: new Date() })
+        .set({
+          ...data,
+          ...(meetingScheduledAt !== undefined
+            ? { meetingScheduledAt: meetingScheduledAt ? new Date(meetingScheduledAt) : null }
+            : {}),
+          updatedAt: new Date(),
+        })
         .where(eq(leads.id, id))
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado" });
@@ -220,20 +248,38 @@ export const leadRouter = router({
     .input(z.object({
       id: z.number(),
       stage: z.string(),
+      disqualifyReason: z.enum(["sem_budget", "sem_autoridade", "timing", "sem_fit"]).optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
       const [updated] = await db
         .update(leads)
-        .set({ stage: input.stage, updatedAt: new Date() })
+        .set({
+          stage: input.stage,
+          ...(input.stage === "desqualificado" && input.disqualifyReason
+            ? { disqualifyReason: input.disqualifyReason }
+            : {}),
+          updatedAt: new Date(),
+        })
         .where(eq(leads.id, input.id))
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado" });
 
+      const DISQUALIFY_LABELS: Record<string, string> = {
+        sem_budget: "Sem budget",
+        sem_autoridade: "Sem autoridade",
+        timing: "Timing",
+        sem_fit: "Sem fit",
+      };
+      const stageNote =
+        input.stage === "desqualificado" && input.disqualifyReason
+          ? `Estágio alterado para: ${input.stage} (motivo: ${DISQUALIFY_LABELS[input.disqualifyReason] ?? input.disqualifyReason})`
+          : `Estágio alterado para: ${input.stage}`;
+
       await db.insert(leadInteractions).values({
         leadId: input.id,
         type: "note",
-        content: `Estágio alterado para: ${input.stage}`,
+        content: stageNote,
       });
 
       const leadLabel = updated.company || updated.name;
@@ -256,6 +302,106 @@ export const leadRouter = router({
       }
 
       return updated;
+    }),
+
+  handoffToCloser: comercialProcedure
+    .input(z.object({
+      leadId: z.number(),
+      closerId: z.string().min(1),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDatabase();
+
+      const [lead] = await db.select().from(leads).where(eq(leads.id, input.leadId)).limit(1);
+      if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado" });
+
+      const [closer] = await db
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
+        .from(users)
+        .where(eq(users.id, input.closerId))
+        .limit(1);
+      if (!closer) throw new TRPCError({ code: "NOT_FOUND", message: "Closer não encontrado" });
+
+      const leadLabel = lead.company || lead.name;
+      const pracaValue = (lead.praca === "manaus" || lead.praca === "rio" || lead.praca === "ambas")
+        ? lead.praca
+        : null;
+
+      const [opportunity] = await db.insert(opportunities).values({
+        title: leadLabel,
+        clientId: lead.clientId ?? null,
+        leadId: lead.id,
+        stage: "qualificada",
+        ownerId: closer.id,
+        opportunityType: (lead.opportunityType as any) ?? null,
+        revenueType: (lead.revenueType as any) ?? null,
+        praca: pracaValue,
+        source: lead.origin ?? null,
+        partnerId: lead.partnerId ?? null,
+        createdBy: ctx.user?.id ?? null,
+      }).returning();
+
+      const [updatedLead] = await db
+        .update(leads)
+        .set({
+          stage: "qualificado_handoff",
+          convertedToType: "opportunity",
+          convertedToId: opportunity.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(leads.id, lead.id))
+        .returning();
+
+      const sdrName = [ctx.user?.firstName, ctx.user?.lastName].filter(Boolean).join(" ") || "SDR";
+      const closerName = [closer.firstName, closer.lastName].filter(Boolean).join(" ") || "closer";
+
+      await db.insert(leadInteractions).values({
+        leadId: lead.id,
+        type: "note",
+        content: `Lead qualificado por ${sdrName} → handoff para closer ${closerName} (oportunidade #${opportunity.id})`,
+      });
+
+      await createCrmNotification(db, {
+        eventType: "lead_qualified_handoff",
+        leadId: lead.id,
+        clientId: lead.clientId ?? null,
+        partnerId: lead.partnerId ?? null,
+        message: `Lead ${leadLabel} qualificado por ${sdrName} → atribuído a ${closerName}`,
+      });
+
+      if (closer.email) {
+        const fmt = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : String(v));
+        const meetingInfo = lead.meetingScheduledAt
+          ? new Date(lead.meetingScheduledAt).toLocaleString("pt-BR")
+          : "—";
+        const html = `
+          <div style="font-family: sans-serif; color: #0a0a0c;">
+            <h2>Novo lead qualificado para você</h2>
+            <p><strong>${fmt(leadLabel)}</strong> foi qualificado por ${fmt(sdrName)} e atribuído a você como closer.</p>
+            <h3>Resumo BANT</h3>
+            <ul>
+              <li><strong>Contato:</strong> ${fmt(lead.contactName || lead.name)} ${lead.cargo ? `(${fmt(lead.cargo)})` : ""}</li>
+              <li><strong>Papel na decisão:</strong> ${fmt(lead.decisionRole)}</li>
+              <li><strong>Produto de interesse:</strong> ${fmt(lead.produtoInteresse)}</li>
+              <li><strong>Praça:</strong> ${fmt(lead.praca)}</li>
+              <li><strong>Budget estimado:</strong> ${fmt(lead.budgetEstimado)}</li>
+              <li><strong>Timing:</strong> ${fmt(lead.timing)}</li>
+              <li><strong>Objeções:</strong> ${fmt(lead.objecoes)}</li>
+            </ul>
+            <h3>Reunião</h3>
+            <p><strong>Agendada para:</strong> ${meetingInfo}</p>
+            ${lead.meetingLink ? `<p><strong>Link:</strong> <a href="${fmt(lead.meetingLink)}">${fmt(lead.meetingLink)}</a></p>` : ""}
+            <p style="margin-top:16px;color:#666;">Oportunidade #${opportunity.id} criada no estágio "qualificada".</p>
+          </div>
+        `;
+        await sendEmail({
+          to: closer.email,
+          subject: `Novo lead qualificado: ${leadLabel}`,
+          html,
+        });
+      }
+
+      return { opportunity, lead: updatedLead };
     }),
 
   listInteractions: protectedProcedure

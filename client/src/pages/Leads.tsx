@@ -74,6 +74,41 @@ const STAGES = [
   { key: "perdido", label: "Perdido", color: "bg-red-500/10 text-red-500 border-red-500/20" },
 ] as const;
 
+// Funil de Pré-vendas (SDR) — leads do tipo anunciante (Task #227).
+const SDR_STAGES = [
+  { key: "novo", label: "Novo", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+  { key: "em_cadencia", label: "Em cadência", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" },
+  { key: "conectado", label: "Conectado", color: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20" },
+  { key: "qualificacao_bant", label: "Qualificação BANT", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
+  { key: "reuniao_agendada", label: "Reunião agendada", color: "bg-orange-500/10 text-orange-500 border-orange-500/20" },
+  { key: "qualificado_handoff", label: "Qualificado (handoff)", color: "bg-green-500/10 text-green-500 border-green-500/20" },
+  { key: "desqualificado", label: "Desqualificado", color: "bg-red-500/10 text-red-500 border-red-500/20" },
+] as const;
+
+const ALL_STAGES = [...STAGES, ...SDR_STAGES];
+
+function stagesForType(type: string | null | undefined) {
+  return type === "restaurante" ? STAGES : SDR_STAGES;
+}
+
+// Remove campos BANT vazios para não violar os enums/decimais do backend.
+function sanitizeLeadPayload<T extends Record<string, any>>(data: T): T {
+  const out: Record<string, any> = { ...data };
+  for (const key of ["decisionRole", "praca", "budgetEstimado", "meetingScheduledAt"]) {
+    if (out[key] === "" || out[key] === undefined) {
+      delete out[key];
+    }
+  }
+  return out as T;
+}
+
+const DISQUALIFY_REASONS = [
+  { value: "sem_budget", label: "Sem budget" },
+  { value: "sem_autoridade", label: "Sem autoridade" },
+  { value: "timing", label: "Timing" },
+  { value: "sem_fit", label: "Sem fit" },
+] as const;
+
 const INTERACTION_TYPES = [
   { key: "call", label: "Ligação", icon: Phone },
   { key: "email", label: "E-mail", icon: Mail },
@@ -86,9 +121,12 @@ const ORIGINS = [
   "Indicação",
   "Site",
   "Instagram",
+  "Inbound Instagram",
   "LinkedIn",
+  "Cold WhatsApp",
   "Telefone",
   "Evento",
+  "QR Sala VIP",
   "Prospecção Ativa",
   "Outro",
 ];
@@ -169,6 +207,15 @@ interface LeadFormData {
   notes: string;
   clientId?: number;
   partnerId?: number | null;
+  cargo: string;
+  decisionRole: string;
+  produtoInteresse: string;
+  praca: string;
+  budgetEstimado: string;
+  timing: string;
+  objecoes: string;
+  meetingScheduledAt: string;
+  meetingLink: string;
 }
 
 const emptyForm: LeadFormData = {
@@ -193,6 +240,15 @@ const emptyForm: LeadFormData = {
   notes: "",
   clientId: undefined,
   partnerId: null,
+  cargo: "",
+  decisionRole: "",
+  produtoInteresse: "",
+  praca: "",
+  budgetEstimado: "",
+  timing: "",
+  objecoes: "",
+  meetingScheduledAt: "",
+  meetingLink: "",
 };
 
 interface ConvertRestaurantForm {
@@ -279,6 +335,11 @@ export default function Leads() {
 
   const [draggedLeadId, setDraggedLeadId] = useState<number | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+
+  const [disqualifyLeadId, setDisqualifyLeadId] = useState<number | null>(null);
+  const [disqualifyReason, setDisqualifyReason] = useState<string>("");
+  const [handoffLeadId, setHandoffLeadId] = useState<number | null>(null);
+  const [handoffCloserId, setHandoffCloserId] = useState<string>("");
 
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertForm, setConvertForm] = useState<ConvertRestaurantForm>(emptyConvertRestaurantForm);
@@ -376,6 +437,18 @@ export default function Leads() {
 
   const changeStageMutation = trpc.lead.changeStage.useMutation({
     onSuccess: () => {
+      utils.lead.list.invalidate();
+      utils.lead.get.invalidate();
+      utils.lead.listInteractions.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handoffMutation = trpc.lead.handoffToCloser.useMutation({
+    onSuccess: () => {
+      toast.success("Lead passado para o closer! Oportunidade criada.");
+      setHandoffLeadId(null);
+      setHandoffCloserId("");
       utils.lead.list.invalidate();
       utils.lead.get.invalidate();
       utils.lead.listInteractions.invalidate();
@@ -501,6 +574,17 @@ export default function Leads() {
         tags: selectedLead.data.tags ?? "",
         notes: selectedLead.data.notes ?? "",
         partnerId: selectedLead.data.partnerId ?? null,
+        cargo: selectedLead.data.cargo ?? "",
+        decisionRole: selectedLead.data.decisionRole ?? "",
+        produtoInteresse: selectedLead.data.produtoInteresse ?? "",
+        praca: selectedLead.data.praca ?? "",
+        budgetEstimado: selectedLead.data.budgetEstimado ?? "",
+        timing: selectedLead.data.timing ?? "",
+        objecoes: selectedLead.data.objecoes ?? "",
+        meetingScheduledAt: selectedLead.data.meetingScheduledAt
+          ? new Date(selectedLead.data.meetingScheduledAt).toISOString().slice(0, 16)
+          : "",
+        meetingLink: selectedLead.data.meetingLink ?? "",
       });
     }
   }, [isEditing, selectedLead.data]);
@@ -541,7 +625,7 @@ export default function Leads() {
       toast.error("Nome é obrigatório");
       return;
     }
-    const payload: any = { ...formData, type: activeTab };
+    const payload: any = sanitizeLeadPayload({ ...formData, type: activeTab });
     if (formData.clientId) {
       payload.clientId = formData.clientId;
       if (!payload.opportunityType) payload.opportunityType = "upsell";
@@ -555,7 +639,8 @@ export default function Leads() {
       toast.error("Nome é obrigatório");
       return;
     }
-    updateMutation.mutate({ id: selectedLeadId, ...editData });
+    const payload: any = sanitizeLeadPayload(editData);
+    updateMutation.mutate({ id: selectedLeadId, ...payload });
   }
 
   function startEditing() {
@@ -567,16 +652,33 @@ export default function Leads() {
     setIsEditing(false);
   }
 
+  // Intercepta estágios que exigem input adicional antes de gravar.
+  function requestStageChange(leadId: number, stage: string) {
+    if (stage === "desqualificado") {
+      setDisqualifyReason("");
+      setDisqualifyLeadId(leadId);
+      return;
+    }
+    if (stage === "qualificado_handoff") {
+      setHandoffCloserId("");
+      setHandoffLeadId(leadId);
+      return;
+    }
+    changeStageMutation.mutate({ id: leadId, stage });
+  }
+
   function moveStage(leadId: number, currentStage: string, direction: "next" | "prev") {
-    const idx = STAGES.findIndex((s) => s.key === currentStage);
+    const lead = leads.find((l) => l.id === leadId);
+    const stages = stagesForType(lead?.type);
+    const idx = stages.findIndex((s) => s.key === currentStage);
     if (idx === -1) return;
     const newIdx = direction === "next" ? idx + 1 : idx - 1;
-    if (newIdx < 0 || newIdx >= STAGES.length) return;
-    changeStageMutation.mutate({ id: leadId, stage: STAGES[newIdx].key });
+    if (newIdx < 0 || newIdx >= stages.length) return;
+    requestStageChange(leadId, stages[newIdx].key);
   }
 
   function moveToStage(leadId: number, stage: string) {
-    changeStageMutation.mutate({ id: leadId, stage });
+    requestStageChange(leadId, stage);
   }
 
   function handleDragStart(e: React.DragEvent, leadId: number) {
@@ -621,7 +723,7 @@ export default function Leads() {
     if (!isNaN(leadId)) {
       const lead = leads.find((l) => l.id === leadId);
       if (lead && lead.stage !== stageKey) {
-        changeStageMutation.mutate({ id: leadId, stage: stageKey });
+        requestStageChange(leadId, stageKey);
       }
     }
     setDraggedLeadId(null);
@@ -637,7 +739,7 @@ export default function Leads() {
   }
 
   function getStageConfig(stage: string) {
-    return STAGES.find((s) => s.key === stage) ?? STAGES[0];
+    return ALL_STAGES.find((s) => s.key === stage) ?? STAGES[0];
   }
 
   function formatDate(d: string | Date | null | undefined) {
@@ -768,12 +870,14 @@ export default function Leads() {
     }));
   };
 
-  const leadsByStage = STAGES.map((stage) => ({
+  const boardStages = activeTab === "restaurante" ? STAGES : SDR_STAGES;
+
+  const leadsByStage = boardStages.map((stage) => ({
     ...stage,
     leads: leads.filter((l) => l.stage === stage.key),
   }));
 
-  const stageOrder: Record<string, number> = Object.fromEntries(STAGES.map((s, i) => [s.key, i]));
+  const stageOrder: Record<string, number> = Object.fromEntries(boardStages.map((s, i) => [s.key, i]));
 
   const filteredLeads = leads.filter((l) => {
     if (!listSearch.trim()) return true;
@@ -1061,6 +1165,118 @@ export default function Leads() {
           </div>
         </div>
 
+        {data.type === "anunciante" && (
+          <>
+            <Separator className="my-1" />
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Qualificação BANT</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Cargo do contato</Label>
+                <Input
+                  value={data.cargo}
+                  onChange={(e) => setData({ ...data, cargo: e.target.value })}
+                  placeholder="Ex.: Diretor de Marketing"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Papel na decisão</Label>
+                <Select
+                  value={data.decisionRole || "none"}
+                  onValueChange={(v) => setData({ ...data, decisionRole: v === "none" ? "" : v })}
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">—</SelectItem>
+                    <SelectItem value="decisor">Decisor</SelectItem>
+                    <SelectItem value="influenciador">Influenciador</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Produto de interesse</Label>
+                <Input
+                  value={data.produtoInteresse}
+                  onChange={(e) => setData({ ...data, produtoInteresse: e.target.value })}
+                  placeholder="Ex.: Bolacha + Tela"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Praça</Label>
+                <Select
+                  value={data.praca || "none"}
+                  onValueChange={(v) => setData({ ...data, praca: v === "none" ? "" : v })}
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">—</SelectItem>
+                    <SelectItem value="manaus">Manaus</SelectItem>
+                    <SelectItem value="rio">Rio</SelectItem>
+                    <SelectItem value="ambas">Ambas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Budget estimado (R$)</Label>
+                <Input
+                  type="number"
+                  value={data.budgetEstimado}
+                  onChange={(e) => setData({ ...data, budgetEstimado: e.target.value })}
+                  placeholder="0,00"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Timing</Label>
+                <Input
+                  value={data.timing}
+                  onChange={(e) => setData({ ...data, timing: e.target.value })}
+                  placeholder="Ex.: próximo trimestre"
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Objeções</Label>
+              <Textarea
+                value={data.objecoes}
+                onChange={(e) => setData({ ...data, objecoes: e.target.value })}
+                placeholder="Principais objeções levantadas"
+                className="text-sm min-h-[60px]"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Reunião agendada</Label>
+                <Input
+                  type="datetime-local"
+                  value={data.meetingScheduledAt}
+                  onChange={(e) => setData({ ...data, meetingScheduledAt: e.target.value })}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Link da reunião</Label>
+                <Input
+                  value={data.meetingLink}
+                  onChange={(e) => setData({ ...data, meetingLink: e.target.value })}
+                  placeholder="https://meet..."
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+          </>
+        )}
+
         {data.type === "restaurante" && (
           <>
             <Separator className="my-1" />
@@ -1192,7 +1408,7 @@ export default function Leads() {
           <TabsList>
             <TabsTrigger value="anunciante" className="gap-1.5">
               <Building2 className="w-3.5 h-3.5" />
-              Anunciantes
+              Pré-vendas (SDR)
             </TabsTrigger>
             <TabsTrigger value="restaurante" className="gap-1.5">
               <UtensilsCrossed className="w-3.5 h-3.5" />
@@ -1230,8 +1446,11 @@ export default function Leads() {
           {activeTab === "oportunidades" ? <OpportunitiesBoard /> : viewMode === "list" ? renderListView() : (
           <div className="overflow-x-auto pb-4 -mx-2 px-2">
             <div className="inline-flex gap-3">
-              {leadsByStage.map((column) => {
+              {leadsByStage.map((column, colIdx) => {
                 const isCollapsed = collapsedStages.includes(column.key);
+                const isFirstCol = colIdx === 0;
+                const isLastCol = colIdx === boardStages.length - 1;
+                const isTerminalCol = ["ganho", "perdido", "qualificado_handoff", "desqualificado"].includes(column.key);
                 const toggleCollapse = () => setCollapsedStages((prev) =>
                   prev.includes(column.key) ? prev.filter((s) => s !== column.key) : [...prev, column.key]
                 );
@@ -1277,7 +1496,7 @@ export default function Leads() {
                     <span className="text-[10px] text-muted-foreground font-medium">
                       {column.leads.length}
                     </span>
-                    {(column.key === "ganho" || column.key === "perdido") && (
+                    {isTerminalCol && (
                       <button onClick={toggleCollapse} className="ml-auto text-muted-foreground hover:text-foreground transition-colors" title="Minimizar">
                         <ChevronsLeftRight className="w-3 h-3" />
                       </button>
@@ -1379,7 +1598,7 @@ export default function Leads() {
                             size="icon"
                             className="h-5 w-5"
                             onClick={(e) => { e.stopPropagation(); moveStage(lead.id, lead.stage, "prev"); }}
-                            disabled={column.key === "novo"}
+                            disabled={isFirstCol}
                           >
                             <ChevronLeft className="w-3 h-3" />
                           </Button>
@@ -1391,7 +1610,7 @@ export default function Leads() {
                             size="icon"
                             className="h-5 w-5"
                             onClick={(e) => { e.stopPropagation(); moveStage(lead.id, lead.stage, "next"); }}
-                            disabled={column.key === "perdido"}
+                            disabled={isLastCol}
                           >
                             <ChevronRight className="w-3 h-3" />
                           </Button>
@@ -1607,6 +1826,20 @@ export default function Leads() {
                       Cotação
                     </Button>
                   )}
+                  {!isEditing && !isConverted && selectedLead.data.type === "anunciante" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 h-8 text-green-600 border-green-600/30 hover:bg-green-600/10"
+                      onClick={() => {
+                        setHandoffCloserId("");
+                        setHandoffLeadId(selectedLead.data!.id);
+                      }}
+                    >
+                      <ArrowRightCircle className="w-3.5 h-3.5" />
+                      Passar para o closer
+                    </Button>
+                  )}
                   {!isEditing && !isConverted && (
                     <Button
                       variant="outline"
@@ -1657,7 +1890,7 @@ export default function Leads() {
                     </Badge>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {STAGES.map((stage) => (
+                    {stagesForType(selectedLead.data.type).map((stage) => (
                       <Button
                         key={stage.key}
                         variant={selectedLead.data!.stage === stage.key ? "default" : "outline"}
@@ -1670,6 +1903,11 @@ export default function Leads() {
                       </Button>
                     ))}
                   </div>
+                  {selectedLead.data.type === "anunciante" && selectedLead.data.disqualifyReason && (
+                    <p className="text-[10px] text-red-500">
+                      Motivo da desqualificação: {DISQUALIFY_REASONS.find((r) => r.value === selectedLead.data!.disqualifyReason)?.label ?? selectedLead.data.disqualifyReason}
+                    </p>
+                  )}
                 </div>
 
                 <Separator />
@@ -2506,6 +2744,86 @@ export default function Leads() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Disqualify Lead Dialog */}
+      <Dialog open={disqualifyLeadId !== null} onOpenChange={(open) => { if (!open) { setDisqualifyLeadId(null); setDisqualifyReason(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Desqualificar lead</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label className="text-xs">Motivo da desqualificação *</Label>
+            <Select value={disqualifyReason} onValueChange={setDisqualifyReason}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Selecione o motivo" />
+              </SelectTrigger>
+              <SelectContent>
+                {DISQUALIFY_REASONS.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDisqualifyLeadId(null); setDisqualifyReason(""); }}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={!disqualifyReason || changeStageMutation.isPending}
+              onClick={() => {
+                if (disqualifyLeadId === null || !disqualifyReason) return;
+                changeStageMutation.mutate(
+                  { id: disqualifyLeadId, stage: "desqualificado", disqualifyReason: disqualifyReason as any },
+                  { onSuccess: () => { setDisqualifyLeadId(null); setDisqualifyReason(""); } }
+                );
+              }}
+            >
+              Desqualificar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Handoff to Closer Dialog */}
+      <Dialog open={handoffLeadId !== null} onOpenChange={(open) => { if (!open) { setHandoffLeadId(null); setHandoffCloserId(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Passar para o closer</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <p className="text-xs text-muted-foreground">
+              Cria uma oportunidade qualificada, notifica e envia e-mail ao closer escolhido.
+            </p>
+            <Label className="text-xs">Closer responsável *</Label>
+            <Select value={handoffCloserId} onValueChange={setHandoffCloserId}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Selecione o closer" />
+              </SelectTrigger>
+              <SelectContent>
+                {(internalUsers.data ?? []).map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.firstName} {u.lastName || ""} {u.role ? `(${u.role})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setHandoffLeadId(null); setHandoffCloserId(""); }}>Cancelar</Button>
+            <Button
+              disabled={!handoffCloserId || handoffMutation.isPending}
+              className="gap-1.5 bg-green-600 hover:bg-green-700"
+              onClick={() => {
+                if (handoffLeadId === null || !handoffCloserId) return;
+                handoffMutation.mutate({ leadId: handoffLeadId, closerId: handoffCloserId });
+              }}
+            >
+              <ArrowRightCircle className="w-4 h-4" />
+              {handoffMutation.isPending ? "Enviando..." : "Confirmar handoff"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Confetti active={showConfetti} />
     </PageContainer>
   );
