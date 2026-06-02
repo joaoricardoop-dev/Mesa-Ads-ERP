@@ -55,8 +55,35 @@ export const contactRouter = router({
     }),
 
   listAll: internalProcedure
-    .query(async () => {
+    .input(z.object({
+      search: z.string().optional(),
+      ownerType: z.enum(["anunciante", "restaurante", "lead"]).optional(),
+    }).optional())
+    .query(async ({ input }) => {
       const db = await getDatabase();
+
+      const conditions = [];
+      if (input?.ownerType === "anunciante") conditions.push(sql`c."clientId" IS NOT NULL`);
+      else if (input?.ownerType === "restaurante") conditions.push(sql`c."restaurantId" IS NOT NULL`);
+      else if (input?.ownerType === "lead") conditions.push(sql`c."leadId" IS NOT NULL AND c."clientId" IS NULL AND c."restaurantId" IS NULL`);
+
+      const term = input?.search?.trim();
+      if (term) {
+        const like = `%${term}%`;
+        conditions.push(sql`(
+          c."name" ILIKE ${like}
+          OR c."email" ILIKE ${like}
+          OR c."phone" ILIKE ${like}
+          OR cl."name" ILIKE ${like}
+          OR r."name" ILIKE ${like}
+          OR l."name" ILIKE ${like}
+        )`);
+      }
+
+      const whereSql = conditions.length
+        ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
+        : sql``;
+
       const rows = await db.execute(sql`
         SELECT c.*,
           cl."name" AS "clientName",
@@ -72,6 +99,7 @@ export const contactRouter = router({
         LEFT JOIN clients cl ON c."clientId" = cl."id"
         LEFT JOIN active_restaurants r ON c."restaurantId" = r."id"
         LEFT JOIN leads l ON c."leadId" = l."id"
+        ${whereSql}
         ORDER BY c."createdAt" DESC
       `);
       return rows.rows as any[];

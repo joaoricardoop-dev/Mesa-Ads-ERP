@@ -1,15 +1,56 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { opportunities, partners } from "../drizzle/schema";
+import { opportunities, partners, leads } from "../drizzle/schema";
 import { eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
+import { ensureContact } from "./contactSync";
 
 async function getDatabase() {
   const d = await getDb();
   if (!d) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
   return d;
+}
+
+/**
+ * Propaga o contato do lead vinculado a uma oportunidade para o diretório
+ * unificado de `contacts`, linkando por clientId (quando a oportunidade tem
+ * anunciante) e por leadId. Idempotente via `ensureContact`.
+ */
+async function syncOpportunityContact(db: any, opp: { leadId?: number | null; clientId?: number | null }) {
+  if (!opp.leadId && !opp.clientId) return;
+  let name: string | null | undefined;
+  let email: string | null | undefined;
+  let phone: string | null | undefined;
+  let role: string | null | undefined;
+  if (opp.leadId) {
+    const [lead] = await db
+      .select({
+        name: leads.name,
+        contactName: leads.contactName,
+        contactEmail: leads.contactEmail,
+        contactPhone: leads.contactPhone,
+        contactWhatsApp: leads.contactWhatsApp,
+        cargo: leads.cargo,
+      })
+      .from(leads)
+      .where(eq(leads.id, opp.leadId))
+      .limit(1);
+    if (lead && (lead.contactName || lead.contactEmail || lead.contactPhone || lead.contactWhatsApp)) {
+      name = lead.contactName || lead.name;
+      email = lead.contactEmail || undefined;
+      phone = lead.contactPhone || lead.contactWhatsApp || undefined;
+      role = lead.cargo || undefined;
+    }
+  }
+  if (!name && !email && !phone) return;
+  if (opp.clientId) {
+    await ensureContact({ clientId: opp.clientId, name, email, phone, role, primaryIfFirst: true });
+  }
+  if (opp.leadId) {
+    await ensureContact({ leadId: opp.leadId, name, email, phone, role, primaryIfFirst: true });
+  }
 }
 
 export const opportunityRouter = router({
@@ -122,6 +163,12 @@ export const opportunityRouter = router({
         });
       }
 
+      try {
+        await syncOpportunityContact(db, { leadId: created.leadId, clientId: created.clientId });
+      } catch (err) {
+        console.error("Failed to sync contact on opportunity create:", err);
+      }
+
       return created;
     }),
 
@@ -153,6 +200,13 @@ export const opportunityRouter = router({
         .where(eq(opportunities.id, id))
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Oportunidade não encontrada" });
+
+      try {
+        await syncOpportunityContact(db, { leadId: updated.leadId, clientId: updated.clientId });
+      } catch (err) {
+        console.error("Failed to sync contact on opportunity update:", err);
+      }
+
       return updated;
     }),
 

@@ -1815,6 +1815,62 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       UPDATE "leads" SET "stage" = 'ativo_rede' WHERE "type" = 'restaurante' AND "stage" = 'ganho';
     `,
   },
+  {
+    // Task #229 — Contatos unificados: backfill idempotente de `contacts` a
+    // partir dos campos inline de contato em `leads`. Cria 1 contato (primário)
+    // por lead que tenha qualquer dado de contato (contactName/Email/Phone/
+    // WhatsApp). Dedupe pelo MESMO contato (e-mail/telefone, ou nome quando não
+    // há nenhum dos dois) dentro do vínculo do lead — não por "qualquer contato
+    // do lead" — para que um lead com outros contatos (ex.: via oportunidade)
+    // ainda receba seu contato inline. Idempotente em re-execuções. Inativação
+    // não se aplica — é só INSERT condicional.
+    name: "task_229_backfill_lead_contacts",
+    sql: `
+      INSERT INTO contacts ("leadId", "name", "email", "phone", "role", "isPrimary", "createdAt", "updatedAt")
+      SELECT l."id",
+             COALESCE(NULLIF(TRIM(l."contactName"), ''), l."name", 'Sem nome'),
+             NULLIF(TRIM(l."contactEmail"), ''),
+             COALESCE(NULLIF(TRIM(l."contactPhone"), ''), NULLIF(TRIM(l."contactWhatsApp"), '')),
+             NULLIF(TRIM(l."cargo"), ''),
+             -- primário só quando o lead ainda não tem nenhum contato vinculado
+             NOT EXISTS (SELECT 1 FROM contacts cp WHERE cp."leadId" = l."id"),
+             NOW(), NOW()
+      FROM leads l
+      WHERE (
+              NULLIF(TRIM(l."contactName"), '') IS NOT NULL
+              OR NULLIF(TRIM(l."contactEmail"), '') IS NOT NULL
+              OR NULLIF(TRIM(l."contactPhone"), '') IS NOT NULL
+              OR NULLIF(TRIM(l."contactWhatsApp"), '') IS NOT NULL
+            )
+        -- dedupe pelo MESMO contato (e-mail/telefone) dentro do vínculo do lead,
+        -- não por "qualquer contato do lead": um lead pode ter outros contatos
+        -- (ex.: via oportunidade) e ainda assim faltar o seu contato inline.
+        -- E-mail comparado em lower/trim; telefone normalizado para dígitos
+        -- (últimos 10) para casar variações de formatação (+55, espaços, hífen)
+        -- e evitar duplicatas. Sem e-mail nem telefone para casar, cai no nome
+        -- como chave de idempotência. Idempotente em re-execuções.
+        AND NOT EXISTS (
+          SELECT 1 FROM contacts c
+          WHERE c."leadId" = l."id"
+            AND (
+              (
+                NULLIF(TRIM(LOWER(l."contactEmail")), '') IS NOT NULL
+                AND LOWER(TRIM(c."email")) = NULLIF(TRIM(LOWER(l."contactEmail")), '')
+              )
+              OR (
+                NULLIF(RIGHT(regexp_replace(COALESCE(NULLIF(TRIM(l."contactPhone"), ''), NULLIF(TRIM(l."contactWhatsApp"), ''), ''), '[^0-9]', '', 'g'), 10), '') IS NOT NULL
+                AND RIGHT(regexp_replace(COALESCE(c."phone", ''), '[^0-9]', '', 'g'), 10)
+                    = NULLIF(RIGHT(regexp_replace(COALESCE(NULLIF(TRIM(l."contactPhone"), ''), NULLIF(TRIM(l."contactWhatsApp"), ''), ''), '[^0-9]', '', 'g'), 10), '')
+              )
+              OR (
+                NULLIF(TRIM(l."contactEmail"), '') IS NULL
+                AND COALESCE(NULLIF(TRIM(l."contactPhone"), ''), NULLIF(TRIM(l."contactWhatsApp"), '')) IS NULL
+                AND c."name" = COALESCE(NULLIF(TRIM(l."contactName"), ''), l."name", 'Sem nome')
+              )
+            )
+        );
+    `,
+  },
 ];
 
 export async function runMigrations() {

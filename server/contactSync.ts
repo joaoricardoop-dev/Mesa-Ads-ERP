@@ -9,12 +9,19 @@ export async function ensureContact(opts: {
   name?: string | null;
   email?: string | null;
   phone?: string | null;
+  role?: string | null;
   isPrimary?: boolean;
+  /**
+   * Quando true, marca o contato como primário SE for o primeiro do vínculo
+   * (nenhum contato existente para o mesmo clientId/restaurantId/leadId).
+   * `isPrimary` explícito tem precedência.
+   */
+  primaryIfFirst?: boolean;
 }): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
-  const { clientId, restaurantId, leadId, email, phone, isPrimary } = opts;
+  const { clientId, restaurantId, leadId, email, phone, role } = opts;
   if (!clientId && !restaurantId && !leadId) return;
 
   const trimmedName = (opts.name || "").trim();
@@ -27,6 +34,15 @@ export async function ensureContact(opts: {
     : restaurantId
       ? eq(contacts.restaurantId, restaurantId)
       : eq(contacts.leadId, leadId!);
+
+  let isPrimary = opts.isPrimary ?? false;
+  if (!opts.isPrimary && opts.primaryIfFirst) {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(contacts)
+      .where(entityFilter);
+    if (Number(row?.count ?? 0) === 0) isPrimary = true;
+  }
 
   if (email) {
     const existing = await db
@@ -67,6 +83,7 @@ export async function ensureContact(opts: {
     name: contactName,
     email: email || undefined,
     phone: phone || undefined,
+    role: role || undefined,
     isPrimary: isPrimary ?? false,
   });
 }

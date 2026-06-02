@@ -60,6 +60,7 @@ import {
   List,
   ArrowUpDown,
   Briefcase,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import OpportunitiesBoard from "./OpportunitiesBoard";
@@ -333,7 +334,9 @@ function formatCnpj(cnpj: string): string {
 
 export default function Leads() {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<LeadType | "oportunidades">("anunciante");
+  const [activeTab, setActiveTab] = useState<LeadType | "oportunidades" | "contatos">("anunciante");
+  const [contactSearch, setContactSearch] = useState("");
+  const [contactOwnerFilter, setContactOwnerFilter] = useState<"all" | "anunciante" | "restaurante" | "lead">("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState<"cnpj" | "form">("form");
   const [cnpjInput, setCnpjInput] = useState("");
@@ -374,9 +377,17 @@ export default function Leads() {
 
   const leadsQuery = trpc.lead.list.useQuery(
     { type: activeTab as LeadType },
-    { enabled: activeTab !== "oportunidades" },
+    { enabled: activeTab === "anunciante" || activeTab === "restaurante" },
   );
   const leads = leadsQuery.data ?? [];
+
+  const contactsDirectory = trpc.contact.listAll.useQuery(
+    {
+      search: contactSearch.trim() || undefined,
+      ownerType: contactOwnerFilter === "all" ? undefined : contactOwnerFilter,
+    },
+    { enabled: activeTab === "contatos" },
+  );
 
   const selectedLead = trpc.lead.get.useQuery(
     { id: selectedLeadId! },
@@ -940,6 +951,92 @@ export default function Leads() {
     }
   }
 
+  function renderContactsView() {
+    const rows = contactsDirectory.data ?? [];
+    const ownerBadge = (ownerType: string) => {
+      if (ownerType === "anunciante") return <Badge className="text-[10px] bg-blue-500/15 text-blue-500 border-blue-500/30">Anunciante</Badge>;
+      if (ownerType === "restaurante") return <Badge className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30">Restaurante</Badge>;
+      if (ownerType === "lead") return <Badge className="text-[10px] bg-purple-500/15 text-purple-500 border-purple-500/30">Lead</Badge>;
+      return <Badge variant="secondary" className="text-[10px]">—</Badge>;
+    };
+    const ownerName = (r: any) => r.clientName || r.restaurantName || r.leadName || "—";
+
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative max-w-xs flex-1 min-w-[200px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              value={contactSearch}
+              onChange={(e) => setContactSearch(e.target.value)}
+              placeholder="Buscar por nome, e-mail, telefone, vínculo..."
+              className="w-full h-8 pl-8 pr-3 text-sm bg-background border border-border rounded-md outline-none focus:ring-2 focus:ring-ring/40"
+            />
+            {contactSearch && (
+              <button
+                onClick={() => setContactSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <Select value={contactOwnerFilter} onValueChange={(v) => setContactOwnerFilter(v as typeof contactOwnerFilter)}>
+            <SelectTrigger className="h-8 w-[160px] text-sm">
+              <SelectValue placeholder="Tipo de vínculo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os vínculos</SelectItem>
+              <SelectItem value="anunciante">Anunciantes</SelectItem>
+              <SelectItem value="restaurante">Restaurantes</SelectItem>
+              <SelectItem value="lead">Leads</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {contactsDirectory.isLoading ? (
+          <div className="text-sm text-muted-foreground py-8 text-center">Carregando contatos...</div>
+        ) : rows.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-8 text-center">Nenhum contato encontrado.</div>
+        ) : (
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="px-3 py-2 font-medium">Nome</th>
+                    <th className="px-3 py-2 font-medium">Cargo</th>
+                    <th className="px-3 py-2 font-medium">E-mail</th>
+                    <th className="px-3 py-2 font-medium">Telefone</th>
+                    <th className="px-3 py-2 font-medium">Vínculo</th>
+                    <th className="px-3 py-2 font-medium">Tipo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r: any) => (
+                    <tr key={r.id} className="border-b border-border/50 last:border-0 hover:bg-muted/40">
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium">{r.name}</span>
+                          {r.isPrimary && <Badge variant="secondary" className="text-[9px] h-4 px-1">Principal</Badge>}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">{r.role || "—"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{r.email || "—"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{r.phone || "—"}</td>
+                      <td className="px-3 py-2">{ownerName(r)}</td>
+                      <td className="px-3 py-2">{ownerBadge(r.ownerType)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
   function renderListView() {
     return (
       <div className="space-y-3">
@@ -1423,7 +1520,7 @@ export default function Leads() {
       title="Leads"
       description="CRM e pipeline de vendas"
       actions={
-        activeTab !== "oportunidades" ? (
+        activeTab === "anunciante" || activeTab === "restaurante" ? (
           <Button size="sm" onClick={openCreateDialog}>
             <Plus className="w-4 h-4 mr-1" />
             Novo Lead
@@ -1431,7 +1528,7 @@ export default function Leads() {
         ) : null
       }
     >
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeadType | "oportunidades")}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeadType | "oportunidades" | "contatos")}>
         <div className="flex items-center justify-between gap-2">
           <TabsList>
             <TabsTrigger value="anunciante" className="gap-1.5">
@@ -1446,9 +1543,13 @@ export default function Leads() {
               <Briefcase className="w-3.5 h-3.5" />
               Oportunidades
             </TabsTrigger>
+            <TabsTrigger value="contatos" className="gap-1.5">
+              <Users className="w-3.5 h-3.5" />
+              Contatos
+            </TabsTrigger>
           </TabsList>
 
-          {activeTab !== "oportunidades" && (
+          {(activeTab === "anunciante" || activeTab === "restaurante") && (
             <div className="flex items-center rounded-md border border-border overflow-hidden">
               <button
                 onClick={() => setViewMode("kanban")}
@@ -1471,7 +1572,7 @@ export default function Leads() {
         </div>
 
         <TabsContent value={activeTab} className="mt-4">
-          {activeTab === "oportunidades" ? <OpportunitiesBoard /> : viewMode === "list" ? renderListView() : (
+          {activeTab === "contatos" ? renderContactsView() : activeTab === "oportunidades" ? <OpportunitiesBoard /> : viewMode === "list" ? renderListView() : (
           <div className="overflow-x-auto pb-4 -mx-2 px-2">
             <div className="inline-flex gap-3">
               {leadsByStage.map((column, colIdx) => {

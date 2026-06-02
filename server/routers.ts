@@ -1196,7 +1196,24 @@ export const appRouter = router({
           parentId: z.number().nullable().optional(),
         })
       )
-      .mutation(({ input }) => createClient(input)),
+      .mutation(async ({ input }) => {
+        const result = await createClient(input);
+        try {
+          if (input.contactEmail || input.contactPhone) {
+            const { ensureContact } = await import("./contactSync");
+            await ensureContact({
+              clientId: result.id,
+              name: input.name,
+              email: input.contactEmail || undefined,
+              phone: input.contactPhone || undefined,
+              primaryIfFirst: true,
+            });
+          }
+        } catch (err) {
+          console.error("Failed to sync contact on advertiser create:", err);
+        }
+        return result;
+      }),
 
     update: protectedProcedure
       .input(
@@ -1221,9 +1238,23 @@ export const appRouter = router({
           showAgencyPricing: z.boolean().nullable().optional(),
         })
       )
-      .mutation(({ input }) => {
+      .mutation(async ({ input }) => {
         const { id, ...data } = input;
-        return updateClient(id, data);
+        await updateClient(id, data);
+        try {
+          if (input.contactEmail || input.contactPhone) {
+            const { ensureContact } = await import("./contactSync");
+            await ensureContact({
+              clientId: id,
+              name: input.name,
+              email: input.contactEmail || undefined,
+              phone: input.contactPhone || undefined,
+              primaryIfFirst: true,
+            });
+          }
+        } catch (err) {
+          console.error("Failed to sync contact on advertiser update:", err);
+        }
       }),
 
     delete: protectedProcedure

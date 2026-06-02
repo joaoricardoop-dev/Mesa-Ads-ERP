@@ -7,6 +7,7 @@ import { eq, desc, and, ne, sql, or, ilike } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
 import { sendEmail } from "./email";
+import { ensureContact } from "./contactSync";
 
 async function getDatabase() {
   const d = await getDb();
@@ -172,6 +173,21 @@ export const leadRouter = router({
         });
       }
 
+      try {
+        if (created.contactName || created.contactEmail || created.contactPhone || created.contactWhatsApp) {
+          await ensureContact({
+            leadId: created.id,
+            name: created.contactName || created.name,
+            email: created.contactEmail || undefined,
+            phone: created.contactPhone || created.contactWhatsApp || undefined,
+            role: created.cargo || undefined,
+            primaryIfFirst: true,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to sync contact on lead create:", err);
+      }
+
       return created;
     }),
 
@@ -232,6 +248,22 @@ export const leadRouter = router({
         .where(eq(leads.id, id))
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado" });
+
+      try {
+        if (updated.contactName || updated.contactEmail || updated.contactPhone || updated.contactWhatsApp) {
+          await ensureContact({
+            leadId: updated.id,
+            name: updated.contactName || updated.name,
+            email: updated.contactEmail || undefined,
+            phone: updated.contactPhone || updated.contactWhatsApp || undefined,
+            role: updated.cargo || undefined,
+            primaryIfFirst: true,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to sync contact on lead update:", err);
+      }
+
       return updated;
     }),
 
