@@ -22,6 +22,9 @@ import {
   Sprout,
   RotateCcw,
   Users,
+  Link2,
+  X,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CsvExportButton, downloadCsv } from "@/components/CsvExportButton";
@@ -40,6 +43,17 @@ const PRACA_LABELS: Record<string, string> = {
   manaus: "Manaus",
   rio: "Rio",
   ambas: "Ambas",
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  new: "New",
+  upsell: "Upsell",
+  renewal: "Renovação",
+};
+
+const REVENUE_LABELS: Record<string, string> = {
+  mrr: "MRR",
+  oneshot: "One Shot",
 };
 
 const emptyForm = {
@@ -86,14 +100,44 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [lossReason, setLossReason] = useState("");
+  const [linkQuotationId, setLinkQuotationId] = useState<string>("");
+  const [createQuotationIds, setCreateQuotationIds] = useState<number[]>([]);
 
   const selected = trpc.opportunity.get.useQuery(
     { id: selectedId! },
     { enabled: selectedId != null }
   );
 
+  const sel = selected.data as any;
+
+  // Cotações já vinculadas à oportunidade aberta no painel de detalhe.
+  const linkedQuotationsQuery = trpc.quotation.list.useQuery(
+    { opportunityId: selectedId! },
+    { enabled: selectedId != null }
+  );
+
+  // Cotações do mesmo anunciante ainda sem oportunidade (para vincular no detalhe).
+  const clientQuotationsQuery = trpc.quotation.list.useQuery(
+    { clientId: sel?.clientId },
+    { enabled: selectedId != null && sel?.clientId != null }
+  );
+
+  // Cotações do anunciante selecionado no diálogo de criação, sem oportunidade.
+  const createClientQuotationsQuery = trpc.quotation.list.useQuery(
+    { clientId: formData.clientId! },
+    { enabled: createOpen && formData.clientId != null }
+  );
+
+  const linkableQuotations = (clientQuotationsQuery.data ?? []).filter(
+    (q: any) => !q.opportunityId
+  );
+  const createLinkableQuotations = (createClientQuotationsQuery.data ?? []).filter(
+    (q: any) => !q.opportunityId
+  );
+
   function invalidate() {
     utils.opportunity.list.invalidate();
+    utils.quotation.list.invalidate();
     if (selectedId != null) utils.opportunity.get.invalidate({ id: selectedId });
   }
 
@@ -102,6 +146,24 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
       toast.success("Oportunidade criada");
       setCreateOpen(false);
       setFormData({ ...emptyForm });
+      setCreateQuotationIds([]);
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const linkQuotationMutation = trpc.quotation.linkOpportunity.useMutation({
+    onSuccess: () => {
+      toast.success("Cotação vinculada");
+      setLinkQuotationId("");
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const unlinkQuotationMutation = trpc.quotation.linkOpportunity.useMutation({
+    onSuccess: () => {
+      toast.success("Cotação desvinculada");
       invalidate();
     },
     onError: (e) => toast.error(e.message),
@@ -153,6 +215,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
       praca: formData.praca as any,
       source: formData.source || undefined,
       partnerId: formData.partnerId,
+      quotationIds: createQuotationIds.length > 0 ? createQuotationIds : undefined,
     });
   }
 
@@ -228,8 +291,6 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
     items: visibleOpportunities.filter((o: any) => o.stage === stage.key),
   }));
 
-  const sel = selected.data as any;
-
   return (
     <div className="mt-4 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -260,7 +321,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
               downloadCsv(res.filename, res.csv);
             }}
           />
-          <Button size="sm" onClick={() => { setFormData({ ...emptyForm }); setCreateOpen(true); }}>
+          <Button size="sm" onClick={() => { setFormData({ ...emptyForm }); setCreateQuotationIds([]); setCreateOpen(true); }}>
             <Plus className="w-4 h-4 mr-1" />
             Nova Oportunidade
           </Button>
@@ -439,7 +500,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
               <Label className="text-xs">Anunciante</Label>
               <Select
                 value={formData.clientId ? String(formData.clientId) : "none"}
-                onValueChange={(v) => setFormData({ ...formData, clientId: v === "none" ? undefined : Number(v) })}
+                onValueChange={(v) => { setFormData({ ...formData, clientId: v === "none" ? undefined : Number(v) }); setCreateQuotationIds([]); }}
               >
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
@@ -553,6 +614,47 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                 </SelectContent>
               </Select>
             </div>
+
+            {formData.clientId && (
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Vincular cotações existentes</Label>
+                {createLinkableQuotations.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {createClientQuotationsQuery.isLoading
+                      ? "Carregando cotações..."
+                      : "Nenhuma cotação disponível para este anunciante."}
+                  </p>
+                ) : (
+                  <div className="max-h-40 overflow-y-auto rounded-md border divide-y">
+                    {createLinkableQuotations.map((q: any) => {
+                      const checked = createQuotationIds.includes(q.id);
+                      return (
+                        <label
+                          key={q.id}
+                          className="flex items-center gap-2 px-2.5 py-2 text-xs cursor-pointer hover:bg-muted/50"
+                        >
+                          <input
+                            type="checkbox"
+                            className="accent-primary"
+                            checked={checked}
+                            onChange={(e) =>
+                              setCreateQuotationIds((prev) =>
+                                e.target.checked ? [...prev, q.id] : prev.filter((id) => id !== q.id)
+                              )
+                            }
+                          />
+                          <span className="flex-1 truncate">
+                            <span className="font-medium">{q.quotationNumber}</span>
+                            {q.quotationName ? ` · ${q.quotationName}` : ""}
+                          </span>
+                          <span className="text-muted-foreground shrink-0">{formatCurrency(q.totalValue)}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -565,10 +667,18 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
       </Dialog>
 
       {/* Detail Sheet */}
-      <Sheet open={selectedId != null} onOpenChange={(open) => { if (!open) { setSelectedId(null); setLossReason(""); } }}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{sel?.title ?? "Oportunidade"}</SheetTitle>
+      <Sheet open={selectedId != null} onOpenChange={(open) => { if (!open) { setSelectedId(null); setLossReason(""); setLinkQuotationId(""); } }}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto p-0">
+          <SheetHeader className="px-6 pt-6 pb-4 border-b">
+            <SheetTitle className="text-base leading-tight pr-8">{sel?.title ?? "Oportunidade"}</SheetTitle>
+            {sel && (
+              <Badge
+                variant="outline"
+                className={`mt-1 w-fit text-[10px] px-1.5 py-0 ${OPPORTUNITY_STAGES.find((s) => s.key === sel.stage)?.color ?? ""}`}
+              >
+                {OPPORTUNITY_STAGES.find((s) => s.key === sel.stage)?.label ?? sel.stage}
+              </Badge>
+            )}
           </SheetHeader>
 
           {selected.isLoading && (
@@ -578,41 +688,116 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
           )}
 
           {sel && (
-            <div className="mt-4 space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                <Info label="Estágio" value={OPPORTUNITY_STAGES.find((s) => s.key === sel.stage)?.label ?? sel.stage} />
+            <div className="px-6 py-6 space-y-8 text-sm">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-5">
                 <Info label="Valor estimado" value={formatCurrency(sel.estimatedValue)} />
+                <Info label="Fechamento previsto" value={formatDate(sel.expectedCloseDate)} />
                 <Info label="Anunciante" value={sel.clientName ?? "—"} />
                 <Info label="Responsável" value={[sel.ownerFirstName, sel.ownerLastName].filter(Boolean).join(" ") || "—"} />
-                <Info label="Tipo" value={sel.opportunityType ?? "—"} />
-                <Info label="Receita" value={sel.revenueType ?? "—"} />
+                <Info label="Tipo" value={sel.opportunityType ? (TYPE_LABELS[sel.opportunityType] ?? sel.opportunityType) : "—"} />
+                <Info label="Receita" value={sel.revenueType ? (REVENUE_LABELS[sel.revenueType] ?? sel.revenueType) : "—"} />
                 <Info label="Praça" value={sel.praca ? (PRACA_LABELS[sel.praca] ?? sel.praca) : "—"} />
-                <Info label="Fechamento previsto" value={formatDate(sel.expectedCloseDate)} />
                 <Info label="Parceiro" value={sel.partnerName ?? "—"} />
                 <Info label="Origem" value={sel.source ?? "—"} />
               </div>
 
+              {/* Cotações vinculadas */}
+              <div className="space-y-3 border-t pt-6">
+                <div className="flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                  <Label className="text-xs font-semibold">Cotações vinculadas</Label>
+                </div>
+
+                {(linkedQuotationsQuery.data ?? []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhuma cotação vinculada.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {(linkedQuotationsQuery.data ?? []).map((q: any) => (
+                      <div
+                        key={q.id}
+                        className="flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs"
+                      >
+                        <button
+                          className="flex-1 min-w-0 flex items-center gap-1.5 text-left hover:text-primary transition-colors"
+                          onClick={() => setLocation(`/comercial/cotacoes/${q.id}`)}
+                        >
+                          <span className="font-medium shrink-0">{q.quotationNumber}</span>
+                          <span className="truncate text-muted-foreground">{q.quotationName ?? ""}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0 text-muted-foreground" />
+                        </button>
+                        <span className="text-muted-foreground shrink-0">{formatCurrency(q.totalValue)}</span>
+                        <button
+                          className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                          title="Desvincular"
+                          onClick={() => unlinkQuotationMutation.mutate({ quotationId: q.id, opportunityId: null })}
+                          disabled={unlinkQuotationMutation.isPending}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {sel.clientId ? (
+                  <div className="flex items-center gap-2">
+                    <Select value={linkQuotationId} onValueChange={setLinkQuotationId}>
+                      <SelectTrigger className="h-9 text-xs flex-1">
+                        <SelectValue placeholder="Vincular cotação existente..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {linkableQuotations.length === 0 ? (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">Nenhuma cotação disponível</div>
+                        ) : (
+                          linkableQuotations.map((q: any) => (
+                            <SelectItem key={q.id} value={String(q.id)}>
+                              {q.quotationNumber}{q.quotationName ? ` · ${q.quotationName}` : ""}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 gap-1.5"
+                      disabled={!linkQuotationId || linkQuotationMutation.isPending}
+                      onClick={() =>
+                        linkQuotationMutation.mutate({ quotationId: Number(linkQuotationId), opportunityId: sel.id })
+                      }
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      Vincular
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    Vincule um anunciante à oportunidade para listar cotações existentes.
+                  </p>
+                )}
+
+                {sel.stage === "ganha" && (
+                  <Button
+                    className="w-full gap-1.5"
+                    onClick={() => handleGenerateQuotation(sel)}
+                    disabled={generateQuotationMutation.isPending}
+                  >
+                    <FileText className="w-4 h-4" />
+                    Gerar nova cotação vinculada
+                  </Button>
+                )}
+              </div>
+
               {sel.stage === "perdida" && (
-                <div className="grid gap-1.5">
-                  <Label className="text-xs">Motivo da perda</Label>
+                <div className="grid gap-1.5 border-t pt-6">
+                  <Label className="text-xs font-semibold">Motivo da perda</Label>
                   <p className="text-xs text-muted-foreground">{sel.lossReason || "—"}</p>
                 </div>
               )}
 
-              {sel.stage === "ganha" && (
-                <Button
-                  className="w-full gap-1.5"
-                  onClick={() => handleGenerateQuotation(sel)}
-                  disabled={generateQuotationMutation.isPending}
-                >
-                  <FileText className="w-4 h-4" />
-                  Gerar cotação vinculada
-                </Button>
-              )}
-
               {sel.stage !== "perdida" && (
-                <div className="grid gap-1.5 border-t pt-4">
-                  <Label className="text-xs">Marcar como perdida</Label>
+                <div className="grid gap-2 border-t pt-6">
+                  <Label className="text-xs font-semibold">Marcar como perdida</Label>
                   <Textarea
                     value={lossReason}
                     onChange={(e) => setLossReason(e.target.value)}
@@ -631,11 +816,11 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                 </div>
               )}
 
-              <div className="border-t pt-4">
+              <div className="border-t pt-6">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-destructive hover:text-destructive gap-1.5"
+                  className="text-destructive hover:text-destructive gap-1.5 px-0"
                   onClick={() => {
                     if (confirm("Remover esta oportunidade?")) deleteMutation.mutate({ id: sel.id });
                   }}
@@ -655,9 +840,9 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="text-sm mt-0.5 truncate">{value}</p>
+      <p className="text-sm mt-1 break-words">{value}</p>
     </div>
   );
 }

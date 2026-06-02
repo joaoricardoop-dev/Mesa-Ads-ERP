@@ -1175,6 +1175,10 @@ export default function BudgetCreator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
   const [schedule, setSchedule] = useState<DraftScheduleItem[]>([]);
+  // Vínculo com oportunidade: "none" | "existing" | "new"
+  const [opportunityMode, setOpportunityMode] = useState<"none" | "existing" | "new">("none");
+  const [opportunityId, setOpportunityId] = useState<number | null>(null);
+  const [newOpportunityTitle, setNewOpportunityTitle] = useState("");
 
   const { data: clientsData } = trpc.advertiser.list.useQuery();
   const clientsList = useMemo(() => (clientsData?.items ?? []) as ClientInfo[], [clientsData]);
@@ -1200,8 +1204,17 @@ export default function BudgetCreator() {
   }, [restaurantsList]);
 
   const createQuotation = trpc.quotation.create.useMutation();
+  const createOpportunity = trpc.opportunity.create.useMutation();
   const addItem = trpc.quotation.addItem.useMutation();
   const setBillingSchedule = trpc.billingSchedule.setForQuotation.useMutation();
+
+  const { data: opportunitiesRaw } = trpc.opportunity.list.useQuery();
+  const matchingOpportunities = useMemo(() => {
+    const all = (opportunitiesRaw as any[]) ?? [];
+    if (clientId) return all.filter((o) => o.clientId === clientId);
+    if (leadId) return all.filter((o) => o.leadId === leadId);
+    return [];
+  }, [opportunitiesRaw, clientId, leadId]);
 
   const agencyBVPercent = useMemo(() => {
     const v = parseFloat(agencyCommissionPercent);
@@ -1314,6 +1327,7 @@ export default function BudgetCreator() {
     setClientId(null); setLeadId(null); setIsBonificada(false);
     setDescontoParceiro(false); setPartnerId(null); setDescontoManual(0);
     setAgencyCommissionPercent("20"); setFormaPagamento("boleto"); setNotes(""); setItems([]);
+    setOpportunityMode("none"); setOpportunityId(null); setNewOpportunityTitle("");
   }, []);
 
   const itemCalcs = useMemo(() => {
@@ -1356,6 +1370,21 @@ export default function BudgetCreator() {
     // Header só comporta 1 produto personalizado (campos custom* vivem em quotations).
     if (customItems.length > 1) { toast.error("Apenas um produto personalizado por cotação é permitido."); return; }
 
+    if (opportunityMode === "new" && !newOpportunityTitle.trim()) {
+      toast.error("Informe o título da nova oportunidade");
+      return;
+    }
+    if (opportunityMode === "existing") {
+      if (!opportunityId) {
+        toast.error("Selecione uma oportunidade existente");
+        return;
+      }
+      if (!matchingOpportunities.some((o: any) => o.id === opportunityId)) {
+        toast.error("A oportunidade selecionada não pertence a este anunciante/lead");
+        return;
+      }
+    }
+
     setIsGenerating(true);
     try {
       const cv = hasCustom ? customItems[0].customValues! : null;
@@ -1365,8 +1394,23 @@ export default function BudgetCreator() {
       const customTotal = (isBonificada || !hasCustom) ? 0 : (cv?.calculatedFinalPrice ?? 0);
       const totalValue = (regularTotal + customTotal).toFixed(2);
 
+      // Resolve o vínculo com oportunidade antes de criar a cotação.
+      let resolvedOpportunityId: number | undefined;
+      if (opportunityMode === "existing" && opportunityId) {
+        resolvedOpportunityId = opportunityId;
+      } else if (opportunityMode === "new") {
+        const opp = await createOpportunity.mutateAsync({
+          title: newOpportunityTitle.trim(),
+          clientId: clientId ?? undefined,
+          leadId: leadId ?? undefined,
+          partnerId: (descontoParceiro || agencyBVPercent > 0) ? (partnerId ?? undefined) : undefined,
+        });
+        resolvedOpportunityId = opp.id;
+      }
+
       const quotation = await createQuotation.mutateAsync({
         clientId: clientId ?? undefined, leadId: leadId ?? undefined,
+        opportunityId: resolvedOpportunityId,
         coasterVolume: totalVolume,
         manualDiscountPercent: hasRegular && descontoManual > 0 ? String(descontoManual) : undefined,
         cycles: hasRegular ? Math.round((itemCalcs[0]?.item.semanas ?? 12) / 4) : undefined,
@@ -1431,7 +1475,7 @@ export default function BudgetCreator() {
     } finally {
       setIsGenerating(false);
     }
-  }, [clientId, leadId, itemCalcs, customItems, totals, descontoManual, notes, isBonificada, descontoParceiro, partnerId, createQuotation, addItem, navigate, agencyBVPercent, agencyCommissionPercent, schedule, setBillingSchedule]);
+  }, [clientId, leadId, itemCalcs, customItems, totals, descontoManual, notes, isBonificada, descontoParceiro, partnerId, createQuotation, createOpportunity, opportunityMode, opportunityId, newOpportunityTitle, matchingOpportunities, addItem, navigate, agencyBVPercent, agencyCommissionPercent, schedule, setBillingSchedule]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -1460,7 +1504,7 @@ export default function BudgetCreator() {
               <div className="space-y-2">
                 <div>
                   <Label className="text-xs text-muted-foreground mb-1 block">Anunciante</Label>
-                  <Select value={clientId ? String(clientId) : ""} onValueChange={(v) => { setClientId(Number(v)); setLeadId(null); }}>
+                  <Select value={clientId ? String(clientId) : ""} onValueChange={(v) => { setClientId(Number(v)); setLeadId(null); setOpportunityMode("none"); setOpportunityId(null); setNewOpportunityTitle(""); }}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar cliente..." /></SelectTrigger>
                     <SelectContent>
                       {clientsList.map((c) => (<SelectItem key={c.id} value={String(c.id)}>{c.company || c.name}</SelectItem>))}
@@ -1470,7 +1514,7 @@ export default function BudgetCreator() {
                 {!clientId && (
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1 block">Lead</Label>
-                    <Select value={leadId ? String(leadId) : ""} onValueChange={(v) => { setLeadId(Number(v)); setClientId(null); }}>
+                    <Select value={leadId ? String(leadId) : ""} onValueChange={(v) => { setLeadId(Number(v)); setClientId(null); setOpportunityMode("none"); setOpportunityId(null); setNewOpportunityTitle(""); }}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar lead..." /></SelectTrigger>
                       <SelectContent>
                         {leadsList.map((l: any) => (<SelectItem key={l.id} value={String(l.id)}>{l.company || l.name}</SelectItem>))}
@@ -1479,6 +1523,57 @@ export default function BudgetCreator() {
                   </div>
                 )}
               </div>
+
+              {(clientId || leadId) && (
+                <div className="space-y-2 rounded-md border border-border/50 p-2.5">
+                  <Label className="text-xs text-muted-foreground block">Oportunidade (CRM)</Label>
+                  <ToggleGroup
+                    type="single"
+                    value={opportunityMode}
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      setOpportunityMode(v as typeof opportunityMode);
+                      setOpportunityId(null);
+                      setNewOpportunityTitle("");
+                    }}
+                    className="justify-start gap-1"
+                  >
+                    <ToggleGroupItem value="none" className="h-7 text-[11px] px-2.5 flex-1">Nenhuma</ToggleGroupItem>
+                    <ToggleGroupItem value="existing" className="h-7 text-[11px] px-2.5 flex-1">Associar</ToggleGroupItem>
+                    <ToggleGroupItem value="new" className="h-7 text-[11px] px-2.5 flex-1">Nova</ToggleGroupItem>
+                  </ToggleGroup>
+
+                  {opportunityMode === "existing" && (
+                    <Select
+                      value={opportunityId ? String(opportunityId) : ""}
+                      onValueChange={(v) => setOpportunityId(Number(v))}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Selecionar oportunidade..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {matchingOpportunities.length === 0 ? (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">Nenhuma oportunidade para este {clientId ? "anunciante" : "lead"}</div>
+                        ) : (
+                          matchingOpportunities.map((o: any) => (
+                            <SelectItem key={o.id} value={String(o.id)}>{o.title}</SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {opportunityMode === "new" && (
+                    <Input
+                      value={newOpportunityTitle}
+                      onChange={(e) => setNewOpportunityTitle(e.target.value)}
+                      placeholder="Título da nova oportunidade"
+                      className="h-8 text-xs"
+                    />
+                  )}
+                </div>
+              )}
+
               {selectedClient && <ClientQualificationCard client={selectedClient} />}
             </section>
 

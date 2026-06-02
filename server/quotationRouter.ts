@@ -1,7 +1,7 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices, seasonalMultipliers, campaignPhases, campaignItems } from "../drizzle/schema";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices, seasonalMultipliers, campaignPhases, campaignItems, opportunities } from "../drizzle/schema";
 import { LOSS_REASON_CODES } from "../shared/loss-reasons";
 import { QUOTATION_DEFAULT_VALIDITY_DAYS, addDaysISO } from "../shared/commercial-config";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
@@ -96,6 +96,7 @@ export const quotationRouter = router({
       status: z.enum(["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]).optional(),
       clientId: z.number().optional(),
       leadId: z.number().optional(),
+      opportunityId: z.number().optional(),
     }).optional())
     .query(async ({ input }) => {
       const db = await getDatabase();
@@ -103,6 +104,7 @@ export const quotationRouter = router({
       if (input?.status) conditions.push(eq(quotations.status, input.status));
       if (input?.clientId) conditions.push(eq(quotations.clientId, input.clientId));
       if (input?.leadId) conditions.push(eq(quotations.leadId, input.leadId));
+      if (input?.opportunityId) conditions.push(eq(quotations.opportunityId, input.opportunityId));
 
       const rows = await db
         .select({
@@ -111,6 +113,7 @@ export const quotationRouter = router({
           quotationName: quotations.quotationName,
           clientId: quotations.clientId,
           leadId: quotations.leadId,
+          opportunityId: quotations.opportunityId,
           coasterVolume: quotations.coasterVolume,
           manualDiscountPercent: quotations.manualDiscountPercent,
           networkProfile: quotations.networkProfile,
@@ -405,6 +408,48 @@ export const quotationRouter = router({
       }
 
       return created;
+    }),
+
+  linkOpportunity: comercialProcedure
+    .input(z.object({
+      quotationId: z.number(),
+      opportunityId: z.number().nullable(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+
+      const [quotation] = await db
+        .select({ id: quotations.id, clientId: quotations.clientId, leadId: quotations.leadId })
+        .from(quotations)
+        .where(eq(quotations.id, input.quotationId))
+        .limit(1);
+      if (!quotation) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
+
+      // Ao vincular (opportunityId != null), exige que cotação e oportunidade
+      // pertençam ao mesmo anunciante/lead — evita vínculos cruzados.
+      if (input.opportunityId != null) {
+        const [opp] = await db
+          .select({ id: opportunities.id, clientId: opportunities.clientId, leadId: opportunities.leadId })
+          .from(opportunities)
+          .where(eq(opportunities.id, input.opportunityId))
+          .limit(1);
+        if (!opp) throw new TRPCError({ code: "NOT_FOUND", message: "Oportunidade não encontrada" });
+        const sameClient = quotation.clientId != null && quotation.clientId === opp.clientId;
+        const sameLead = quotation.leadId != null && quotation.leadId === opp.leadId;
+        if (!sameClient && !sameLead) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "A cotação e a oportunidade devem pertencer ao mesmo anunciante ou lead.",
+          });
+        }
+      }
+
+      const [updated] = await db
+        .update(quotations)
+        .set({ opportunityId: input.opportunityId, updatedAt: new Date() })
+        .where(eq(quotations.id, input.quotationId))
+        .returning();
+      return updated;
     }),
 
   update: comercialProcedure

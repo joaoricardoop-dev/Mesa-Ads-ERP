@@ -1,8 +1,8 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { opportunities, partners, leads } from "../drizzle/schema";
-import { eq, sql } from "drizzle-orm";
+import { opportunities, partners, leads, quotations } from "../drizzle/schema";
+import { eq, sql, inArray, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
 import { ensureContact } from "./contactSync";
@@ -186,6 +186,7 @@ export const opportunityRouter = router({
       praca: z.enum(["manaus", "rio", "ambas"]).nullable().optional(),
       source: z.string().nullable().optional(),
       partnerId: z.number().nullable().optional(),
+      quotationIds: z.array(z.number()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDatabase();
@@ -222,6 +223,22 @@ export const opportunityRouter = router({
         await syncOpportunityContact(db, { leadId: created.leadId, clientId: created.clientId });
       } catch (err) {
         console.error("Failed to sync contact on opportunity create:", err);
+      }
+
+      if (input.quotationIds && input.quotationIds.length > 0) {
+        // Só vincula cotações que pertençam ao mesmo anunciante/lead da
+        // oportunidade — evita vínculos cruzados via IDs forjados/obsoletos.
+        const ownerCondition = created.clientId != null
+          ? eq(quotations.clientId, created.clientId)
+          : created.leadId != null
+            ? eq(quotations.leadId, created.leadId)
+            : null;
+        if (ownerCondition) {
+          await db
+            .update(quotations)
+            .set({ opportunityId: created.id, updatedAt: new Date() })
+            .where(and(inArray(quotations.id, input.quotationIds), ownerCondition));
+        }
       }
 
       return created;
