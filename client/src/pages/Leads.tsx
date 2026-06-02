@@ -64,6 +64,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import OpportunitiesBoard from "./OpportunitiesBoard";
+import { CsvExportButton, downloadCsv, type CsvExportRange } from "@/components/CsvExportButton";
+
+export type ContactRecordFilter =
+  | { kind: "lead" | "client" | "restaurant"; id: number; label: string }
+  | null;
 
 const STAGES = [
   { key: "novo", label: "Novo", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
@@ -337,6 +342,7 @@ export default function Leads() {
   const [activeTab, setActiveTab] = useState<LeadType | "oportunidades" | "contatos">("anunciante");
   const [contactSearch, setContactSearch] = useState("");
   const [contactOwnerFilter, setContactOwnerFilter] = useState<"all" | "anunciante" | "restaurante" | "lead">("all");
+  const [contactRecordFilter, setContactRecordFilter] = useState<ContactRecordFilter>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState<"cnpj" | "form">("form");
   const [cnpjInput, setCnpjInput] = useState("");
@@ -385,9 +391,19 @@ export default function Leads() {
     {
       search: contactSearch.trim() || undefined,
       ownerType: contactOwnerFilter === "all" ? undefined : contactOwnerFilter,
+      leadId: contactRecordFilter?.kind === "lead" ? contactRecordFilter.id : undefined,
+      clientId: contactRecordFilter?.kind === "client" ? contactRecordFilter.id : undefined,
+      restaurantId: contactRecordFilter?.kind === "restaurant" ? contactRecordFilter.id : undefined,
     },
     { enabled: activeTab === "contatos" },
   );
+
+  function viewContactsForRecord(filter: NonNullable<ContactRecordFilter>) {
+    setContactRecordFilter(filter);
+    setContactSearch("");
+    setContactOwnerFilter("all");
+    setActiveTab("contatos");
+  }
 
   const selectedLead = trpc.lead.get.useQuery(
     { id: selectedLeadId! },
@@ -992,7 +1008,36 @@ export default function Leads() {
               <SelectItem value="lead">Leads</SelectItem>
             </SelectContent>
           </Select>
+          <CsvExportButton
+            onExport={async (range) => {
+              const res = await utils.contact.exportCsv.fetch({
+                search: contactSearch.trim() || undefined,
+                ownerType: contactOwnerFilter === "all" ? undefined : contactOwnerFilter,
+                leadId: contactRecordFilter?.kind === "lead" ? contactRecordFilter.id : undefined,
+                clientId: contactRecordFilter?.kind === "client" ? contactRecordFilter.id : undefined,
+                restaurantId: contactRecordFilter?.kind === "restaurant" ? contactRecordFilter.id : undefined,
+                dateFrom: range.dateFrom,
+                dateTo: range.dateTo,
+              });
+              downloadCsv(res.filename, res.csv);
+            }}
+          />
         </div>
+
+        {contactRecordFilter && (
+          <div className="flex items-center gap-2 text-xs">
+            <Badge className="bg-primary/15 text-primary border-primary/30 gap-1.5">
+              <Users className="w-3 h-3" />
+              Filtrando por: {contactRecordFilter.label}
+            </Badge>
+            <button
+              onClick={() => setContactRecordFilter(null)}
+              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-3 h-3" /> Limpar filtro
+            </button>
+          </div>
+        )}
 
         {contactsDirectory.isLoading ? (
           <div className="text-sm text-muted-foreground py-8 text-center">Carregando contatos...</div>
@@ -1148,6 +1193,13 @@ export default function Leads() {
                     </td>
                     <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-0.5 justify-end">
+                        <button
+                          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => viewContactsForRecord({ kind: "lead", id: lead.id, label: lead.name })}
+                          title="Ver contatos"
+                        >
+                          <Users className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
                           disabled={lead.stage === "novo"}
@@ -1550,29 +1602,41 @@ export default function Leads() {
           </TabsList>
 
           {(activeTab === "anunciante" || activeTab === "restaurante") && (
-            <div className="flex items-center rounded-md border border-border overflow-hidden">
-              <button
-                onClick={() => setViewMode("kanban")}
-                className={`flex items-center gap-1.5 px-2.5 h-8 text-xs transition-colors ${viewMode === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-                title="Visão Kanban"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Kanban</span>
-              </button>
-              <button
-                onClick={() => setViewMode("list")}
-                className={`flex items-center gap-1.5 px-2.5 h-8 text-xs transition-colors border-l border-border ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-                title="Visão em Lista"
-              >
-                <List className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Lista</span>
-              </button>
+            <div className="flex items-center gap-2">
+              <CsvExportButton
+                onExport={async (range) => {
+                  const res = await utils.lead.exportCsv.fetch({
+                    type: activeTab as "anunciante" | "restaurante",
+                    dateFrom: range.dateFrom,
+                    dateTo: range.dateTo,
+                  });
+                  downloadCsv(res.filename, res.csv);
+                }}
+              />
+              <div className="flex items-center rounded-md border border-border overflow-hidden">
+                <button
+                  onClick={() => setViewMode("kanban")}
+                  className={`flex items-center gap-1.5 px-2.5 h-8 text-xs transition-colors ${viewMode === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                  title="Visão Kanban"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Kanban</span>
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`flex items-center gap-1.5 px-2.5 h-8 text-xs transition-colors border-l border-border ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                  title="Visão em Lista"
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Lista</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
 
         <TabsContent value={activeTab} className="mt-4">
-          {activeTab === "contatos" ? renderContactsView() : activeTab === "oportunidades" ? <OpportunitiesBoard /> : viewMode === "list" ? renderListView() : (
+          {activeTab === "contatos" ? renderContactsView() : activeTab === "oportunidades" ? <OpportunitiesBoard onViewContacts={viewContactsForRecord} /> : viewMode === "list" ? renderListView() : (
           <div className="overflow-x-auto pb-4 -mx-2 px-2">
             <div className="inline-flex gap-3">
               {leadsByStage.map((column, colIdx) => {
@@ -1731,9 +1795,13 @@ export default function Leads() {
                           >
                             <ChevronLeft className="w-3 h-3" />
                           </Button>
-                          <span className="text-[9px] text-muted-foreground">
-                            {formatDate(lead.updatedAt)}
-                          </span>
+                          <button
+                            className="inline-flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={(e) => { e.stopPropagation(); viewContactsForRecord({ kind: "lead", id: lead.id, label: lead.name }); }}
+                            title="Ver contatos"
+                          >
+                            <Users className="w-3 h-3" /> Contatos
+                          </button>
                           <Button
                             variant="ghost"
                             size="icon"

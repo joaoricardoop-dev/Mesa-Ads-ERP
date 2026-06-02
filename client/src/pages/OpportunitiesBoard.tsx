@@ -19,8 +19,13 @@ import {
   Trash2,
   FileText,
   Loader2,
+  Sprout,
+  RotateCcw,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { CsvExportButton, downloadCsv } from "@/components/CsvExportButton";
+import type { ContactRecordFilter } from "./Leads";
 
 export const OPPORTUNITY_STAGES = [
   { key: "qualificada", label: "Qualificada", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
@@ -62,9 +67,11 @@ function formatDate(d: string | Date | null | undefined) {
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
-export default function OpportunitiesBoard() {
+export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?: (filter: NonNullable<ContactRecordFilter>) => void }) {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+
+  const [farmingOnly, setFarmingOnly] = useState(false);
 
   const opportunitiesQuery = trpc.opportunity.list.useQuery();
   const clientsList = trpc.advertiser.list.useQuery();
@@ -109,6 +116,14 @@ export default function OpportunitiesBoard() {
     onSuccess: () => {
       toast.success("Oportunidade removida");
       setSelectedId(null);
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const reactivateMutation = trpc.opportunity.reactivate.useMutation({
+    onSuccess: () => {
+      toast.success("Oportunidade reativada do farming");
       invalidate();
     },
     onError: (e) => toast.error(e.message),
@@ -202,23 +217,54 @@ export default function OpportunitiesBoard() {
     });
   }
 
+  const visibleOpportunities = farmingOnly
+    ? opportunities.filter((o: any) => o.farmingStatus)
+    : opportunities;
+
+  const farmingCount = opportunities.filter((o: any) => o.farmingStatus).length;
+
   const oppsByStage = OPPORTUNITY_STAGES.map((stage) => ({
     ...stage,
-    items: opportunities.filter((o: any) => o.stage === stage.key),
+    items: visibleOpportunities.filter((o: any) => o.stage === stage.key),
   }));
 
   const sel = selected.data as any;
 
   return (
     <div className="mt-4 space-y-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <p className="text-xs text-muted-foreground">
           Funil de negócios — um anunciante pode ter várias oportunidades simultâneas.
         </p>
-        <Button size="sm" onClick={() => { setFormData({ ...emptyForm }); setCreateOpen(true); }}>
-          <Plus className="w-4 h-4 mr-1" />
-          Nova Oportunidade
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={farmingOnly ? "default" : "outline"}
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setFarmingOnly((v) => !v)}
+            title="Filtrar oportunidades em farming"
+          >
+            <Sprout className="w-3.5 h-3.5" />
+            Farming
+            {farmingCount > 0 && (
+              <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px]">{farmingCount}</Badge>
+            )}
+          </Button>
+          <CsvExportButton
+            onExport={async (range) => {
+              const res = await utils.opportunity.exportCsv.fetch({
+                farmingStatus: farmingOnly ? "pausado" : undefined,
+                dateFrom: range.dateFrom,
+                dateTo: range.dateTo,
+              });
+              downloadCsv(res.filename, res.csv);
+            }}
+          />
+          <Button size="sm" onClick={() => { setFormData({ ...emptyForm }); setCreateOpen(true); }}>
+            <Plus className="w-4 h-4 mr-1" />
+            Nova Oportunidade
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-x-auto pb-4 -mx-2 px-2">
@@ -282,6 +328,12 @@ export default function OpportunitiesBoard() {
                       {opp.praca && (
                         <Badge variant="secondary" className="text-[9px] h-3.5 px-1">{PRACA_LABELS[opp.praca] ?? opp.praca}</Badge>
                       )}
+                      {opp.farmingStatus && (
+                        <Badge className="text-[9px] h-3.5 px-1 bg-lime-500/15 text-lime-600 border-lime-500/30 gap-0.5">
+                          <Sprout className="w-2.5 h-2.5" />
+                          Farming
+                        </Badge>
+                      )}
                     </div>
 
                     {opp.partnerName && (
@@ -304,6 +356,19 @@ export default function OpportunitiesBoard() {
                       </Button>
                     )}
 
+                    {opp.farmingStatus && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full h-6 mt-2 text-[10px] gap-1 border-lime-500/40 text-lime-600 hover:bg-lime-500/10"
+                        onClick={(e) => { e.stopPropagation(); reactivateMutation.mutate({ id: opp.id }); }}
+                        disabled={reactivateMutation.isPending}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Reativar
+                      </Button>
+                    )}
+
                     <div className="flex items-center justify-between mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
@@ -314,7 +379,18 @@ export default function OpportunitiesBoard() {
                       >
                         <ChevronLeft className="w-3 h-3" />
                       </Button>
-                      <span className="text-[9px] text-muted-foreground">{formatDate(opp.updatedAt)}</span>
+                      <button
+                        className="inline-flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (opp.clientId) onViewContacts?.({ kind: "client", id: opp.clientId, label: opp.clientName || opp.title });
+                          else if (opp.leadId) onViewContacts?.({ kind: "lead", id: opp.leadId, label: opp.title });
+                          else toast.error("Oportunidade sem anunciante ou lead vinculado");
+                        }}
+                        title="Ver contatos"
+                      >
+                        <Users className="w-3 h-3" /> Contatos
+                      </button>
                       <Button
                         variant="ghost"
                         size="icon"

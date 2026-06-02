@@ -8,6 +8,7 @@ import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
 import { sendEmail } from "./email";
 import { ensureContact } from "./contactSync";
+import { toCsv } from "./_core/csv";
 
 async function getDatabase() {
   const d = await getDb();
@@ -46,6 +47,56 @@ export const leadRouter = router({
       `);
 
       return rows.rows as any[];
+    }),
+
+  exportCsv: protectedProcedure
+    .input(z.object({
+      type: z.enum(["anunciante", "restaurante"]).optional(),
+      stage: z.string().optional(),
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const conditions = [];
+      if (input?.type) conditions.push(sql`l."type" = ${input.type}`);
+      if (input?.stage) conditions.push(sql`l."stage" = ${input.stage}`);
+      if (input?.dateFrom) conditions.push(sql`l."createdAt" >= ${input.dateFrom}`);
+      if (input?.dateTo) conditions.push(sql`l."createdAt" < (${input.dateTo}::date + interval '1 day')`);
+      const whereSql = conditions.length ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
+
+      const rows = await db.execute(sql`
+        SELECT l.*,
+          "at"."first_name" AS "assignedToFirstName",
+          "at"."last_name" AS "assignedToLastName",
+          "cl"."name" AS "clientName",
+          "p"."name" AS "partnerName"
+        FROM leads l
+        LEFT JOIN users "at" ON l."assignedTo" = "at"."id"
+        LEFT JOIN clients "cl" ON l."client_id" = "cl"."id"
+        LEFT JOIN partners "p" ON l."partnerId" = "p"."id"
+        ${whereSql}
+        ORDER BY l."createdAt" DESC
+      `);
+
+      const headers = ["ID", "Tipo", "Nome", "Empresa", "CNPJ", "Estágio", "Contato", "Telefone", "E-mail", "Origem", "Cidade/UF", "Responsável", "Parceiro", "Criado em"];
+      const data = (rows.rows as any[]).map((r) => [
+        r.id,
+        r.type,
+        r.name,
+        r.company,
+        r.cnpj,
+        r.stage,
+        r.contactName,
+        r.contactPhone,
+        r.contactEmail,
+        r.origin,
+        [r.city, r.state].filter(Boolean).join("/"),
+        [r.assignedToFirstName, r.assignedToLastName].filter(Boolean).join(" "),
+        r.partnerName,
+        r.createdAt ? new Date(r.createdAt).toLocaleDateString("pt-BR") : "",
+      ]);
+      return { filename: `leads-${new Date().toISOString().slice(0, 10)}.csv`, csv: toCsv(headers, data) };
     }),
 
   get: protectedProcedure

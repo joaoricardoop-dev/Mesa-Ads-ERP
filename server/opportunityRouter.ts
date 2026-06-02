@@ -6,6 +6,7 @@ import { eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
 import { ensureContact } from "./contactSync";
+import { toCsv } from "./_core/csv";
 
 async function getDatabase() {
   const d = await getDb();
@@ -91,6 +92,60 @@ export const opportunityRouter = router({
       `);
 
       return rows.rows as any[];
+    }),
+
+  exportCsv: protectedProcedure
+    .input(z.object({
+      stage: z.string().optional(),
+      ownerId: z.string().optional(),
+      clientId: z.number().optional(),
+      farmingStatus: z.string().optional(),
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const conditions = [];
+      if (input?.stage) conditions.push(sql`o."stage" = ${input.stage}`);
+      if (input?.ownerId) conditions.push(sql`o."ownerId" = ${input.ownerId}`);
+      if (input?.clientId) conditions.push(sql`o."clientId" = ${input.clientId}`);
+      if (input?.farmingStatus) conditions.push(sql`o."farmingStatus" = ${input.farmingStatus}`);
+      if (input?.dateFrom) conditions.push(sql`o."createdAt" >= ${input.dateFrom}`);
+      if (input?.dateTo) conditions.push(sql`o."createdAt" < (${input.dateTo}::date + interval '1 day')`);
+      const whereSql = conditions.length ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
+
+      const rows = await db.execute(sql`
+        SELECT o.*,
+          "ow"."first_name" AS "ownerFirstName",
+          "ow"."last_name" AS "ownerLastName",
+          "cl"."name" AS "clientName",
+          "p"."name" AS "partnerName"
+        FROM opportunities o
+        LEFT JOIN users "ow" ON o."ownerId" = "ow"."id"
+        LEFT JOIN clients "cl" ON o."clientId" = "cl"."id"
+        LEFT JOIN partners "p" ON o."partnerId" = "p"."id"
+        ${whereSql}
+        ORDER BY o."createdAt" DESC
+      `);
+
+      const headers = ["ID", "Título", "Anunciante", "Estágio", "Valor estimado", "Tipo", "Receita", "Praça", "Responsável", "Parceiro", "Farming", "Tags farming", "Fechamento previsto", "Criado em"];
+      const data = (rows.rows as any[]).map((r) => [
+        r.id,
+        r.title,
+        r.clientName,
+        r.stage,
+        r.estimatedValue,
+        r.opportunityType,
+        r.revenueType,
+        r.praca,
+        [r.ownerFirstName, r.ownerLastName].filter(Boolean).join(" "),
+        r.partnerName,
+        r.farmingStatus,
+        r.farmingTags,
+        r.expectedCloseDate ? new Date(r.expectedCloseDate).toLocaleDateString("pt-BR") : "",
+        r.createdAt ? new Date(r.createdAt).toLocaleDateString("pt-BR") : "",
+      ]);
+      return { filename: `oportunidades-${new Date().toISOString().slice(0, 10)}.csv`, csv: toCsv(headers, data) };
     }),
 
   get: protectedProcedure
@@ -235,6 +290,36 @@ export const opportunityRouter = router({
         clientId: updated.clientId ?? null,
         partnerId: updated.partnerId ?? null,
         message: `Oportunidade ${updated.title} avançou para: ${input.stage}`,
+      });
+
+      return updated;
+    }),
+
+  reactivate: comercialProcedure
+    .input(z.object({
+      id: z.number(),
+      stage: z.string().default("qualificada"),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+      const [updated] = await db
+        .update(opportunities)
+        .set({
+          farmingStatus: null,
+          farmingTags: null,
+          stage: input.stage,
+          updatedAt: new Date(),
+        })
+        .where(eq(opportunities.id, input.id))
+        .returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Oportunidade não encontrada" });
+
+      await createCrmNotification(db, {
+        eventType: "opportunity_stage_changed",
+        leadId: updated.leadId ?? null,
+        clientId: updated.clientId ?? null,
+        partnerId: updated.partnerId ?? null,
+        message: `Oportunidade ${updated.title} reativada do farming para: ${input.stage}`,
       });
 
       return updated;
