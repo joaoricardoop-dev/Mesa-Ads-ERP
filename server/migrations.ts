@@ -1921,6 +1921,31 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
         );
     `,
   },
+  {
+    // Task #241 — Remapeia os estágios genéricos legados dos leads de ANUNCIANTE
+    // para o novo funil SDR (`SDR_STAGES` em client/src/pages/Leads.tsx). A série
+    // CRM só havia remapeado leads de restaurante (task_228) — os de anunciante
+    // continuaram em `contato`/`qualificado`/`proposta`/`negociacao`/`ganho`/
+    // `perdido`, que não existem como coluna no quadro SDR, então sumiam do board.
+    // A Task #240 reabriu as oportunidades órfãs mas não tocou no estágio do lead.
+    // Mapa confirmado com o usuário (mesmo padrão da task_228):
+    //   contato    → conectado
+    //   qualificado→ qualificacao_bant
+    //   proposta   → reuniao_agendada
+    //   negociacao → reuniao_agendada
+    //   ganho      → qualificado_handoff
+    //   perdido    → desqualificado
+    // `novo` já é um estágio válido do SDR, então fica intacto. Idempotente:
+    // após rodar, os estágios de origem não existem mais para anunciantes.
+    name: "task_241_map_anunciante_leads_to_sdr_stages",
+    sql: `
+      UPDATE "leads" SET "stage" = 'conectado' WHERE "type" = 'anunciante' AND "stage" = 'contato';
+      UPDATE "leads" SET "stage" = 'qualificacao_bant' WHERE "type" = 'anunciante' AND "stage" = 'qualificado';
+      UPDATE "leads" SET "stage" = 'reuniao_agendada' WHERE "type" = 'anunciante' AND "stage" IN ('proposta', 'negociacao');
+      UPDATE "leads" SET "stage" = 'qualificado_handoff' WHERE "type" = 'anunciante' AND "stage" = 'ganho';
+      UPDATE "leads" SET "stage" = 'desqualificado' WHERE "type" = 'anunciante' AND "stage" = 'perdido';
+    `,
+  },
 ];
 
 export async function runMigrations() {
