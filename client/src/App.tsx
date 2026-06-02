@@ -167,40 +167,40 @@ const clerkAppearance = {
     fontFamily:
       '"DM Sans", "DM Sans Variable", ui-sans-serif, system-ui, sans-serif',
     colorPrimary: "#00e640",
-    colorBackground: "#0a0a0c",
+    colorBackground: "#17171b",
     colorText: "#f5f5f3",
-    colorTextSecondary: "#a6a6aa",
-    colorInputBackground: "#141416",
+    colorTextSecondary: "#c2c2c6",
+    colorInputBackground: "#0b0b0d",
     colorInputText: "#f5f5f3",
     colorDanger: "#ff2e8a",
     borderRadius: "0.75rem",
   },
   elements: {
     rootBox: "mx-auto",
-    card: "bg-[#0a0a0c] border border-white/8 shadow-2xl rounded-2xl",
+    card: "bg-[#17171b] border border-white/15 shadow-2xl rounded-2xl",
     headerTitle:
       "text-[#f5f5f3] font-display tracking-tight text-2xl font-semibold",
-    headerSubtitle: "text-[#a6a6aa] text-sm",
+    headerSubtitle: "text-[#c2c2c6] text-sm",
     formFieldLabel:
-      "text-[#a6a6aa] label-mono text-[10px] tracking-[0.18em]",
+      "text-[#c2c2c6] label-mono text-[10px] tracking-[0.18em]",
     formFieldInput:
-      "bg-[#141416] border-white/8 text-[#f5f5f3] rounded-lg focus:border-[#00e640]/60 focus:ring-1 focus:ring-[#00e640]/40",
+      "bg-[#0b0b0d] border-white/15 text-[#f5f5f3] placeholder:text-[#8a8a8f] rounded-lg focus:border-[#00e640]/70 focus:ring-1 focus:ring-[#00e640]/40",
     formButtonPrimary:
       "bg-[#00e640] hover:bg-[#00c238] text-[#040405] font-semibold tracking-tight rounded-lg shadow-[0_0_0_1px_rgba(0,230,64,0.4)] transition-all",
     footer: "hidden",
     footerAction: "hidden",
     footerActionLink: "hidden",
     socialButtonsBlockButton:
-      "border-white/8 text-[#f5f5f3]/85 hover:bg-white/[0.04] rounded-lg",
-    socialButtonsBlockButtonText: "text-[#f5f5f3]/85 font-medium",
-    dividerLine: "bg-white/8",
-    dividerText: "text-[#a6a6aa] label-mono text-[10px]",
-    identityPreview: "bg-[#141416] border-white/8 rounded-lg",
+      "border-white/15 bg-white/[0.04] text-[#f5f5f3] hover:bg-white/[0.09] rounded-lg",
+    socialButtonsBlockButtonText: "text-[#f5f5f3] font-medium",
+    dividerLine: "bg-white/15",
+    dividerText: "text-[#c2c2c6] label-mono text-[10px]",
+    identityPreview: "bg-[#0b0b0d] border-white/15 rounded-lg",
     identityPreviewText: "text-[#f5f5f3]",
     identityPreviewEditButton: "text-[#00e640] hover:text-[#00c238]",
-    formFieldInputShowPasswordButton: "text-[#a6a6aa]",
+    formFieldInputShowPasswordButton: "text-[#c2c2c6] hover:text-[#f5f5f3]",
     otpCodeFieldInput:
-      "bg-[#141416] border-white/8 text-[#f5f5f3] rounded-lg focus:border-[#00e640]/60",
+      "bg-[#0b0b0d] border-white/15 text-[#f5f5f3] rounded-lg focus:border-[#00e640]/70",
   },
 };
 
