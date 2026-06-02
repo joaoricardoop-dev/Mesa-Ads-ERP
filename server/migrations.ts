@@ -1871,6 +1871,56 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
         );
     `,
   },
+  {
+    // Task #240 — Reabrir oportunidades órfãs da migração CRM.
+    // A série CRM (1–5) só remapeou leads de RESTAURANTE para o novo funil de
+    // venue. Os leads de ANUNCIANTE ficaram nos estágios do funil genérico
+    // legado (`contato`, `qualificado`, `proposta`, `negociacao`, `ganho`), que
+    // não existem como coluna no funil SDR atual — então sumiram do quadro.
+    // Este backfill cria, para cada um desses leads, UMA oportunidade no
+    // primeiro estágio do funil de oportunidades (`qualificada`), preservando o
+    // vínculo com o lead de origem (`leadId`) e, quando o lead já havia sido
+    // convertido em cliente, também com esse cliente (`clientId`).
+    //
+    // - `title` vem do nome do lead.
+    // - `clientId` resolve para o cliente convertido SOMENTE quando ele existe
+    //   de fato na tabela `clients` (subquery retorna NULL caso contrário — ex.:
+    //   lead "Solar Neo Energia", convertido sem cliente correspondente). Não
+    //   consideramos `convertedToId` quando o lead aponta para uma oportunidade
+    //   (`convertedToType = 'opportunity'`) para não confundir ids.
+    // - `praca` é copiada do lead quando é um valor conhecido do funil.
+    // - `source = 'crm_reopen_migracao'` marca este backfill e serve de chave de
+    //   idempotência: re-execuções (boot/deploy repetidos) não criam duplicatas.
+    //
+    // NÃO alteramos o lead de origem (estágio, convertedToId/Type permanecem),
+    // só criamos a oportunidade. O remapeamento do estágio do lead para o funil
+    // SDR é problema separado (out of scope).
+    name: "task_240_reopen_orphan_advertiser_opportunities",
+    sql: `
+      INSERT INTO opportunities ("title", "leadId", "clientId", "stage", "praca", "source", "createdAt", "updatedAt")
+      SELECT
+        l."name",
+        l."id",
+        (
+          SELECT c."id" FROM clients c
+          WHERE c."id" = COALESCE(
+            l."client_id",
+            CASE WHEN l."convertedToType" IS DISTINCT FROM 'opportunity' THEN l."convertedToId" END
+          )
+        ),
+        'qualificada',
+        CASE WHEN l."praca" IN ('manaus', 'rio', 'ambas') THEN l."praca" ELSE NULL END,
+        'crm_reopen_migracao',
+        NOW(), NOW()
+      FROM leads l
+      WHERE l."type" = 'anunciante'
+        AND l."stage" IN ('contato', 'qualificado', 'proposta', 'negociacao', 'ganho')
+        AND NOT EXISTS (
+          SELECT 1 FROM opportunities o
+          WHERE o."leadId" = l."id" AND o."source" = 'crm_reopen_migracao'
+        );
+    `,
+  },
 ];
 
 export async function runMigrations() {
