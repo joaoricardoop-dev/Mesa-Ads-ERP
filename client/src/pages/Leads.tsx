@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, Link } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
 import PageContainer from "@/components/PageContainer";
 import Confetti from "@/components/Confetti";
 import { trpc } from "@/lib/trpc";
@@ -364,6 +365,7 @@ export default function Leads() {
   const [contactFormOpen, setContactFormOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "" });
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [sdrFilter, setSdrFilter] = useState<string>("all");
   const [listSearch, setListSearch] = useState("");
   const [listSortField, setListSortField] = useState<"stage" | "name" | "updatedAt">("stage");
   const [listSortDir, setListSortDir] = useState<"asc" | "desc">("asc");
@@ -444,6 +446,41 @@ export default function Leads() {
   const closers = trpc.lead.listClosers.useQuery();
   const clientsList = trpc.advertiser.list.useQuery();
   const partnersList = trpc.partner.list.useQuery();
+
+  const { user: currentUser } = useAuth();
+  const currentUserId = currentUser?.id ?? null;
+
+  const usersById = useMemo(() => {
+    const m = new Map<string, { isSdr: boolean; isCloser: boolean }>();
+    for (const u of internalUsers.data ?? []) {
+      m.set(u.id, { isSdr: !!u.isSdr, isCloser: !!u.isCloser });
+    }
+    return m;
+  }, [internalUsers.data]);
+
+  const sdrUsers = useMemo(
+    () => (internalUsers.data ?? []).filter((u) => u.isSdr),
+    [internalUsers.data],
+  );
+
+  const currentUserIsSdr = currentUserId ? usersById.get(currentUserId)?.isSdr ?? false : false;
+
+  function roleBadges(userId: string | null | undefined, size: "sm" | "xs" = "sm") {
+    if (!userId) return null;
+    const roles = usersById.get(userId);
+    if (!roles || (!roles.isSdr && !roles.isCloser)) return null;
+    const cls = size === "xs" ? "text-[8px] h-3.5 px-1" : "text-[9px] h-4 px-1.5";
+    return (
+      <>
+        {roles.isSdr && (
+          <Badge className={`${cls} bg-indigo-500/15 text-indigo-500 border-indigo-500/30`}>SDR</Badge>
+        )}
+        {roles.isCloser && (
+          <Badge className={`${cls} bg-emerald-500/15 text-emerald-600 border-emerald-500/30`}>Closer</Badge>
+        )}
+      </>
+    );
+  }
 
   const cnpjClean = cnpjInput.replace(/\D/g, "");
   const { isFetching: isCnpjLoading, error: cnpjError, refetch: fetchCnpj } = trpc.cnpj.lookup.useQuery(
@@ -917,14 +954,21 @@ export default function Leads() {
 
   const boardStages = activeTab === "restaurante" ? VENUE_STAGES : SDR_STAGES;
 
+  const sdrFilteredLeads = leads.filter((l) => {
+    if (sdrFilter === "all") return true;
+    const ownerId = (l.assignedTo as string | null) ?? null;
+    if (sdrFilter === "mine") return ownerId === currentUserId;
+    return ownerId === sdrFilter;
+  });
+
   const leadsByStage = boardStages.map((stage) => ({
     ...stage,
-    leads: leads.filter((l) => l.stage === stage.key),
+    leads: sdrFilteredLeads.filter((l) => l.stage === stage.key),
   }));
 
   const stageOrder: Record<string, number> = Object.fromEntries(boardStages.map((s, i) => [s.key, i]));
 
-  const filteredLeads = leads.filter((l) => {
+  const filteredLeads = sdrFilteredLeads.filter((l) => {
     if (!listSearch.trim()) return true;
     const q = listSearch.toLowerCase();
     return (
@@ -1175,6 +1219,7 @@ export default function Leads() {
                           <span className="text-[11px] text-muted-foreground truncate max-w-[90px]">
                             {lead.assignedToFirstName || lead.createdByFirstName}
                           </span>
+                          {roleBadges(lead.assignedTo ?? lead.createdBy)}
                         </div>
                       ) : <span className="text-[11px] text-muted-foreground">—</span>}
                     </td>
@@ -1593,6 +1638,25 @@ export default function Leads() {
 
           {(activeTab === "anunciante" || activeTab === "restaurante") && (
             <div className="flex items-center gap-2">
+              <Select value={sdrFilter} onValueChange={setSdrFilter}>
+                <SelectTrigger className="h-8 w-[170px] text-xs">
+                  <SelectValue placeholder="Responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os responsáveis</SelectItem>
+                  {currentUserIsSdr && currentUserId && (
+                    <SelectItem value="mine">Meus leads (SDR)</SelectItem>
+                  )}
+                  {sdrUsers.length > 0 && (
+                    <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">SDRs</div>
+                  )}
+                  {sdrUsers.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {[u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || u.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <CsvExportButton
                 onExport={async (range) => {
                   const res = await utils.lead.exportCsv.fetch({
@@ -1773,6 +1837,7 @@ export default function Leads() {
                               </span>
                             </div>
                           )}
+                          {roleBadges(lead.assignedTo ?? lead.createdBy, "xs")}
                         </div>
 
                         <div className="flex items-center justify-between mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">

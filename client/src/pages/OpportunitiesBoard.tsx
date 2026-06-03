@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -95,6 +95,31 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
   const partnersList = trpc.partner.list.useQuery();
 
   const opportunities = opportunitiesQuery.data ?? [];
+
+  const usersById = useMemo(() => {
+    const m = new Map<string, { isSdr: boolean; isCloser: boolean }>();
+    for (const u of internalUsers.data ?? []) {
+      m.set(u.id, { isSdr: !!u.isSdr, isCloser: !!u.isCloser });
+    }
+    return m;
+  }, [internalUsers.data]);
+
+  function roleBadges(userId: string | null | undefined, size: "sm" | "xs" = "sm") {
+    if (!userId) return null;
+    const roles = usersById.get(userId);
+    if (!roles || (!roles.isSdr && !roles.isCloser)) return null;
+    const cls = size === "xs" ? "text-[8px] h-3.5 px-1" : "text-[9px] h-4 px-1.5";
+    return (
+      <>
+        {roles.isSdr && (
+          <Badge className={`${cls} bg-indigo-500/15 text-indigo-500 border-indigo-500/30`}>SDR</Badge>
+        )}
+        {roles.isCloser && (
+          <Badge className={`${cls} bg-emerald-500/15 text-emerald-600 border-emerald-500/30`}>Closer</Badge>
+        )}
+      </>
+    );
+  }
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -477,6 +502,20 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                       </div>
                     )}
 
+                    {(opp.ownerFirstName || opp.ownerId) && (
+                      <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                        {opp.ownerFirstName && (
+                          <>
+                            <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                              <span className="text-[8px] font-bold text-primary">{opp.ownerFirstName[0]}</span>
+                            </div>
+                            <span className="text-[9px] text-muted-foreground truncate max-w-[70px]">{opp.ownerFirstName}</span>
+                          </>
+                        )}
+                        {roleBadges(opp.ownerId, "xs")}
+                      </div>
+                    )}
+
                     {opp.stage === "ganha" && (
                       <Button
                         size="sm"
@@ -849,7 +888,11 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                 <Info label="Valor estimado" value={formatCurrency(sel.estimatedValue)} />
                 <Info label="Fechamento previsto" value={formatDate(sel.expectedCloseDate)} />
                 <Info label="Anunciante" value={sel.clientName ?? "—"} />
-                <Info label="Responsável" value={[sel.ownerFirstName, sel.ownerLastName].filter(Boolean).join(" ") || "—"} />
+                <Info
+                  label="Responsável"
+                  value={[sel.ownerFirstName, sel.ownerLastName].filter(Boolean).join(" ") || "—"}
+                  badge={roleBadges(sel.ownerId)}
+                />
                 <Info label="Tipo" value={sel.opportunityType ? (TYPE_LABELS[sel.opportunityType] ?? sel.opportunityType) : "—"} />
                 <Info label="Receita" value={sel.revenueType ? (REVENUE_LABELS[sel.revenueType] ?? sel.revenueType) : "—"} />
                 <Info label="Praça" value={sel.praca ? (PRACA_LABELS[sel.praca] ?? sel.praca) : "—"} />
@@ -1022,11 +1065,14 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, value, badge }: { label: string; value: string; badge?: React.ReactNode }) {
   return (
     <div className="min-w-0">
       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="text-sm mt-1 break-words">{value}</p>
+      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+        <p className="text-sm break-words">{value}</p>
+        {badge}
+      </div>
     </div>
   );
 }
