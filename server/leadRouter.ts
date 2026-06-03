@@ -9,6 +9,7 @@ import { createCrmNotification } from "./notificationRouter";
 import { sendEmail } from "./email";
 import { ensureContact } from "./contactSync";
 import { toCsv } from "./_core/csv";
+import { getMissingHandoffLabels } from "../shared/handoff-checklist";
 
 async function getDatabase() {
   const d = await getDb();
@@ -438,10 +439,16 @@ export const leadRouter = router({
       const sdrName = [ctx.user?.firstName, ctx.user?.lastName].filter(Boolean).join(" ") || "SDR";
       const closerName = [closer.firstName, closer.lastName].filter(Boolean).join(" ") || "closer";
 
+      const missingHandoffLabels = getMissingHandoffLabels(lead);
+      const missingSummary = missingHandoffLabels.join(", ");
+      const pendingNote = missingHandoffLabels.length > 0
+        ? ` — passado com informações faltando: ${missingSummary}`
+        : "";
+
       await db.insert(leadInteractions).values({
         leadId: lead.id,
         type: "note",
-        content: `Lead qualificado por ${sdrName} → handoff para closer ${closerName} (oportunidade #${opportunity.id})`,
+        content: `Lead qualificado por ${sdrName} → handoff para closer ${closerName} (oportunidade #${opportunity.id})${pendingNote}`,
       });
 
       await createCrmNotification(db, {
@@ -449,7 +456,7 @@ export const leadRouter = router({
         leadId: lead.id,
         clientId: lead.clientId ?? null,
         partnerId: lead.partnerId ?? null,
-        message: `Lead ${leadLabel} qualificado por ${sdrName} → atribuído a ${closerName}`,
+        message: `Lead ${leadLabel} qualificado por ${sdrName} → atribuído a ${closerName}${pendingNote}`,
       });
 
       if (closer.email) {
@@ -461,6 +468,7 @@ export const leadRouter = router({
           <div style="font-family: sans-serif; color: #0a0a0c;">
             <h2>Novo lead qualificado para você</h2>
             <p><strong>${fmt(leadLabel)}</strong> foi qualificado por ${fmt(sdrName)} e atribuído a você como closer.</p>
+            ${missingHandoffLabels.length > 0 ? `<p style="background:#fff4e5;border:1px solid #ffb74d;border-radius:8px;padding:12px;color:#7a4f01;"><strong>⚠ Passado com informações faltando:</strong> ${fmt(missingSummary)}. Cobre esses dados com o SDR.</p>` : ""}
             <h3>Resumo BANT</h3>
             <ul>
               <li><strong>Contato:</strong> ${fmt(lead.contactName || lead.name)} ${lead.cargo ? `(${fmt(lead.cargo)})` : ""}</li>

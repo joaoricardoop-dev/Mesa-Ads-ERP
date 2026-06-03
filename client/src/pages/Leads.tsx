@@ -23,6 +23,7 @@ import {
   DIGITAL_PRESENCE_LABELS,
   PRIMARY_DRINK_LABELS,
 } from "@shared/rating-config";
+import { getHandoffChecklist, getMissingHandoffLabels } from "@shared/handoff-checklist";
 import {
   Plus,
   Phone,
@@ -2978,6 +2979,43 @@ export default function Leads() {
             <p className="text-xs text-muted-foreground">
               Cria uma oportunidade qualificada, notifica e envia e-mail ao closer escolhido.
             </p>
+            {selectedLead.data && (() => {
+              const checklist = getHandoffChecklist(selectedLead.data);
+              const missing = getMissingHandoffLabels(selectedLead.data);
+              return (
+                <div className="rounded-md border border-border bg-muted/30 p-2.5 grid gap-1.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wide text-muted-foreground">
+                    Informações de qualificação
+                  </span>
+                  <ul className="grid gap-1">
+                    {checklist.map((item) => (
+                      <li key={item.key} className="flex items-start gap-1.5 text-xs">
+                        {item.filled ? (
+                          <Check className="w-3.5 h-3.5 shrink-0 mt-0.5 text-green-600" />
+                        ) : (
+                          <X className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#e51e75]" />
+                        )}
+                        <span className={item.filled ? "text-foreground" : "text-muted-foreground"}>
+                          {item.label}
+                          {!item.filled && item.missingParts.length > 0 && (
+                            <span className="text-[#e51e75]"> — falta: {item.missingParts.join(", ")}</span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {missing.length > 0 && (
+                    <div className="flex items-start gap-1.5 rounded bg-amber-500/10 border border-amber-500/30 p-2 text-[11px] text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span>
+                        Faltam informações: <strong>{missing.join(", ")}</strong>. Você pode voltar ao
+                        cadastro para completar ou seguir mesmo assim — o closer será avisado do que ficou pendente.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <Label className="text-xs">Closer responsável *</Label>
             <Select value={handoffCloserId} onValueChange={setHandoffCloserId}>
               <SelectTrigger className="h-9 text-sm">
