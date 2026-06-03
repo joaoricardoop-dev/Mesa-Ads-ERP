@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LOSS_REASON_CODES, LOSS_REASON_LABELS, isLossReasonCode } from "@shared/loss-reasons";
+import { useConfigOptions } from "@/lib/configOptions";
 import {
   Dialog,
   DialogContent,
@@ -87,6 +87,8 @@ export default function QuotationDetail() {
   const [lossOpen, setLossOpen] = useState(false);
   const [lossReason, setLossReason] = useState<string>("");
   const [lossReasonNotes, setLossReasonNotes] = useState<string>("");
+  const { options: lossOptions, labelOf: lossLabelOf } = useConfigOptions("loss_reason");
+  const isValidLoss = (code: string) => lossOptions.some((o) => o.code === code);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [osDialogOpen, setOsDialogOpen] = useState(false);
   const [osForm, setOsForm] = useState({ description: "", paymentTerms: "" });
@@ -932,7 +934,7 @@ export default function QuotationDetail() {
                     <XCircle className="w-4 h-4" /> Cotação Perdida
                   </h3>
                   {quotation.lossReason && (
-                    <p className="text-xs text-muted-foreground">Motivo: {quotation.lossReason}</p>
+                    <p className="text-xs text-muted-foreground">Motivo: {lossLabelOf(quotation.lossReason)}</p>
                   )}
                 </div>
               )}
@@ -1401,12 +1403,12 @@ export default function QuotationDetail() {
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Motivo *</label>
               <Select value={lossReason} onValueChange={setLossReason}>
-                <SelectTrigger className="bg-background border-border/30">
+                <SelectTrigger className="bg-background border-border/30" data-testid="select-quotation-loss">
                   <SelectValue placeholder="Selecione o motivo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {LOSS_REASON_CODES.map((code) => (
-                    <SelectItem key={code} value={code}>{LOSS_REASON_LABELS[code]}</SelectItem>
+                  {lossOptions.map((o) => (
+                    <SelectItem key={o.code} value={o.code}>{o.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1419,9 +1421,9 @@ export default function QuotationDetail() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={!isLossReasonCode(lossReason) || lossMutation.isPending}
+              disabled={!isValidLoss(lossReason) || lossMutation.isPending}
               onClick={() => {
-                if (isLossReasonCode(lossReason)) {
+                if (isValidLoss(lossReason)) {
                   lossMutation.mutate({ id: quotationId, lossReason, lossReasonNotes: lossReasonNotes.trim() || undefined });
                 }
               }}

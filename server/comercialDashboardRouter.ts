@@ -5,7 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { sql, eq, and, inArray, isNotNull, desc, asc } from "drizzle-orm";
 import { quotations, leads, partners, clients } from "../drizzle/schema";
 import { users } from "../shared/models/auth";
-import { LOSS_REASON_CODES, LOSS_REASON_LABELS, type LossReasonCode } from "../shared/loss-reasons";
+import { getConfigLabels } from "./configOptionRouter";
 import { computePartnerHealth } from "./partnerRouter";
 
 async function getDatabase() {
@@ -146,12 +146,17 @@ export const comercialDashboardRouter = router({
          ORDER BY count DESC
       `);
 
+      // Labels saem da fonte única (config_options) para que renomeações feitas
+      // pelo admin reflitam no dashboard. Fallback para o próprio código quando
+      // não houver label cadastrado.
+      const lossLabels = await getConfigLabels("loss_reason");
+
       // Agrega por motivo (somando perdida + expirada).
       type LossItem = { reason: string; label: string; count: number; lostValue: number; byStatus: Record<string, number> };
       const map = new Map<string, LossItem>();
       for (const r of rows.rows as any[]) {
         const reason = String(r.reason);
-        const label = (LOSS_REASON_LABELS as any)[reason] || (reason === "sem_motivo" ? "Sem motivo informado" : reason);
+        const label = lossLabels.get(reason) || (reason === "sem_motivo" ? "Sem motivo informado" : reason);
         const existing: LossItem = map.get(reason) || { reason, label, count: 0, lostValue: 0, byStatus: {} };
         existing.count += Number(r.count || 0);
         existing.lostValue += Number(r.lost_value || 0);

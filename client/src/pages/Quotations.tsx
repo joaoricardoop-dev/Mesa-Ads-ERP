@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LOSS_REASON_CODES, LOSS_REASON_LABELS, isLossReasonCode } from "@shared/loss-reasons";
+import { useConfigOptions } from "@/lib/configOptions";
 import {
   QUOTATION_AGE_WARNING_DAYS,
   QUOTATION_AGE_DANGER_DAYS,
@@ -238,6 +238,8 @@ export default function Quotations() {
   const [lossDialogId, setLossDialogId] = useState<number | null>(null);
   const [lossReason, setLossReason] = useState<string>("");
   const [lossReasonNotes, setLossReasonNotes] = useState<string>("");
+  const { options: lossOptions } = useConfigOptions("loss_reason");
+  const isValidLoss = (code: string) => lossOptions.some((o) => o.code === code);
   const [osDialogId, setOsDialogId] = useState<number | null>(null);
   const [osForm, setOsForm] = useState({ description: "", paymentTerms: "" });
   const [osBatchIds, setOsBatchIds] = useState<number[]>([]);
@@ -1582,8 +1584,8 @@ export default function Quotations() {
                   <SelectValue placeholder="Selecione o motivo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {LOSS_REASON_CODES.map((code) => (
-                    <SelectItem key={code} value={code}>{LOSS_REASON_LABELS[code]}</SelectItem>
+                  {lossOptions.map((o) => (
+                    <SelectItem key={o.code} value={o.code}>{o.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1602,9 +1604,9 @@ export default function Quotations() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={!isLossReasonCode(lossReason) || lossMutation.isPending}
+              disabled={!isValidLoss(lossReason) || lossMutation.isPending}
               onClick={() => {
-                if (lossDialogId && isLossReasonCode(lossReason)) {
+                if (lossDialogId && isValidLoss(lossReason)) {
                   lossMutation.mutate({
                     id: lossDialogId,
                     lossReason,

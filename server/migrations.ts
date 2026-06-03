@@ -1956,6 +1956,52 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       ALTER TABLE "opportunities" ADD COLUMN IF NOT EXISTS "lossReasonNotes" TEXT;
     `,
   },
+  {
+    // Listas paramétricas editáveis em Configurações (config_options),
+    // compartilhadas por Oportunidades e Cotações:
+    //   • loss_reason     — motivos de perda (code preserva os valores já gravados)
+    //   • origin_category — categorias de origem (code = label legado de leads.origin)
+    // Seeds idempotentes a partir das listas hardcoded anteriores.
+    name: "create_config_options_and_seed",
+    sql: `
+      CREATE TABLE IF NOT EXISTS "config_options" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "type" varchar(40) NOT NULL,
+        "code" varchar(120) NOT NULL,
+        "label" varchar(200) NOT NULL,
+        "sortOrder" integer NOT NULL DEFAULT 0,
+        "isActive" boolean NOT NULL DEFAULT true,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_config_options_type_code"
+        ON "config_options" ("type", "code");
+      CREATE INDEX IF NOT EXISTS "idx_config_options_type"
+        ON "config_options" ("type");
+
+      INSERT INTO "config_options" ("type", "code", "label", "sortOrder") VALUES
+        ('loss_reason', 'preco', 'Preço', 0),
+        ('loss_reason', 'prazo', 'Prazo', 1),
+        ('loss_reason', 'concorrente', 'Perdemos para um concorrente', 2),
+        ('loss_reason', 'sem_orcamento', 'Cliente sem orçamento', 3),
+        ('loss_reason', 'sem_decisao', 'Cliente não decidiu / adiou', 4),
+        ('loss_reason', 'escopo_nao_atende', 'Escopo não atende', 5),
+        ('loss_reason', 'sem_retorno', 'Sem retorno do cliente', 6),
+        ('loss_reason', 'outro', 'Outro', 7),
+        ('origin_category', 'Indicação', 'Indicação', 0),
+        ('origin_category', 'Site', 'Site', 1),
+        ('origin_category', 'Instagram', 'Instagram', 2),
+        ('origin_category', 'Inbound Instagram', 'Inbound Instagram', 3),
+        ('origin_category', 'LinkedIn', 'LinkedIn', 4),
+        ('origin_category', 'Cold WhatsApp', 'Cold WhatsApp', 5),
+        ('origin_category', 'Telefone', 'Telefone', 6),
+        ('origin_category', 'Evento', 'Evento', 7),
+        ('origin_category', 'QR Sala VIP', 'QR Sala VIP', 8),
+        ('origin_category', 'Prospecção Ativa', 'Prospecção Ativa', 9),
+        ('origin_category', 'Outro', 'Outro', 10)
+      ON CONFLICT ("type", "code") DO NOTHING;
+    `,
+  },
 ];
 
 export async function runMigrations() {

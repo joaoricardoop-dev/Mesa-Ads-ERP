@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { CsvExportButton, downloadCsv } from "@/components/CsvExportButton";
-import { LOSS_REASON_CODES, LOSS_REASON_LABELS, isLossReasonCode } from "@shared/loss-reasons";
+import { useConfigOptions } from "@/lib/configOptions";
 import type { ContactRecordFilter } from "./Leads";
 
 export const OPPORTUNITY_STAGES = [
@@ -109,6 +109,9 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
   const [dialogLossNotes, setDialogLossNotes] = useState("");
   const [linkQuotationId, setLinkQuotationId] = useState<string>("");
   const [createQuotationIds, setCreateQuotationIds] = useState<number[]>([]);
+  const { options: lossOptions, labelOf: lossLabelOf } = useConfigOptions("loss_reason");
+  const { options: originOptions, labelOf: originLabelOf } = useConfigOptions("origin_category");
+  const isValidLoss = (code: string) => lossOptions.some((o) => o.code === code);
 
   const selected = trpc.opportunity.get.useQuery(
     { id: selectedId! },
@@ -685,6 +688,22 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
               </Select>
             </div>
 
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Origem</Label>
+              <Select
+                value={formData.source || "none"}
+                onValueChange={(v) => setFormData({ ...formData, source: v === "none" ? "" : v })}
+              >
+                <SelectTrigger className="h-9 text-sm" data-testid="select-opportunity-origin"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">—</SelectItem>
+                  {originOptions.map((o) => (
+                    <SelectItem key={o.code} value={o.code}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {editId == null && formData.clientId && (
               <div className="grid gap-1.5">
                 <Label className="text-xs">Vincular cotações existentes</Label>
@@ -752,8 +771,8 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                   <SelectValue placeholder="Selecione o motivo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {LOSS_REASON_CODES.map((code) => (
-                    <SelectItem key={code} value={code}>{LOSS_REASON_LABELS[code]}</SelectItem>
+                  {lossOptions.map((o) => (
+                    <SelectItem key={o.code} value={o.code}>{o.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -770,7 +789,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
             <Button variant="outline" onClick={() => setLossDialogId(null)}>Cancelar</Button>
             <Button
               onClick={() => {
-                if (lossDialogId == null || !isLossReasonCode(dialogLossReason)) {
+                if (lossDialogId == null || !isValidLoss(dialogLossReason)) {
                   toast.error("Selecione o motivo da perda");
                   return;
                 }
@@ -784,7 +803,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                   { onSuccess: () => { setLossDialogId(null); setDialogLossReason(""); setDialogLossNotes(""); } },
                 );
               }}
-              disabled={!isLossReasonCode(dialogLossReason) || changeStageMutation.isPending}
+              disabled={!isValidLoss(dialogLossReason) || changeStageMutation.isPending}
             >
               {changeStageMutation.isPending ? "Salvando..." : "Marcar perdida"}
             </Button>
@@ -835,7 +854,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                 <Info label="Receita" value={sel.revenueType ? (REVENUE_LABELS[sel.revenueType] ?? sel.revenueType) : "—"} />
                 <Info label="Praça" value={sel.praca ? (PRACA_LABELS[sel.praca] ?? sel.praca) : "—"} />
                 <Info label="Parceiro" value={sel.partnerName ?? "—"} />
-                <Info label="Origem" value={sel.source ?? "—"} />
+                <Info label="Origem" value={originLabelOf(sel.source)} />
               </div>
 
               {/* Cotações vinculadas */}
@@ -930,8 +949,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                   <Label className="text-xs font-semibold">Motivo da perda</Label>
                   <p className="text-sm">
                     {(() => {
-                      const code = sel.lossReason;
-                      return isLossReasonCode(code) ? LOSS_REASON_LABELS[code] : (code || "—");
+                      return lossLabelOf(sel.lossReason);
                     })()}
                   </p>
                   {sel.lossReasonNotes && (
@@ -944,12 +962,12 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                 <div className="grid gap-2 border-t pt-6">
                   <Label className="text-xs font-semibold">Marcar como perdida</Label>
                   <Select value={lossReason} onValueChange={setLossReason}>
-                    <SelectTrigger className="h-9 text-sm">
+                    <SelectTrigger className="h-9 text-sm" data-testid="select-opportunity-loss">
                       <SelectValue placeholder="Selecione o motivo" />
                     </SelectTrigger>
                     <SelectContent>
-                      {LOSS_REASON_CODES.map((code) => (
-                        <SelectItem key={code} value={code}>{LOSS_REASON_LABELS[code]}</SelectItem>
+                      {lossOptions.map((o) => (
+                        <SelectItem key={o.code} value={o.code}>{o.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -964,7 +982,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      if (!isLossReasonCode(lossReason)) {
+                      if (!isValidLoss(lossReason)) {
                         toast.error("Selecione o motivo da perda");
                         return;
                       }
@@ -975,7 +993,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                         lossReasonNotes: lossReasonNotes.trim() || undefined,
                       });
                     }}
-                    disabled={!isLossReasonCode(lossReason) || changeStageMutation.isPending}
+                    disabled={!isValidLoss(lossReason) || changeStageMutation.isPending}
                   >
                     Marcar perdida
                   </Button>

@@ -7,7 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
 import { ensureContact } from "./contactSync";
 import { toCsv } from "./_core/csv";
-import { LOSS_REASON_CODES } from "../shared/loss-reasons";
+import { getActiveConfigCodes } from "./configOptionRouter";
 
 async function getDatabase() {
   const d = await getDb();
@@ -290,17 +290,15 @@ export const opportunityRouter = router({
       stage: z.string(),
       lossReason: z.string().optional(),
       lossReasonNotes: z.string().optional(),
-    }).superRefine((val, ctx) => {
-      if (val.stage === "perdida" && !(LOSS_REASON_CODES as readonly string[]).includes(val.lossReason ?? "")) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Selecione um motivo de perda válido",
-          path: ["lossReason"],
-        });
-      }
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
+      if (input.stage === "perdida") {
+        const validCodes = await getActiveConfigCodes("loss_reason");
+        if (!input.lossReason || !validCodes.has(input.lossReason)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Selecione um motivo de perda válido" });
+        }
+      }
       const [updated] = await db
         .update(opportunities)
         .set({

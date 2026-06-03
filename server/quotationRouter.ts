@@ -2,7 +2,7 @@ import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices, seasonalMultipliers, campaignPhases, campaignItems, opportunities } from "../drizzle/schema";
-import { LOSS_REASON_CODES } from "../shared/loss-reasons";
+import { getActiveConfigCodes } from "./configOptionRouter";
 import { QUOTATION_DEFAULT_VALIDITY_DAYS, addDaysISO } from "../shared/commercial-config";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -467,7 +467,7 @@ export const quotationRouter = router({
       notes: z.string().optional(),
       validUntil: z.string().optional(),
       status: z.enum(["rascunho", "enviada", "ativa", "os_gerada", "win", "perdida", "expirada"]).optional(),
-      lossReason: z.enum(LOSS_REASON_CODES).optional(),
+      lossReason: z.string().optional(),
       lossReasonNotes: z.string().optional().nullable(),
       isBonificada: z.boolean().optional(),
       hasPartnerDiscount: z.boolean().optional(),
@@ -511,6 +511,13 @@ export const quotationRouter = router({
             code: "BAD_REQUEST",
             message: "Motivo da perda é obrigatório ao marcar como perdida ou expirada.",
           });
+        }
+        // Quando um novo motivo é informado, valida contra a fonte única (DB).
+        if (data.lossReason) {
+          const validCodes = await getActiveConfigCodes("loss_reason");
+          if (!validCodes.has(data.lossReason)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Selecione um motivo de perda válido." });
+          }
         }
       }
 
@@ -720,11 +727,15 @@ export const quotationRouter = router({
   markLost: comercialProcedure
     .input(z.object({
       id: z.number(),
-      lossReason: z.enum(LOSS_REASON_CODES),
+      lossReason: z.string().min(1),
       lossReasonNotes: z.string().optional().nullable(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
+      const validCodes = await getActiveConfigCodes("loss_reason");
+      if (!validCodes.has(input.lossReason)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Selecione um motivo de perda válido." });
+      }
       const [updated] = await db
         .update(quotations)
         .set({

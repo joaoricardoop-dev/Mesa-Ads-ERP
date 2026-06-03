@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import PageContainer from "@/components/PageContainer";
 import Confetti from "@/components/Confetti";
 import { trpc } from "@/lib/trpc";
+import { useConfigOptions } from "@/lib/configOptions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -133,20 +134,6 @@ const INTERACTION_TYPES = [
   { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { key: "visit", label: "Visita", icon: MapPin },
   { key: "note", label: "Nota", icon: StickyNote },
-];
-
-const ORIGINS = [
-  "Indicação",
-  "Site",
-  "Instagram",
-  "Inbound Instagram",
-  "LinkedIn",
-  "Cold WhatsApp",
-  "Telefone",
-  "Evento",
-  "QR Sala VIP",
-  "Prospecção Ativa",
-  "Outro",
 ];
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -348,6 +335,7 @@ export default function Leads() {
   const [cnpjInput, setCnpjInput] = useState("");
   const [cnpjFetched, setCnpjFetched] = useState(false);
   const [formData, setFormData] = useState<LeadFormData>(emptyForm);
+  const { options: originOptions } = useConfigOptions("origin_category");
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [interactionType, setInteractionType] = useState("note");
   const [interactionContent, setInteractionContent] = useState("");
@@ -1330,12 +1318,12 @@ export default function Leads() {
               value={data.origin}
               onValueChange={(v) => setData({ ...data, origin: v })}
             >
-              <SelectTrigger className="h-8 text-sm">
+              <SelectTrigger className="h-8 text-sm" data-testid="select-lead-origin">
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
-                {ORIGINS.map((o) => (
-                  <SelectItem key={o} value={o}>{o}</SelectItem>
+                {originOptions.map((o) => (
+                  <SelectItem key={o.code} value={o.code}>{o.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

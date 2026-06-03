@@ -1115,6 +1115,28 @@ export const seasonalMultipliers = pgTable("seasonal_multipliers", {
 export type SeasonalMultiplier = typeof seasonalMultipliers.$inferSelect;
 export type InsertSeasonalMultiplier = typeof seasonalMultipliers.$inferInsert;
 
+// ─── Config Options (listas paramétricas editáveis) ──────────────────────────
+// Listas configuráveis em Configurações, compartilhadas por Oportunidades e
+// Cotações. `type` discrimina a lista (loss_reason | origin_category). O valor
+// gravado nos registros (opportunities.lossReason, quotations.lossReason,
+// leads.origin, opportunities.source) é o `code`; o `label` é apenas display.
+export const configOptions = pgTable("config_options", {
+  id: serial("id").primaryKey(),
+  type: varchar("type", { length: 40 }).notNull(),
+  code: varchar("code", { length: 120 }).notNull(),
+  label: varchar("label", { length: 200 }).notNull(),
+  sortOrder: integer("sortOrder").notNull().default(0),
+  isActive: boolean("isActive").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("uq_config_options_type_code").on(t.type, t.code),
+  index("idx_config_options_type").on(t.type),
+]);
+
+export type ConfigOption = typeof configOptions.$inferSelect;
+export type InsertConfigOption = typeof configOptions.$inferInsert;
+
 // ─── Campaign Drafts (Marketplace v2) ────────────────────────────────────────
 // Persistência de carrinho do fluxo /montar-campanha por anunciante.
 // `cartJson` guarda o snapshot do carrinho (locais, shares, datas, totais).
