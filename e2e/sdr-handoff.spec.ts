@@ -1,5 +1,11 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
-import { devLoginAdmin, trpcMutation, trpcQuery } from "./_finance-helpers";
+import {
+  devLoginAdmin,
+  devCreateInternalUser,
+  devDeleteUser,
+  trpcMutation,
+  trpcQuery,
+} from "./_finance-helpers";
 
 // Task #234 — trava o funil de Pré-vendas (SDR) e o handoff "Passar para o
 // closer". O lead anunciante é criado + BANT preenchido via tRPC (paralelo-
@@ -64,53 +70,68 @@ test.describe("Funil SDR — handoff para o closer", () => {
     const request = page.request;
     await devLoginAdmin(request);
 
-    const name = `E2E SDR Handoff ${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
-    const lead = await createAnuncianteLead(request, name);
-    expect(lead.id).toBeGreaterThan(0);
-
-    await openLeadInUI(page, name);
-
-    // Abre o diálogo de handoff.
-    await page.getByRole("button", { name: /Passar para o closer/i }).click();
-
-    const handoffDialog = page
-      .getByRole("dialog")
-      .filter({ hasText: "Passar para o closer" });
-    await expect(handoffDialog).toBeVisible();
-
-    // Seleciona o primeiro closer disponível (o próprio admin logado já
-    // aparece, pois lead.listUsers devolve internos ativos).
-    await handoffDialog.getByRole("combobox").click();
-    await page.getByRole("option").first().click();
-
-    await handoffDialog.getByRole("button", { name: /Confirmar handoff/i }).click();
-
-    // O diálogo fecha e o Sheet re-renderiza como convertido.
-    await expect(handoffDialog).toBeHidden();
-    await expect(page.getByText("Convertido").first()).toBeVisible({
-      timeout: 15_000,
+    // O seletor de handoff usa lead.listClosers, então precisa existir um
+    // usuário com a tag Closer no banco de teste. Cria um e remove no fim.
+    const stamp = `${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
+    const closerLast = `Closer ${stamp}`;
+    const closer = await devCreateInternalUser(request, {
+      role: "comercial",
+      isCloser: true,
+      firstName: "E2E",
+      lastName: closerLast,
     });
-    await expect(
-      page.getByText(/Qualificado \(handoff\)/i).first(),
-    ).toBeVisible();
 
-    // Asserções servidor: lead vira qualificado_handoff + aponta p/ oportunidade.
-    const updated = await trpcQuery<CreatedLead>(request, "lead.get", {
-      id: lead.id,
-    });
-    expect(updated.stage).toBe("qualificado_handoff");
-    expect(updated.convertedToType).toBe("opportunity");
-    expect(updated.convertedToId).toBeTruthy();
+    try {
+      const name = `E2E SDR Handoff ${stamp}`;
+      const lead = await createAnuncianteLead(request, name);
+      expect(lead.id).toBeGreaterThan(0);
 
-    // A oportunidade foi de fato criada no estágio "qualificada".
-    const opps = await trpcQuery<Array<{ id: number; leadId: number | null; stage: string }>>(
-      request,
-      "opportunity.list",
-    );
-    const opp = opps.find((o) => o.leadId === lead.id);
-    expect(opp, "oportunidade vinculada ao lead deve existir").toBeTruthy();
-    expect(opp!.id).toBe(updated.convertedToId);
-    expect(opp!.stage).toBe("qualificada");
+      await openLeadInUI(page, name);
+
+      // Abre o diálogo de handoff.
+      await page.getByRole("button", { name: /Passar para o closer/i }).click();
+
+      const handoffDialog = page
+        .getByRole("dialog")
+        .filter({ hasText: "Passar para o closer" });
+      await expect(handoffDialog).toBeVisible();
+
+      // Seleciona o closer criado (lead.listClosers só devolve usuários
+      // ativos com a tag Closer).
+      await handoffDialog.getByRole("combobox").click();
+      await page.getByRole("option").filter({ hasText: closerLast }).click();
+
+      await handoffDialog.getByRole("button", { name: /Confirmar handoff/i }).click();
+
+      // O diálogo fecha e o Sheet re-renderiza como convertido.
+      await expect(handoffDialog).toBeHidden();
+      await expect(page.getByText("Convertido").first()).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(
+        page.getByText(/Qualificado \(handoff\)/i).first(),
+      ).toBeVisible();
+
+      // Asserções servidor: lead vira qualificado_handoff + aponta p/ oportunidade.
+      const updated = await trpcQuery<CreatedLead>(request, "lead.get", {
+        id: lead.id,
+      });
+      expect(updated.stage).toBe("qualificado_handoff");
+      expect(updated.convertedToType).toBe("opportunity");
+      expect(updated.convertedToId).toBeTruthy();
+
+      // A oportunidade foi de fato criada no estágio "qualificada".
+      const opps = await trpcQuery<Array<{ id: number; leadId: number | null; stage: string }>>(
+        request,
+        "opportunity.list",
+      );
+      const opp = opps.find((o) => o.leadId === lead.id);
+      expect(opp, "oportunidade vinculada ao lead deve existir").toBeTruthy();
+      expect(opp!.id).toBe(updated.convertedToId);
+      expect(opp!.stage).toBe("qualificada");
+    } finally {
+      await devDeleteUser(request, closer.id);
+    }
   });
 
   test("desqualificar um lead exige escolher um motivo", async ({

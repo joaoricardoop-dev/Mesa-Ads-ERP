@@ -772,6 +772,42 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
     }
   });
 
+  // Cria um usuário interno de teste com tags configuráveis (isCloser/isSdr).
+  // Usado pelos specs de handoff (Task #248) que precisam de um Closer real e
+  // de um interno SEM a tag para exercitar tanto o seletor (lead.listClosers)
+  // quanto a recusa server-side (handoffToCloser). Gateado por sentinel como
+  // todas as rotas /api/dev-*; o id sempre nasce com prefixo "e2e-" para que o
+  // cleanup via dev-delete-user consiga removê-lo.
+  app.post("/api/dev-create-internal-user", async (req, res) => {
+    try {
+      if (!(await sentinelAllows(res))) return;
+      const { authStorage } = await import("../replit_integrations/auth");
+      const role = typeof req.body?.role === "string" ? req.body.role : "comercial";
+      const isCloser = req.body?.isCloser === true;
+      const isSdr = req.body?.isSdr === true;
+      const isActive = req.body?.isActive === false ? false : true;
+      const firstName = typeof req.body?.firstName === "string" ? req.body.firstName : "E2E";
+      const lastName = typeof req.body?.lastName === "string" ? req.body.lastName : "Interno";
+      const id = `e2e-internal-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+      const user = await authStorage.upsertUser({
+        id,
+        email: `${id}@e2e.test`,
+        firstName,
+        lastName,
+        role,
+        isCloser,
+        isSdr,
+        isActive,
+        onboardingComplete: true,
+      });
+      const { passwordHash: _, ...safe } = user;
+      res.json({ user: safe, created: true });
+    } catch (error) {
+      console.error("Dev create internal user error:", error);
+      res.status(500).json({ message: "Erro ao criar usuário interno de teste." });
+    }
+  });
+
   app.post("/api/dev-delete-user", async (req, res) => {
     try {
       if (!(await sentinelAllows(res))) return;

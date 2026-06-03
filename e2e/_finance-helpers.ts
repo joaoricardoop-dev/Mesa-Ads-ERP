@@ -96,6 +96,25 @@ export async function devEnsureBankAccount(
   return (await res.json()) as { id: number; created: boolean };
 }
 
+export async function devCreateInternalUser(
+  request: APIRequestContext,
+  opts: {
+    role?: string;
+    isCloser?: boolean;
+    isSdr?: boolean;
+    isActive?: boolean;
+    firstName?: string;
+    lastName?: string;
+  } = {},
+): Promise<DevUser & { firstName: string | null; lastName: string | null; isCloser?: boolean }> {
+  const res = await request.post("/api/dev-create-internal-user", { data: opts });
+  if (!res.ok()) {
+    throw new Error(`dev-create-internal-user failed: ${res.status()} ${await res.text()}`);
+  }
+  const body = (await res.json()) as { user: DevUser & { firstName: string | null; lastName: string | null } };
+  return body.user;
+}
+
 export async function devDeleteUser(request: APIRequestContext, userId: string): Promise<void> {
   if (!userId.startsWith("e2e-")) return;
   const res = await request.post("/api/dev-delete-user", { data: { userId } });
