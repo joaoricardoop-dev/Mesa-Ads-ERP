@@ -116,6 +116,18 @@ const emptyForm = {
   partnerId: undefined as number | undefined,
 };
 
+const emptyBant = {
+  cargo: "",
+  decisionRole: "",
+  produtoInteresse: "",
+  praca: "",
+  budgetEstimado: "",
+  timing: "",
+  objecoes: "",
+  meetingScheduledAt: "",
+  meetingLink: "",
+};
+
 function formatCurrency(v: string | number | null | undefined) {
   if (v == null || v === "") return "—";
   const n = typeof v === "string" ? parseFloat(v) : v;
@@ -184,6 +196,8 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
   const [contactFormOpen, setContactFormOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "" });
   const [deleteContactId, setDeleteContactId] = useState<number | null>(null);
+  const [editBant, setEditBant] = useState(false);
+  const [bantForm, setBantForm] = useState({ ...emptyBant });
   const { options: lossOptions, labelOf: lossLabelOf } = useConfigOptions("loss_reason");
   const { options: originOptions, labelOf: originLabelOf } = useConfigOptions("origin_category");
   const isValidLoss = (code: string) => lossOptions.some((o) => o.code === code);
@@ -357,6 +371,48 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const updateBantMutation = trpc.lead.update.useMutation({
+    onSuccess: () => {
+      toast.success("Qualificação BANT atualizada");
+      setEditBant(false);
+      if (sel?.leadId != null) utils.lead.get.invalidate({ id: sel.leadId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  function startEditBant() {
+    setBantForm({
+      cargo: linkedLead?.cargo ?? "",
+      decisionRole: linkedLead?.decisionRole ?? "",
+      produtoInteresse: linkedLead?.produtoInteresse ?? "",
+      praca: linkedLead?.praca ?? "",
+      budgetEstimado: linkedLead?.budgetEstimado != null ? String(linkedLead.budgetEstimado) : "",
+      timing: linkedLead?.timing ?? "",
+      objecoes: linkedLead?.objecoes ?? "",
+      meetingScheduledAt: linkedLead?.meetingScheduledAt
+        ? new Date(linkedLead.meetingScheduledAt).toISOString().slice(0, 16)
+        : "",
+      meetingLink: linkedLead?.meetingLink ?? "",
+    });
+    setEditBant(true);
+  }
+
+  function handleSaveBant() {
+    if (sel?.leadId == null) return;
+    updateBantMutation.mutate({
+      id: sel.leadId,
+      cargo: bantForm.cargo || null,
+      decisionRole: (bantForm.decisionRole || null) as any,
+      produtoInteresse: bantForm.produtoInteresse || null,
+      praca: (bantForm.praca || null) as any,
+      budgetEstimado: bantForm.budgetEstimado || null,
+      timing: bantForm.timing || null,
+      objecoes: bantForm.objecoes || null,
+      meetingScheduledAt: bantForm.meetingScheduledAt || null,
+      meetingLink: bantForm.meetingLink || null,
+    });
+  }
 
   function handleAddInteraction() {
     if (sel?.leadId == null || !interactionContent.trim()) return;
@@ -973,7 +1029,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
       </Dialog>
 
       {/* Detail Sheet */}
-      <Sheet open={selectedId != null} onOpenChange={(open) => { if (!open) { setSelectedId(null); setLossReason(""); setLossReasonNotes(""); setLinkQuotationId(""); setInteractionContent(""); setInteractionType("note"); } }}>
+      <Sheet open={selectedId != null} onOpenChange={(open) => { if (!open) { setSelectedId(null); setLossReason(""); setLossReasonNotes(""); setLinkQuotationId(""); setInteractionContent(""); setInteractionType("note"); setEditBant(false); } }}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto p-0">
           <SheetHeader className="px-6 pt-6 pb-4 border-b">
             <SheetTitle className="text-base leading-tight pr-8">{sel?.title ?? "Oportunidade"}</SheetTitle>
@@ -1189,14 +1245,146 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
 
               {/* Qualificação BANT */}
               <div className="space-y-3 border-t pt-6">
-                <div className="flex items-center gap-1.5">
-                  <Target className="w-3.5 h-3.5 text-muted-foreground" />
-                  <Label className="text-xs font-semibold">Qualificação BANT</Label>
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <Target className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Label className="text-xs font-semibold">Qualificação BANT</Label>
+                  </div>
+                  {sel.leadId != null && !editBant && !(linkedLeadQuery.isLoading && !linkedLead) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 text-xs"
+                      onClick={startEditBant}
+                    >
+                      <Pencil className="w-3 h-3" />
+                      Editar
+                    </Button>
+                  )}
                 </div>
                 {sel.leadId == null ? (
                   <p className="text-xs text-muted-foreground">Sem lead vinculado para qualificação.</p>
                 ) : linkedLeadQuery.isLoading && !linkedLead ? (
                   <p className="text-xs text-muted-foreground italic">Carregando...</p>
+                ) : editBant ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Cargo do contato</Label>
+                      <Input
+                        value={bantForm.cargo}
+                        onChange={(e) => setBantForm({ ...bantForm, cargo: e.target.value })}
+                        placeholder="Ex.: Diretor de Marketing"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Papel na decisão</Label>
+                      <Select
+                        value={bantForm.decisionRole || "none"}
+                        onValueChange={(v) => setBantForm({ ...bantForm, decisionRole: v === "none" ? "" : v })}
+                      >
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">—</SelectItem>
+                          <SelectItem value="decisor">Decisor</SelectItem>
+                          <SelectItem value="influenciador">Influenciador</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Produto de interesse</Label>
+                      <Input
+                        value={bantForm.produtoInteresse}
+                        onChange={(e) => setBantForm({ ...bantForm, produtoInteresse: e.target.value })}
+                        placeholder="Ex.: Bolacha + Tela"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Praça</Label>
+                      <Select
+                        value={bantForm.praca || "none"}
+                        onValueChange={(v) => setBantForm({ ...bantForm, praca: v === "none" ? "" : v })}
+                      >
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">—</SelectItem>
+                          <SelectItem value="manaus">Manaus</SelectItem>
+                          <SelectItem value="rio">Rio</SelectItem>
+                          <SelectItem value="ambas">Ambas</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Budget estimado (R$)</Label>
+                      <Input
+                        type="number"
+                        value={bantForm.budgetEstimado}
+                        onChange={(e) => setBantForm({ ...bantForm, budgetEstimado: e.target.value })}
+                        placeholder="0,00"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Timing</Label>
+                      <Input
+                        value={bantForm.timing}
+                        onChange={(e) => setBantForm({ ...bantForm, timing: e.target.value })}
+                        placeholder="Ex.: próximo trimestre"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="col-span-2 grid gap-1.5">
+                      <Label className="text-xs">Objeções</Label>
+                      <Textarea
+                        value={bantForm.objecoes}
+                        onChange={(e) => setBantForm({ ...bantForm, objecoes: e.target.value })}
+                        placeholder="Principais objeções levantadas"
+                        className="text-sm min-h-[60px]"
+                      />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Reunião agendada</Label>
+                      <Input
+                        type="datetime-local"
+                        value={bantForm.meetingScheduledAt}
+                        onChange={(e) => setBantForm({ ...bantForm, meetingScheduledAt: e.target.value })}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Link da reunião</Label>
+                      <Input
+                        value={bantForm.meetingLink}
+                        onChange={(e) => setBantForm({ ...bantForm, meetingLink: e.target.value })}
+                        placeholder="https://meet..."
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="col-span-2 flex items-center gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        className="h-8 gap-1.5 flex-1"
+                        onClick={handleSaveBant}
+                        disabled={updateBantMutation.isPending}
+                      >
+                        {updateBantMutation.isPending ? "Salvando..." : "Salvar"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={() => setEditBant(false)}
+                        disabled={updateBantMutation.isPending}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                     <Info label="Cargo do contato" value={linkedLead?.cargo || "—"} />
