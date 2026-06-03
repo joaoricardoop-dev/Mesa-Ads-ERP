@@ -400,11 +400,13 @@ export const leadRouter = router({
       if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado" });
 
       const [closer] = await db
-        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email, isCloser: users.isCloser, isActive: users.isActive })
         .from(users)
         .where(eq(users.id, input.closerId))
         .limit(1);
       if (!closer) throw new TRPCError({ code: "NOT_FOUND", message: "Closer não encontrado" });
+      if (!closer.isActive) throw new TRPCError({ code: "BAD_REQUEST", message: "Closer inativo não pode receber handoff." });
+      if (!closer.isCloser) throw new TRPCError({ code: "BAD_REQUEST", message: "Usuário selecionado não tem a tag Closer." });
 
       const leadLabel = lead.company || lead.name;
       const pracaValue = (lead.praca === "manaus" || lead.praca === "rio" || lead.praca === "ambas")
@@ -535,11 +537,34 @@ export const leadRouter = router({
           lastName: users.lastName,
           role: users.role,
           email: users.email,
+          isSdr: users.isSdr,
+          isCloser: users.isCloser,
         })
         .from(users)
         .where(and(
           eq(users.isActive, true),
           ne(users.role, "anunciante")
+        ));
+      return result;
+    }),
+
+  listClosers: protectedProcedure
+    .query(async () => {
+      const db = await getDatabase();
+      const result = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          role: users.role,
+          email: users.email,
+          isSdr: users.isSdr,
+          isCloser: users.isCloser,
+        })
+        .from(users)
+        .where(and(
+          eq(users.isActive, true),
+          eq(users.isCloser, true)
         ));
       return result;
     }),

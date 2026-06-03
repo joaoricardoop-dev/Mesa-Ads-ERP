@@ -24,6 +24,8 @@ export const users = pgTable("users", {
   clientId: integer("client_id"),
   restaurantId: integer("restaurant_id"),
   partnerId: integer("partner_id"),
+  isSdr: boolean("is_sdr").default(false),
+  isCloser: boolean("is_closer").default(false),
   onboardingComplete: boolean("onboarding_complete").default(false),
   selfRegistered: boolean("self_registered").default(false),
   lastLoginAt: timestamp("last_login_at"),

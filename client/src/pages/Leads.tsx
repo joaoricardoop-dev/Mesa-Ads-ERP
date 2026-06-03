@@ -441,6 +441,7 @@ export default function Leads() {
   });
 
   const internalUsers = trpc.lead.listUsers.useQuery();
+  const closers = trpc.lead.listClosers.useQuery();
   const clientsList = trpc.advertiser.list.useQuery();
   const partnersList = trpc.partner.list.useQuery();
 
@@ -3022,11 +3023,17 @@ export default function Leads() {
                 <SelectValue placeholder="Selecione o closer" />
               </SelectTrigger>
               <SelectContent>
-                {(internalUsers.data ?? []).map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.firstName} {u.lastName || ""} {u.role ? `(${u.role})` : ""}
-                  </SelectItem>
-                ))}
+                {(closers.data ?? []).length === 0 ? (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                    Nenhum usuário com a tag Closer. Marque a tag em Membros.
+                  </div>
+                ) : (
+                  (closers.data ?? []).map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.firstName} {u.lastName || ""} {u.role ? `(${u.role})` : ""}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>

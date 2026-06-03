@@ -122,6 +122,8 @@ export default function Members() {
     role: string;
     clientId: number | null;
     partnerId: number | null;
+    isSdr: boolean;
+    isCloser: boolean;
   }>({
     email: "",
     firstName: "",
@@ -129,6 +131,8 @@ export default function Members() {
     role: "comercial",
     clientId: null,
     partnerId: null,
+    isSdr: false,
+    isCloser: false,
   });
 
 
@@ -163,8 +167,16 @@ export default function Members() {
       utils.members.list.invalidate();
       utils.members.listInvitations.invalidate();
       setCreateDialogOpen(false);
-      setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null, partnerId: null });
+      setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null, partnerId: null, isSdr: false, isCloser: false });
       toast.success(`Convite enviado para ${data.email}! O usuário receberá um e-mail para criar sua conta.`);
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const updateTagsMutation = trpc.members.updateTags.useMutation({
+    onSuccess: () => {
+      utils.members.list.invalidate();
+      toast.success("Tags atualizadas com sucesso!");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
@@ -215,7 +227,7 @@ export default function Members() {
       description="Cadastrar, gerenciar papéis e permissões dos usuários da plataforma"
       actions={
         <Button onClick={() => {
-          setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null, partnerId: null });
+          setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null, partnerId: null, isSdr: false, isCloser: false });
           setCreateDialogOpen(true);
         }}>
           <Send className="w-4 h-4 mr-2" />
@@ -382,6 +394,37 @@ export default function Members() {
                           ? `Parceiro: ${partnersList.find((p) => p.id === member.partnerId)?.name || `#${member.partnerId}`}`
                           : "Vincular parceiro"}
                       </button>
+                    )}
+                    {!EXTERNAL_ROLES.includes(member.role || "") && (
+                      <div className="flex items-center gap-1">
+                        {([
+                          { key: "isSdr", label: "SDR" },
+                          { key: "isCloser", label: "Closer" },
+                        ] as const).map(({ key, label }) => {
+                          const active = !!(member as any)[key];
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              disabled={updateTagsMutation.isPending}
+                              onClick={() => {
+                                updateTagsMutation.mutate({
+                                  userId: member.id,
+                                  isSdr: key === "isSdr" ? !active : !!(member as any).isSdr,
+                                  isCloser: key === "isCloser" ? !active : !!(member as any).isCloser,
+                                });
+                              }}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors disabled:opacity-50 ${
+                                active
+                                  ? "bg-primary/20 text-primary border-primary/30"
+                                  : "bg-transparent text-muted-foreground border-border/40 hover:border-border"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
 
@@ -718,6 +761,36 @@ export default function Members() {
                 </SelectContent>
               </Select>
             </div>
+            {!["anunciante", "restaurante", "parceiro"].includes(createForm.role) && (
+              <div className="grid gap-2">
+                <Label>Tags</Label>
+                <div className="flex items-center gap-2">
+                  {([
+                    { key: "isSdr", label: "SDR" },
+                    { key: "isCloser", label: "Closer" },
+                  ] as const).map(({ key, label }) => {
+                    const active = createForm[key];
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setCreateForm({ ...createForm, [key]: !active })}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                          active
+                            ? "bg-primary/20 text-primary border-primary/30"
+                            : "bg-transparent text-muted-foreground border-border/40 hover:border-border"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Closer recebe handoffs de leads qualificados. Tags são independentes do papel.
+                </p>
+              </div>
+            )}
             {createForm.role === "anunciante" && (
               <div className="grid gap-2">
                 <Label>Anunciante vinculado</Label>

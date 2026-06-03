@@ -2002,6 +2002,15 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       ON CONFLICT ("type", "code") DO NOTHING;
     `,
   },
+  {
+    // Task #243 — tags SDR/Closer independentes do role para usuários internos.
+    // Usadas pelo handoff (seletor de closer) e funil de SDR.
+    name: "add_sdr_closer_tags_to_users",
+    sql: `
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_sdr" boolean DEFAULT false;
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_closer" boolean DEFAULT false;
+    `,
+  },
 ];
 
 export async function runMigrations() {

@@ -190,6 +190,8 @@ export const appRouter = router({
             isActive: !cu.banned,
             clientId: meta?.clientId ? Number(meta.clientId) : null,
             partnerId: meta?.partnerId ? Number(meta.partnerId) : null,
+            isSdr: !!meta?.isSdr,
+            isCloser: !!meta?.isCloser,
             lastLoginAt: cu.lastSignInAt ? new Date(cu.lastSignInAt).toISOString() : null,
             createdAt: cu.createdAt ? new Date(cu.createdAt).toISOString() : null,
             updatedAt: cu.updatedAt ? new Date(cu.updatedAt).toISOString() : null,
@@ -208,6 +210,8 @@ export const appRouter = router({
               clientId: u.clientId,
               partnerId: u.partnerId,
               isActive: u.isActive,
+              isSdr: u.isSdr,
+              isCloser: u.isCloser,
             });
           } catch {}
         }
@@ -235,6 +239,48 @@ export const appRouter = router({
         }
 
         const user = await authStorage.updateUserRole(input.userId, input.role);
+        if (!user) return undefined;
+        const { passwordHash: _, ...safe } = user;
+        return safe;
+      }),
+
+    updateTags: adminProcedure
+      .input(z.object({
+        userId: z.string(),
+        isSdr: z.boolean(),
+        isCloser: z.boolean(),
+      }))
+      .mutation(async ({ input }) => {
+        const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
+        const { createClerkClient } = await import("@clerk/express");
+        const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+
+        let clerkUser;
+        try {
+          clerkUser = await clerkClient.users.getUser(input.userId);
+        } catch (err: any) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado no Clerk." });
+        }
+
+        const role = (clerkUser.publicMetadata as any)?.role || "anunciante";
+        if (!INTERNAL_ROLES.includes(role)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Tags SDR/Closer só podem ser atribuídas a usuários internos." });
+        }
+
+        try {
+          await clerkClient.users.updateUser(input.userId, {
+            publicMetadata: {
+              ...clerkUser.publicMetadata,
+              isSdr: input.isSdr,
+              isCloser: input.isCloser,
+            },
+          });
+        } catch (err: any) {
+          console.error("Failed to update Clerk tags metadata:", err);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao atualizar tags no Clerk." });
+        }
+
+        const user = await authStorage.updateUserTags(input.userId, { isSdr: input.isSdr, isCloser: input.isCloser });
         if (!user) return undefined;
         const { passwordHash: _, ...safe } = user;
         return safe;
@@ -364,6 +410,8 @@ export const appRouter = router({
         role: z.string().default("comercial"),
         clientId: z.number().nullable().optional(),
         partnerId: z.number().nullable().optional(),
+        isSdr: z.boolean().optional(),
+        isCloser: z.boolean().optional(),
       }))
       .mutation(async ({ input }) => {
         if (input.role === "anunciante" && !input.clientId) {
@@ -372,6 +420,11 @@ export const appRouter = router({
         if (input.role === "parceiro" && !input.partnerId) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Parceiros devem ser vinculados a um parceiro cadastrado." });
         }
+
+        const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
+        const isInternal = INTERNAL_ROLES.includes(input.role);
+        const isSdr = isInternal ? !!input.isSdr : false;
+        const isCloser = isInternal ? !!input.isCloser : false;
 
         const { createClerkClient } = await import("@clerk/express");
         const { appUrl } = await import("./_core/appUrl");
@@ -387,6 +440,8 @@ export const appRouter = router({
               partnerId: input.role === "parceiro" ? input.partnerId : null,
               firstName: input.firstName,
               lastName: input.lastName || null,
+              isSdr,
+              isCloser,
             },
             redirectUrl: `${appUrl()}/`,
           });

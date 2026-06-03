@@ -13,6 +13,8 @@ The CRM has distinct kanban stage sets keyed off `leads.type`, not one generic f
 - Restaurant: moving a lead to `ativo_rede` fires the existing `activeRestaurant.create` flow (convert dialog), and on success sets stage `ativo_rede` + `convertedToId`. The conversion logic itself is untouched — only the trigger stage + dialog opening were wired in.
 - Anunciante: `qualificado_handoff` opens the closer handoff dialog (creates an opportunity).
 
+**Closer eligibility is tag-driven, not role-driven:** `users.is_closer` / `users.is_sdr` (mirrored in Clerk `publicMetadata`) decide who can receive a handoff. The handoff closer selector uses `lead.listClosers` (active + is_closer); the generic `lead.listUsers` (any active non-anunciante) still backs the "Responsável" selectors in Leads + OpportunitiesBoard — don't filter listUsers to closers or you break those. `handoffToCloser` defensively rejects non-closer/inactive targets. Tags only assignable to internal roles (admin/comercial/operacoes/financeiro/manager) via Members screen.
+
 **Why:** CRM restructure (series CRM 1–5) replaced the legacy generic 7-stage funnel (novo/contato/qualificado/proposta/negociacao/ganho/perdido). New leads must be created at the first stage of their type's set (`stagesForType(type)[0].key`), or they fall off the board.
 
 **Partner portal** (`ParceiroLeads.tsx`): partner-referred leads are ALWAYS `type=anunciante` (hardcoded in `parceiroPortalRouter.createLead`), so its STAGES mirror `SDR_STAGES`. `getStageConfig` falls back to a raw-label badge for legacy/unknown stages so old leads (e.g. server `convertLeadToClient` still sets `ganho`) don't vanish.

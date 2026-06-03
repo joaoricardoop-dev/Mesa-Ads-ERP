@@ -156,6 +156,8 @@ async function startServer() {
             clientId: clientId ? Number(clientId) : null,
             restaurantId: restaurantId ? Number(restaurantId) : null,
             partnerId: partnerId ? Number(partnerId) : null,
+            isSdr: !!meta.isSdr,
+            isCloser: !!meta.isCloser,
             onboardingComplete: !isSelfRegistered,
             selfRegistered: isSelfRegistered,
           });
