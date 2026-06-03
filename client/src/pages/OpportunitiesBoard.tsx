@@ -26,6 +26,16 @@ import {
   X,
   ExternalLink,
   Pencil,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Hash,
+  Clock,
+  StickyNote,
+  MessageCircle,
+  Target,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CsvExportButton, downloadCsv } from "@/components/CsvExportButton";
@@ -57,6 +67,30 @@ const REVENUE_LABELS: Record<string, string> = {
   mrr: "MRR",
   oneshot: "One Shot",
 };
+
+const DECISION_ROLE_LABELS: Record<string, string> = {
+  decisor: "Decisor",
+  influenciador: "Influenciador",
+};
+
+const INTERACTION_TYPES = [
+  { key: "call", label: "Ligação", icon: Phone },
+  { key: "email", label: "E-mail", icon: Mail },
+  { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { key: "visit", label: "Visita", icon: MapPin },
+  { key: "note", label: "Nota", icon: StickyNote },
+];
+
+function formatDateTime(d: string | Date | null | undefined) {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 const emptyForm = {
   title: "",
@@ -134,6 +168,8 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
   const [dialogLossNotes, setDialogLossNotes] = useState("");
   const [linkQuotationId, setLinkQuotationId] = useState<string>("");
   const [createQuotationIds, setCreateQuotationIds] = useState<number[]>([]);
+  const [interactionType, setInteractionType] = useState("note");
+  const [interactionContent, setInteractionContent] = useState("");
   const { options: lossOptions, labelOf: lossLabelOf } = useConfigOptions("loss_reason");
   const { options: originOptions, labelOf: originLabelOf } = useConfigOptions("origin_category");
   const isValidLoss = (code: string) => lossOptions.some((o) => o.code === code);
@@ -155,6 +191,41 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
   const clientQuotationsQuery = trpc.quotation.list.useQuery(
     { clientId: sel?.clientId },
     { enabled: selectedId != null && sel?.clientId != null }
+  );
+
+  // Lead vinculado — fonte da qualificação BANT e do histórico de interações.
+  const linkedLeadQuery = trpc.lead.get.useQuery(
+    { id: sel?.leadId },
+    { enabled: selectedId != null && sel?.leadId != null }
+  );
+  const linkedLead = linkedLeadQuery.data as any;
+
+  // Anunciante vinculado — fonte das informações cadastrais completas.
+  const linkedClientQuery = trpc.advertiser.get.useQuery(
+    { id: sel?.clientId },
+    { enabled: selectedId != null && sel?.clientId != null }
+  );
+  const linkedClient = linkedClientQuery.data as any;
+
+  // Cadastro completo: prioriza o anunciante; cai para o lead quando não há cliente.
+  const reg = linkedClient ?? linkedLead ?? null;
+
+  // Contatos do lead/cliente da oportunidade (mesma consulta do Pré-vendas).
+  const contactInput =
+    sel?.leadId != null
+      ? { leadId: sel.leadId as number }
+      : sel?.clientId != null
+        ? { clientId: sel.clientId as number }
+        : null;
+  const oppContactsQuery = trpc.contact.list.useQuery(
+    contactInput ?? {},
+    { enabled: selectedId != null && contactInput != null }
+  );
+
+  // Histórico de interações (existe apenas quando há lead vinculado).
+  const oppInteractionsQuery = trpc.lead.listInteractions.useQuery(
+    { leadId: sel?.leadId },
+    { enabled: selectedId != null && sel?.leadId != null }
   );
 
   // Cotações do anunciante selecionado no diálogo de criação, sem oportunidade.
@@ -244,6 +315,24 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const addInteractionMutation = trpc.lead.addInteraction.useMutation({
+    onSuccess: () => {
+      toast.success("Interação registrada");
+      setInteractionContent("");
+      if (sel?.leadId != null) utils.lead.listInteractions.invalidate({ leadId: sel.leadId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  function handleAddInteraction() {
+    if (sel?.leadId == null || !interactionContent.trim()) return;
+    addInteractionMutation.mutate({
+      leadId: sel.leadId,
+      type: interactionType,
+      content: interactionContent.trim(),
+    });
+  }
 
   function openCreate() {
     setEditId(null);
@@ -851,7 +940,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
       </Dialog>
 
       {/* Detail Sheet */}
-      <Sheet open={selectedId != null} onOpenChange={(open) => { if (!open) { setSelectedId(null); setLossReason(""); setLossReasonNotes(""); setLinkQuotationId(""); } }}>
+      <Sheet open={selectedId != null} onOpenChange={(open) => { if (!open) { setSelectedId(null); setLossReason(""); setLossReasonNotes(""); setLinkQuotationId(""); setInteractionContent(""); setInteractionType("note"); } }}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto p-0">
           <SheetHeader className="px-6 pt-6 pb-4 border-b">
             <SheetTitle className="text-base leading-tight pr-8">{sel?.title ?? "Oportunidade"}</SheetTitle>
@@ -898,6 +987,149 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                 <Info label="Praça" value={sel.praca ? (PRACA_LABELS[sel.praca] ?? sel.praca) : "—"} />
                 <Info label="Parceiro" value={sel.partnerName ?? "—"} />
                 <Info label="Origem" value={originLabelOf(sel.source)} />
+              </div>
+
+              {/* Informações cadastrais completas */}
+              <div className="space-y-3 border-t pt-6">
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                  <Label className="text-xs font-semibold">Informações cadastrais</Label>
+                </div>
+                {!sel.clientId && !sel.leadId ? (
+                  <p className="text-xs text-muted-foreground">Oportunidade sem anunciante ou lead vinculado.</p>
+                ) : (linkedClientQuery.isLoading || linkedLeadQuery.isLoading) && !reg ? (
+                  <p className="text-xs text-muted-foreground italic">Carregando...</p>
+                ) : (
+                  <div className="grid gap-1.5 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span className="truncate">{reg?.name ?? sel.clientName ?? "—"}</span>
+                    </div>
+                    {reg?.cnpj && (
+                      <div className="flex items-center gap-2">
+                        <Hash className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="truncate font-mono text-xs">{reg.cnpj}</span>
+                      </div>
+                    )}
+                    {reg?.contactPhone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="truncate">{reg.contactPhone}</span>
+                      </div>
+                    )}
+                    {reg?.contactEmail && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="truncate">{reg.contactEmail}</span>
+                      </div>
+                    )}
+                    {(reg?.address || reg?.neighborhood || reg?.city) && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="truncate text-xs">
+                          {[reg.address, reg.addressNumber].filter(Boolean).join(", ")}
+                          {reg.neighborhood ? ` — ${reg.neighborhood}` : ""}
+                          {reg.city ? `, ${reg.city}` : ""}
+                          {reg.state ? `/${reg.state}` : ""}
+                        </span>
+                      </div>
+                    )}
+                    {!reg?.cnpj && !reg?.contactPhone && !reg?.contactEmail && !reg?.address && !reg?.neighborhood && !reg?.city && (
+                      <p className="text-xs text-muted-foreground italic">Sem informações cadastrais adicionais.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Contatos */}
+              <div className="space-y-3 border-t pt-6">
+                <div className="flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                  <Label className="text-xs font-semibold">
+                    Contatos ({oppContactsQuery.data?.length ?? 0})
+                  </Label>
+                </div>
+                {!contactInput ? (
+                  <p className="text-xs text-muted-foreground">Sem anunciante ou lead vinculado.</p>
+                ) : oppContactsQuery.isLoading ? (
+                  <p className="text-xs text-muted-foreground italic">Carregando...</p>
+                ) : (oppContactsQuery.data ?? []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Sem contatos.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {(oppContactsQuery.data ?? []).map((c: any) => (
+                      <div key={c.id} className="p-2 rounded-lg bg-muted/30 border border-border/30">
+                        <div className="flex items-center gap-1.5">
+                          <User className="w-3 h-3 text-muted-foreground shrink-0" />
+                          <span className="text-xs font-medium truncate">{c.name}</span>
+                          {c.role && (
+                            <Badge variant="secondary" className="text-[9px] h-4 px-1">{c.role}</Badge>
+                          )}
+                          {c.isPrimary && (
+                            <Badge variant="secondary" className="text-[9px] h-4 px-1">Principal</Badge>
+                          )}
+                        </div>
+                        {(c.phone || c.email) && (
+                          <div className="flex items-center gap-2 mt-0.5 ml-[18px] flex-wrap">
+                            {c.phone && (
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                <Phone className="w-2.5 h-2.5" />{c.phone}
+                              </span>
+                            )}
+                            {c.email && (
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                <Mail className="w-2.5 h-2.5" />{c.email}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Qualificação BANT */}
+              <div className="space-y-3 border-t pt-6">
+                <div className="flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5 text-muted-foreground" />
+                  <Label className="text-xs font-semibold">Qualificação BANT</Label>
+                </div>
+                {sel.leadId == null ? (
+                  <p className="text-xs text-muted-foreground">Sem lead vinculado para qualificação.</p>
+                ) : linkedLeadQuery.isLoading && !linkedLead ? (
+                  <p className="text-xs text-muted-foreground italic">Carregando...</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                    <Info label="Cargo do contato" value={linkedLead?.cargo || "—"} />
+                    <Info label="Papel na decisão" value={linkedLead?.decisionRole ? (DECISION_ROLE_LABELS[linkedLead.decisionRole] ?? linkedLead.decisionRole) : "—"} />
+                    <Info label="Produto de interesse" value={linkedLead?.produtoInteresse || "—"} />
+                    <Info label="Praça" value={linkedLead?.praca ? (PRACA_LABELS[linkedLead.praca] ?? linkedLead.praca) : "—"} />
+                    <Info label="Budget estimado" value={formatCurrency(linkedLead?.budgetEstimado)} />
+                    <Info label="Timing" value={linkedLead?.timing || "—"} />
+                    <div className="col-span-2">
+                      <Info label="Objeções" value={linkedLead?.objecoes || "—"} />
+                    </div>
+                    <div className="col-span-2 flex items-center gap-1.5 text-sm">
+                      <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Reunião:</span>
+                      <span>{formatDateTime(linkedLead?.meetingScheduledAt)}</span>
+                    </div>
+                    {linkedLead?.meetingLink && (
+                      <div className="col-span-2">
+                        <a
+                          href={linkedLead.meetingLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
+                        >
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                          {linkedLead.meetingLink}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Cotações vinculadas */}
@@ -1042,6 +1274,92 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
                   </Button>
                 </div>
               )}
+
+              {/* Nova interação + Histórico */}
+              <div className="space-y-4 border-t pt-6">
+                <div className="space-y-3">
+                  <Label className="text-xs font-semibold">Nova interação</Label>
+                  {sel.leadId == null ? (
+                    <p className="text-xs text-muted-foreground">
+                      Vincule um lead à oportunidade para registrar interações.
+                    </p>
+                  ) : (
+                    <>
+                      <Select value={interactionType} onValueChange={setInteractionType}>
+                        <SelectTrigger className="w-[150px] h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {INTERACTION_TYPES.map((t) => (
+                            <SelectItem key={t.key} value={t.key}>
+                              <span className="flex items-center gap-1.5">
+                                <t.icon className="w-3 h-3" />
+                                {t.label}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="flex gap-2 items-end">
+                        <Textarea
+                          value={interactionContent}
+                          onChange={(e) => setInteractionContent(e.target.value)}
+                          placeholder="Descreva a interação..."
+                          rows={2}
+                          className="flex-1 text-sm"
+                        />
+                        <Button
+                          size="sm"
+                          className="h-8"
+                          onClick={handleAddInteraction}
+                          disabled={!interactionContent.trim() || addInteractionMutation.isPending}
+                        >
+                          Salvar
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-xs font-semibold">Histórico</Label>
+                  {sel.leadId == null ? (
+                    <p className="text-xs text-muted-foreground">Sem histórico de interações.</p>
+                  ) : oppInteractionsQuery.isLoading ? (
+                    <p className="text-xs text-muted-foreground italic">Carregando...</p>
+                  ) : (oppInteractionsQuery.data ?? []).length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4">Nenhuma interação registrada</p>
+                  ) : (
+                    <div className="max-h-[250px] overflow-y-auto space-y-2.5 pr-1">
+                      {(oppInteractionsQuery.data ?? []).map((interaction: any) => {
+                        const typeConfig = INTERACTION_TYPES.find((t) => t.key === interaction.type);
+                        const Icon = typeConfig?.icon ?? StickyNote;
+                        return (
+                          <div key={interaction.id} className="flex gap-2.5 text-sm">
+                            <div className="shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center mt-0.5">
+                              <Icon className="w-3 h-3 text-muted-foreground" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium text-[10px]">{typeConfig?.label ?? interaction.type}</span>
+                                <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  {formatDateTime(interaction.createdAt)}
+                                </span>
+                              </div>
+                              {interaction.content && (
+                                <p className="text-[11px] text-muted-foreground mt-0.5 whitespace-pre-wrap break-words">
+                                  {interaction.content}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <div className="border-t pt-6">
                 <Button
