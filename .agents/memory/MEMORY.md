@@ -3,4 +3,4 @@
 - [Schema.ts vs runMigrations drift](schema-migration-drift.md) — new schema.ts columns need a custom migration too, else fresh/E2E DBs 500 on any ORM insert.
 - [Resend email graceful degradation](resend-email-degradation.md) — sendEmail never throws; 403 "testing email" in dev/e2e is expected until a domain is verified + RESEND_FROM set.
 - [CRM funnel stages per type](crm-funnel-stages-per-type.md) — leads.type drives which stage set (SDR vs venue); convert fires on ativo_rede/qualificado_handoff; partner portal mirrors SDR.
-- [config_options single source](config-options-single-source.md) — loss reasons + origin categories are DB-backed; read via useConfigOptions / getActiveConfigCodes / getConfigLabels, never shared/loss-reasons.ts for display.
+- [config_options single source](config-options-single-source.md) — loss reasons + origin categories are DB-backed editable lists; every consumer (selects, validation, dashboards) reads the DB, never the legacy static loss-reasons module.
