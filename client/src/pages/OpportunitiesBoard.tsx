@@ -36,7 +36,18 @@ import {
   MessageCircle,
   Target,
   Calendar,
+  Check,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { CsvExportButton, downloadCsv } from "@/components/CsvExportButton";
 import { useConfigOptions } from "@/lib/configOptions";
@@ -170,6 +181,9 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
   const [createQuotationIds, setCreateQuotationIds] = useState<number[]>([]);
   const [interactionType, setInteractionType] = useState("note");
   const [interactionContent, setInteractionContent] = useState("");
+  const [contactFormOpen, setContactFormOpen] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "" });
+  const [deleteContactId, setDeleteContactId] = useState<number | null>(null);
   const { options: lossOptions, labelOf: lossLabelOf } = useConfigOptions("loss_reason");
   const { options: originOptions, labelOf: originLabelOf } = useConfigOptions("origin_category");
   const isValidLoss = (code: string) => lossOptions.some((o) => o.code === code);
@@ -321,6 +335,25 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
       toast.success("Interação registrada");
       setInteractionContent("");
       if (sel?.leadId != null) utils.lead.listInteractions.invalidate({ leadId: sel.leadId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const createContactMutation = trpc.contact.create.useMutation({
+    onSuccess: () => {
+      setContactForm({ name: "", email: "", phone: "" });
+      setContactFormOpen(false);
+      utils.contact.list.invalidate();
+      toast.success("Contato adicionado");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteContactMutation = trpc.contact.delete.useMutation({
+    onSuccess: () => {
+      setDeleteContactId(null);
+      utils.contact.list.invalidate();
+      toast.success("Contato removido");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -1043,46 +1076,111 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
 
               {/* Contatos */}
               <div className="space-y-3 border-t pt-6">
-                <div className="flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                  <Label className="text-xs font-semibold">
-                    Contatos ({oppContactsQuery.data?.length ?? 0})
-                  </Label>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Label className="text-xs font-semibold">
+                      Contatos ({oppContactsQuery.data?.length ?? 0})
+                    </Label>
+                  </div>
+                  {contactInput && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs gap-1"
+                      onClick={() => setContactFormOpen((v) => !v)}
+                    >
+                      {contactFormOpen ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                      {contactFormOpen ? "Cancelar" : "Adicionar"}
+                    </Button>
+                  )}
                 </div>
+
+                {contactInput && contactFormOpen && (
+                  <div className="space-y-2 p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <Input
+                      placeholder="Nome *"
+                      value={contactForm.name}
+                      onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      placeholder="Telefone"
+                      value={contactForm.phone}
+                      onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      placeholder="Email"
+                      value={contactForm.email}
+                      onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                    <Button
+                      size="sm"
+                      className="w-full h-7 text-xs gap-1"
+                      disabled={!contactForm.name.trim() || createContactMutation.isPending}
+                      onClick={() => {
+                        if (!contactInput) return;
+                        createContactMutation.mutate({
+                          ...contactInput,
+                          name: contactForm.name.trim(),
+                          email: contactForm.email || undefined,
+                          phone: contactForm.phone || undefined,
+                        });
+                      }}
+                    >
+                      <Check className="w-3 h-3" />
+                      {createContactMutation.isPending ? "Salvando..." : "Salvar Contato"}
+                    </Button>
+                  </div>
+                )}
+
                 {!contactInput ? (
                   <p className="text-xs text-muted-foreground">Sem anunciante ou lead vinculado.</p>
                 ) : oppContactsQuery.isLoading ? (
                   <p className="text-xs text-muted-foreground italic">Carregando...</p>
                 ) : (oppContactsQuery.data ?? []).length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Sem contatos.</p>
+                  !contactFormOpen && <p className="text-xs text-muted-foreground">Sem contatos.</p>
                 ) : (
                   <div className="space-y-1.5">
                     {(oppContactsQuery.data ?? []).map((c: any) => (
-                      <div key={c.id} className="p-2 rounded-lg bg-muted/30 border border-border/30">
-                        <div className="flex items-center gap-1.5">
-                          <User className="w-3 h-3 text-muted-foreground shrink-0" />
-                          <span className="text-xs font-medium truncate">{c.name}</span>
-                          {c.role && (
-                            <Badge variant="secondary" className="text-[9px] h-4 px-1">{c.role}</Badge>
-                          )}
-                          {c.isPrimary && (
-                            <Badge variant="secondary" className="text-[9px] h-4 px-1">Principal</Badge>
-                          )}
-                        </div>
-                        {(c.phone || c.email) && (
-                          <div className="flex items-center gap-2 mt-0.5 ml-[18px] flex-wrap">
-                            {c.phone && (
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                                <Phone className="w-2.5 h-2.5" />{c.phone}
-                              </span>
+                      <div key={c.id} className="flex items-start justify-between gap-2 p-2 rounded-lg bg-muted/30 border border-border/30 group">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <User className="w-3 h-3 text-muted-foreground shrink-0" />
+                            <span className="text-xs font-medium truncate">{c.name}</span>
+                            {c.role && (
+                              <Badge variant="secondary" className="text-[9px] h-4 px-1">{c.role}</Badge>
                             )}
-                            {c.email && (
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                                <Mail className="w-2.5 h-2.5" />{c.email}
-                              </span>
+                            {c.isPrimary && (
+                              <Badge variant="secondary" className="text-[9px] h-4 px-1">Principal</Badge>
                             )}
                           </div>
-                        )}
+                          {(c.phone || c.email) && (
+                            <div className="flex items-center gap-2 mt-0.5 ml-[18px] flex-wrap">
+                              {c.phone && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                  <Phone className="w-2.5 h-2.5" />{c.phone}
+                                </span>
+                              )}
+                              {c.email && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                  <Mail className="w-2.5 h-2.5" />{c.email}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Remover contato"
+                          onClick={() => setDeleteContactId(c.id)}
+                        >
+                          <Trash2 className="w-3 h-3 text-destructive" />
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -1379,6 +1477,29 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={deleteContactId != null} onOpenChange={(open) => { if (!open) setDeleteContactId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover contato</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover este contato? Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteContactMutation.isPending}
+              onClick={() => {
+                if (deleteContactId != null) deleteContactMutation.mutate({ id: deleteContactId });
+              }}
+            >
+              {deleteContactMutation.isPending ? "Removendo..." : "Remover"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
