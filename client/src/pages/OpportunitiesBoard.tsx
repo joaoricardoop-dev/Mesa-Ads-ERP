@@ -25,9 +25,11 @@ import {
   Link2,
   X,
   ExternalLink,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CsvExportButton, downloadCsv } from "@/components/CsvExportButton";
+import { LOSS_REASON_CODES, LOSS_REASON_LABELS, isLossReasonCode } from "@shared/loss-reasons";
 import type { ContactRecordFilter } from "./Leads";
 
 export const OPPORTUNITY_STAGES = [
@@ -95,11 +97,16 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
   const opportunities = opportunitiesQuery.data ?? [];
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
   const [formData, setFormData] = useState({ ...emptyForm });
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [lossReason, setLossReason] = useState("");
+  const [lossReasonNotes, setLossReasonNotes] = useState("");
+  const [lossDialogId, setLossDialogId] = useState<number | null>(null);
+  const [dialogLossReason, setDialogLossReason] = useState("");
+  const [dialogLossNotes, setDialogLossNotes] = useState("");
   const [linkQuotationId, setLinkQuotationId] = useState<string>("");
   const [createQuotationIds, setCreateQuotationIds] = useState<number[]>([]);
 
@@ -152,6 +159,17 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
     onError: (e) => toast.error(e.message),
   });
 
+  const updateMutation = trpc.opportunity.update.useMutation({
+    onSuccess: () => {
+      toast.success("Oportunidade atualizada");
+      setCreateOpen(false);
+      setEditId(null);
+      setFormData({ ...emptyForm });
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const linkQuotationMutation = trpc.quotation.linkOpportunity.useMutation({
     onSuccess: () => {
       toast.success("Cotação vinculada");
@@ -199,9 +217,52 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
     onError: (e) => toast.error(e.message),
   });
 
+  function openCreate() {
+    setEditId(null);
+    setFormData({ ...emptyForm });
+    setCreateQuotationIds([]);
+    setCreateOpen(true);
+  }
+
+  function openEdit(opp: any) {
+    setEditId(opp.id);
+    setFormData({
+      title: opp.title ?? "",
+      clientId: opp.clientId ?? undefined,
+      ownerId: opp.ownerId ?? undefined,
+      estimatedValue: opp.estimatedValue != null ? String(opp.estimatedValue) : "",
+      expectedCloseDate: opp.expectedCloseDate
+        ? String(opp.expectedCloseDate).slice(0, 10)
+        : "",
+      opportunityType: opp.opportunityType ?? undefined,
+      revenueType: opp.revenueType ?? undefined,
+      praca: opp.praca ?? undefined,
+      source: opp.source ?? "",
+      partnerId: opp.partnerId ?? undefined,
+    });
+    setCreateQuotationIds([]);
+    setCreateOpen(true);
+  }
+
   function handleCreate() {
     if (!formData.title.trim()) {
       toast.error("Título é obrigatório");
+      return;
+    }
+    if (editId != null) {
+      updateMutation.mutate({
+        id: editId,
+        title: formData.title.trim(),
+        clientId: formData.clientId ?? null,
+        ownerId: formData.ownerId ?? null,
+        estimatedValue: formData.estimatedValue || null,
+        expectedCloseDate: formData.expectedCloseDate || null,
+        opportunityType: (formData.opportunityType as any) ?? null,
+        revenueType: (formData.revenueType as any) ?? null,
+        praca: (formData.praca as any) ?? null,
+        source: formData.source || null,
+        partnerId: formData.partnerId ?? null,
+      });
       return;
     }
     createMutation.mutate({
@@ -219,12 +280,20 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
     });
   }
 
+  function requestLoss(id: number) {
+    setLossDialogId(id);
+    setDialogLossReason("");
+    setDialogLossNotes("");
+  }
+
   function moveStage(id: number, currentStage: string, direction: "next" | "prev") {
     const idx = OPPORTUNITY_STAGES.findIndex((s) => s.key === currentStage);
     if (idx === -1) return;
     const newIdx = direction === "next" ? idx + 1 : idx - 1;
     if (newIdx < 0 || newIdx >= OPPORTUNITY_STAGES.length) return;
-    changeStageMutation.mutate({ id, stage: OPPORTUNITY_STAGES[newIdx].key });
+    const target = OPPORTUNITY_STAGES[newIdx].key;
+    if (target === "perdida") { requestLoss(id); return; }
+    changeStageMutation.mutate({ id, stage: target });
   }
 
   function handleDragStart(e: React.DragEvent, id: number) {
@@ -261,7 +330,8 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
     if (!isNaN(id)) {
       const opp = opportunities.find((o: any) => o.id === id);
       if (opp && opp.stage !== stageKey) {
-        changeStageMutation.mutate({ id, stage: stageKey });
+        if (stageKey === "perdida") requestLoss(id);
+        else changeStageMutation.mutate({ id, stage: stageKey });
       }
     }
     setDraggedId(null);
@@ -321,7 +391,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
               downloadCsv(res.filename, res.csv);
             }}
           />
-          <Button size="sm" onClick={() => { setFormData({ ...emptyForm }); setCreateQuotationIds([]); setCreateOpen(true); }}>
+          <Button size="sm" onClick={openCreate}>
             <Plus className="w-4 h-4 mr-1" />
             Nova Oportunidade
           </Button>
@@ -478,11 +548,11 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
         </div>
       </div>
 
-      {/* Create Dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      {/* Create / Edit Dialog */}
+      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setEditId(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nova Oportunidade</DialogTitle>
+            <DialogTitle>{editId != null ? "Editar Oportunidade" : "Nova Oportunidade"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3">
@@ -615,7 +685,7 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
               </Select>
             </div>
 
-            {formData.clientId && (
+            {editId == null && formData.clientId && (
               <div className="grid gap-1.5">
                 <Label className="text-xs">Vincular cotações existentes</Label>
                 {createLinkableQuotations.length === 0 ? (
@@ -658,26 +728,93 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Criando..." : "Criar Oportunidade"}
+            <Button variant="outline" onClick={() => { setCreateOpen(false); setEditId(null); }}>Cancelar</Button>
+            <Button onClick={handleCreate} disabled={createMutation.isPending || updateMutation.isPending}>
+              {editId != null
+                ? (updateMutation.isPending ? "Salvando..." : "Salvar alterações")
+                : (createMutation.isPending ? "Criando..." : "Criar Oportunidade")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Loss reason dialog (drag/drop + arrow moves to "perdida") */}
+      <Dialog open={lossDialogId != null} onOpenChange={(open) => { if (!open) { setLossDialogId(null); setDialogLossReason(""); setDialogLossNotes(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Marcar como perdida</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid gap-2">
+              <Label className="text-xs font-semibold">Motivo da perda</Label>
+              <Select value={dialogLossReason} onValueChange={setDialogLossReason}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LOSS_REASON_CODES.map((code) => (
+                    <SelectItem key={code} value={code}>{LOSS_REASON_LABELS[code]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Textarea
+              value={dialogLossNotes}
+              onChange={(e) => setDialogLossNotes(e.target.value)}
+              placeholder="Detalhe (opcional): contexto, concorrente, valor..."
+              rows={2}
+              className="text-sm"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLossDialogId(null)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (lossDialogId == null || !isLossReasonCode(dialogLossReason)) {
+                  toast.error("Selecione o motivo da perda");
+                  return;
+                }
+                changeStageMutation.mutate(
+                  {
+                    id: lossDialogId,
+                    stage: "perdida",
+                    lossReason: dialogLossReason,
+                    lossReasonNotes: dialogLossNotes.trim() || undefined,
+                  },
+                  { onSuccess: () => { setLossDialogId(null); setDialogLossReason(""); setDialogLossNotes(""); } },
+                );
+              }}
+              disabled={!isLossReasonCode(dialogLossReason) || changeStageMutation.isPending}
+            >
+              {changeStageMutation.isPending ? "Salvando..." : "Marcar perdida"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Detail Sheet */}
-      <Sheet open={selectedId != null} onOpenChange={(open) => { if (!open) { setSelectedId(null); setLossReason(""); setLinkQuotationId(""); } }}>
+      <Sheet open={selectedId != null} onOpenChange={(open) => { if (!open) { setSelectedId(null); setLossReason(""); setLossReasonNotes(""); setLinkQuotationId(""); } }}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto p-0">
           <SheetHeader className="px-6 pt-6 pb-4 border-b">
             <SheetTitle className="text-base leading-tight pr-8">{sel?.title ?? "Oportunidade"}</SheetTitle>
             {sel && (
-              <Badge
-                variant="outline"
-                className={`mt-1 w-fit text-[10px] px-1.5 py-0 ${OPPORTUNITY_STAGES.find((s) => s.key === sel.stage)?.color ?? ""}`}
-              >
-                {OPPORTUNITY_STAGES.find((s) => s.key === sel.stage)?.label ?? sel.stage}
-              </Badge>
+              <div className="flex items-center justify-between gap-2 mt-1">
+                <Badge
+                  variant="outline"
+                  className={`w-fit text-[10px] px-1.5 py-0 ${OPPORTUNITY_STAGES.find((s) => s.key === sel.stage)?.color ?? ""}`}
+                >
+                  {OPPORTUNITY_STAGES.find((s) => s.key === sel.stage)?.label ?? sel.stage}
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => openEdit(sel)}
+                >
+                  <Pencil className="w-3 h-3" />
+                  Editar
+                </Button>
+              </div>
             )}
           </SheetHeader>
 
@@ -791,25 +928,54 @@ export default function OpportunitiesBoard({ onViewContacts }: { onViewContacts?
               {sel.stage === "perdida" && (
                 <div className="grid gap-1.5 border-t pt-6">
                   <Label className="text-xs font-semibold">Motivo da perda</Label>
-                  <p className="text-xs text-muted-foreground">{sel.lossReason || "—"}</p>
+                  <p className="text-sm">
+                    {(() => {
+                      const code = sel.lossReason;
+                      return isLossReasonCode(code) ? LOSS_REASON_LABELS[code] : (code || "—");
+                    })()}
+                  </p>
+                  {sel.lossReasonNotes && (
+                    <p className="text-xs text-muted-foreground">{sel.lossReasonNotes}</p>
+                  )}
                 </div>
               )}
 
               {sel.stage !== "perdida" && (
                 <div className="grid gap-2 border-t pt-6">
                   <Label className="text-xs font-semibold">Marcar como perdida</Label>
+                  <Select value={lossReason} onValueChange={setLossReason}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Selecione o motivo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LOSS_REASON_CODES.map((code) => (
+                        <SelectItem key={code} value={code}>{LOSS_REASON_LABELS[code]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Textarea
-                    value={lossReason}
-                    onChange={(e) => setLossReason(e.target.value)}
-                    placeholder="Motivo da perda..."
+                    value={lossReasonNotes}
+                    onChange={(e) => setLossReasonNotes(e.target.value)}
+                    placeholder="Detalhe (opcional): contexto, concorrente, valor..."
                     rows={2}
                     className="text-sm"
                   />
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => changeStageMutation.mutate({ id: sel.id, stage: "perdida", lossReason: lossReason || undefined })}
-                    disabled={changeStageMutation.isPending}
+                    onClick={() => {
+                      if (!isLossReasonCode(lossReason)) {
+                        toast.error("Selecione o motivo da perda");
+                        return;
+                      }
+                      changeStageMutation.mutate({
+                        id: sel.id,
+                        stage: "perdida",
+                        lossReason,
+                        lossReasonNotes: lossReasonNotes.trim() || undefined,
+                      });
+                    }}
+                    disabled={!isLossReasonCode(lossReason) || changeStageMutation.isPending}
                   >
                     Marcar perdida
                   </Button>

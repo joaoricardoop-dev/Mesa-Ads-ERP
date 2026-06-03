@@ -703,6 +703,7 @@ export const opportunities = pgTable("opportunities", {
   revenueType: varchar("revenueType", { length: 20 }),
   praca: varchar("praca", { length: 20 }),
   lossReason: text("lossReason"),
+  lossReasonNotes: text("lossReasonNotes"),
   source: varchar("source", { length: 50 }),
   farmingStatus: varchar("farmingStatus", { length: 20 }),
   farmingTags: text("farmingTags"),

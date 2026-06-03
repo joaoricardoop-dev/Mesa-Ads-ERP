@@ -1946,6 +1946,16 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       UPDATE "leads" SET "stage" = 'desqualificado' WHERE "type" = 'anunciante' AND "stage" = 'perdido';
     `,
   },
+  {
+    // Motivos de perda das oportunidades alinhados aos das cotações
+    // (shared/loss-reasons.ts): `lossReason` passa a guardar o CÓDIGO do motivo
+    // (preco/prazo/concorrente/...) e ganha um campo opcional de notas livres,
+    // espelhando o par lossReason/lossReasonNotes das cotações.
+    name: "opportunities_add_loss_reason_notes",
+    sql: `
+      ALTER TABLE "opportunities" ADD COLUMN IF NOT EXISTS "lossReasonNotes" TEXT;
+    `,
+  },
 ];
 
 export async function runMigrations() {

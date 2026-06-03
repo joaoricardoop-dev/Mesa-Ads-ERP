@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
 import { ensureContact } from "./contactSync";
 import { toCsv } from "./_core/csv";
+import { LOSS_REASON_CODES } from "../shared/loss-reasons";
 
 async function getDatabase() {
   const d = await getDb();
@@ -258,6 +259,7 @@ export const opportunityRouter = router({
       revenueType: z.enum(["mrr", "oneshot"]).nullable().optional(),
       praca: z.enum(["manaus", "rio", "ambas"]).nullable().optional(),
       lossReason: z.string().nullable().optional(),
+      lossReasonNotes: z.string().nullable().optional(),
       source: z.string().nullable().optional(),
       farmingStatus: z.enum(["ativo", "pausado"]).nullable().optional(),
       farmingTags: z.string().nullable().optional(),
@@ -287,6 +289,15 @@ export const opportunityRouter = router({
       id: z.number(),
       stage: z.string(),
       lossReason: z.string().optional(),
+      lossReasonNotes: z.string().optional(),
+    }).superRefine((val, ctx) => {
+      if (val.stage === "perdida" && !(LOSS_REASON_CODES as readonly string[]).includes(val.lossReason ?? "")) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Selecione um motivo de perda válido",
+          path: ["lossReason"],
+        });
+      }
     }))
     .mutation(async ({ input }) => {
       const db = await getDatabase();
@@ -294,7 +305,9 @@ export const opportunityRouter = router({
         .update(opportunities)
         .set({
           stage: input.stage,
-          ...(input.stage === "perdida" && input.lossReason ? { lossReason: input.lossReason } : {}),
+          ...(input.stage === "perdida" && input.lossReason
+            ? { lossReason: input.lossReason, lossReasonNotes: input.lossReasonNotes ?? null }
+            : {}),
           updatedAt: new Date(),
         })
         .where(eq(opportunities.id, input.id))
