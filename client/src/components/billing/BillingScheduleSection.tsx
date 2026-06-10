@@ -15,6 +15,7 @@ import {
   addDaysIso,
   sumSchedule,
   scheduleMatchesTotal,
+  formatIsoDateBR,
   DEFAULT_DUE_OFFSET_DAYS,
 } from "@shared/billingSchedule";
 
@@ -332,9 +333,7 @@ export function ReadonlySchedule({
   total?: number | string;
   loading?: boolean;
 }) {
-  const fmtDate = (d: string) => {
-    try { return new Date(d.length === 10 ? `${d}T00:00:00Z` : d).toLocaleDateString("pt-BR", { timeZone: "UTC" }); } catch { return d; }
-  };
+  const fmtDate = (d: string) => formatIsoDateBR(d);
   if (loading) return <p className="text-xs text-muted-foreground">carregando...</p>;
   if (!items || items.length === 0) {
     return <p className="text-xs text-muted-foreground">Pagamento em parcela única no início da campanha.</p>;

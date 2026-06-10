@@ -26,6 +26,26 @@ export function addDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Formatador canônico de data ISO → "DD/MM/AAAA" (pt-BR).
+ *
+ * Fonte única para exibir qualquer data ISO (`YYYY-MM-DD` ou ISO completo) em
+ * todas as telas (interna, pública, PDF). Ancora SEMPRE em UTC para que uma data
+ * de 10 caracteres (`YYYY-MM-DD`) seja exibida VERBATIM, independentemente do
+ * fuso horário do navegador — caso contrário `new Date("2026-06-25")` é meia-
+ * noite UTC e, em UTC-3 (Brasil), regride para 24/06. Nunca desloca o dado.
+ */
+export function formatIsoDateBR(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+  } catch {
+    return iso;
+  }
+}
+
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }

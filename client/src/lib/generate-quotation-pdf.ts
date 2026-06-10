@@ -6,6 +6,7 @@ import {
   drawPdfHeader,
   drawPdfFooter,
 } from "./pdf-branding";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 
 export interface QuotationSignPDFData {
   orderNumber: string;
@@ -107,13 +108,7 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
 
-  const formatDate = (d: string) => {
-    try {
-      return new Date(d).toLocaleDateString("pt-BR");
-    } catch {
-      return d;
-    }
-  };
+  const formatDate = (d: string) => formatIsoDateBR(d);
 
   doc.setFont(FONT_NAME, "bold");
   doc.text("Início:", margin, y);
@@ -153,7 +148,7 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
     doc.setFont(FONT_NAME, "normal");
     doc.setTextColor(60, 60, 60);
     for (const r of data.billingSchedule) {
-      const due = r.dueDate.length >= 10 ? new Date(r.dueDate + "T00:00:00Z").toLocaleDateString("pt-BR", { timeZone: "UTC" }) : r.dueDate;
+      const due = formatIsoDateBR(r.dueDate);
       doc.text(String(r.sequence), margin, y);
       doc.text(due, margin + 15, y);
       doc.text(

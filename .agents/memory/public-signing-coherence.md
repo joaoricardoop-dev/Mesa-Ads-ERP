@@ -42,7 +42,26 @@ a campaign already exists (edit via the campaign, which carries the
 terminal-invoice lock). If a stored schedule looks wrong, the user fixes it in
 the editor — code must not "correct" it.
 
-E2E: `e2e/public-signing-coerencia.spec.ts` (price/Σ invariants only) and
-`e2e/condicoes-pagamento-edicao.spec.ts` (internal == public schedule, and a
-pre-period due date preserved verbatim after edit) seed via
+## ISO date display = UTC-anchored single source (NO timezone shift)
+
+ANY ISO date string (`YYYY-MM-DD`) shown in the UI/PDF must be formatted via the
+canonical `formatIsoDateBR` in `shared/billingSchedule.ts`, which anchors to UTC
+(`new Date(\`${iso}T00:00:00Z\`).toLocaleDateString("pt-BR", {timeZone:"UTC"})`).
+
+**Why:** `new Date("2026-06-25").toLocaleDateString("pt-BR")` (no UTC anchor)
+parses as UTC midnight then renders in the browser's local tz; in Brazil (UTC-3)
+it regresses to 24/06 — a silent off-by-one. The public signing screen + its PDF
+used the unanchored form while the internal editor anchored UTC, so the same
+stored date showed one day apart across screens. The data was identical; only the
+rendering diverged.
+
+**How to apply:** Never write `new Date(isoDateOnly).toLocaleDateString(...)`
+without `{timeZone:"UTC"}` + the `T00:00:00Z` anchor for date-only strings. Reuse
+`formatIsoDateBR` instead of re-implementing. (Datetime strings with a real time
+component are fine as-is.)
+
+E2E: `e2e/public-signing-coerencia.spec.ts` (price/Σ invariants + displayed-date
+parity: each rendered DD/MM/AAAA equals the UTC-anchored format of the ISO from
+the public GET) and `e2e/condicoes-pagamento-edicao.spec.ts` (internal == public
+schedule, pre-period due date preserved verbatim after edit) seed via
 `/api/dev-seed-signable-quotation`.

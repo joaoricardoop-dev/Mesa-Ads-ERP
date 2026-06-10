@@ -12,6 +12,14 @@ import { test, expect, type APIRequestContext } from "@playwright/test";
 
 const TOLERANCE = 0.01; // 1 centavo
 
+// Formata uma data ISO (YYYY-MM-DD) → "DD/MM/AAAA" ancorando em UTC, espelhando
+// o formatador canônico `formatIsoDateBR`. Usado para provar que a tela pública
+// exibe a data VERBATIM (sem deslocamento de fuso) idêntica à fonte ISO.
+function isoToBR(iso: string): string {
+  const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
+  return d.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+}
+
 function parseBRL(text: string): number {
   // "R$ 4.800,00" → 4800.00 ; "R$ 1,5000" → 1.5
   const cleaned = text
@@ -101,5 +109,27 @@ test.describe("tela pública de assinatura — coerência de preços e venciment
       Math.abs(somaParcelas - grandTotal),
       `Σ parcelas (${somaParcelas}) ≠ total geral (${grandTotal})`,
     ).toBeLessThanOrEqual(TOLERANCE);
+
+    // ── Paridade de data exibida (sem off-by-one de fuso) ───────────────────
+    // Cada vencimento renderizado (DD/MM/AAAA) deve bater EXATAMENTE com a data
+    // ISO da fonte (GET público), ancorada em UTC — provando que a tela pública
+    // não desloca a data em -1 dia no fuso do Brasil.
+    const apiRes = await request.get(`/api/public-signing/quotation/${token}`);
+    expect(apiRes.ok(), `GET público falhou (${apiRes.status()})`).toBeTruthy();
+    const apiBody = await apiRes.json();
+    const apiSchedule = (apiBody.billingSchedule ?? []) as Array<{
+      sequence: number;
+      dueDate: string;
+    }>;
+    expect(apiSchedule.length).toBe(parcelaCount);
+    for (const it of apiSchedule) {
+      const shown = (
+        await page.getByTestId(`parcela-venc-${it.sequence}`).innerText()
+      ).trim();
+      expect(
+        shown,
+        `parcela ${it.sequence}: exibido ${shown} ≠ fonte ISO ${it.dueDate} (${isoToBR(it.dueDate)})`,
+      ).toBe(isoToBR(it.dueDate));
+    }
   });
 });

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
 import { Loader2, CheckCircle2, AlertCircle, FileDown } from "lucide-react";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 
 interface QuotationItem {
   productName: string | null;
@@ -35,13 +36,7 @@ const formatCpf = (value: string) => {
 const formatCurrency = (value: number) =>
   `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const formatDate = (d: string) => {
-  try {
-    return new Date(d).toLocaleDateString("pt-BR");
-  } catch {
-    return d;
-  }
-};
+const formatDate = (d: string) => formatIsoDateBR(d);
 
 export default function QuotationSign() {
   const { token } = useParams<{ token: string }>();
