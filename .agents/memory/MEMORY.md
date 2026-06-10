@@ -4,3 +4,4 @@
 - [Resend email graceful degradation](resend-email-degradation.md) — sendEmail never throws; 403 "testing email" in dev/e2e is expected until a domain is verified + RESEND_FROM set.
 - [CRM funnel stages per type](crm-funnel-stages-per-type.md) — leads.type drives which stage set (SDR vs venue); convert fires on ativo_rede/qualificado_handoff; partner portal mirrors SDR.
 - [Single source of truth](config-options-single-source.md) — one datum = one origin; search before creating, derive from one canonical fn read by all screens/PDF, no recompute, extract shared. Includes config_options (loss reasons + origin categories DB-backed) instance.
+- [Proposal per-line pricing](proposal-line-pricing.md) — per-line proposal prices come from computeProposalLinePrices (shared); never recompute BV scale inline; cents close via largest-remainder.

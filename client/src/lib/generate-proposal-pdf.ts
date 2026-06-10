@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { LOGO_WHITE_BASE64 } from "./pdf-assets";
+import { computeProposalLinePrices } from "@shared/proposal-line-pricing";
 import {
   PDF_FONT as FONT_NAME,
   PDF_COLORS,
@@ -306,8 +307,7 @@ export function generateProposalPdf(data: ProposalPDFData) {
 
     const items = data.items!;
     const totalVolume = items.reduce((s, i) => s + i.volume, 0);
-    const rawItemsTotal = items.reduce((s, i) => s + i.totalPrice, 0);
-    const bvScaleFactor = rawItemsTotal > 0 ? itemsSubtotalForPdf / rawItemsTotal : 1;
+    const scaledLines = computeProposalLinePrices(items, itemsSubtotalForPdf);
     const itemsFootLabel = isMixed ? "Subtotal itens" : "Total";
     const hasTelasItems = items.some(i => i.spotSeconds !== null && i.spotSeconds !== undefined);
 
@@ -315,12 +315,12 @@ export function generateProposalPdf(data: ProposalPDFData) {
       autoTable(doc, {
         startY: y,
         head: [["Produto", "Duração", "Spot", "Impressões/Rest./Mês", "Total"]],
-        body: items.map(item => [
+        body: items.map((item, idx) => [
           item.productName,
           `${item.semanas} sem.`,
           item.spotSeconds ? `${item.spotSeconds}s` : "—",
           item.impressionsPerRestaurant !== undefined ? fmtNumber(item.impressionsPerRestaurant) : "—",
-          isBonificada ? "Bonificado" : fmtCurrency(item.totalPrice * bvScaleFactor),
+          isBonificada ? "Bonificado" : fmtCurrency(scaledLines[idx].totalPrice),
         ]),
         foot: [[
           `${items.length} produto${items.length !== 1 ? "s" : ""}`,
@@ -347,12 +347,12 @@ export function generateProposalPdf(data: ProposalPDFData) {
       autoTable(doc, {
         startY: y,
         head: [["Produto", "Duração", "Volume", "Preço/un.", "Total"]],
-        body: items.map(item => [
+        body: items.map((item, idx) => [
           item.productName,
           `${item.semanas} sem.`,
           fmtNumber(item.volume) + " un.",
-          isBonificada ? "—" : `R$ ${(item.unitPrice * bvScaleFactor).toFixed(4)}`,
-          isBonificada ? "Bonificado" : fmtCurrency(item.totalPrice * bvScaleFactor),
+          isBonificada ? "—" : `R$ ${scaledLines[idx].unitPrice.toFixed(4)}`,
+          isBonificada ? "Bonificado" : fmtCurrency(scaledLines[idx].totalPrice),
         ]),
         foot: [[
           `${items.length} produto${items.length !== 1 ? "s" : ""}`,
@@ -555,20 +555,17 @@ export function generateProposalPdf(data: ProposalPDFData) {
       doc.text("Composição do investimento", margin + 10, y + 10);
 
       let rowTop = y + 20;
-      const itemsBvScale = (() => {
-        const raw = multiItems.reduce((s, i) => s + i.totalPrice, 0);
-        return raw > 0 ? itemsSubtotalForPdf / raw : 1;
-      })();
-      for (const item of multiItems) {
+      const scaledMultiItems = computeProposalLinePrices(multiItems, itemsSubtotalForPdf);
+      multiItems.forEach((item, idx) => {
         doc.setFontSize(7.5);
         doc.setFont(FONT_NAME, "normal");
         doc.setTextColor(...GRAY);
         doc.text(`${item.productName} · ${item.semanas} sem. · ${fmtNumber(item.volume)} un.`, margin + 12, rowTop);
         doc.setFont(FONT_NAME, "bold");
         doc.setTextColor(...DARK_GRAY);
-        doc.text(fmtCurrency(item.totalPrice * itemsBvScale), pageWidth - margin - 10, rowTop, { align: "right" });
+        doc.text(fmtCurrency(scaledMultiItems[idx].totalPrice), pageWidth - margin - 10, rowTop, { align: "right" });
         rowTop += 10;
-      }
+      });
       // Linha do projeto sob medida
       doc.setFontSize(7.5);
       doc.setFont(FONT_NAME, "normal");
@@ -647,16 +644,17 @@ export function generateProposalPdf(data: ProposalPDFData) {
       doc.text("Composição do investimento", margin + 10, y + 10);
 
       let rowTop = y + 20;
-      for (const item of multiItems) {
+      const scaledMultiItems = computeProposalLinePrices(multiItems, itemsSubtotalForPdf);
+      multiItems.forEach((item, idx) => {
         doc.setFontSize(7.5);
         doc.setFont(FONT_NAME, "normal");
         doc.setTextColor(...GRAY);
         doc.text(`${item.productName} · ${item.semanas} sem. · ${fmtNumber(item.volume)} un.`, margin + 12, rowTop);
         doc.setFont(FONT_NAME, "bold");
         doc.setTextColor(...DARK_GRAY);
-        doc.text(fmtCurrency(item.totalPrice), pageWidth - margin - 10, rowTop, { align: "right" });
+        doc.text(fmtCurrency(scaledMultiItems[idx].totalPrice), pageWidth - margin - 10, rowTop, { align: "right" });
         rowTop += 10;
-      }
+      });
 
       // Separator before total
       doc.setDrawColor(200, 200, 200);

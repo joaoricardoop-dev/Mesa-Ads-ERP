@@ -4,6 +4,7 @@ import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
 import { generateProposalPdf } from "@/lib/generate-proposal-pdf";
+import { computeProposalLinePrices } from "@shared/proposal-line-pricing";
 import { BillingScheduleSection, ReadonlySchedule } from "@/components/billing/BillingScheduleSection";
 import { BillingScheduleHistory } from "@/components/billing/BillingScheduleHistory";
 import { Button } from "@/components/ui/button";
@@ -130,15 +131,6 @@ export default function QuotationDetail() {
   const { data: os } = trpc.quotation.getOS.useQuery({ quotationId }, { enabled: !!quotation && (quotation.status === "os_gerada" || quotation.status === "win") });
   const { data: allocatedRestaurants = [] } = trpc.quotation.getRestaurants.useQuery({ quotationId });
   const { data: quotationItemsList = [] } = trpc.quotation.listItems.useQuery({ quotationId }, { enabled: !isNaN(quotationId) });
-
-  const bvScale = (() => {
-    if (!quotation) return 1;
-    const bvPct = Number((quotation as any).agencyCommissionPercent ?? 0);
-    if (bvPct <= 0) return 1;
-    const rawTotal = quotationItemsList.reduce((s, i) => s + Number(i.totalPrice || 0), 0);
-    const finalTotal = Number(quotation.totalValue || 0);
-    return rawTotal > 0 ? finalTotal / rawTotal : 1;
-  })();
 
   const updateMutation = trpc.quotation.update.useMutation({
     onSuccess: () => { utils.quotation.get.invalidate({ id: quotationId }); utils.quotation.list.invalidate(); setEditOpen(false); toast.success("Cotação atualizada!"); },
@@ -500,8 +492,6 @@ export default function QuotationDetail() {
                 </div>
 
                 {quotationItemsList.length > 0 ? (() => {
-                  const bvPercent = Number((quotation as any).agencyCommissionPercent ?? 0);
-                  const rawItemsTotal = quotationItemsList.reduce((s, i) => s + Number(i.totalPrice || 0), 0);
                   const totalValue = Number(quotation.totalValue || 0);
                   // Em cotações mistas (custom + padrão), totalValue inclui ambos.
                   // Subtraímos a fatia custom para que o subtotal de itens fique correto.
@@ -512,7 +502,15 @@ export default function QuotationDetail() {
                     ? Number((quotation as any).customFinalPrice || 0)
                     : 0;
                   const itemsSubtotalEffective = Math.max(0, totalValue - customCalcPrice);
-                  const bvScale = bvPercent > 0 && rawItemsTotal > 0 ? itemsSubtotalEffective / rawItemsTotal : 1;
+                  // Fonte única: mesma função canônica usada no PDF da proposta.
+                  const scaledLines = computeProposalLinePrices(
+                    quotationItemsList.map((i) => ({
+                      volume: Number(i.quantity) || 0,
+                      unitPrice: Number(i.unitPrice) || 0,
+                      totalPrice: Number(i.totalPrice) || 0,
+                    })),
+                    itemsSubtotalEffective,
+                  );
                   return (
                   <table className="w-full text-sm">
                     <thead>
@@ -524,7 +522,7 @@ export default function QuotationDetail() {
                       </tr>
                     </thead>
                     <tbody>
-                      {quotationItemsList.map((item) => (
+                      {quotationItemsList.map((item, idx) => (
                         <tr key={item.id} className="border-t border-border/20 hover:bg-muted/20 transition-colors">
                           <td className="px-4 py-3">
                             <p className="font-medium">{item.productName}</p>
@@ -537,14 +535,14 @@ export default function QuotationDetail() {
                           </td>
                           <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">
                             {item.unitPrice && Number(item.unitPrice) > 0
-                              ? `R$ ${(Number(item.unitPrice) * bvScale).toFixed(4)}`
+                              ? `R$ ${scaledLines[idx].unitPrice.toFixed(4)}`
                               : "—"}
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-semibold">
                             {quotation.isBonificada || (Number(item.totalPrice ?? 0) === 0 && Number(item.unitPrice ?? 0) > 0) ? (
                               <span className="text-amber-500 text-xs">Bonif.</span>
                             ) : item.totalPrice && Number(item.totalPrice) > 0 ? (
-                              formatCurrency(Number(item.totalPrice) * bvScale)
+                              formatCurrency(scaledLines[idx].totalPrice)
                             ) : "—"}
                           </td>
                         </tr>
