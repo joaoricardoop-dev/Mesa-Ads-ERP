@@ -939,17 +939,20 @@ export default function QuotationDetail() {
                 </div>
               )}
 
-              {/* Task #197 — Condições de pagamento */}
-              {!quotation.isBonificada && ["rascunho", "enviada", "ativa"].includes(status) && (
+              {/* Task #197/#260 — Condições de pagamento editáveis em qualquer
+                  fase até a conversão em campanha (rascunho → os_gerada). A
+                  âncora do "Sugerir" usa o início do período da OS quando já
+                  existe (fonte única). */}
+              {!quotation.isBonificada && ["rascunho", "enviada", "ativa", "os_gerada"].includes(status) && (
                 <BillingScheduleSection
                   mode="quotation"
                   ownerId={quotationId}
                   totalValue={quotation.totalValue || "0"}
-                  periodStart={(quotation as any).periodStart}
+                  periodStart={(os as any)?.periodStart || (quotation as any).periodStart}
                 />
               )}
-              {/* Read-only visibility para status terminais (os_gerada/win/etc). */}
-              {!quotation.isBonificada && !["rascunho", "enviada", "ativa"].includes(status) && (
+              {/* Read-only visibility para status terminais (win/perdida/etc). */}
+              {!quotation.isBonificada && !["rascunho", "enviada", "ativa", "os_gerada"].includes(status) && (
                 <div className="bg-card border border-border/30 rounded-xl p-4 space-y-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     Condições de pagamento

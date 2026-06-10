@@ -11,6 +11,7 @@ import {
   campaignPhases,
   campaignItems,
   invoices,
+  serviceOrders,
 } from "../drizzle/schema";
 import {
   suggestBillingSchedule,
@@ -27,8 +28,6 @@ async function getDatabase() {
   if (!d) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível" });
   return d;
 }
-
-const QUOTATION_EDITABLE_STATUSES = new Set(["rascunho", "enviada", "ativa"]);
 
 const itemInput = z.object({
   sequence: z.number().int().min(1),
@@ -197,6 +196,49 @@ export async function reconcileQuotationScheduleDueDates(
 }
 
 /**
+ * Task #260 — Fonte ÚNICA da âncora de reconciliação do cronograma de uma
+ * cotação. Quando já existe uma OS vinculada, o início do período exibido em
+ * todas as telas (interna em qualquer status + pública de assinatura) é o
+ * `serviceOrders.periodStart` (que acompanha o lote selecionado). Antes da OS,
+ * cai no `quotations.periodStart`. Usar este resolver em TODOS os pontos de
+ * reconciliação elimina a divergência histórica em que `generateOS` ancorava em
+ * `quotation.periodStart` enquanto a tela pública ancorava no início do lote.
+ */
+export async function resolveQuotationPeriodStart(
+  db: any,
+  quotationId: number,
+): Promise<string | null> {
+  const [os] = await db
+    .select({ periodStart: serviceOrders.periodStart })
+    .from(serviceOrders)
+    .where(eq(serviceOrders.quotationId, quotationId))
+    .orderBy(asc(serviceOrders.id))
+    .limit(1);
+  if (os?.periodStart) return os.periodStart;
+  const [q] = await db
+    .select({ periodStart: quotations.periodStart })
+    .from(quotations)
+    .where(eq(quotations.id, quotationId))
+    .limit(1);
+  return q?.periodStart ?? null;
+}
+
+/**
+ * Task #260 — Lê o cronograma de uma cotação SEMPRE reconciliado contra a
+ * âncora canônica (resolveQuotationPeriodStart). Idempotente: se já coerente,
+ * o reconcile é no-op. Garante que toda tela (interna e pública) leia exatamente
+ * o mesmo cronograma persistido, independente da fase.
+ */
+export async function getReconciledQuotationSchedule(
+  db: any,
+  quotationId: number,
+) {
+  const periodStart = await resolveQuotationPeriodStart(db, quotationId);
+  await reconcileQuotationScheduleDueDates(db, quotationId, periodStart);
+  return readBillingSchedule(db, "quotation", quotationId);
+}
+
+/**
  * Copia o schedule de uma cotação para a campanha gerada. Se a cotação não
  * tem schedule, sintetiza o default usando as fases recém-criadas (uma
  * parcela por fase, due = periodStart+15d, valor pelo somatório dos itens
@@ -357,7 +399,9 @@ export const billingScheduleRouter = router({
     .input(z.object({ quotationId: z.number().int() }))
     .query(async ({ input }) => {
       const db = await getDatabase();
-      const items = await readBillingSchedule(db, "quotation", input.quotationId);
+      // Task #260 — lê sempre reconciliado contra a âncora canônica, idêntico
+      // ao que a tela pública de assinatura mostra (fonte única).
+      const items = await getReconciledQuotationSchedule(db, input.quotationId);
       return items.map((r: any) => ({
         sequence: r.sequence,
         amount: r.amount,
@@ -374,20 +418,51 @@ export const billingScheduleRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await getDatabase();
       const [q] = await db
-        .select({ id: quotations.id, status: quotations.status, totalValue: quotations.totalValue })
+        .select({
+          id: quotations.id,
+          status: quotations.status,
+          totalValue: quotations.totalValue,
+          isBonificada: quotations.isBonificada,
+        })
         .from(quotations)
         .where(eq(quotations.id, input.quotationId))
         .limit(1);
       if (!q) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
-      if (!QUOTATION_EDITABLE_STATUSES.has(q.status)) {
+      if (q.isBonificada) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cotação bonificada — sem cronograma de pagamento." });
+      }
+
+      // Task #260 — edição liberada em QUALQUER fase da cotação (rascunho →
+      // os_gerada). A única trava é quando a cotação já virou campanha: aí a
+      // fonte de verdade passa a ser o cronograma da campanha (que carrega a
+      // trava de faturas terminais emitidas/pagas/canceladas).
+      const [camp] = await db
+        .select({ id: campaigns.id })
+        .from(campaigns)
+        .where(eq(campaigns.quotationId, input.quotationId))
+        .limit(1);
+      if (camp) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `Cotação em estado "${q.status}" não permite editar condições — edite via campanha.`,
+          message: "Cotação já convertida em campanha — edite as condições de pagamento pela campanha.",
+        });
+      }
+
+      // Invariante: Σ parcelas = valor total da cotação (tolerância 1 centavo).
+      if (!scheduleMatchesTotal(input.items, q.totalValue ?? "0")) {
+        const sum = sumSchedule(input.items);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Soma das parcelas (R$ ${sum.toFixed(2)}) deve bater com o total da cotação (R$ ${parseFloat(q.totalValue ?? "0").toFixed(2)}).`,
         });
       }
 
       const before = await readBillingSchedule(db, "quotation", input.quotationId);
       await replaceBillingSchedule(db, "quotation", input.quotationId, input.items);
+      // Invariante: nenhum vencimento antes do início do período canônico.
+      // Idempotente quando o usuário já enviou datas coerentes.
+      const periodStart = await resolveQuotationPeriodStart(db, input.quotationId);
+      await reconcileQuotationScheduleDueDates(db, input.quotationId, periodStart);
       const after = await readBillingSchedule(db, "quotation", input.quotationId);
 
       // Trilha de auditoria (entityType "invoice" — única entrada do union)
