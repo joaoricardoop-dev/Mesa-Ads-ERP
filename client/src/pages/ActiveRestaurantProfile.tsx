@@ -306,7 +306,7 @@ export default function ActiveRestaurantProfile() {
   const generateAccountInviteMutation = trpc.activeRestaurant.generateAccountInvite.useMutation({
     onSuccess: (data) => {
       utils.term.list.invalidate();
-      const inviteUrl = `${window.location.origin}/parceiro/convite/${data.inviteToken}`;
+      const inviteUrl = `${window.location.origin}/locais/convite/${data.inviteToken}`;
       setGeneratedInviteUrl(inviteUrl);
     },
     onError: (err) => toast.error(err.message),

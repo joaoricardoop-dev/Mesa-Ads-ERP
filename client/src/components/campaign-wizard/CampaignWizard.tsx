@@ -62,7 +62,7 @@ export default function CampaignWizard() {
     const roleKey = (user?.role ?? "").toLowerCase();
     const portal =
       roleKey === "restaurante" || roleKey === "restaurant"
-        ? { href: "/parceiro", label: "ir para o portal do restaurante" }
+        ? { href: "/portal", label: "ir para o portal do restaurante" }
         : roleKey === "anunciante"
         ? { href: "/portal", label: "ir para o portal do anunciante" }
         : { href: "/", label: "voltar para o início" };

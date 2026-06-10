@@ -1116,7 +1116,7 @@ export const appRouter = router({
           status: "enviado",
         }).returning();
 
-        const inviteUrl = `/parceiro/convite/${token}`;
+        const inviteUrl = `/locais/convite/${token}`;
         return { ...created, inviteToken: token, inviteUrl };
       }),
 

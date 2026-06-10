@@ -407,7 +407,7 @@ function ClerkLoginPage() {
         </button>
 
         <a
-          href="/parceiro"
+          href="/locais"
           className="mt-3 text-sm block text-[#a6a6aa] hover:text-[#f5f5f3] transition-colors text-center"
         >
           É um local parceiro? <span className="text-[#00e640] hover:underline cursor-pointer font-medium">Cadastre-se aqui</span>
@@ -665,8 +665,10 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Switch>
-            <Route path="/parceiro/convite/:token" component={RestaurantInviteAccept} />
-            <Route path="/parceiro" component={PublicRestaurantOnboarding} />
+            <Route path="/locais/convite/:token" component={RestaurantInviteAccept} />
+            <Route path="/locais" component={PublicRestaurantOnboarding} />
+            <Route path="/parceiro/convite/:token">{(params) => <Redirect to={`/locais/convite/${params.token}`} />}</Route>
+            <Route path="/parceiro">{() => <Redirect to={`/${window.location.search}`} />}</Route>
             <Route path="/montar-campanha">
               {() => (
                 <ExternalShell>
