@@ -653,7 +653,7 @@ export const parceiroPortalRouter = router({
             firstName: input.firstName,
             lastName: input.lastName || null,
           },
-          redirectUrl: `${appUrl()}/parceiro`,
+          redirectUrl: `${appUrl()}/`,
         });
 
         return {
