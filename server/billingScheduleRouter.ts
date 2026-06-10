@@ -12,6 +12,8 @@ import {
   campaignItems,
   invoices,
   serviceOrders,
+  financialAuditLog,
+  users,
 } from "../drizzle/schema";
 import {
   suggestBillingSchedule,
@@ -436,6 +438,62 @@ export const billingScheduleRouter = router({
       }));
     }),
 
+  // Task #262 — Histórico de quem alterou as condições de pagamento de uma
+  // cotação. Lê do financial_audit_log (escrito por setForQuotation), resolve
+  // o nome do autor pela tabela users e devolve as parcelas antes/depois de
+  // cada salvamento para a tela de detalhe da cotação renderizar o diff.
+  historyForQuotation: protectedProcedure
+    .input(z.object({ quotationId: z.number().int() }))
+    .query(async ({ input }) => {
+      const db = await getDatabase();
+      const rows = await db
+        .select({
+          id: financialAuditLog.id,
+          createdAt: financialAuditLog.createdAt,
+          actorUserId: financialAuditLog.actorUserId,
+          actorRole: financialAuditLog.actorRole,
+          before: financialAuditLog.before,
+          after: financialAuditLog.after,
+          actorFirstName: users.firstName,
+          actorLastName: users.lastName,
+          actorEmail: users.email,
+        })
+        .from(financialAuditLog)
+        .leftJoin(users, eq(users.id, financialAuditLog.actorUserId))
+        .where(and(
+          eq(financialAuditLog.entityType, "invoice"),
+          eq(financialAuditLog.action, "update"),
+          sql`${financialAuditLog.metadata}->>'kind' = 'billing_schedule'`,
+          sql`${financialAuditLog.metadata}->>'ownerType' = 'quotation'`,
+          sql`(${financialAuditLog.after}->>'quotationId')::int = ${input.quotationId}`,
+        ))
+        .orderBy(desc(financialAuditLog.createdAt))
+        .limit(50);
+
+      const pickItems = (raw: unknown) => {
+        const items = (raw as any)?.items;
+        if (!Array.isArray(items)) return [] as Array<{ sequence: number; amount: string; dueDate: string; notes: string | null }>;
+        return items.map((it: any) => ({
+          sequence: Number(it.sequence),
+          amount: String(it.amount),
+          dueDate: String(it.dueDate),
+          notes: it.notes ?? null,
+        }));
+      };
+
+      return rows.map((r) => {
+        const name = [r.actorFirstName, r.actorLastName].filter(Boolean).join(" ").trim();
+        return {
+          id: r.id,
+          createdAt: r.createdAt,
+          actorName: name || r.actorEmail || null,
+          actorRole: r.actorRole,
+          before: pickItems(r.before),
+          after: pickItems(r.after),
+        };
+      });
+    }),
+
   setForQuotation: comercialProcedure
     .input(z.object({
       quotationId: z.number().int(),
@@ -498,7 +556,7 @@ export const billingScheduleRouter = router({
         action: "update",
         before: { quotationId: input.quotationId, items: before },
         after: { quotationId: input.quotationId, items: after },
-        metadata: { kind: "billing_schedule", ownerType: "quotation" },
+        metadata: { kind: "billing_schedule", ownerType: "quotation", quotationId: input.quotationId },
       });
 
       return {

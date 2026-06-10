@@ -77,6 +77,7 @@ export function BillingScheduleSection({
     onSuccess: () => {
       toast.success("Condições de pagamento atualizadas");
       utils.billingSchedule.getForQuotation.invalidate({ quotationId: ownerId });
+      utils.billingSchedule.historyForQuotation.invalidate({ quotationId: ownerId });
     },
     onError: (e) => toast.error(e.message),
   });

@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
 import { generateProposalPdf } from "@/lib/generate-proposal-pdf";
 import { BillingScheduleSection, ReadonlySchedule } from "@/components/billing/BillingScheduleSection";
+import { BillingScheduleHistory } from "@/components/billing/BillingScheduleHistory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -962,6 +963,10 @@ export default function QuotationDetail() {
                     total={quotation.totalValue || "0"}
                   />
                 </div>
+              )}
+              {/* Task #262 — Histórico de quem alterou as condições de pagamento. */}
+              {!quotation.isBonificada && (
+                <BillingScheduleHistory quotationId={quotationId} />
               )}
 
               {/* Campaign metadata */}
