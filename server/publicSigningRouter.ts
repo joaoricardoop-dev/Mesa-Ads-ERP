@@ -11,7 +11,6 @@ import {
   ensureDefaultQuotationSchedule,
   seedCampaignScheduleFromQuotation,
   readBillingSchedule,
-  getReconciledQuotationSchedule,
 } from "./billingScheduleRouter";
 import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { TRPCError } from "@trpc/server";
@@ -112,17 +111,10 @@ export function setupPublicSigningRoutes(app: express.Express) {
         }
       }
 
-      // Task #197/#218/#260 — inclui cronograma de pagamento lido pela fonte
-      // única (reconciliado contra a âncora canônica), idêntico ao que a tela
-      // interna mostra em qualquer fase. Auto-heal de vencimentos legados
-      // incoerentes é idempotente/no-op quando já coerente.
-      let billingSchedule: any[];
-      try {
-        billingSchedule = await getReconciledQuotationSchedule(db, quotation[0].id);
-      } catch (e) {
-        console.warn("[public-signing] getReconciledQuotationSchedule:", (e as Error)?.message);
-        billingSchedule = await readBillingSchedule(db, "quotation", quotation[0].id);
-      }
+      // Fonte única: lê o cronograma de pagamento persistido verbatim, idêntico
+      // ao que a tela interna mostra em qualquer fase. Sem reconciliação ou
+      // deslocamento de vencimentos.
+      const billingSchedule = await readBillingSchedule(db, "quotation", quotation[0].id);
 
       res.json({
         quotation: quotation[0],

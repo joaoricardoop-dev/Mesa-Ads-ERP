@@ -21,7 +21,6 @@ import {
   sumSchedule,
   type BillingScheduleSuggestion,
   addDaysIso,
-  DEFAULT_DUE_OFFSET_DAYS,
 } from "../shared/billingSchedule";
 import { recordAudit } from "./finance/audit";
 
@@ -150,82 +149,6 @@ export async function ensureDefaultQuotationSchedule(
 }
 
 /**
- * Task #218 — Reconcilia os vencimentos do schedule de uma cotação para
- * acompanhar um novo `periodStart`, preservando a quantidade de parcelas, os
- * valores e o espaçamento relativo entre elas. Só atua quando algum
- * vencimento está incoerente (anterior ao início do período), deslocando todas
- * as parcelas pelo mesmo delta de dias para que a primeira parcela vença em
- * `periodStart + DEFAULT_DUE_OFFSET_DAYS`. Idempotente: se todos os
- * vencimentos já são coerentes, é no-op (não mexe em schedules customizados
- * que já estão alinhados ao período).
- */
-export async function reconcileQuotationScheduleDueDates(
-  db: any,
-  quotationId: number,
-  periodStart: string | null | undefined,
-): Promise<{ reconciled: boolean }> {
-  if (!periodStart || periodStart.length < 10) return { reconciled: false };
-  const existing = await readBillingSchedule(db, "quotation", quotationId);
-  if (existing.length === 0) return { reconciled: false };
-
-  // Só reconcilia se houver vencimento anterior ao início do período.
-  const hasIncoherent = existing.some((r: any) => r.dueDate < periodStart);
-  if (!hasIncoherent) return { reconciled: false };
-
-  const sorted = [...existing].sort((a: any, b: any) => a.sequence - b.sequence);
-  // Âncora no vencimento MAIS CEDO (não no menor sequence). Sequence e ordem
-  // cronológica podem divergir em schedules customizados; deslocar pelo delta
-  // do menor sequence deixaria outra parcela ainda antes do início. Anchorar
-  // no mínimo garante que TODAS as parcelas fiquem >= periodStart após o shift.
-  const earliestDue = existing.reduce(
-    (min: string, r: any) => (r.dueDate < min ? r.dueDate : min),
-    existing[0].dueDate as string,
-  );
-  const targetEarliestDue = addDaysIso(periodStart, DEFAULT_DUE_OFFSET_DAYS);
-  const deltaDays = Math.round(
-    (Date.parse(`${targetEarliestDue}T00:00:00Z`) - Date.parse(`${earliestDue}T00:00:00Z`)) / 86_400_000,
-  );
-  if (deltaDays === 0) return { reconciled: false };
-
-  const items = sorted.map((r: any) => ({
-    sequence: r.sequence,
-    amount: r.amount,
-    dueDate: addDaysIso(r.dueDate, deltaDays),
-    notes: r.notes,
-  }));
-  await replaceBillingSchedule(db, "quotation", quotationId, items);
-  return { reconciled: true };
-}
-
-/**
- * Task #260 — Fonte ÚNICA da âncora de reconciliação do cronograma de uma
- * cotação. Quando já existe uma OS vinculada, o início do período exibido em
- * todas as telas (interna em qualquer status + pública de assinatura) é o
- * `serviceOrders.periodStart` (que acompanha o lote selecionado). Antes da OS,
- * cai no `quotations.periodStart`. Usar este resolver em TODOS os pontos de
- * reconciliação elimina a divergência histórica em que `generateOS` ancorava em
- * `quotation.periodStart` enquanto a tela pública ancorava no início do lote.
- */
-export async function resolveQuotationPeriodStart(
-  db: any,
-  quotationId: number,
-): Promise<string | null> {
-  const [os] = await db
-    .select({ periodStart: serviceOrders.periodStart })
-    .from(serviceOrders)
-    .where(eq(serviceOrders.quotationId, quotationId))
-    .orderBy(asc(serviceOrders.id))
-    .limit(1);
-  if (os?.periodStart) return os.periodStart;
-  const [q] = await db
-    .select({ periodStart: quotations.periodStart })
-    .from(quotations)
-    .where(eq(quotations.id, quotationId))
-    .limit(1);
-  return q?.periodStart ?? null;
-}
-
-/**
  * Task #263 — Fonte ÚNICA do início do período de uma campanha, usada para a
  * invariante "nenhum vencimento antes do início do período" ao editar o
  * cronograma pela tela da campanha. Âncora = vencimento mais cedo possível =
@@ -251,20 +174,6 @@ export async function resolveCampaignPeriodStart(
   return c?.startDate ?? null;
 }
 
-/**
- * Task #260 — Lê o cronograma de uma cotação SEMPRE reconciliado contra a
- * âncora canônica (resolveQuotationPeriodStart). Idempotente: se já coerente,
- * o reconcile é no-op. Garante que toda tela (interna e pública) leia exatamente
- * o mesmo cronograma persistido, independente da fase.
- */
-export async function getReconciledQuotationSchedule(
-  db: any,
-  quotationId: number,
-) {
-  const periodStart = await resolveQuotationPeriodStart(db, quotationId);
-  await reconcileQuotationScheduleDueDates(db, quotationId, periodStart);
-  return readBillingSchedule(db, "quotation", quotationId);
-}
 
 /**
  * Copia o schedule de uma cotação para a campanha gerada. Se a cotação não
@@ -427,9 +336,9 @@ export const billingScheduleRouter = router({
     .input(z.object({ quotationId: z.number().int() }))
     .query(async ({ input }) => {
       const db = await getDatabase();
-      // Task #260 — lê sempre reconciliado contra a âncora canônica, idêntico
-      // ao que a tela pública de assinatura mostra (fonte única).
-      const items = await getReconciledQuotationSchedule(db, input.quotationId);
+      // Fonte única: lê o cronograma persistido verbatim, idêntico ao que a
+      // tela pública de assinatura e o PDF mostram. Sem reconciliação/deslocamento.
+      const items = await readBillingSchedule(db, "quotation", input.quotationId);
       return items.map((r: any) => ({
         sequence: r.sequence,
         amount: r.amount,
@@ -542,11 +451,11 @@ export const billingScheduleRouter = router({
       }
 
       const before = await readBillingSchedule(db, "quotation", input.quotationId);
+      // Fonte única: persiste exatamente as datas/valores enviados pelo usuário,
+      // sem reconciliar/deslocar. Vencimentos podem ser anteriores ao início do
+      // período (pagamento antecipado é válido). As mesmas linhas são lidas
+      // verbatim por todas as telas (interna e pública de assinatura).
       await replaceBillingSchedule(db, "quotation", input.quotationId, input.items);
-      // Invariante: nenhum vencimento antes do início do período canônico.
-      // Idempotente quando o usuário já enviou datas coerentes.
-      const periodStart = await resolveQuotationPeriodStart(db, input.quotationId);
-      await reconcileQuotationScheduleDueDates(db, input.quotationId, periodStart);
       const after = await readBillingSchedule(db, "quotation", input.quotationId);
 
       // Trilha de auditoria (entityType "invoice" — única entrada do union)

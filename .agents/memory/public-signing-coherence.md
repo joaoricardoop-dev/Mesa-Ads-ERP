@@ -1,40 +1,48 @@
 ---
 name: Public signing coherence rules
-description: Invariants the public quotation/OS signing screen must satisfy so it never shows divergent prices or due dates.
+description: Invariants the public quotation/OS signing screen must satisfy so it never shows divergent prices, and the rule that billing due dates are a verbatim single source.
 ---
 
 The public signing screen (`/cotacao/assinar/:token`, served by
-`publicSigningRouter` GET + `QuotationSign.tsx`) must NEVER display divergent
-prices or due dates. Invariants:
+`publicSigningRouter` GET + `QuotationSign.tsx`) must NEVER display prices that
+diverge from the internal source. Price invariants:
 - preço/un × qtd = total da linha
 - Σ(totais das linhas) = total geral (footer) = Σ(parcelas)
-- nenhum vencimento é anterior ao início do período
 
-**Why:** `quotation_items` store RAW unitPrice/totalPrice, but `quotations.totalValue`
-already embeds BV / agency commission. The final (BV-embedded) price is the
-source of truth, so the line items must be SCALED to that total, never shown raw.
-Legacy billing schedules can have due dates seeded before the period start.
+**Why (prices):** `quotation_items` store RAW unitPrice/totalPrice, but
+`quotations.totalValue` already embeds BV / agency commission. The final
+(BV-embedded) price is the source of truth, so line items must be SCALED to that
+total on the front-end, never shown raw.
 
-**How to apply:**
-- Front-end derives line totals by distributing `totalValue` across items
-  (weights: totalPrice → unitPrice×qty → uniform), reconciling cents on the last
-  weighted line, then unit = lineTotal/qty.
-- Server auto-heals due dates via `reconcileQuotationScheduleDueDates` (anchor the
-  shift on the EARLIEST due date, not the lowest sequence, so all parcels end up
-  >= periodStart).
-- **Single reconciliation anchor (fonte única).** ALL reconcile call sites must
-  resolve the periodStart through `resolveQuotationPeriodStart` (OS.periodStart if
-  an OS exists, else quotation.periodStart) — never hand-pick a different anchor
-  per call site. Historically generateOS anchored on quotation.periodStart while
-  the public GET anchored on the batch/OS start, so the schedule diverged between
-  internal and public screens. Read paths (`quotation.get`,
-  `billingSchedule.getForQuotation`, public GET) all go through
-  `getReconciledQuotationSchedule` so every screen reads the identical persisted
-  schedule regardless of phase.
-- **Editing the quotation schedule** (`billingSchedule.setForQuotation`) is allowed
-  in ANY phase up to conversion; the ONLY block is when a campaign already exists
-  for the quotation (then edit via the campaign, which carries the terminal-invoice
-  lock). It enforces Σ parcels = totalValue and re-reconciles after replace.
-- E2E: `e2e/public-signing-coerencia.spec.ts` (DOM invariants) and
-  `e2e/condicoes-pagamento-edicao.spec.ts` (internal==public schedule + edit in
-  os_gerada reflecting on public) both seed via `/api/dev-seed-signable-quotation`.
+**How to apply (prices):** Front-end derives line totals by distributing
+`totalValue` across items (weights: totalPrice → unitPrice×qty → uniform),
+reconciling cents on the last weighted line, then unit = lineTotal/qty.
+
+## Billing due dates = verbatim single source (NO auto-shift)
+
+The persisted quotation billing schedule (`billing_schedule_items`) is the ONE
+source of truth for payment dates. Every surface — internal detail
+(`billingSchedule.getForQuotation`), `quotation.get`, public signing GET, PDF —
+reads it verbatim via `readBillingSchedule(db, "quotation", id)`. Saving
+(`billingSchedule.setForQuotation`) persists the user's dates exactly as sent
+(only invariant: Σ parcels = totalValue). Generating the OS or the signing link
+must NOT touch the schedule.
+
+**Why:** Due dates may legitimately fall BEFORE the campaign period start
+(advance payment). An earlier "no due date before period start" invariant
+auto-shifted the whole schedule forward to anchor the first installment at
+periodStart + N days, silently overriding deliberate user edits and making the
+public link diverge from the internal editor. That violated the single-source
+rule ("um dado, uma origem; nunca recalcular/mutar em vários lugares").
+
+**How to apply:** NEVER reintroduce any reconcile/auto-heal that mutates stored
+due dates based on a derived period anchor. The editor allows saving dates in any
+pre-conversion phase (including before period start); the only save block is when
+a campaign already exists (edit via the campaign, which carries the
+terminal-invoice lock). If a stored schedule looks wrong, the user fixes it in
+the editor — code must not "correct" it.
+
+E2E: `e2e/public-signing-coerencia.spec.ts` (price/Σ invariants only) and
+`e2e/condicoes-pagamento-edicao.spec.ts` (internal == public schedule, and a
+pre-period due date preserved verbatim after edit) seed via
+`/api/dev-seed-signable-quotation`.

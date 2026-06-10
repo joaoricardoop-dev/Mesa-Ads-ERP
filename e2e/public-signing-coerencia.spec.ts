@@ -1,14 +1,14 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 
-// Task #218 — a tela pública de assinatura (/cotacao/assinar/:token) NUNCA
-// pode exibir preços ou vencimentos divergentes:
+// A tela pública de assinatura (/cotacao/assinar/:token) NUNCA pode exibir
+// preços divergentes:
 //   • preço/un × qtd = total da linha
 //   • Σ(totais das linhas) = total geral exibido no rodapé
-//   • nenhum vencimento é anterior ao início do período
+//   • Σ(parcelas) = total geral
 // O fixture dev `/api/dev-seed-signable-quotation` cria propositalmente um
-// cenário "ruim" (BV embutido no total + cronograma legado com vencimentos
-// antes do início) para garantir que o front-end (escala dos itens) e o
-// auto-heal do GET (reconciliação dos vencimentos) corrigem ambos.
+// total com BV embutido para garantir que o front-end escala os itens. Os
+// vencimentos são exibidos VERBATIM (fonte única) — podem ser anteriores ao
+// início do período (pagamento antecipado é válido), então isso não é validado.
 
 const TOLERANCE = 0.01; // 1 centavo
 
@@ -19,12 +19,6 @@ function parseBRL(text: string): number {
     .replace(/\./g, "")
     .replace(",", ".");
   return parseFloat(cleaned);
-}
-
-function parseBRDate(text: string): Date {
-  // "08/07/2026" → Date(2026, 6, 8)
-  const [d, m, y] = text.trim().split("/").map((n) => parseInt(n, 10));
-  return new Date(y, m - 1, d);
 }
 
 async function seedSignableQuotation(request: APIRequestContext): Promise<{
@@ -44,7 +38,7 @@ test.describe("tela pública de assinatura — coerência de preços e venciment
     await context.clearCookies();
   });
 
-  test("preços por linha somam o total geral e vencimentos respeitam o início", async ({
+  test("preços por linha somam o total geral e Σ parcelas = total", async ({
     page,
     request,
   }) => {
@@ -88,26 +82,15 @@ test.describe("tela pública de assinatura — coerência de preços e venciment
       `Σ linhas (${somaLinhas}) ≠ total geral (${grandTotal})`,
     ).toBeLessThanOrEqual(TOLERANCE);
 
-    // ── Coerência de vencimentos ───────────────────────────────────────────
-    const inicio = parseBRDate(
-      await page.getByTestId("periodo-inicio").innerText(),
-    );
-
+    // ── Coerência de vencimentos (Σ parcelas) ──────────────────────────────
+    // Fonte única: os vencimentos são exibidos verbatim (podem ser anteriores
+    // ao início do período — pagamento antecipado é válido). Aqui só validamos
+    // que a soma das parcelas bate com o total geral.
     const parcelaRows = page.locator("[data-testid^='parcela-venc-']");
     const parcelaCount = await parcelaRows.count();
     expect(parcelaCount).toBeGreaterThan(0);
 
     let somaParcelas = 0;
-    for (let i = 0; i < parcelaCount; i++) {
-      const vencText = await parcelaRows.nth(i).innerText();
-      const venc = parseBRDate(vencText);
-      // Nenhum vencimento anterior ao início do período.
-      expect(
-        venc.getTime(),
-        `parcela ${i}: vencimento ${vencText} é anterior ao início do período`,
-      ).toBeGreaterThanOrEqual(inicio.getTime());
-    }
-
     const valorParcelas = page.locator("[data-testid^='parcela-valor-']");
     for (let i = 0; i < parcelaCount; i++) {
       somaParcelas += parseBRL(await valorParcelas.nth(i).innerText());

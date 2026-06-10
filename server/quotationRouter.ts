@@ -10,7 +10,7 @@ import crypto from "crypto";
 import { createCrmNotification } from "./notificationRouter";
 import { buildCampaignName } from "./utils/campaignName";
 import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
-import { ensureDefaultQuotationSchedule, seedCampaignScheduleFromQuotation, readBillingSchedule, reconcileQuotationScheduleDueDates, resolveQuotationPeriodStart, getReconciledQuotationSchedule } from "./billingScheduleRouter";
+import { ensureDefaultQuotationSchedule, seedCampaignScheduleFromQuotation, readBillingSchedule } from "./billingScheduleRouter";
 import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { withUniqueRetry, describeDbError } from "./utils/uniqueNumberRetry";
 import { nextNumber } from "./utils/numberCounter";
@@ -246,7 +246,7 @@ export const quotationRouter = router({
       // Task #197 — embed billing schedule in the canonical quotation
       // payload so consumers (proposta, PDF, internal detail) don't need
       // a second roundtrip.
-      const billingSchedule = await getReconciledQuotationSchedule(db, rows[0].id);
+      const billingSchedule = await readBillingSchedule(db, "quotation", rows[0].id);
       return { ...rows[0], billingSchedule };
     }),
 
@@ -838,16 +838,8 @@ export const quotationRouter = router({
         .set({ status: "os_gerada", updatedAt: new Date() })
         .where(eq(quotations.id, input.id));
 
-      // Task #218/#260 — reconcilia vencimentos para acompanhar o período,
-      // ancorando na fonte única (resolveQuotationPeriodStart → OS.periodStart),
-      // evitando que a tela pública mostre vencimento anterior ao início.
-      try {
-        const ps = await resolveQuotationPeriodStart(db, input.id);
-        await reconcileQuotationScheduleDueDates(db, input.id, ps);
-      } catch (e) {
-        console.warn("[generateOS] reconcileQuotationScheduleDueDates:", (e as Error)?.message);
-      }
-
+      // Fonte única: a OS não toca no cronograma de pagamento. As datas
+      // persistidas pelo usuário são lidas verbatim por todas as telas.
       return { quotationId: input.id, serviceOrderId: os.id, orderNumber };
     }),
 
@@ -945,17 +937,8 @@ export const quotationRouter = router({
         }).where(eq(serviceOrders.id, os[0].id));
       }
 
-      // Task #218/#260 — o link público exibe o período dos batches selecionados;
-      // a OS.periodStart acabou de ser atualizada para o início do lote, então
-      // reconciliamos pela fonte única (resolveQuotationPeriodStart) para manter
-      // o cronograma idêntico em todas as telas.
-      try {
-        const ps = await resolveQuotationPeriodStart(db, input.quotationId);
-        await reconcileQuotationScheduleDueDates(db, input.quotationId, ps);
-      } catch (e) {
-        console.warn("[generateSigningLink] reconcileQuotationScheduleDueDates:", (e as Error)?.message);
-      }
-
+      // Fonte única: o link público lê o cronograma persistido verbatim
+      // (readBillingSchedule). Não há reconciliação/deslocamento de vencimentos.
       const { appUrl } = await import("./_core/appUrl");
       const signingUrl = `${appUrl()}/cotacao/assinar/${token}`;
 

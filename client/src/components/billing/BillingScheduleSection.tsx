@@ -114,13 +114,9 @@ export function BillingScheduleSection({
   const matches = useMemo(() => scheduleMatchesTotal(items, total), [items, total]);
   const diff = total - sum;
 
-  // Invariante: nenhum vencimento antes do início do período. Parcelas
-  // travadas (invoice terminal) são ignoradas — só validamos as editáveis.
-  const anchorStart = periodStart && periodStart.length >= 10 ? periodStart.slice(0, 10) : null;
-  const dueBeforeStart = useMemo(
-    () => (anchorStart ? items.some((it) => !it.locked && it.dueDate < anchorStart) : false),
-    [items, anchorStart],
-  );
+  // Fonte única: as datas são definidas livremente pelo usuário e persistidas
+  // verbatim. Vencimentos podem ser anteriores ao início do período (pagamento
+  // antecipado é válido) — não há trava nem reconciliação.
 
   function applySuggestion(parts: number) {
     const amounts = splitAmount(total, parts);
@@ -306,7 +302,7 @@ export function BillingScheduleSection({
                   <span className="text-[11px] text-muted-foreground">
                     Total: <span className="font-mono">{formatCurrency(total)}</span>
                   </span>
-                  <Button type="button" size="sm" disabled={!dirty || saving || dueBeforeStart} onClick={save}>
+                  <Button type="button" size="sm" disabled={!dirty || saving} onClick={save}>
                     {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : "Salvar"}
                   </Button>
                 </div>
@@ -319,12 +315,6 @@ export function BillingScheduleSection({
                 </p>
               )}
 
-              {dueBeforeStart && anchorStart && (
-                <p className="text-[11px] text-amber-500 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3" />
-                  Há parcela com vencimento anterior ao início do período ({new Date(`${anchorStart}T00:00:00Z`).toLocaleDateString("pt-BR", { timeZone: "UTC" })}). Ajuste antes de salvar.
-                </p>
-              )}
             </>
           )}
         </div>
