@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { trpc } from "@/lib/trpc";
 import { formatCurrency } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -59,9 +60,7 @@ const INVOICE_STATUS_LABEL: Record<string, string> = {
 };
 
 function fmtDate(s?: string | null) {
-  if (!s) return "—";
-  const d = new Date(s.length === 10 ? `${s}T00:00:00` : s);
-  return isNaN(d.getTime()) ? s : d.toLocaleDateString("pt-BR");
+  return formatIsoDateBR(s);
 }
 
 function fmtMonth(s?: string | null) {

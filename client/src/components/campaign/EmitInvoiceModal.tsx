@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +12,7 @@ import { getInvoiceBadgeMeta, type ScheduleSlot } from "./InvoiceSchedule";
 import { Badge } from "@/components/ui/badge";
 
 function fmtDate(iso: string): string {
-  const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
-  return isNaN(d.getTime()) ? iso : d.toLocaleDateString("pt-BR");
+  return formatIsoDateBR(iso);
 }
 
 function addDaysIso(iso: string, days: number): string {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
@@ -118,7 +119,8 @@ const termStatusConfig: Record<string, { label: string; color: string }> = {
 
 function formatDate(d: string | Date | null | undefined) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR");
+  if (typeof d === "string") return formatIsoDateBR(d);
+  return d.toLocaleDateString("pt-BR");
 }
 
 function formatDateTime(d: string | Date | null | undefined) {

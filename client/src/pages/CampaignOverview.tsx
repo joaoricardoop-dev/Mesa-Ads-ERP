@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -34,11 +35,7 @@ function QuotationSection({ quotationId }: { quotationId: number }) {
   const itemsTotal = items.reduce((s, it) => s + parseFloat(it.totalPrice ?? "0"), 0);
   const headerTotal = quotation?.totalValue ? parseFloat(quotation.totalValue) : itemsTotal;
 
-  const fmtDate = (s?: string | null) => {
-    if (!s) return "—";
-    const d = new Date(s.length === 10 ? `${s}T00:00:00` : s);
-    return isNaN(d.getTime()) ? s : d.toLocaleDateString("pt-BR");
-  };
+  const fmtDate = (s?: string | null) => formatIsoDateBR(s);
 
   return (
     <section className="bg-card border border-border/30 rounded-xl overflow-hidden">
@@ -87,7 +84,7 @@ function QuotationSection({ quotationId }: { quotationId: number }) {
                 </div>
                 <div>
                   <div className="text-muted-foreground uppercase tracking-wide text-[10px] mb-0.5">Assinado em</div>
-                  <div className="font-medium">{fmtDate(quotation.signedAt as unknown as string)}</div>
+                  <div className="font-medium">{quotation.signedAt ? new Date(quotation.signedAt as unknown as string).toLocaleDateString("pt-BR") : "—"}</div>
                 </div>
               </div>
 
@@ -477,11 +474,7 @@ export default function CampaignOverview() {
 function _CampaignEconomicsSectionLegacy({ campaign }: { campaign: any }) {
   const [open, setOpen] = useState(false);
 
-  const fmtDate = (s?: string | null) => {
-    if (!s) return "—";
-    const d = new Date(s.length === 10 ? `${s}T00:00:00` : s);
-    return isNaN(d.getTime()) ? s : d.toLocaleDateString("pt-BR");
-  };
+  const fmtDate = (s?: string | null) => formatIsoDateBR(s);
   const fmtPct = (v: any) => {
     const n = Number(v);
     if (!Number.isFinite(n)) return "—";

@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import autoTable from "jspdf-autotable";
 import {
   PDF_FONT as FONT_NAME,
@@ -78,7 +79,7 @@ export function generateOSPdf(data: OSPDFData) {
     y += 6;
   }
   if (data.periodStart && data.periodEnd) {
-    const fmtDate = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("pt-BR");
+    const fmtDate = (d: string) => formatIsoDateBR(d);
     doc.text(`Período: ${fmtDate(data.periodStart)} a ${fmtDate(data.periodEnd)}`, 20, y);
     y += 6;
   }

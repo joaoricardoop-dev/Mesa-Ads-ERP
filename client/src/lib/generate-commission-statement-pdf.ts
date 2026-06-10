@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import autoTable from "jspdf-autotable";
 import {
   PDF_FONT as FONT_NAME,
@@ -173,9 +174,9 @@ function fmtCurrency(val: number): string {
 
 function fmtDate(d: string | Date | null | undefined): string {
   if (!d) return "—";
-  const date = typeof d === "string" ? new Date(d) : d;
-  if (isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("pt-BR");
+  if (typeof d === "string") return formatIsoDateBR(d);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("pt-BR");
 }
 
 function fmtRefMonth(m: string | null | undefined): string {

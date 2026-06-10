@@ -1,3 +1,4 @@
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useState, useMemo, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 
@@ -1638,7 +1639,7 @@ export default function CampaignDetail() {
                               <p className="text-[10px] text-muted-foreground">Previsão</p>
                               {t.expectedDate ? (
                                 <div className="flex items-center gap-1">
-                                  <p className="text-xs">{new Date(t.expectedDate).toLocaleDateString("pt-BR")}</p>
+                                  <p className="text-xs">{formatIsoDateBR(t.expectedDate)}</p>
                                   {t.expectedDate < new Date().toISOString().split("T")[0] && <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />}
                                 </div>
                               ) : <p className="text-xs">—</p>}
@@ -1708,7 +1709,7 @@ export default function CampaignDetail() {
                 <h3 className="text-sm font-semibold text-violet-400">Pronto para Execução</h3>
               </div>
               <p className="text-xs text-muted-foreground">
-                Material recebido em {(campaign as any).materialReceivedDate ? new Date((campaign as any).materialReceivedDate).toLocaleDateString("pt-BR") : "—"}.
+                Material recebido em {(campaign as any).materialReceivedDate ? formatIsoDateBR((campaign as any).materialReceivedDate) : "—"}.
                 Configure os restaurantes na aba Distribuição e defina o período de veiculação para iniciar.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1739,7 +1740,7 @@ export default function CampaignDetail() {
                 <h3 className="text-sm font-semibold text-teal-400">Distribuição em Andamento</h3>
               </div>
               <p className="text-xs text-muted-foreground">
-                Material recebido em {(campaign as any).materialReceivedDate ? new Date((campaign as any).materialReceivedDate).toLocaleDateString("pt-BR") : "—"}.
+                Material recebido em {(campaign as any).materialReceivedDate ? formatIsoDateBR((campaign as any).materialReceivedDate) : "—"}.
                 Configure os restaurantes na aba Distribuição e defina o período de veiculação para concluir.
               </p>
 
@@ -1799,7 +1800,7 @@ export default function CampaignDetail() {
                               <p className="text-[10px] text-muted-foreground">Previsão</p>
                               {t.expectedDate ? (
                                 <div className="flex items-center gap-1">
-                                  <p className="text-xs">{new Date(t.expectedDate).toLocaleDateString("pt-BR")}</p>
+                                  <p className="text-xs">{formatIsoDateBR(t.expectedDate)}</p>
                                   {t.expectedDate < new Date().toISOString().split("T")[0] && <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />}
                                 </div>
                               ) : <p className="text-xs">—</p>}
@@ -1880,8 +1881,8 @@ export default function CampaignDetail() {
                 <span><strong>Lembrete:</strong> Registre fotos semanais de cada restaurante — são obrigatórias para comprovação da veiculação. Uma foto por semana por restaurante.</span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <MiniStat label="Início" value={(campaign as any).veiculacaoStartDate ? new Date((campaign as any).veiculacaoStartDate).toLocaleDateString("pt-BR") : "—"} />
-                <MiniStat label="Fim" value={(campaign as any).veiculacaoEndDate ? new Date((campaign as any).veiculacaoEndDate).toLocaleDateString("pt-BR") : "—"} />
+                <MiniStat label="Início" value={(campaign as any).veiculacaoStartDate ? formatIsoDateBR((campaign as any).veiculacaoStartDate) : "—"} />
+                <MiniStat label="Fim" value={(campaign as any).veiculacaoEndDate ? formatIsoDateBR((campaign as any).veiculacaoEndDate) : "—"} />
                 <MiniStat label="Locais" value={`${restaurantsConfigured}`} />
                 <MiniStat label="Comprovantes" value={`${proofsList.length}`} />
               </div>
@@ -2036,7 +2037,7 @@ export default function CampaignDetail() {
                                 <p className="text-[10px] text-muted-foreground">Previsão</p>
                                 {t.expectedDate ? (
                                   <div className="flex items-center gap-1">
-                                    <p className="text-xs">{new Date(t.expectedDate).toLocaleDateString("pt-BR")}</p>
+                                    <p className="text-xs">{formatIsoDateBR(t.expectedDate)}</p>
                                     {t.expectedDate < new Date().toISOString().split("T")[0] && <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />}
                                   </div>
                                 ) : <p className="text-xs">—</p>}
@@ -2142,7 +2143,7 @@ export default function CampaignDetail() {
                                 <p className="text-[10px] text-muted-foreground">Previsão</p>
                                 {t.expectedDate ? (
                                   <div className="flex items-center gap-1">
-                                    <p className="text-xs">{new Date(t.expectedDate).toLocaleDateString("pt-BR")}</p>
+                                    <p className="text-xs">{formatIsoDateBR(t.expectedDate)}</p>
                                     {t.expectedDate < new Date().toISOString().split("T")[0] && <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />}
                                   </div>
                                 ) : <p className="text-xs">—</p>}
@@ -2288,7 +2289,7 @@ export default function CampaignDetail() {
                     />
                     {campaign.materialReceivedDate && (
                       <DetailRow label="Material Recebido"
-                        value={new Date(campaign.materialReceivedDate + "T12:00:00").toLocaleDateString("pt-BR")}
+                        value={formatIsoDateBR(campaign.materialReceivedDate)}
                         icon={<Package className="w-3 h-3" />}
                       />
                     )}
@@ -2459,15 +2460,15 @@ export default function CampaignDetail() {
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Período de Veiculação</p>
                       {campaign.veiculacaoStartDate ? (
                         <p className="text-sm mt-0.5 font-medium">
-                          {new Date(campaign.veiculacaoStartDate + "T12:00:00").toLocaleDateString("pt-BR")}
+                          {formatIsoDateBR(campaign.veiculacaoStartDate)}
                           {" → "}
-                          {campaign.veiculacaoEndDate ? new Date(campaign.veiculacaoEndDate + "T12:00:00").toLocaleDateString("pt-BR") : "—"}
+                          {campaign.veiculacaoEndDate ? formatIsoDateBR(campaign.veiculacaoEndDate) : "—"}
                         </p>
                       ) : campaign.startDate && campaign.endDate ? (
                         <p className="text-sm mt-0.5">
-                          {new Date(campaign.startDate).toLocaleDateString("pt-BR")}
+                          {formatIsoDateBR(campaign.startDate)}
                           {" → "}
-                          {new Date(campaign.endDate).toLocaleDateString("pt-BR")}
+                          {formatIsoDateBR(campaign.endDate)}
                           <span className="text-[10px] text-muted-foreground ml-1">(previsto)</span>
                         </p>
                       ) : (
@@ -2647,7 +2648,7 @@ export default function CampaignDetail() {
                                   {t.freightProvider && <span className="text-muted-foreground ml-1.5">· {t.freightProvider}</span>}
                                 </div>
                                 {t.expectedDate && (
-                                  <span className="text-muted-foreground text-[10px]">Prev. {new Date(t.expectedDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                                  <span className="text-muted-foreground text-[10px]">Prev. {formatIsoDateBR(t.expectedDate)}</span>
                                 )}
                               </div>
                             ))}
@@ -2683,7 +2684,7 @@ export default function CampaignDetail() {
                                   {t.freightProvider && <span className="text-muted-foreground text-[10px]">{t.freightProvider}</span>}
                                 </div>
                                 {t.expectedDate && (
-                                  <span className="text-muted-foreground text-[10px]">Prev. {new Date(t.expectedDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                                  <span className="text-muted-foreground text-[10px]">Prev. {formatIsoDateBR(t.expectedDate)}</span>
                                 )}
                               </div>
                             ))}
@@ -2710,7 +2711,7 @@ export default function CampaignDetail() {
                           <div>
                             <span className="font-mono font-medium">{formatCurrency(Number(inv.amount))}</span>
                             {inv.dueDate && (
-                              <span className="text-muted-foreground ml-1.5">vence {new Date(inv.dueDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                              <span className="text-muted-foreground ml-1.5">vence {formatIsoDateBR(inv.dueDate)}</span>
                             )}
                           </div>
                           <span className={`text-[10px] font-semibold ${statusColor}`}>{statusLabel[inv.status] || inv.status}</span>
@@ -2900,9 +2901,9 @@ export default function CampaignDetail() {
                   {batchCount > 0 ? (
                     <>
                       <div className="flex items-center justify-between text-sm">
-                        <span>{new Date(batchStartDate).toLocaleDateString("pt-BR")}</span>
+                        <span>{formatIsoDateBR(batchStartDate)}</span>
                         <span className="text-muted-foreground">→</span>
-                        <span>{new Date(batchEndDate).toLocaleDateString("pt-BR")}</span>
+                        <span>{formatIsoDateBR(batchEndDate)}</span>
                       </div>
                       {batchLabel && (
                         <div className="flex items-center gap-1.5">
@@ -3283,7 +3284,7 @@ export default function CampaignDetail() {
                               <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-400 bg-blue-500/10">{typeLabel}</Badge>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(report.periodStart).toLocaleDateString("pt-BR")} – {new Date(report.periodEnd).toLocaleDateString("pt-BR")}
+                              {formatIsoDateBR(report.periodStart)} – {formatIsoDateBR(report.periodEnd)}
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">

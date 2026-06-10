@@ -1,3 +1,4 @@
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useState } from "react";
 import PageContainer from "@/components/PageContainer";
 import { trpc } from "@/lib/trpc";
@@ -666,7 +667,7 @@ export default function Production() {
                         </TableCell>
                         <TableCell className="text-center hidden lg:table-cell text-sm text-muted-foreground">
                           {b.validUntil
-                            ? new Date(b.validUntil).toLocaleDateString("pt-BR")
+                            ? formatIsoDateBR(b.validUntil)
                             : "—"}
                         </TableCell>
                         <TableCell className="text-center">

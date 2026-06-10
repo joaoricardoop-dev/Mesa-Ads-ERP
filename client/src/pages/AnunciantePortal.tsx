@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -571,7 +572,8 @@ function fmt(value: string | number | null | undefined) {
 
 function fmtDate(d: string | Date | null | undefined) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR");
+  if (typeof d === "string") return formatIsoDateBR(d);
+  return d.toLocaleDateString("pt-BR");
 }
 
 function StatusPill({ status, cfg }: { status: string; cfg: { label: string; color: string } }) {
@@ -787,7 +789,7 @@ function CampaignDetail({ campaign, onBack, clientId }: { campaign: any; onBack:
                           <div>
                             <p className="text-white font-bold text-lg leading-tight">{report.title}</p>
                             <p className="text-white/60 text-xs mt-0.5">
-                              {new Date(report.periodStart).toLocaleDateString("pt-BR")} – {new Date(report.periodEnd).toLocaleDateString("pt-BR")}
+                              {formatIsoDateBR(report.periodStart)} – {formatIsoDateBR(report.periodEnd)}
                             </p>
                           </div>
                           {totalImpressions > 0 && (
@@ -815,7 +817,7 @@ function CampaignDetail({ campaign, onBack, clientId }: { campaign: any; onBack:
                             <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-400 bg-blue-500/10">{typeLabel}</Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {new Date(report.periodStart).toLocaleDateString("pt-BR")} – {new Date(report.periodEnd).toLocaleDateString("pt-BR")}
+                            {formatIsoDateBR(report.periodStart)} – {formatIsoDateBR(report.periodEnd)}
                           </p>
                         </div>
                         {totalImpressions > 0 && (
@@ -1766,7 +1768,7 @@ export default function AnunciantePortal() {
                           <span className="font-semibold text-foreground/80">{fmt(os.totalValue)}</span>
                         </div>
                         {os.signedAt && (
-                          <p className="text-xs text-emerald-400 mt-1">✓ Assinada em {fmtDate(os.signedAt)} por {os.signedByName}</p>
+                          <p className="text-xs text-emerald-400 mt-1">✓ Assinada em {new Date(os.signedAt).toLocaleDateString("pt-BR")} por {os.signedByName}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">

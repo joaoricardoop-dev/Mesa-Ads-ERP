@@ -1,3 +1,4 @@
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -203,7 +204,7 @@ function CampaignCard({
       {campaign.endDate && (
         <div className={`flex items-center gap-1 text-xs ${overdue ? "text-red-400" : "text-muted-foreground"}`}>
           {overdue ? <AlertTriangle className="w-3 h-3 shrink-0" /> : <Calendar className="w-3 h-3 shrink-0" />}
-          <span>{overdue ? "Atrasada · " : ""}{new Date(campaign.endDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+          <span>{overdue ? "Atrasada · " : ""}{formatIsoDateBR(campaign.endDate)}</span>
         </div>
       )}
 

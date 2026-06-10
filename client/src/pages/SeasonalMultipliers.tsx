@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { trpc, type RouterOutputs } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,12 +54,7 @@ const EMPTY_FORM: FormState = {
 };
 
 function fmtDate(s: string) {
-  if (!s) return "—";
-  try {
-    return new Date(s + "T00:00:00").toLocaleDateString("pt-BR");
-  } catch {
-    return s;
-  }
+  return formatIsoDateBR(s);
 }
 
 export default function SeasonalMultipliers() {

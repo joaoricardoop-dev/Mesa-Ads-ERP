@@ -1,3 +1,4 @@
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useState, useMemo, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import DOMPurify from "dompurify";
@@ -794,7 +795,7 @@ export default function ActiveRestaurantProfile() {
                               <Badge variant="outline" className={STATUS_COLORS[c.status || ""] || ""}>{STATUS_LABELS[c.status || ""] || c.status}</Badge>
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {c.clientName} · {c.startDate ? new Date(c.startDate).toLocaleDateString("pt-BR") : ""} → {c.endDate ? new Date(c.endDate).toLocaleDateString("pt-BR") : ""}
+                              {c.clientName} · {c.startDate ? formatIsoDateBR(c.startDate) : ""} → {c.endDate ? formatIsoDateBR(c.endDate) : ""}
                             </p>
                           </div>
                           <div className="hidden md:flex items-center gap-6 text-sm shrink-0">
@@ -874,7 +875,7 @@ export default function ActiveRestaurantProfile() {
                               {PAYMENT_STATUS_LABELS[p.status] || p.status}
                             </Badge>
                           </td>
-                          <td className="p-3 text-xs">{p.paymentDate ? new Date(p.paymentDate).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td className="p-3 text-xs">{p.paymentDate ? formatIsoDateBR(p.paymentDate) : "—"}</td>
                           <td className="p-3 text-right">
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deletePaymentMutation.mutate({ id: p.id })}>
                               <Trash2 className="w-3 h-3" />
@@ -969,7 +970,7 @@ export default function ActiveRestaurantProfile() {
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {term.validFrom && term.validUntil ? `${new Date(term.validFrom).toLocaleDateString("pt-BR")} → ${new Date(term.validUntil).toLocaleDateString("pt-BR")}` : term.validFrom ? `A partir de ${new Date(term.validFrom).toLocaleDateString("pt-BR")}` : "Sem período definido"}
+                            {term.validFrom && term.validUntil ? `${formatIsoDateBR(term.validFrom)} → ${formatIsoDateBR(term.validUntil)}` : term.validFrom ? `A partir de ${formatIsoDateBR(term.validFrom)}` : "Sem período definido"}
                           </p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">

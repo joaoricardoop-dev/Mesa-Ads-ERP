@@ -1,3 +1,4 @@
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useState, Fragment, useCallback } from "react";
 import { z } from "zod";
 import { useLocation } from "wouter";
@@ -685,7 +686,7 @@ export default function Quotations() {
                     {q.validUntil ? (
                       <div className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {new Date(q.validUntil + "T00:00:00").toLocaleDateString("pt-BR")}
+                        {formatIsoDateBR(q.validUntil)}
                       </div>
                     ) : (
                       "—"
@@ -1491,7 +1492,7 @@ export default function Quotations() {
                       <div className="flex-1">
                         <span className="text-sm font-medium">{batch.label}</span>
                         <span className="text-xs text-muted-foreground ml-2">
-                          {new Date(batch.startDate + "T00:00:00").toLocaleDateString("pt-BR")} — {new Date(batch.endDate + "T00:00:00").toLocaleDateString("pt-BR")}
+                          {formatIsoDateBR(batch.startDate)} — {formatIsoDateBR(batch.endDate)}
                         </span>
                       </div>
                     </label>
@@ -1505,7 +1506,7 @@ export default function Quotations() {
                       if (selected.length === 0) return "";
                       const first = selected[0];
                       const last = selected[selected.length - 1];
-                      return ` — ${new Date(first.startDate + "T00:00:00").toLocaleDateString("pt-BR")} a ${new Date(last.endDate + "T00:00:00").toLocaleDateString("pt-BR")}`;
+                      return ` — ${formatIsoDateBR(first.startDate)} a ${formatIsoDateBR(last.endDate)}`;
                     })()}
                   </p>
                 )}

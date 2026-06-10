@@ -1,3 +1,4 @@
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useState } from "react";
 import ClientPresentation from "@/components/ClientPresentation";
 import { useLocation, useParams } from "wouter";
@@ -1008,7 +1009,7 @@ export default function QuotationDetail() {
                   <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                   <span className="text-xs text-muted-foreground">Válido até</span>
                   <span className="text-xs font-medium ml-auto">
-                    {new Date(quotation.validUntil + "T00:00:00").toLocaleDateString("pt-BR")}
+                    {formatIsoDateBR(quotation.validUntil)}
                   </span>
                 </div>
               )}
@@ -1277,7 +1278,7 @@ export default function QuotationDetail() {
                     <div className="flex-1">
                       <span className="text-sm font-medium">{batch.label}</span>
                       <span className="text-xs text-muted-foreground ml-2">
-                        {new Date(batch.startDate + "T00:00:00").toLocaleDateString("pt-BR")} — {new Date(batch.endDate + "T00:00:00").toLocaleDateString("pt-BR")}
+                        {formatIsoDateBR(batch.startDate)} — {formatIsoDateBR(batch.endDate)}
                       </span>
                     </div>
                   </label>
@@ -1291,7 +1292,7 @@ export default function QuotationDetail() {
                     if (selected.length === 0) return "";
                     const first = selected[0];
                     const last = selected[selected.length - 1];
-                    return ` — ${new Date(first.startDate + "T00:00:00").toLocaleDateString("pt-BR")} a ${new Date(last.endDate + "T00:00:00").toLocaleDateString("pt-BR")}`;
+                    return ` — ${formatIsoDateBR(first.startDate)} a ${formatIsoDateBR(last.endDate)}`;
                   })()}
                 </p>
               )}
@@ -1348,7 +1349,7 @@ export default function QuotationDetail() {
                     <div className="flex-1">
                       <span className="text-sm font-medium">{batch.label}</span>
                       <span className="text-xs text-muted-foreground ml-2">
-                        {new Date(batch.startDate + "T00:00:00").toLocaleDateString("pt-BR")} — {new Date(batch.endDate + "T00:00:00").toLocaleDateString("pt-BR")}
+                        {formatIsoDateBR(batch.startDate)} — {formatIsoDateBR(batch.endDate)}
                       </span>
                     </div>
                   </label>

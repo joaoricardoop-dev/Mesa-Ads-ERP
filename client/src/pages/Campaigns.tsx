@@ -1,3 +1,4 @@
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useState, useMemo, useEffect } from "react";
 import { z } from "zod";
 import { trpc } from "@/lib/trpc";
@@ -981,7 +982,7 @@ export default function Campaigns() {
                             <div className="min-w-0">
                               <p className="text-xs font-medium truncate">{batch.label}</p>
                               <p className="text-[10px] text-muted-foreground">
-                                {new Date(batch.startDate + "T12:00:00").toLocaleDateString("pt-BR")} — {new Date(batch.endDate + "T12:00:00").toLocaleDateString("pt-BR")}
+                                {formatIsoDateBR(batch.startDate)} — {formatIsoDateBR(batch.endDate)}
                               </p>
                             </div>
                           </div>
@@ -992,9 +993,9 @@ export default function Campaigns() {
                       <div className="text-xs text-muted-foreground bg-muted/30 rounded-md px-3 py-2">
                         <span className="font-medium text-foreground">{selectedBatchIds.length} batch(es)</span>
                         {" · "}
-                        {derivedStartDate && new Date(derivedStartDate + "T12:00:00").toLocaleDateString("pt-BR")}
+                        {derivedStartDate && formatIsoDateBR(derivedStartDate)}
                         {" → "}
-                        {derivedEndDate && new Date(derivedEndDate + "T12:00:00").toLocaleDateString("pt-BR")}
+                        {derivedEndDate && formatIsoDateBR(derivedEndDate)}
                         {" · "}
                         Duração: {selectedBatchIds.length} ciclo(s) de 4 semanas
                       </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useLocation, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
@@ -416,7 +417,7 @@ export default function ParceiroPortal() {
                                 : "px-2 py-0.5 rounded-full text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400"
                             }
                           >
-                            {it.status === "paid" ? `pago${it.paymentDate ? ` em ${new Date(it.paymentDate).toLocaleDateString("pt-BR")}` : ""}` : "a receber"}
+                            {it.status === "paid" ? `pago${it.paymentDate ? ` em ${formatIsoDateBR(it.paymentDate)}` : ""}` : "a receber"}
                           </span>
                           <span className="font-mono tabular-nums font-semibold">{formatCurrency(it.amount)}</span>
                         </div>

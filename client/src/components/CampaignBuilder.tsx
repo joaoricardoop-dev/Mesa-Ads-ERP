@@ -1,3 +1,4 @@
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useState, useMemo } from "react";
 import { trpc, type RouterOutputs } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -719,7 +720,7 @@ function StepConfirmacao({ cart, campaignName, startDate, briefing, hasPartner, 
           {startDate && (
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
               <Calendar className="w-3 h-3" />
-              Início: {new Date(startDate + "T00:00:00").toLocaleDateString("pt-BR")}
+              Início: {formatIsoDateBR(startDate)}
             </p>
           )}
           {briefing && (

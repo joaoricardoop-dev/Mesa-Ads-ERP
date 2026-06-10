@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -101,12 +102,7 @@ const OS_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 function formatDate(d: string | null | undefined) {
-  if (!d) return "—";
-  try {
-    return new Date(d).toLocaleDateString("pt-BR");
-  } catch {
-    return d;
-  }
+  return formatIsoDateBR(d);
 }
 
 function KpiCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: string | number; color: string }) {
@@ -1019,7 +1015,7 @@ export default function ClientDetail() {
                       <Badge variant="outline" className="text-xs">{u.role}</Badge>
                       {u.lastLoginAt && (
                         <span className="text-xs text-muted-foreground">
-                          Último login: {formatDate(u.lastLoginAt)}
+                          Último login: {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("pt-BR") : "—"}
                         </span>
                       )}
                       {u.isActive ? (
