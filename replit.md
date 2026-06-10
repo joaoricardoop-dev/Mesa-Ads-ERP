@@ -6,6 +6,15 @@ Mesa Ads ERP is a financial simulation and management SaaS designed for a Brazil
 ## User Preferences
 I prefer clear and concise communication. Focus on high-level concepts and architectural decisions. When making changes, prioritize modularity and maintainability. I prefer an iterative development approach, with regular updates on progress and potential roadblocks. Do not make changes to the `shared/rating-config.ts` file.
 
+### Fonte única de verdade (OBRIGATÓRIO)
+Uma informação = uma origem. O agente repetidamente cria múltiplas fontes para o mesmo dado (constantes, configs, cálculos, mapeamentos, derivações), gerando divergências entre telas (ex.: a mesma data calculada com âncoras diferentes em três pontos). Para evitar isso, toda implementação DEVE seguir estas regras checáveis:
+
+1. **Pesquisar antes de criar.** Antes de adicionar qualquer constante, config, cálculo, mapeamento ou derivação, pesquise (`rg`/grep) se aquele dado já existe no código. Se existir, reuse — não recrie.
+2. **Um dado, uma origem.** Todo valor derivado sai de uma única função/fonte canônica, lida por TODAS as telas (interna, pública, PDF). Telas nunca recalculam por conta própria.
+3. **Proibido recalcular em mais de um lugar.** É proibido reimplementar o mesmo cálculo/derivação com lógica ou âncora própria em pontos diferentes. Extraia para `shared/` (ou um helper canônico) e chame em todos os pontos.
+4. **Na dúvida, pergunte.** Se não tiver certeza se um valor novo é o mesmo dado de um já existente, pergunte ao usuário antes de duplicar.
+5. **Liste as fontes ao concluir.** Ao finalizar uma feature, liste no resumo as fontes de dado usadas, confirmando explicitamente que não há duplicação de origem.
+
 ## System Architecture
 
 ### UI/UX Decisions
