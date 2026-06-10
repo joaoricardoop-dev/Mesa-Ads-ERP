@@ -640,6 +640,20 @@ function AuthenticatedApp() {
   );
 }
 
+function PublicRestaurantOnboarding() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (isAuthenticated) {
+    return <Redirect to="/" />;
+  }
+
+  return <RestaurantOnboarding />;
+}
+
 function App() {
   useEffect(() => {
     captureTrackingFromUrl();
@@ -652,7 +666,7 @@ function App() {
           <Toaster />
           <Switch>
             <Route path="/parceiro/convite/:token" component={RestaurantInviteAccept} />
-            <Route path="/parceiro" component={RestaurantOnboarding} />
+            <Route path="/parceiro" component={PublicRestaurantOnboarding} />
             <Route path="/montar-campanha">
               {() => (
                 <ExternalShell>
