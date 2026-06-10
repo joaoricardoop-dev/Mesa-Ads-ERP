@@ -224,6 +224,32 @@ export async function resolveQuotationPeriodStart(
 }
 
 /**
+ * Task #263 — Fonte ÚNICA do início do período de uma campanha, usada para a
+ * invariante "nenhum vencimento antes do início do período" ao editar o
+ * cronograma pela tela da campanha. Âncora = vencimento mais cedo possível =
+ * MIN(campaignPhases.periodStart). Fallback: campaigns.startDate quando a
+ * campanha ainda não tem fases materializadas.
+ */
+export async function resolveCampaignPeriodStart(
+  db: any,
+  campaignId: number,
+): Promise<string | null> {
+  const [phase] = await db
+    .select({ periodStart: campaignPhases.periodStart })
+    .from(campaignPhases)
+    .where(eq(campaignPhases.campaignId, campaignId))
+    .orderBy(asc(campaignPhases.periodStart))
+    .limit(1);
+  if (phase?.periodStart) return phase.periodStart;
+  const [c] = await db
+    .select({ startDate: campaigns.startDate })
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId))
+    .limit(1);
+  return c?.startDate ?? null;
+}
+
+/**
  * Task #260 — Lê o cronograma de uma cotação SEMPRE reconciliado contra a
  * âncora canônica (resolveQuotationPeriodStart). Idempotente: se já coerente,
  * o reconcile é no-op. Garante que toda tela (interna e pública) leia exatamente
@@ -640,6 +666,26 @@ export const billingScheduleRouter = router({
           code: "BAD_REQUEST",
           message: `Soma das parcelas (R$ ${newSum.toFixed(2)}) é inferior ao já emitido/pago (R$ ${terminalSum.toFixed(2)}).`,
         });
+      }
+
+      // Task #263 — Invariante: nenhum vencimento antes do início do período.
+      // Âncora canônica = resolveCampaignPeriodStart (MIN(fase.periodStart),
+      // fallback campaign.startDate). Parcelas com invoice terminal já foram
+      // validadas como inalteradas acima, então só barramos as editáveis.
+      const periodStart = await resolveCampaignPeriodStart(db, input.campaignId);
+      if (periodStart && periodStart.length >= 10) {
+        for (const it of input.items) {
+          const prev = existing.find((e: any) => e.sequence === it.sequence);
+          const inv: any = prev ? invByNumber.get(`PREV-${input.campaignId}-${prev.sequence}`) : null;
+          const isTerminal = inv && ["emitida", "paga", "cancelada"].includes(inv.status);
+          if (isTerminal) continue;
+          if (it.dueDate < periodStart) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Parcela #${it.sequence} vence em ${it.dueDate}, antes do início do período (${periodStart}). Ajuste o vencimento.`,
+            });
+          }
+        }
       }
 
       // Aplica: substitui o schedule e recria invoices prevista órfãs.
