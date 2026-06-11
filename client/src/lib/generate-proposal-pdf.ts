@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { LOGO_WHITE_BASE64 } from "./pdf-assets";
 import { computeProposalLinePrices } from "@shared/proposal-line-pricing";
+import { MASTER_CONTRACT_URL, PROPOSAL_BINDING_CLAUSE_PREFIX } from "@shared/const";
 import {
   PDF_FONT as FONT_NAME,
   PDF_COLORS,
@@ -1056,6 +1057,19 @@ export function generateProposalPdf(data: ProposalPDFData) {
     y = justifyText(doc, line, margin + 5, y, contentWidth - 5, 4.5);
     y += 2;
   });
+
+  // Cláusula de vínculo ao contrato master (Termos e Condições Gerais).
+  // Texto e URL vêm de shared/const.ts (fonte única). A URL é renderizada
+  // como link clicável logo após o texto justificado.
+  y = checkPageBreak(doc, y, 18);
+  doc.setTextColor(...DARK_GRAY);
+  doc.setFontSize(8.5);
+  doc.setFont(FONT_NAME, "normal");
+  doc.text("•", margin, y);
+  y = justifyText(doc, PROPOSAL_BINDING_CLAUSE_PREFIX, margin + 5, y, contentWidth - 5, 4.5);
+  doc.setTextColor(...GREEN);
+  doc.textWithLink(MASTER_CONTRACT_URL, margin + 5, y, { url: MASTER_CONTRACT_URL });
+  y += 6;
 
   y += 14;
   y = checkPageBreak(doc, y, 30);
