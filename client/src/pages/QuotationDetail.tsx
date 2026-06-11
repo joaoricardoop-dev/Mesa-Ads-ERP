@@ -264,7 +264,32 @@ export default function QuotationDetail() {
         : undefined;
 
       const billingScheduleData = await utils.billingSchedule.getForQuotation.fetch({ quotationId }).catch(() => [] as any[]);
+
+      // Cotação convertida/assinada → embute o registro de assinatura do cliente
+      // no mesmo PDF da proposta. Origem única: quotations.signedAt/signedBy/signatureData.
+      let signature:
+        | { signerName: string; signerCpf?: string; signedAt: string; signatureHash?: string; ip?: string }
+        | undefined;
+      const sigRaw = (quotation as any).signatureData;
+      const signedDate = quotation.signedAt ? new Date(quotation.signedAt as any) : null;
+      if (signedDate && !Number.isNaN(signedDate.getTime()) && sigRaw) {
+        const signedAtIso = signedDate.toISOString();
+        try {
+          const parsed = JSON.parse(sigRaw);
+          signature = {
+            signerName: parsed.name || (quotation as any).signedBy || "Cliente",
+            signerCpf: parsed.cpf || undefined,
+            signedAt: signedAtIso,
+            signatureHash: parsed.hash || undefined,
+            ip: parsed.ip || undefined,
+          };
+        } catch {
+          signature = { signerName: (quotation as any).signedBy || "Cliente", signedAt: signedAtIso };
+        }
+      }
+
       generateProposalPdf({
+        signature,
         billingSchedule: (billingScheduleData as any[]).map((b: any) => ({ sequence: b.sequence, amount: b.amount, dueDate: b.dueDate, notes: b.notes })),
         clientName: quotation.clientName || quotation.leadName || "Cliente",
         clientCompany: quotation.clientCompany || quotation.leadCompany || undefined,

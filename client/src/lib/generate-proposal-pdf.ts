@@ -79,6 +79,20 @@ interface ProposalPDFData {
   irpj?: number;
   /** Task #197 — cronograma de parcelas (opcional). */
   billingSchedule?: Array<{ sequence: number; amount: string | number; dueDate: string; notes?: string | null }>;
+  /**
+   * Registro de assinatura digital — presente apenas para cotações
+   * convertidas/assinadas. Origem única: quotations.signedAt / signedBy /
+   * signatureData (campo JSON com name, cpf, ip, userAgent, hash). Quando
+   * presente, o PDF mostra o registro do cliente em vez das linhas de
+   * assinatura manual.
+   */
+  signature?: {
+    signerName: string;
+    signerCpf?: string;
+    signedAt: string;
+    signatureHash?: string;
+    ip?: string;
+  };
 }
 
 const DEFAULT_IRPJ = 0.06;
@@ -1046,19 +1060,72 @@ export function generateProposalPdf(data: ProposalPDFData) {
   y += 14;
   y = checkPageBreak(doc, y, 30);
 
-  doc.setDrawColor(200, 200, 200);
-  doc.line(margin, y, margin + 60, y);
-  doc.line(pageWidth - margin - 60, y, pageWidth - margin, y);
-  y += 5;
-  doc.setFontSize(8);
-  doc.setTextColor(...GRAY);
-  doc.setFont(FONT_NAME, "normal");
-  doc.text("Anunciante", margin + 30, y, { align: "center" });
-  doc.text("Mesa Ads", pageWidth - margin - 30, y, { align: "center" });
-  y += 5;
-  doc.setFontSize(7);
-  doc.text(data.clientName, margin + 30, y, { align: "center" });
-  doc.text("Representante Legal", pageWidth - margin - 30, y, { align: "center" });
+  if (data.signature) {
+    // Cotação convertida/assinada: registra a assinatura digital do cliente
+    // em vez das linhas de assinatura manual.
+    y = checkPageBreak(doc, y, 56);
+    doc.setDrawColor(...GREEN);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
+    doc.setFontSize(11);
+    doc.setFont(FONT_NAME, "bold");
+    doc.setTextColor(...BLACK);
+    doc.text("REGISTRO DE ASSINATURA DIGITAL", margin, y);
+    y += 7;
+
+    const signedDateStr = new Date(data.signature.signedAt).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const sigRows: Array<[string, string]> = [["Assinado por:", data.signature.signerName]];
+    if (data.signature.signerCpf) sigRows.push(["CPF:", data.signature.signerCpf]);
+    sigRows.push(["Data/Hora:", signedDateStr]);
+    if (data.signature.ip) sigRows.push(["IP:", data.signature.ip]);
+
+    doc.setFontSize(9);
+    for (const [label, value] of sigRows) {
+      doc.setFont(FONT_NAME, "bold");
+      doc.setTextColor(...DARK_GRAY);
+      doc.text(label, margin, y);
+      doc.setFont(FONT_NAME, "normal");
+      doc.text(value, margin + 32, y);
+      y += 6;
+    }
+
+    if (data.signature.signatureHash) {
+      y += 1;
+      doc.setFontSize(7.5);
+      doc.setFont(FONT_NAME, "normal");
+      doc.setTextColor(...GRAY);
+      doc.text(`Verificação (SHA-256): ${data.signature.signatureHash}`, margin, y, { maxWidth: contentWidth });
+      y += 5;
+    }
+
+    doc.setFontSize(7.5);
+    doc.setFont(FONT_NAME, "normal");
+    doc.setTextColor(...GRAY);
+    doc.text("Assinado digitalmente via plataforma mesa.ads.", margin, y, { maxWidth: contentWidth });
+  } else {
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, y, margin + 60, y);
+    doc.line(pageWidth - margin - 60, y, pageWidth - margin, y);
+    y += 5;
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY);
+    doc.setFont(FONT_NAME, "normal");
+    doc.text("Anunciante", margin + 30, y, { align: "center" });
+    doc.text("Mesa Ads", pageWidth - margin - 30, y, { align: "center" });
+    y += 5;
+    doc.setFontSize(7);
+    doc.text(data.clientName, margin + 30, y, { align: "center" });
+    doc.text("Representante Legal", pageWidth - margin - 30, y, { align: "center" });
+  }
 
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
@@ -1083,8 +1150,9 @@ export function generateProposalPdf(data: ProposalPDFData) {
     doc.text(`${i}/${totalPages}`, pageWidth / 2, pageHeight - 14, { align: "center" });
   }
 
-  const filename = data.quotationName
-    ? `Proposta_${data.quotationName.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`
-    : `Proposta_${data.clientName.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`;
+  const baseName = (data.quotationName || data.clientName).replace(/[^a-zA-Z0-9]/g, "_");
+  const filename = data.signature
+    ? `Proposta_Assinada_${baseName}.pdf`
+    : `Proposta_${baseName}.pdf`;
   doc.save(filename);
 }

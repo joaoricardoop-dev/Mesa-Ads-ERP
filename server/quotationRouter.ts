@@ -216,6 +216,8 @@ export const quotationRouter = router({
           updatedAt: quotations.updatedAt,
           publicToken: quotations.publicToken,
           signedAt: quotations.signedAt,
+          signedBy: quotations.signedBy,
+          signatureData: quotations.signatureData,
           clientName: clients.name,
           clientCompany: clients.company,
           clientCnpj: clients.cnpj,
