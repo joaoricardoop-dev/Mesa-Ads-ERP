@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
-import { Loader2, CheckCircle2, AlertCircle, FileDown } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, FileDown, ExternalLink } from "lucide-react";
 import { formatIsoDateBR } from "@shared/billingSchedule";
+import { fetchContractLinks, type ContractLinks } from "@/lib/contract-links";
 
 interface QuotationItem {
   productName: string | null;
@@ -50,6 +51,11 @@ export default function QuotationSign() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [signResult, setSignResult] = useState<SignResult | null>(null);
+  const [contractLinks, setContractLinks] = useState<ContractLinks | null>(null);
+
+  useEffect(() => {
+    fetchContractLinks().then(setContractLinks).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -470,6 +476,37 @@ export default function QuotationSign() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="border-t border-[hsl(0,0%,14%)]" />
+            </>
+          )}
+
+          {contractLinks && (
+            <>
+              <div>
+                <h3 className="text-xs font-semibold text-[#00e640] uppercase tracking-wider mb-3">Termos e Condições</h3>
+                <div className="space-y-2">
+                  <a
+                    href={contractLinks.masterContractUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="link-contrato-master"
+                    className="flex items-center justify-between gap-2 p-3 rounded-lg border border-[hsl(0,0%,14%)] hover:border-[#00e640]/50 transition-colors group"
+                  >
+                    <span className="text-sm text-white">Contrato de Prestação de Serviços</span>
+                    <ExternalLink className="w-4 h-4 text-[hsl(0,0%,45%)] group-hover:text-[#00e640] flex-shrink-0" />
+                  </a>
+                  <a
+                    href={contractLinks.campaignTermUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="link-termo-campanha"
+                    className="flex items-center justify-between gap-2 p-3 rounded-lg border border-[hsl(0,0%,14%)] hover:border-[#00e640]/50 transition-colors group"
+                  >
+                    <span className="text-sm text-white">Termo de Contratação de Campanha Publicitária</span>
+                    <ExternalLink className="w-4 h-4 text-[hsl(0,0%,45%)] group-hover:text-[#00e640] flex-shrink-0" />
+                  </a>
+                </div>
               </div>
               <div className="border-t border-[hsl(0,0%,14%)]" />
             </>
