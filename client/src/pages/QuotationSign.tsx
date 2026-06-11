@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
-import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
+import { generateProposalPdf } from "@/lib/generate-proposal-pdf";
+import { assembleProposalData } from "@shared/proposalData";
 import { Loader2, CheckCircle2, AlertCircle, FileDown, ExternalLink } from "lucide-react";
 import { formatIsoDateBR } from "@shared/billingSchedule";
 import { fetchContractLinks, type ContractLinks } from "@/lib/contract-links";
@@ -11,6 +12,7 @@ interface QuotationItem {
   unitPrice: string | null;
   totalPrice: string | null;
   unitLabelPlural: string | null;
+  notes?: string | null;
 }
 
 interface QuotationData {
@@ -19,6 +21,7 @@ interface QuotationData {
   restaurants: any[];
   batches: any[];
   items: QuotationItem[];
+  billingSchedule?: Array<{ sequence: number; amount: string; dueDate: string; notes?: string | null }>;
 }
 
 interface SignResult {
@@ -47,10 +50,12 @@ export default function QuotationSign() {
   const [alreadySigned, setAlreadySigned] = useState(false);
   const [signerName, setSignerName] = useState("");
   const [signerCpf, setSignerCpf] = useState("");
+  const [signerEmail, setSignerEmail] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [signResult, setSignResult] = useState<SignResult | null>(null);
+  const [emailStatus, setEmailStatus] = useState<"idle" | "sent" | "failed">("idle");
   const [contractLinks, setContractLinks] = useState<ContractLinks | null>(null);
 
   useEffect(() => {
@@ -80,31 +85,79 @@ export default function QuotationSign() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  const downloadPdf = (result?: SignResult) => {
-    if (!data) return;
+  // Documento de OS assinada = mesmo gerador da proposta (generate-proposal-pdf),
+  // alimentado pela MESMA montagem canônica (assembleProposalData) usada pelas
+  // telas internas. Garante que a OS traga TODAS as informações da proposta.
+  const buildSignedProposalData = (r: SignResult) => {
+    const q = data!.quotation;
+    return {
+      ...assembleProposalData({
+        quotation: {
+          clientName: q?.clientName,
+          clientCompany: q?.clientCompany,
+          clientCnpj: q?.clientCnpj || q?.leadCnpj,
+          clientEmail: q?.clientEmail || q?.leadEmail,
+          clientPhone: q?.clientPhone || q?.leadPhone,
+          leadName: q?.leadName,
+          leadCompany: q?.leadCompany,
+          quotationName: q?.quotationName,
+          quotationNumber: q?.quotationNumber,
+          coasterVolume: q?.coasterVolume ?? 0,
+          totalValue: q?.totalValue,
+          cycles: q?.cycles,
+          includesProduction: q?.includesProduction,
+          isBonificada: q?.isBonificada,
+          hasPartnerDiscount: q?.hasPartnerDiscount,
+          productName: q?.productName,
+          productUnitLabelPlural: q?.productUnitLabelPlural,
+          periodStart: q?.periodStart,
+          batchWeeks: q?.batchWeeks,
+          productIrpj: q?.productIrpj,
+          isCustomProduct: q?.isCustomProduct,
+          customProductName: q?.customProductName,
+          customProjectCost: q?.customProjectCost,
+          customPricingMode: q?.customPricingMode,
+          customMarginPercent: q?.customMarginPercent,
+          customRestaurantCommission: q?.customRestaurantCommission,
+          customPartnerCommission: q?.customPartnerCommission,
+          customSellerCommission: q?.customSellerCommission,
+          customFinalPrice: q?.customFinalPrice,
+          agencyCommissionPercent: q?.agencyCommissionPercent,
+        },
+        restaurants: (data!.restaurants || []).map((rr: any) => ({
+          restaurantName: rr.restaurantName || rr.name,
+          restaurantAddress: rr.restaurantAddress,
+          coasterQuantity: rr.coasterQuantity,
+        })),
+        items: (data!.items || []).map((it) => ({
+          productName: it.productName,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          totalPrice: it.totalPrice,
+          notes: it.notes,
+        })),
+        billingSchedule: data!.billingSchedule,
+      }),
+      signature: {
+        signerName,
+        signerCpf,
+        signedAt: r.signedAt,
+        signatureHash: r.signatureHash,
+      },
+    };
+  };
+
+  const downloadPdf = async (result?: SignResult): Promise<{ base64: string; fileName: string } | null> => {
+    if (!data) return null;
     const r = result || signResult;
-    if (!r) return;
-    const q = data.quotation;
-    const so = data.serviceOrder;
-    generateQuotationSignPdf({
-      orderNumber: so?.orderNumber || so?.id?.toString() || "-",
-      quotationNumber: q?.quotationNumber || q?.id?.toString() || "-",
-      quotationName: q?.name || q?.quotationName || "-",
-      description: q?.description || undefined,
-      totalValue: q?.totalValue || q?.value || 0,
-      coasterVolume: q?.coasterVolume || q?.volume || 0,
-      periodStart: so?.periodStart || q?.periodStart || "",
-      periodEnd: so?.periodEnd || q?.periodEnd || "",
-      restaurants: (data.restaurants || []).map((r: any) => r.name || r.restaurantName || "-"),
-      signerName,
-      signerCpf,
-      signedAt: r.signedAt,
-      signatureHash: r.signatureHash,
-      billingSchedule: (data as any).billingSchedule || undefined,
-    }).catch((err) => {
+    if (!r) return null;
+    try {
+      return await generateProposalPdf(buildSignedProposalData(r));
+    } catch (err) {
       console.error("[QuotationSign] falha ao gerar PDF:", err);
       setError("Erro ao gerar o PDF. Tente novamente.");
-    });
+      return null;
+    }
   };
 
   const handleSubmit = async () => {
@@ -118,6 +171,11 @@ export default function QuotationSign() {
       setSubmitError("CPF inválido.");
       return;
     }
+    const emailClean = signerEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) {
+      setSubmitError("Informe um e-mail válido.");
+      return;
+    }
     if (!accepted) {
       setSubmitError("Você deve aceitar os termos para continuar.");
       return;
@@ -127,7 +185,7 @@ export default function QuotationSign() {
       const res = await fetch(`/api/public-signing/quotation/${token}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ signerName: signerName.trim(), signerCpf: cpfClean }),
+        body: JSON.stringify({ signerName: signerName.trim(), signerCpf: cpfClean, signerEmail: emailClean }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -139,7 +197,25 @@ export default function QuotationSign() {
         signatureHash: json.signatureHash || "",
       };
       setSignResult(result);
-      setTimeout(() => downloadPdf(result), 500);
+      // Gera o PDF (download local) e envia a MESMA OS por email ao endereço
+      // usado para assinar. O servidor lê o destinatário do registro de
+      // assinatura — o cliente só envia o PDF gerado.
+      const pdf = await downloadPdf(result);
+      if (pdf?.base64) {
+        try {
+          const emailRes = await fetch(`/api/public-signing/quotation/${token}/email-os`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pdfBase64: pdf.base64, fileName: pdf.fileName }),
+          });
+          const emailJson = await emailRes.json().catch(() => ({}));
+          setEmailStatus(emailJson?.emailSent ? "sent" : "failed");
+        } catch {
+          setEmailStatus("failed");
+        }
+      } else {
+        setEmailStatus("failed");
+      }
     } catch {
       setSubmitError("Erro de conexão. Tente novamente.");
     } finally {
@@ -219,9 +295,19 @@ export default function QuotationSign() {
               <CheckCircle2 className="w-8 h-8 text-[#00e640]" />
             </div>
             <h2 className="text-xl font-bold text-white mb-2">Assinatura realizada!</h2>
-            <p className="text-sm text-[hsl(0,0%,50%)] mb-6 leading-relaxed">
+            <p className="text-sm text-[hsl(0,0%,50%)] mb-3 leading-relaxed">
               A Ordem de Serviço foi assinada com sucesso. O PDF foi baixado automaticamente.
             </p>
+            {emailStatus === "sent" && (
+              <p className="text-sm text-[#00e640] mb-6 leading-relaxed" data-testid="email-status-sent">
+                Uma cópia também foi enviada para <strong>{signerEmail}</strong>.
+              </p>
+            )}
+            {emailStatus === "failed" && (
+              <p className="text-sm text-amber-400 mb-6 leading-relaxed" data-testid="email-status-failed">
+                Não conseguimos enviar a cópia por e-mail agora, mas o PDF já foi baixado. Guarde o arquivo.
+              </p>
+            )}
             <button
               onClick={() => downloadPdf()}
               className="inline-flex items-center justify-center gap-2 w-full h-10 bg-[#00e640] hover:bg-[#00c238] text-black font-semibold rounded-lg text-sm transition-colors"
@@ -535,6 +621,21 @@ export default function QuotationSign() {
                   className={inputClass}
                   inputMode="numeric"
                 />
+              </div>
+              <div>
+                <label className="text-xs text-[hsl(0,0%,55%)] font-medium">E-mail *</label>
+                <input
+                  type="email"
+                  value={signerEmail}
+                  onChange={(e) => setSignerEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  className={inputClass}
+                  inputMode="email"
+                  data-testid="input-signer-email"
+                />
+                <p className="text-[11px] text-[hsl(0,0%,40%)] mt-1">
+                  Enviaremos a Ordem de Serviço assinada para este e-mail.
+                </p>
               </div>
               <label className="flex items-start gap-3 cursor-pointer group">
                 <div

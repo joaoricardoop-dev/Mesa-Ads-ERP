@@ -22,6 +22,7 @@ export async function sendEmail(params: {
   subject: string;
   html: string;
   cc?: string | string[];
+  attachments?: Array<{ filename: string; content: string | Buffer; contentType?: string }>;
 }): Promise<{ sent: boolean; reason?: string }> {
   try {
     const client = getClient();
@@ -51,6 +52,9 @@ export async function sendEmail(params: {
       cc: params.cc,
       subject: params.subject,
       html: params.html,
+      ...(params.attachments && params.attachments.length > 0
+        ? { attachments: params.attachments }
+        : {}),
     });
 
     if (error) {

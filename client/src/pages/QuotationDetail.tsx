@@ -5,6 +5,7 @@ import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
 import { generateProposalPdf } from "@/lib/generate-proposal-pdf";
+import { assembleProposalData } from "@shared/proposalData";
 import { computeProposalLinePrices } from "@shared/proposal-line-pricing";
 import { BillingScheduleSection, ReadonlySchedule } from "@/components/billing/BillingScheduleSection";
 import { BillingScheduleHistory } from "@/components/billing/BillingScheduleHistory";
@@ -225,44 +226,6 @@ export default function QuotationDetail() {
         utils.quotation.listItems.fetch({ quotationId }),
       ]);
 
-      const numRest = fetchedRestaurants.length;
-      const duration = quotation.cycles || 1;
-      const totalContractValue = Number(quotation.totalValue || 0);
-      const monthlyTotal = duration > 0 ? totalContractValue / duration : totalContractValue;
-      const effectiveNumRest = numRest > 0 ? numRest : 1;
-      const pricePerRest = monthlyTotal / effectiveNumRest;
-
-      const restaurants = fetchedRestaurants.map((r: any) => ({
-        name: r.restaurantName || "Local",
-        neighborhood: r.restaurantAddress || "",
-        coasters: r.coasterQuantity || 0,
-      }));
-
-      const proposalItems = fetchedItems.length > 0
-        ? fetchedItems.map((item) => {
-            const semanasMatch = item.notes?.match(/(\d+)sem/);
-            const itemSemanas = semanasMatch ? parseInt(semanasMatch[1]) : duration * 4;
-            const spotMatch = item.notes?.match(/Spot(30|15)s/);
-            const insMatch = item.notes?.match(/(\d+)ins\/dia/);
-            const cliMatch = item.notes?.match(/(\d+)cli\/mês/);
-            const spotSec = spotMatch ? (parseInt(spotMatch[1]) as 15 | 30) : null;
-            const insPerDay = insMatch ? parseInt(insMatch[1]) : null;
-            const monthlyClients = cliMatch ? parseInt(cliMatch[1]) : null;
-            const impressionsPerRestaurant = (insPerDay !== null && monthlyClients !== null)
-              ? insPerDay * monthlyClients
-              : undefined;
-            return {
-              productName: item.productName,
-              volume: Number(item.quantity),
-              semanas: itemSemanas,
-              unitPrice: Number(item.unitPrice || 0),
-              totalPrice: Number(item.totalPrice || 0),
-              spotSeconds: spotSec,
-              impressionsPerRestaurant,
-            };
-          })
-        : undefined;
-
       const billingScheduleData = await utils.billingSchedule.getForQuotation.fetch({ quotationId }).catch(() => [] as any[]);
 
       // Cotação convertida/assinada → embute o registro de assinatura do cliente
@@ -289,42 +252,54 @@ export default function QuotationDetail() {
       }
 
       await generateProposalPdf({
+        ...assembleProposalData({
+          quotation: {
+            clientName: quotation.clientName,
+            clientCompany: quotation.clientCompany,
+            clientCnpj: (quotation as any).clientCnpj,
+            clientEmail: (quotation as any).clientEmail,
+            clientPhone: (quotation as any).clientPhone,
+            leadName: quotation.leadName,
+            leadCompany: quotation.leadCompany,
+            quotationName: quotation.quotationName,
+            quotationNumber: quotation.quotationNumber,
+            coasterVolume: quotation.coasterVolume,
+            totalValue: quotation.totalValue,
+            cycles: quotation.cycles,
+            includesProduction: quotation.includesProduction,
+            isBonificada: quotation.isBonificada,
+            hasPartnerDiscount: quotation.hasPartnerDiscount,
+            productName: (quotation as any).productName,
+            productUnitLabelPlural: (quotation as any).productUnitLabelPlural,
+            periodStart: (quotation as any).periodStart,
+            batchWeeks: (quotation as any).batchWeeks,
+            productIrpj: (quotation as any).productIrpj,
+            isCustomProduct: (quotation as any).isCustomProduct,
+            customProductName: (quotation as any).customProductName,
+            customProjectCost: (quotation as any).customProjectCost,
+            customPricingMode: (quotation as any).customPricingMode,
+            customMarginPercent: (quotation as any).customMarginPercent,
+            customRestaurantCommission: (quotation as any).customRestaurantCommission,
+            customPartnerCommission: (quotation as any).customPartnerCommission,
+            customSellerCommission: (quotation as any).customSellerCommission,
+            customFinalPrice: (quotation as any).customFinalPrice,
+            agencyCommissionPercent: (quotation as any).agencyCommissionPercent,
+          },
+          restaurants: fetchedRestaurants.map((r: any) => ({
+            restaurantName: r.restaurantName,
+            restaurantAddress: r.restaurantAddress,
+            coasterQuantity: r.coasterQuantity,
+          })),
+          items: fetchedItems.map((item) => ({
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            notes: item.notes,
+          })),
+          billingSchedule: (billingScheduleData as any[]).map((b: any) => ({ sequence: b.sequence, amount: b.amount, dueDate: b.dueDate, notes: b.notes })),
+        }),
         signature,
-        billingSchedule: (billingScheduleData as any[]).map((b: any) => ({ sequence: b.sequence, amount: b.amount, dueDate: b.dueDate, notes: b.notes })),
-        clientName: quotation.clientName || quotation.leadName || "Cliente",
-        clientCompany: quotation.clientCompany || quotation.leadCompany || undefined,
-        clientCnpj: (quotation as any).clientCnpj || undefined,
-        clientEmail: (quotation as any).clientEmail || undefined,
-        clientPhone: (quotation as any).clientPhone || undefined,
-        quotationName: quotation.quotationName || quotation.quotationNumber,
-        coasterVolume: quotation.coasterVolume,
-        numRestaurants: numRest,
-        coastersPerRestaurant: numRest > 0 ? Math.round(quotation.coasterVolume / numRest) : quotation.coasterVolume,
-        contractDuration: duration,
-        semanas: undefined,
-        pricePerRestaurant: pricePerRest,
-        monthlyTotal,
-        contractTotal: totalContractValue,
-        includesProduction: quotation.includesProduction ?? true,
-        isBonificada: quotation.isBonificada ?? false,
-        hasPartnerDiscount: quotation.hasPartnerDiscount ?? false,
-        restaurants,
-        productName: (quotation as any).productName || undefined,
-        productUnitLabelPlural: (quotation as any).productUnitLabelPlural || undefined,
-        items: proposalItems,
-        periodStart: (quotation as any).periodStart || undefined,
-        batchWeeks: (quotation as any).batchWeeks ?? 4,
-        isCustomProduct: (quotation as any).isCustomProduct ?? false,
-        customProductName: (quotation as any).customProductName || undefined,
-        customProjectCost: (quotation as any).customProjectCost ? Number((quotation as any).customProjectCost) : undefined,
-        customPricingMode: (quotation as any).customPricingMode || undefined,
-        customMarginPercent: (quotation as any).customMarginPercent ? Number((quotation as any).customMarginPercent) : undefined,
-        customRestaurantCommission: (quotation as any).customRestaurantCommission ? Number((quotation as any).customRestaurantCommission) : undefined,
-        customPartnerCommission: (quotation as any).customPartnerCommission ? Number((quotation as any).customPartnerCommission) : undefined,
-        customSellerCommission: (quotation as any).customSellerCommission ? Number((quotation as any).customSellerCommission) : undefined,
-        customFinalPrice: (quotation as any).customFinalPrice ? Number((quotation as any).customFinalPrice) : undefined,
-        agencyCommissionPercent: (quotation as any).agencyCommissionPercent ? Number((quotation as any).agencyCommissionPercent) : undefined,
-        irpj: parseFloat((quotation as any).productIrpj ?? "6") / 100,
       });
       toast.success("PDF da proposta gerado!");
     } catch {

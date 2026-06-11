@@ -5,6 +5,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
 import { generateProposalPdf } from "@/lib/generate-proposal-pdf";
+import { assembleProposalData } from "@shared/proposalData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -779,78 +780,52 @@ export default function Quotations() {
                                   utils.quotation.getRestaurants.fetch({ quotationId: q.id }),
                                   utils.quotation.listItems.fetch({ quotationId: q.id }),
                                 ]);
-                                const numRest = fetchedRestaurants.length;
-                                const duration = q.cycles || 1;
-                                const totalContractValue = Number(q.totalValue || 0);
-                                const monthlyTotal = duration > 0 ? totalContractValue / duration : totalContractValue;
-                                const pricePerRest = (numRest > 0 ? numRest : 1) > 0 ? monthlyTotal / (numRest > 0 ? numRest : 1) : monthlyTotal;
-                                const restaurants = fetchedRestaurants.map((r) => ({
-                                  name: r.restaurantName || "Local",
-                                  neighborhood: r.restaurantAddress || "",
-                                  coasters: r.coasterQuantity || 0,
+                                await generateProposalPdf(assembleProposalData({
+                                  quotation: {
+                                    clientName: q.clientName,
+                                    clientCompany: q.clientCompany,
+                                    clientCnpj: q.clientCnpj || q.leadCnpj,
+                                    clientEmail: q.clientEmail || q.leadEmail,
+                                    clientPhone: q.clientPhone || q.leadPhone,
+                                    leadName: q.leadName,
+                                    leadCompany: q.leadCompany,
+                                    quotationName: q.quotationName,
+                                    quotationNumber: q.quotationNumber,
+                                    coasterVolume: q.coasterVolume ?? 0,
+                                    totalValue: q.totalValue,
+                                    cycles: q.cycles,
+                                    includesProduction: q.includesProduction,
+                                    isBonificada: q.isBonificada,
+                                    hasPartnerDiscount: q.hasPartnerDiscount,
+                                    productName: q.productName,
+                                    productUnitLabelPlural: q.productUnitLabelPlural,
+                                    periodStart: q.periodStart,
+                                    batchWeeks: q.batchWeeks,
+                                    productIrpj: (q as any).productIrpj,
+                                    isCustomProduct: (q as any).isCustomProduct,
+                                    customProductName: (q as any).customProductName,
+                                    customProjectCost: (q as any).customProjectCost,
+                                    customPricingMode: (q as any).customPricingMode,
+                                    customMarginPercent: (q as any).customMarginPercent,
+                                    customRestaurantCommission: (q as any).customRestaurantCommission,
+                                    customPartnerCommission: (q as any).customPartnerCommission,
+                                    customSellerCommission: (q as any).customSellerCommission,
+                                    customFinalPrice: (q as any).customFinalPrice,
+                                    agencyCommissionPercent: (q as any).agencyCommissionPercent,
+                                  },
+                                  restaurants: fetchedRestaurants.map((r) => ({
+                                    restaurantName: r.restaurantName,
+                                    restaurantAddress: r.restaurantAddress,
+                                    coasterQuantity: r.coasterQuantity,
+                                  })),
+                                  items: fetchedItems.map((item) => ({
+                                    productName: item.productName,
+                                    quantity: item.quantity,
+                                    unitPrice: item.unitPrice,
+                                    totalPrice: item.totalPrice,
+                                    notes: item.notes,
+                                  })),
                                 }));
-                                const proposalItems = fetchedItems.length > 0
-                                  ? fetchedItems.map(item => {
-                                      const semanasMatch = item.notes?.match(/(\d+)sem/);
-                                      const itemSemanas = semanasMatch ? parseInt(semanasMatch[1]) : duration * 4;
-                                      const spotMatch = item.notes?.match(/Spot(30|15)s/);
-                                      const insMatch = item.notes?.match(/(\d+)ins\/dia/);
-                                      const cliMatch = item.notes?.match(/(\d+)cli\/mês/);
-                                      const spotSec = spotMatch ? (parseInt(spotMatch[1]) as 15 | 30) : null;
-                                      const insPerDay = insMatch ? parseInt(insMatch[1]) : null;
-                                      const monthlyClients = cliMatch ? parseInt(cliMatch[1]) : null;
-                                      const impressionsPerRestaurant = (insPerDay !== null && monthlyClients !== null)
-                                        ? insPerDay * monthlyClients
-                                        : undefined;
-                                      return {
-                                        productName: item.productName,
-                                        volume: Number(item.quantity),
-                                        semanas: itemSemanas,
-                                        unitPrice: Number(item.unitPrice || 0),
-                                        totalPrice: Number(item.totalPrice || 0),
-                                        spotSeconds: spotSec,
-                                        impressionsPerRestaurant,
-                                      };
-                                    })
-                                  : undefined;
-                                await generateProposalPdf({
-                                  clientName: q.clientName || q.leadName || "Cliente",
-                                  clientCompany: q.clientCompany || q.leadCompany || undefined,
-                                  clientCnpj: q.clientCnpj || q.leadCnpj || undefined,
-                                  clientEmail: q.clientEmail || q.leadEmail || undefined,
-                                  clientPhone: q.clientPhone || q.leadPhone || undefined,
-                                  quotationName: q.quotationName || q.quotationNumber,
-                                  coasterVolume: q.coasterVolume ?? 0,
-                                  numRestaurants: numRest,
-                                  coastersPerRestaurant: numRest > 0 ? Math.round((q.coasterVolume ?? 0) / numRest) : (q.coasterVolume ?? 0),
-                                  contractDuration: duration,
-                                  semanas: proposalItems ? undefined : (q.cycles || 1) * 4,
-                                  pricePerRestaurant: pricePerRest,
-                                  monthlyTotal,
-                                  contractTotal: totalContractValue,
-                                  includesProduction: q.includesProduction ?? true,
-                                  isBonificada: q.isBonificada ?? false,
-                                  hasPartnerDiscount: q.hasPartnerDiscount ?? false,
-                                  restaurants,
-                                  productName: q.productName || undefined,
-                                  productUnitLabelPlural: q.productUnitLabelPlural || undefined,
-                                  items: proposalItems,
-                                  periodStart: q.periodStart || undefined,
-                                  batchWeeks: q.batchWeeks ?? 4,
-                                  // Campos do projeto sob medida — necessários para
-                                  // cotações puras-custom e mistas (custom + padrão).
-                                  isCustomProduct: (q as any).isCustomProduct ?? false,
-                                  customProductName: (q as any).customProductName || undefined,
-                                  customProjectCost: (q as any).customProjectCost != null ? Number((q as any).customProjectCost) : undefined,
-                                  customPricingMode: (q as any).customPricingMode || undefined,
-                                  customMarginPercent: (q as any).customMarginPercent != null ? Number((q as any).customMarginPercent) : undefined,
-                                  customRestaurantCommission: (q as any).customRestaurantCommission != null ? Number((q as any).customRestaurantCommission) : undefined,
-                                  customPartnerCommission: (q as any).customPartnerCommission != null ? Number((q as any).customPartnerCommission) : undefined,
-                                  customSellerCommission: (q as any).customSellerCommission != null ? Number((q as any).customSellerCommission) : undefined,
-                                  customFinalPrice: (q as any).customFinalPrice != null ? Number((q as any).customFinalPrice) : undefined,
-                                  agencyCommissionPercent: (q as any).agencyCommissionPercent != null ? Number((q as any).agencyCommissionPercent) : undefined,
-                                  irpj: parseFloat((q as any).productIrpj ?? "6") / 100,
-                                });
                                 toast.success("PDF da proposta gerado!");
                               } catch {
                                 toast.error("Erro ao gerar PDF da proposta");

@@ -14,6 +14,7 @@ import {
 } from "./billingScheduleRouter";
 import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { TRPCError } from "@trpc/server";
+import { sendEmail } from "./email";
 
 async function getDatabase() {
   const d = await getDb();
@@ -49,9 +50,37 @@ export function setupPublicSigningRoutes(app: express.Express) {
           clientName: clients.name,
           clientCompany: clients.company,
           clientCnpj: clients.cnpj,
+          clientEmail: clients.contactEmail,
+          clientPhone: clients.contactPhone,
+          leadName: leads.name,
+          leadCompany: leads.company,
+          leadCnpj: leads.cnpj,
+          leadEmail: leads.contactEmail,
+          leadPhone: leads.contactPhone,
+          includesProduction: quotations.includesProduction,
+          hasPartnerDiscount: quotations.hasPartnerDiscount,
+          cycles: quotations.cycles,
+          batchWeeks: quotations.batchWeeks,
+          periodStart: quotations.periodStart,
+          isCustomProduct: quotations.isCustomProduct,
+          customProductName: quotations.customProductName,
+          customProjectCost: quotations.customProjectCost,
+          customPricingMode: quotations.customPricingMode,
+          customMarginPercent: quotations.customMarginPercent,
+          customRestaurantCommission: quotations.customRestaurantCommission,
+          customPartnerCommission: quotations.customPartnerCommission,
+          customSellerCommission: quotations.customSellerCommission,
+          customFinalPrice: quotations.customFinalPrice,
+          agencyCommissionPercent: quotations.agencyCommissionPercent,
+          productId: quotations.productId,
+          productName: products.name,
+          productUnitLabelPlural: products.unitLabelPlural,
+          productIrpj: products.irpj,
         })
         .from(quotations)
         .leftJoin(clients, eq(quotations.clientId, clients.id))
+        .leftJoin(leads, eq(quotations.leadId, leads.id))
+        .leftJoin(products, eq(quotations.productId, products.id))
         .where(eq(quotations.publicToken, token))
         .limit(1);
 
@@ -76,6 +105,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
       const restaurants = await db
         .select({
           restaurantName: activeRestaurants.name,
+          restaurantAddress: activeRestaurants.neighborhood,
           coasterQuantity: quotationRestaurants.coasterQuantity,
         })
         .from(quotationRestaurants)
@@ -89,6 +119,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
           unitPrice: quotationItems.unitPrice,
           totalPrice: quotationItems.totalPrice,
           unitLabelPlural: products.unitLabelPlural,
+          notes: quotationItems.notes,
         })
         .from(quotationItems)
         .leftJoin(products, eq(quotationItems.productId, products.id))
@@ -147,7 +178,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
     try {
       const db = await getDatabase();
       const { token } = req.params;
-      const { signerName, signerCpf } = req.body;
+      const { signerName, signerCpf, signerEmail } = req.body;
 
       if (!signerName || !signerCpf) {
         return res.status(400).json({ error: "Nome e CPF são obrigatórios" });
@@ -156,6 +187,11 @@ export function setupPublicSigningRoutes(app: express.Express) {
       const cpfClean = signerCpf.replace(/\D/g, "");
       if (cpfClean.length !== 11) {
         return res.status(400).json({ error: "CPF inválido" });
+      }
+
+      const signerEmailClean = typeof signerEmail === "string" ? signerEmail.trim().toLowerCase() : "";
+      if (!signerEmailClean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signerEmailClean)) {
+        return res.status(400).json({ error: "E-mail inválido" });
       }
 
       const quotation = await db.select().from(quotations).where(eq(quotations.publicToken, token)).limit(1);
@@ -263,6 +299,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
       const signatureData = JSON.stringify({
         name: signerName,
         cpf: cpfClean,
+        email: signerEmailClean,
         ip: typeof ip === "string" ? ip : ip[0],
         userAgent,
         hash: signatureHash,
@@ -430,6 +467,100 @@ export function setupPublicSigningRoutes(app: express.Express) {
       console.error("Error signing quotation:", err);
       const status = isUniqueViolation(err) ? 409 : 500;
       res.status(status).json({ error: describeDbError(err, "Erro ao processar assinatura") });
+    }
+  });
+
+  // Envia a OS assinada por email para o endereço que o cliente usou ao
+  // assinar (origem única: quotations.signatureData.email). O PDF é gerado no
+  // cliente (mesmo documento da proposta, com bloco de assinatura) e enviado
+  // como base64 — o servidor nunca aceita destinatário arbitrário.
+  router.post("/quotation/:token/email-os", async (req, res) => {
+    try {
+      const db = await getDatabase();
+      const { token } = req.params;
+      const { pdfBase64, fileName } = req.body as { pdfBase64?: string; fileName?: string };
+
+      if (!pdfBase64 || typeof pdfBase64 !== "string") {
+        return res.status(400).json({ error: "PDF ausente" });
+      }
+
+      // Defesa: limita tamanho do anexo (~15MB de PDF ≈ 20MB em base64)
+      // e valida que o conteúdo realmente começa com o magic number %PDF.
+      const MAX_BASE64_LEN = 20 * 1024 * 1024;
+      if (pdfBase64.length > MAX_BASE64_LEN) {
+        return res.status(413).json({ error: "Arquivo muito grande", emailSent: false });
+      }
+      let pdfHeader = "";
+      try {
+        pdfHeader = Buffer.from(pdfBase64.slice(0, 12), "base64").toString("latin1");
+      } catch {
+        pdfHeader = "";
+      }
+      if (!pdfHeader.startsWith("%PDF")) {
+        return res.status(400).json({ error: "Arquivo inválido", emailSent: false });
+      }
+
+      const [q] = await db
+        .select({
+          id: quotations.id,
+          signedAt: quotations.signedAt,
+          signatureData: quotations.signatureData,
+          quotationName: quotations.quotationName,
+          quotationNumber: quotations.quotationNumber,
+        })
+        .from(quotations)
+        .where(eq(quotations.publicToken, token))
+        .limit(1);
+
+      if (!q) {
+        return res.status(404).json({ error: "Link de assinatura inválido ou expirado" });
+      }
+      if (!q.signedAt) {
+        return res.status(400).json({ error: "Ordem de serviço ainda não foi assinada" });
+      }
+
+      let signerEmail = "";
+      let signerName = "";
+      try {
+        const parsed = JSON.parse(q.signatureData || "{}");
+        signerEmail = typeof parsed.email === "string" ? parsed.email : "";
+        signerName = typeof parsed.name === "string" ? parsed.name : "";
+      } catch {
+        // signatureData ausente/legado — sem email registrado.
+      }
+
+      if (!signerEmail) {
+        return res.status(422).json({ error: "Nenhum e-mail foi registrado nesta assinatura", emailSent: false });
+      }
+
+      const docLabel = q.quotationName || q.quotationNumber || "Ordem de Serviço";
+      const safeFileName = (fileName && /\.pdf$/i.test(fileName)) ? fileName : "Ordem_de_Servico_Assinada.pdf";
+
+      const result = await sendEmail({
+        to: signerEmail,
+        subject: `Sua Ordem de Serviço assinada — ${docLabel}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; color: #1a1a1a; line-height: 1.6;">
+            <p>Olá${signerName ? `, ${signerName}` : ""}!</p>
+            <p>Recebemos a assinatura da sua Ordem de Serviço <strong>${docLabel}</strong> na Mesa Ads.</p>
+            <p>Em anexo está o documento assinado, em PDF, com todas as informações da proposta e o registro da sua assinatura digital.</p>
+            <p>Obrigado por escolher a Mesa Ads.</p>
+            <p style="color: #00a830; font-weight: bold; margin-top: 24px;">mesa.ads</p>
+          </div>
+        `,
+        attachments: [
+          {
+            filename: safeFileName,
+            content: pdfBase64,
+            contentType: "application/pdf",
+          },
+        ],
+      });
+
+      return res.json({ emailSent: result.sent, reason: result.reason });
+    } catch (err: any) {
+      console.error("Error emailing signed OS:", err);
+      res.status(500).json({ error: "Erro ao enviar a OS por email", emailSent: false });
     }
   });
 

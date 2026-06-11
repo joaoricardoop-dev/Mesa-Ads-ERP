@@ -4,6 +4,7 @@ import { LOGO_WHITE_BASE64 } from "./pdf-assets";
 import { computeProposalLinePrices } from "@shared/proposal-line-pricing";
 import { PROPOSAL_BINDING_CLAUSE_PREFIX, CAMPAIGN_TERM_BINDING_CLAUSE_PREFIX } from "@shared/const";
 import { fetchContractLinks } from "./contract-links";
+import type { ProposalPDFData, ProposalItem } from "@shared/proposalData";
 import {
   PDF_FONT as FONT_NAME,
   PDF_COLORS,
@@ -20,82 +21,7 @@ import {
   pdfCheckPageBreak,
 } from "./pdf-branding";
 
-interface ProposalItem {
-  productName: string;
-  volume: number;
-  semanas: number;
-  unitPrice: number;
-  totalPrice: number;
-  spotSeconds?: 15 | 30 | null;
-  impressionsPerRestaurant?: number;
-  numRestaurants?: number;
-}
-
-interface ProposalPDFData {
-  clientName: string;
-  clientCompany?: string;
-  clientCnpj?: string;
-  clientEmail?: string;
-  clientPhone?: string;
-  quotationName?: string;
-  coasterVolume: number;
-  numRestaurants: number;
-  coastersPerRestaurant: number;
-  contractDuration: number;
-  pricePerRestaurant: number;
-  monthlyTotal: number;
-  contractTotal: number;
-  includesProduction: boolean;
-  restaurants: Array<{
-    name: string;
-    neighborhood: string;
-    coasters: number;
-  }>;
-  validityDays?: number;
-  agencyCommissionPercent?: number;
-  hasPartnerDiscount?: boolean;
-  productName?: string;
-  productUnitLabelPlural?: string;
-  semanas?: number;
-  /** Multi-product items from BudgetCreator. When provided, switches to multi-product PDF layout. */
-  items?: ProposalItem[];
-  isBonificada?: boolean;
-  periodStart?: string;
-  batchWeeks?: number;
-  /** Custom product (Projeto Sob Medida) fields */
-  isCustomProduct?: boolean;
-  customProductName?: string;
-  customProjectCost?: number;
-  customPricingMode?: string;
-  customMarginPercent?: number;
-  customRestaurantCommission?: number;
-  customPartnerCommission?: number;
-  customSellerCommission?: number;
-  customFinalPrice?: number;
-  /** Telas (screen/TV) product fields */
-  isTelas?: boolean;
-  telasMonthlyCustomers?: number;
-  telasImpressions30s?: number;
-  telasImpressions15s?: number;
-  /** IRPJ rate for the product (decimal, e.g. 0.06). Defaults to 6% if not provided. */
-  irpj?: number;
-  /** Task #197 — cronograma de parcelas (opcional). */
-  billingSchedule?: Array<{ sequence: number; amount: string | number; dueDate: string; notes?: string | null }>;
-  /**
-   * Registro de assinatura digital — presente apenas para cotações
-   * convertidas/assinadas. Origem única: quotations.signedAt / signedBy /
-   * signatureData (campo JSON com name, cpf, ip, userAgent, hash). Quando
-   * presente, o PDF mostra o registro do cliente em vez das linhas de
-   * assinatura manual.
-   */
-  signature?: {
-    signerName: string;
-    signerCpf?: string;
-    signedAt: string;
-    signatureHash?: string;
-    ip?: string;
-  };
-}
+export type { ProposalPDFData, ProposalItem } from "@shared/proposalData";
 
 const DEFAULT_IRPJ = 0.06;
 void PDF_COLORS;
@@ -227,7 +153,10 @@ const drawSectionTitle = drawPdfSectionTitle;
 const drawInfoRow = drawPdfInfoRow;
 const checkPageBreak = pdfCheckPageBreak;
 
-export async function generateProposalPdf(data: ProposalPDFData) {
+export async function generateProposalPdf(
+  data: ProposalPDFData,
+  options?: { autoSave?: boolean },
+): Promise<{ fileName: string; base64: string }> {
   const { masterContractUrl, campaignTermUrl } = await fetchContractLinks();
   const doc = new jsPDF();
   registerFonts(doc);
@@ -1179,8 +1108,13 @@ export async function generateProposalPdf(data: ProposalPDFData) {
   }
 
   const baseName = (data.quotationName || data.clientName).replace(/[^a-zA-Z0-9]/g, "_");
-  const filename = data.signature
+  const fileName = data.signature
     ? `Proposta_Assinada_${baseName}.pdf`
     : `Proposta_${baseName}.pdf`;
-  doc.save(filename);
+
+  const base64 = doc.output("datauristring").split(",")[1] ?? "";
+  if (options?.autoSave !== false) {
+    doc.save(fileName);
+  }
+  return { fileName, base64 };
 }
