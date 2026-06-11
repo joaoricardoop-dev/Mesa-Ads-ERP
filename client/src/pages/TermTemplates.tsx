@@ -256,22 +256,23 @@ export default function TermTemplates() {
 
         {/* Termo de contratação de campanha */}
         <div className="space-y-2 border-t border-border/30 pt-4">
-          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Termo de Contratação de Campanha Publicitária
-          </Label>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Termo de Contratação de Campanha Publicitária
+            </Label>
+            {contractDocs?.campaignTerm && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
+                v{contractDocs.campaignTerm.version}
+              </Badge>
+            )}
+            {contractDocs?.campaignTerm && !contractDocs.campaignTerm.isActive && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-red-500/10 text-red-400 border-red-500/30">
+                Inativo
+              </Badge>
+            )}
+          </div>
           {contractDocs?.campaignTerm ? (
             <>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium">{contractDocs.campaignTerm.title}</span>
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
-                  v{contractDocs.campaignTerm.version}
-                </Badge>
-                {!contractDocs.campaignTerm.isActive && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-red-500/10 text-red-400 border-red-500/30">
-                    Inativo
-                  </Badge>
-                )}
-              </div>
               <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
                 <div className="flex-1 flex items-center gap-2 min-w-0 bg-muted/40 rounded-md px-3 py-2">
                   <Link2 className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
