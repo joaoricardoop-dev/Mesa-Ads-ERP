@@ -7,6 +7,8 @@ import {
   drawPdfFooter,
 } from "./pdf-branding";
 import { formatIsoDateBR } from "@shared/billingSchedule";
+import { PROPOSAL_BINDING_CLAUSE_PREFIX, CAMPAIGN_TERM_BINDING_CLAUSE_PREFIX } from "@shared/const";
+import { fetchContractLinks } from "./contract-links";
 
 export interface QuotationSignPDFData {
   orderNumber: string;
@@ -26,7 +28,8 @@ export interface QuotationSignPDFData {
   billingSchedule?: Array<{ sequence: number; amount: string | number; dueDate: string }>;
 }
 
-export function generateQuotationSignPdf(data: QuotationSignPDFData) {
+export async function generateQuotationSignPdf(data: QuotationSignPDFData) {
+  const { masterContractUrl, campaignTermUrl } = await fetchContractLinks();
   const doc = new jsPDF();
   registerPdfFonts(doc);
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -164,6 +167,34 @@ export function generateQuotationSignPdf(data: QuotationSignPDFData) {
     doc.line(margin, y, pageWidth - margin, y);
     y += 10;
   }
+
+  // ── Termos e condições (links contrato master + termo de campanha) ──────────
+  // Fonte única do servidor (fetchContractLinks), editável em Termos Padrão.
+  if (y > pageHeight - 80) {
+    doc.addPage();
+    y = 20;
+  }
+  doc.setTextColor(...PDF_COLORS.ink);
+  doc.setFontSize(11);
+  doc.setFont(FONT_NAME, "bold");
+  doc.text("TERMOS E CONDIÇÕES", margin, y);
+  y += 7;
+  doc.setFont(FONT_NAME, "normal");
+  doc.setFontSize(8);
+
+  const drawClauseWithLink = (prefix: string, url: string) => {
+    const lines = doc.splitTextToSize(prefix, contentWidth) as string[];
+    doc.setTextColor(80, 80, 80);
+    doc.text(lines, margin, y);
+    y += lines.length * 4.2 + 1;
+    doc.setTextColor(...PDF_COLORS.neon);
+    doc.textWithLink(url, margin, y, { url });
+    y += 7;
+  };
+
+  drawClauseWithLink(PROPOSAL_BINDING_CLAUSE_PREFIX, masterContractUrl);
+  drawClauseWithLink(CAMPAIGN_TERM_BINDING_CLAUSE_PREFIX, campaignTermUrl);
+  y += 6;
 
   if (y > pageHeight - 60) {
     doc.addPage();

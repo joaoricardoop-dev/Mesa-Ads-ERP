@@ -878,9 +878,18 @@ export const termTemplates = pgTable("term_templates", {
   requiredFor: text("requiredFor").notNull().default("[]"),
   isActive: boolean("isActive").default(true).notNull(),
   version: integer("version").notNull().default(1),
+  // Documentos contratuais especiais (contrato master / termo de campanha).
+  // `slug` identifica a linha canônica de forma estável (links nunca mudam).
+  // `externalUrl` guarda a URL de um contrato hospedado fora do app.
+  // `isPublic` libera a leitura via página pública não-logada (/termo/:slug).
+  slug: varchar("slug", { length: 120 }),
+  externalUrl: text("externalUrl"),
+  isPublic: boolean("isPublic").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  uniqueIndex("uq_term_templates_slug").on(t.slug),
+]);
 
 export type TermTemplate = typeof termTemplates.$inferSelect;
 export type InsertTermTemplate = typeof termTemplates.$inferInsert;

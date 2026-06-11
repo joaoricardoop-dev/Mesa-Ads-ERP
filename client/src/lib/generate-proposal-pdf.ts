@@ -2,7 +2,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { LOGO_WHITE_BASE64 } from "./pdf-assets";
 import { computeProposalLinePrices } from "@shared/proposal-line-pricing";
-import { MASTER_CONTRACT_URL, PROPOSAL_BINDING_CLAUSE_PREFIX } from "@shared/const";
+import { PROPOSAL_BINDING_CLAUSE_PREFIX, CAMPAIGN_TERM_BINDING_CLAUSE_PREFIX } from "@shared/const";
+import { fetchContractLinks } from "./contract-links";
 import {
   PDF_FONT as FONT_NAME,
   PDF_COLORS,
@@ -226,7 +227,8 @@ const drawSectionTitle = drawPdfSectionTitle;
 const drawInfoRow = drawPdfInfoRow;
 const checkPageBreak = pdfCheckPageBreak;
 
-export function generateProposalPdf(data: ProposalPDFData) {
+export async function generateProposalPdf(data: ProposalPDFData) {
+  const { masterContractUrl, campaignTermUrl } = await fetchContractLinks();
   const doc = new jsPDF();
   registerFonts(doc);
 
@@ -1059,8 +1061,8 @@ export function generateProposalPdf(data: ProposalPDFData) {
   });
 
   // Cláusula de vínculo ao contrato master (Termos e Condições Gerais).
-  // Texto e URL vêm de shared/const.ts (fonte única). A URL é renderizada
-  // como link clicável logo após o texto justificado.
+  // O texto vem de shared/const.ts; a URL vem da fonte única do servidor
+  // (fetchContractLinks), editável em Termos Padrão. Link clicável após o texto.
   y = checkPageBreak(doc, y, 18);
   doc.setTextColor(...DARK_GRAY);
   doc.setFontSize(8.5);
@@ -1068,7 +1070,19 @@ export function generateProposalPdf(data: ProposalPDFData) {
   doc.text("•", margin, y);
   y = justifyText(doc, PROPOSAL_BINDING_CLAUSE_PREFIX, margin + 5, y, contentWidth - 5, 4.5);
   doc.setTextColor(...GREEN);
-  doc.textWithLink(MASTER_CONTRACT_URL, margin + 5, y, { url: MASTER_CONTRACT_URL });
+  doc.textWithLink(masterContractUrl, margin + 5, y, { url: masterContractUrl });
+  y += 6;
+
+  // Cláusula de vínculo ao Termo de Contratação de Campanha Publicitária,
+  // com link público (não-logado) também vindo da fonte única do servidor.
+  y = checkPageBreak(doc, y, 18);
+  doc.setTextColor(...DARK_GRAY);
+  doc.setFontSize(8.5);
+  doc.setFont(FONT_NAME, "normal");
+  doc.text("•", margin, y);
+  y = justifyText(doc, CAMPAIGN_TERM_BINDING_CLAUSE_PREFIX, margin + 5, y, contentWidth - 5, 4.5);
+  doc.setTextColor(...GREEN);
+  doc.textWithLink(campaignTermUrl, margin + 5, y, { url: campaignTermUrl });
   y += 6;
 
   y += 14;

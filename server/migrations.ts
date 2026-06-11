@@ -2011,6 +2011,34 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_closer" boolean DEFAULT false;
     `,
   },
+  {
+    // Documentos contratuais gerenciados em "Termos Padrão":
+    //  - contrato-master: URL externa (Termos e Condições Gerais) editável.
+    //  - contratacao-campanha: termo com conteúdo interno + página pública.
+    // Linhas semeadas idempotentemente por slug (índice único). NULLs em slug
+    // permanecem distintos no Postgres, então templates antigos não conflitam.
+    name: "add_contract_documents_to_term_templates",
+    sql: `
+      ALTER TABLE "term_templates" ADD COLUMN IF NOT EXISTS "slug" varchar(120);
+      ALTER TABLE "term_templates" ADD COLUMN IF NOT EXISTS "externalUrl" text;
+      ALTER TABLE "term_templates" ADD COLUMN IF NOT EXISTS "isPublic" boolean DEFAULT false NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_term_templates_slug" ON "term_templates" ("slug");
+      INSERT INTO "term_templates" ("title", "content", "requiredFor", "isActive", "slug", "externalUrl", "isPublic")
+        VALUES (
+          'Contrato de Prestação de Serviços – Termos e Condições Gerais',
+          'Documento externo (contrato master). O conteúdo é hospedado fora do app; edite apenas a URL em Termos Padrão.',
+          '[]', true, 'contrato-master', 'https://link.kaizenco.io/contratomaster1-2023', false
+        )
+        ON CONFLICT ("slug") DO NOTHING;
+      INSERT INTO "term_templates" ("title", "content", "requiredFor", "isActive", "slug", "externalUrl", "isPublic")
+        VALUES (
+          'Termo de Contratação de Campanha Publicitária',
+          '<p>Conteúdo do termo a ser definido em Termos Padrão.</p>',
+          '[]', true, 'contratacao-campanha', NULL, true
+        )
+        ON CONFLICT ("slug") DO NOTHING;
+    `,
+  },
 ];
 
 export async function runMigrations() {

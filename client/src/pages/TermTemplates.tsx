@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import PageContainer from "@/components/PageContainer";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { FileText, Plus, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
+import { FileText, Plus, Pencil, Trash2, Eye, EyeOff, Link2, Copy, ExternalLink, FileSignature } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 
 const ROLE_OPTIONS = [
@@ -82,6 +82,72 @@ export default function TermTemplates() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
+  // ── Documentos contratuais (contrato master + termo de campanha) ────────────
+  const { data: contractDocs } = trpc.termTemplate.getContractDocs.useQuery();
+  const [masterUrl, setMasterUrl] = useState("");
+  const [masterUrlDirty, setMasterUrlDirty] = useState(false);
+  const [campaignDialogOpen, setCampaignDialogOpen] = useState(false);
+  const [campaignForm, setCampaignForm] = useState<{ title: string; content: string; isActive: boolean }>({
+    title: "",
+    content: "",
+    isActive: true,
+  });
+
+  useEffect(() => {
+    if (contractDocs && !masterUrlDirty) {
+      setMasterUrl(contractDocs.masterContractUrl ?? "");
+    }
+  }, [contractDocs, masterUrlDirty]);
+
+  const updateMasterUrlMutation = trpc.termTemplate.updateMasterContractUrl.useMutation({
+    onSuccess: () => {
+      utils.termTemplate.getContractDocs.invalidate();
+      utils.termTemplate.getContractLinks.invalidate();
+      setMasterUrlDirty(false);
+      toast.success("URL do contrato master atualizada!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const updateCampaignTermMutation = trpc.termTemplate.updateCampaignTerm.useMutation({
+    onSuccess: () => {
+      utils.termTemplate.getContractDocs.invalidate();
+      utils.termTemplate.getContractLinks.invalidate();
+      setCampaignDialogOpen(false);
+      toast.success("Termo de campanha atualizado!");
+    },
+    onError: (err) => toast.error(`Erro: ${err.message}`),
+  });
+
+  function openCampaignEdit() {
+    if (!contractDocs?.campaignTerm) return;
+    setCampaignForm({
+      title: contractDocs.campaignTerm.title,
+      content: contractDocs.campaignTerm.content,
+      isActive: contractDocs.campaignTerm.isActive,
+    });
+    setCampaignDialogOpen(true);
+  }
+
+  function handleSaveCampaignTerm() {
+    if (!campaignForm.title.trim() || !campaignForm.content.trim()) {
+      toast.error("Título e conteúdo são obrigatórios.");
+      return;
+    }
+    updateCampaignTermMutation.mutate({
+      title: campaignForm.title,
+      content: campaignForm.content,
+      isActive: campaignForm.isActive,
+    });
+  }
+
+  function copyPublicUrl(url: string) {
+    navigator.clipboard.writeText(url).then(
+      () => toast.success("Link copiado!"),
+      () => toast.error("Não foi possível copiar o link."),
+    );
+  }
+
   function openCreate() {
     setEditingId(null);
     setForm(emptyForm);
@@ -127,6 +193,7 @@ export default function TermTemplates() {
   }
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
+  const genericTemplates = templates.filter((t) => !(t as any).slug);
 
   return (
     <PageContainer
@@ -139,9 +206,112 @@ export default function TermTemplates() {
         </Button>
       }
     >
+      {/* ── Documentos contratuais ─────────────────────────────────────────── */}
+      <div className="bg-card border border-border/30 rounded-lg p-5 mb-6 space-y-5">
+        <div className="flex items-center gap-3">
+          <FileSignature className="w-5 h-5 text-primary flex-shrink-0" />
+          <div>
+            <h3 className="text-sm font-semibold">Documentos contratuais</h3>
+            <p className="text-xs text-muted-foreground">
+              Referenciados automaticamente em todas as propostas e ordens de serviço.
+            </p>
+          </div>
+        </div>
+
+        {/* Contrato master */}
+        <div className="space-y-2">
+          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Contrato master (Termos e Condições Gerais)
+          </Label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              value={masterUrl}
+              onChange={(e) => {
+                setMasterUrl(e.target.value);
+                setMasterUrlDirty(true);
+              }}
+              placeholder="https://..."
+              className="flex-1"
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => masterUrl && window.open(masterUrl, "_blank", "noopener")}
+                disabled={!masterUrl}
+                title="Abrir contrato master"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => updateMasterUrlMutation.mutate({ url: masterUrl.trim() })}
+                disabled={!masterUrlDirty || updateMasterUrlMutation.isPending}
+              >
+                Salvar URL
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Termo de contratação de campanha */}
+        <div className="space-y-2 border-t border-border/30 pt-4">
+          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Termo de Contratação de Campanha Publicitária
+          </Label>
+          {contractDocs?.campaignTerm ? (
+            <>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium">{contractDocs.campaignTerm.title}</span>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
+                  v{contractDocs.campaignTerm.version}
+                </Badge>
+                {!contractDocs.campaignTerm.isActive && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-red-500/10 text-red-400 border-red-500/30">
+                    Inativo
+                  </Badge>
+                )}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                <div className="flex-1 flex items-center gap-2 min-w-0 bg-muted/40 rounded-md px-3 py-2">
+                  <Link2 className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                  <span className="text-xs text-muted-foreground truncate">
+                    {contractDocs.campaignTerm.publicUrl}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyPublicUrl(contractDocs.campaignTerm!.publicUrl)}
+                    title="Copiar link público"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(contractDocs.campaignTerm!.publicUrl, "_blank", "noopener")}
+                    title="Abrir link público"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" onClick={openCampaignEdit}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Editar conteúdo
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">Termo de campanha não encontrado.</p>
+          )}
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="text-center text-muted-foreground py-12">Carregando...</div>
-      ) : templates.length === 0 ? (
+      ) : genericTemplates.length === 0 ? (
         <div className="text-center py-16 space-y-3">
           <FileText className="w-12 h-12 text-muted-foreground/40 mx-auto" />
           <p className="text-muted-foreground">Nenhum template cadastrado</p>
@@ -152,7 +322,7 @@ export default function TermTemplates() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {templates.map((template) => {
+          {genericTemplates.map((template) => {
             let roles: string[] = [];
             try { roles = JSON.parse(template.requiredFor); } catch {}
             return (
@@ -274,6 +444,61 @@ export default function TermTemplates() {
             </Button>
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving ? "Salvando..." : editingId ? "Salvar Alterações" : "Criar Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={campaignDialogOpen} onOpenChange={setCampaignDialogOpen}>
+        <DialogContent className="bg-card border-border/30 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSignature className="w-5 h-5 text-primary" />
+              Editar Termo de Contratação de Campanha
+            </DialogTitle>
+            <DialogDescription>
+              Este conteúdo é exibido no link público e referenciado nas propostas e ordens de serviço. Alterar o conteúdo incrementa a versão.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Título *</Label>
+              <Input
+                value={campaignForm.title}
+                onChange={(e) => setCampaignForm({ ...campaignForm, title: e.target.value })}
+                placeholder="Ex: Termo de Contratação de Campanha Publicitária"
+                className="bg-background border-border/30"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Conteúdo do Termo *</Label>
+              <RichTextEditor
+                value={campaignForm.content}
+                onChange={(html) => setCampaignForm({ ...campaignForm, content: html })}
+                placeholder="Digite o conteúdo completo do termo..."
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={campaignForm.isActive}
+                onCheckedChange={(checked) => setCampaignForm({ ...campaignForm, isActive: checked })}
+              />
+              <Label className="flex items-center gap-2 cursor-pointer">
+                {campaignForm.isActive ? <Eye className="w-4 h-4 text-primary" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
+                {campaignForm.isActive ? "Ativo (link público acessível)" : "Inativo (link público indisponível)"}
+              </Label>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCampaignDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveCampaignTerm} disabled={updateCampaignTermMutation.isPending}>
+              {updateCampaignTermMutation.isPending ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </DialogFooter>
         </DialogContent>

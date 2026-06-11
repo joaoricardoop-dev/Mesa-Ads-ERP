@@ -268,11 +268,11 @@ export default function QuotationPreview() {
 
   const selectedLead = leadsList.find((l) => l.id === parseInt(selectedLeadId));
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     if (selectedClientId === "none" && selectedLeadId === "none") { toast.error("Selecione um cliente ou lead antes de exportar"); return; }
     try {
     const mc = avgMonthlyCustomersForSimulator ?? 3000;
-    generateProposalPdf({
+    await generateProposalPdf({
       clientName: selectedClient?.name || selectedLead?.name || "Cliente",
       clientCompany: selectedClient?.company || selectedLead?.company || undefined,
       clientCnpj: selectedClient?.cnpj || selectedLead?.cnpj || undefined,

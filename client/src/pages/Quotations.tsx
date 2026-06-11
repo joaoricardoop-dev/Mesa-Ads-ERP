@@ -138,7 +138,7 @@ function OSActionButton({ quotationId, quotationNumber, clientName, clientCompan
                 name: r.restaurantName || `Restaurante #${r.restaurantId}`,
                 coasterQuantity: r.coasterQuantity,
               })),
-            });
+            }).catch(() => toast.error("Erro ao gerar PDF da OS"));
           }
         }}
         title="Baixar OS em PDF"
@@ -813,7 +813,7 @@ export default function Quotations() {
                                       };
                                     })
                                   : undefined;
-                                generateProposalPdf({
+                                await generateProposalPdf({
                                   clientName: q.clientName || q.leadName || "Cliente",
                                   clientCompany: q.clientCompany || q.leadCompany || undefined,
                                   clientCnpj: q.clientCnpj || q.leadCnpj || undefined,
@@ -1534,7 +1534,7 @@ export default function Quotations() {
                     name: r.restaurantName || `Restaurante #${r.restaurantId}`,
                     coasterQuantity: r.coasterQuantity,
                   })),
-                });
+                }).catch(() => toast.error("Erro ao gerar PDF da OS"));
               }}
               disabled={allocatedRestaurants.length === 0}
             >

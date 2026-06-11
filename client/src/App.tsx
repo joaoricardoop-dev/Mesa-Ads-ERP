@@ -57,6 +57,7 @@ import TermTemplates from "./pages/TermTemplates";
 import IntegrationSettings from "./pages/IntegrationSettings";
 import MediaKitSettings from "./pages/MediaKitSettings";
 import QuotationSign from "./pages/QuotationSign";
+import PublicTerm from "./pages/PublicTerm";
 import Products from "./pages/Products";
 import SeasonalMultipliers from "./pages/SeasonalMultipliers";
 import ConfigLists from "./pages/ConfigLists";
@@ -684,6 +685,7 @@ function App() {
               )}
             </Route>
             <Route path="/cotacao/assinar/:token" component={QuotationSign} />
+            <Route path="/termo/:slug" component={PublicTerm} />
             <Route>{() => <AuthenticatedApp />}</Route>
           </Switch>
         </TooltipProvider>

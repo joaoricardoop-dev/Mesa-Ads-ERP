@@ -2604,9 +2604,92 @@ export const appRouter = router({
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
         const { termTemplates } = await import("../drizzle/schema");
         const { eq } = await import("drizzle-orm");
+        const existing = await db.select().from(termTemplates).where(eq(termTemplates.id, input.id));
+        if (existing[0]?.slug) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Documentos contratuais não podem ser excluídos." });
+        }
         await db.delete(termTemplates).where(eq(termTemplates.id, input.id));
         return { success: true };
       }),
+
+    // ── Documentos contratuais (contrato master + termo de campanha) ──────────
+    // Gerenciados em "Termos Padrão"; refletem em todos os PDFs de proposta/OS.
+    getContractDocs: adminProcedure.query(async () => {
+      const { getDb: getDatabase } = await import("./db");
+      const db = await getDatabase();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const { termTemplates } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const { appUrl } = await import("./_core/appUrl");
+      const { CONTRACT_MASTER_SLUG, CAMPAIGN_TERM_SLUG, PUBLIC_TERM_PATH } = await import("@shared/const");
+
+      const [master] = await db.select().from(termTemplates).where(eq(termTemplates.slug, CONTRACT_MASTER_SLUG)).limit(1);
+      const [campaign] = await db.select().from(termTemplates).where(eq(termTemplates.slug, CAMPAIGN_TERM_SLUG)).limit(1);
+
+      return {
+        masterContractUrl: master?.externalUrl ?? "",
+        campaignTerm: campaign
+          ? {
+              title: campaign.title,
+              content: campaign.content,
+              version: campaign.version,
+              isActive: campaign.isActive,
+              publicUrl: `${appUrl()}${PUBLIC_TERM_PATH(CAMPAIGN_TERM_SLUG)}`,
+            }
+          : null,
+      };
+    }),
+
+    updateMasterContractUrl: adminProcedure
+      .input(z.object({ url: z.string().trim().url("URL inválida") }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { termTemplates } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const { CONTRACT_MASTER_SLUG } = await import("@shared/const");
+        const [updated] = await db
+          .update(termTemplates)
+          .set({ externalUrl: input.url, updatedAt: new Date() })
+          .where(eq(termTemplates.slug, CONTRACT_MASTER_SLUG))
+          .returning();
+        if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Contrato master não encontrado" });
+        return updated;
+      }),
+
+    updateCampaignTerm: adminProcedure
+      .input(z.object({
+        title: z.string().min(1).optional(),
+        content: z.string().min(1),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { getDb: getDatabase } = await import("./db");
+        const db = await getDatabase();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+        const { termTemplates } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const { CAMPAIGN_TERM_SLUG } = await import("@shared/const");
+        const [existing] = await db.select().from(termTemplates).where(eq(termTemplates.slug, CAMPAIGN_TERM_SLUG)).limit(1);
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Termo de campanha não encontrado" });
+
+        const updates: Record<string, any> = { updatedAt: new Date() };
+        if (input.title !== undefined) updates.title = input.title;
+        if (input.isActive !== undefined) updates.isActive = input.isActive;
+        if (input.content !== existing.content) {
+          updates.content = input.content;
+          updates.version = existing.version + 1;
+        }
+        const [updated] = await db.update(termTemplates).set(updates).where(eq(termTemplates.id, existing.id)).returning();
+        return updated;
+      }),
+
+    /** Links de contrato para os PDFs (proposta/OS). Dados públicos por natureza. */
+    getContractLinks: protectedProcedure.query(async () => {
+      const { getContractLinks } = await import("./contractLinks");
+      return getContractLinks();
+    }),
   }),
 
   restaurantePortal: router({

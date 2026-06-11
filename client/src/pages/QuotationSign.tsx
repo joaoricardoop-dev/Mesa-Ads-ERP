@@ -95,6 +95,9 @@ export default function QuotationSign() {
       signedAt: r.signedAt,
       signatureHash: r.signatureHash,
       billingSchedule: (data as any).billingSchedule || undefined,
+    }).catch((err) => {
+      console.error("[QuotationSign] falha ao gerar PDF:", err);
+      setError("Erro ao gerar o PDF. Tente novamente.");
     });
   };
 

@@ -288,7 +288,7 @@ export default function QuotationDetail() {
         }
       }
 
-      generateProposalPdf({
+      await generateProposalPdf({
         signature,
         billingSchedule: (billingScheduleData as any[]).map((b: any) => ({ sequence: b.sequence, amount: b.amount, dueDate: b.dueDate, notes: b.notes })),
         clientName: quotation.clientName || quotation.leadName || "Cliente",
@@ -825,7 +825,7 @@ export default function QuotationDetail() {
                               name: r.restaurantName || `Restaurante #${r.restaurantId}`,
                               coasterQuantity: r.coasterQuantity,
                             })),
-                          });
+                          }).catch(() => toast.error("Erro ao gerar PDF da OS"));
                         }}
                       >
                         <Download className="w-3.5 h-3.5" /> PDF

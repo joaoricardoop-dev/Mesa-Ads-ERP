@@ -1796,7 +1796,7 @@ export default function AnunciantePortal() {
                               signerCpf: os.signedByCpf || "",
                               signedAt: new Date(os.signedAt).toISOString(),
                               signatureHash: os.signatureHash || undefined,
-                            });
+                            }).catch(() => toast.error("Erro ao gerar PDF do contrato"));
                           }}>
                             <Download className="w-3.5 h-3.5" />
                             Contrato

@@ -14,6 +14,7 @@ import { setupClerkAuth } from "../replit_integrations/auth";
 import { clerkWebhookHandler } from "../clerkWebhook";
 import { setupRestaurantOnboardingRoutes } from "../restaurantOnboardingRouter";
 import { setupPublicSigningRoutes } from "../publicSigningRouter";
+import { setupPublicTermsRoutes } from "../publicTermsRouter";
 import { setupPublicLogoUploadRoutes, setupAuthenticatedLogoUploadRoutes } from "../logoUploadRouter";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 import { runMigrations } from "../migrations";
@@ -58,6 +59,7 @@ async function startServer() {
 
   setupRestaurantOnboardingRoutes(app);
   setupPublicSigningRoutes(app);
+  setupPublicTermsRoutes(app);
   setupPublicLogoUploadRoutes(app);
   registerObjectStorageRoutes(app);
 
