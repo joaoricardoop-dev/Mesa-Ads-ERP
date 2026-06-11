@@ -2039,6 +2039,28 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
         ON CONFLICT ("slug") DO NOTHING;
     `,
   },
+  {
+    // Fonte única do "Termo de Contratação de Campanha Publicitária".
+    // Antes da introdução do slug, esse termo existia como template genérico
+    // (sem slug, requiredFor=["anunciante"]). Ao adicionar o sistema de slug,
+    // foi semeada uma SEGUNDA linha (slug=contratacao-campanha) — a canônica,
+    // usada na página pública, no fluxo de assinatura e em todos os PDFs de
+    // proposta/OS. A linha antiga sem slug ficou órfã (nenhum fluxo a consome:
+    // o portal/onboarding do anunciante não busca term_templates) e apenas
+    // duplicava o documento na tela "Termos Padrão".
+    // Remove a duplicata órfã SOMENTE quando o conteúdo é byte-idêntico ao da
+    // linha canônica (md5), garantindo zero perda de conteúdo: se divergirem
+    // em algum ambiente, nada é apagado. Idempotente.
+    name: "dedupe_campaign_term_single_source",
+    sql: `
+      DELETE FROM "term_templates" dup
+      USING "term_templates" canon
+      WHERE canon."slug" = 'contratacao-campanha'
+        AND dup."slug" IS NULL
+        AND lower(dup."title") = lower(canon."title")
+        AND md5(dup."content") = md5(canon."content");
+    `,
+  },
 ];
 
 export async function runMigrations() {
