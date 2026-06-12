@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
 import { generateProposalPdf } from "@/lib/generate-proposal-pdf";
-import { assembleProposalData } from "@shared/proposalData";
+import { assembleProposalData, buildProposalSignature, buildOSSignature } from "@shared/proposalData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,12 +106,51 @@ function OSActionButton({ quotationId, quotationNumber, clientName, clientCompan
     concluida: "OS Concluída",
   };
 
+  const downloadOSPdf = () => {
+    if (!os) return;
+    generateOSPdf({
+      orderNumber: os.orderNumber,
+      quotationNumber,
+      type: os.type,
+      clientName,
+      clientCompany,
+      coasterVolume,
+      totalValue: totalValue || os.totalValue || undefined,
+      paymentTerms: os.paymentTerms || undefined,
+      periodStart: os.periodStart || undefined,
+      periodEnd: os.periodEnd || undefined,
+      description: os.description || undefined,
+      restaurants: restaurants.map((r: any) => ({
+        name: r.restaurantName || `Restaurante #${r.restaurantId}`,
+        coasterQuantity: r.coasterQuantity,
+      })),
+      signature: buildOSSignature({
+        signedAt: (os as any).signedAt,
+        signedByName: (os as any).signedByName,
+        signedByCpf: (os as any).signedByCpf,
+        signatureHash: (os as any).signatureHash,
+      }),
+    }).catch(() => toast.error("Erro ao gerar PDF da OS"));
+  };
+
   if (os.status === "assinada" || os.status === "execucao" || os.status === "concluida") {
     return (
-      <Badge variant="outline" className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">
-        <CheckCircle2 className="w-3 h-3 mr-1" />
-        {osStatusLabels[os.status] || os.status}
-      </Badge>
+      <div className="flex items-center gap-1">
+        <Badge variant="outline" className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">
+          <CheckCircle2 className="w-3 h-3 mr-1" />
+          {osStatusLabels[os.status] || os.status}
+        </Badge>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-emerald-400 hover:text-emerald-300 gap-1"
+          onClick={downloadOSPdf}
+          title="Baixar OS assinada em PDF"
+        >
+          <Download className="w-3.5 h-3.5" />
+          PDF
+        </Button>
+      </div>
     );
   }
 
@@ -121,27 +160,7 @@ function OSActionButton({ quotationId, quotationNumber, clientName, clientCompan
         variant="ghost"
         size="sm"
         className="h-7 text-xs text-amber-400 hover:text-amber-300 gap-1"
-        onClick={() => {
-          if (os) {
-            generateOSPdf({
-              orderNumber: os.orderNumber,
-              quotationNumber,
-              type: os.type,
-              clientName,
-              clientCompany,
-              coasterVolume,
-              totalValue: totalValue || os.totalValue || undefined,
-              paymentTerms: os.paymentTerms || undefined,
-              periodStart: os.periodStart || undefined,
-              periodEnd: os.periodEnd || undefined,
-              description: os.description || undefined,
-              restaurants: restaurants.map((r: any) => ({
-                name: r.restaurantName || `Restaurante #${r.restaurantId}`,
-                coasterQuantity: r.coasterQuantity,
-              })),
-            }).catch(() => toast.error("Erro ao gerar PDF da OS"));
-          }
-        }}
+        onClick={downloadOSPdf}
         title="Baixar OS em PDF"
       >
         <Download className="w-3.5 h-3.5" />
@@ -780,7 +799,8 @@ export default function Quotations() {
                                   utils.quotation.getRestaurants.fetch({ quotationId: q.id }),
                                   utils.quotation.listItems.fetch({ quotationId: q.id }),
                                 ]);
-                                await generateProposalPdf(assembleProposalData({
+                                await generateProposalPdf({
+                                  ...assembleProposalData({
                                   quotation: {
                                     clientName: q.clientName,
                                     clientCompany: q.clientCompany,
@@ -825,7 +845,16 @@ export default function Quotations() {
                                     totalPrice: item.totalPrice,
                                     notes: item.notes,
                                   })),
-                                }));
+                                }),
+                                  // Cotação assinada/"win" → embute o registro de
+                                  // assinatura. Origem única: quotation.list
+                                  // (signedAt/signedBy/signatureData) via buildProposalSignature.
+                                  signature: buildProposalSignature({
+                                    signedAt: (q as any).signedAt,
+                                    signedBy: (q as any).signedBy,
+                                    signatureData: (q as any).signatureData,
+                                  }),
+                                });
                                 toast.success("PDF da proposta gerado!");
                               } catch {
                                 toast.error("Erro ao gerar PDF da proposta");

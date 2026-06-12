@@ -5,7 +5,7 @@ import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { generateOSPdf } from "@/lib/generate-os-pdf";
 import { generateProposalPdf } from "@/lib/generate-proposal-pdf";
-import { assembleProposalData } from "@shared/proposalData";
+import { assembleProposalData, buildProposalSignature, buildOSSignature } from "@shared/proposalData";
 import { computeProposalLinePrices } from "@shared/proposal-line-pricing";
 import { BillingScheduleSection, ReadonlySchedule } from "@/components/billing/BillingScheduleSection";
 import { BillingScheduleHistory } from "@/components/billing/BillingScheduleHistory";
@@ -229,27 +229,13 @@ export default function QuotationDetail() {
       const billingScheduleData = await utils.billingSchedule.getForQuotation.fetch({ quotationId }).catch(() => [] as any[]);
 
       // Cotação convertida/assinada → embute o registro de assinatura do cliente
-      // no mesmo PDF da proposta. Origem única: quotations.signedAt/signedBy/signatureData.
-      let signature:
-        | { signerName: string; signerCpf?: string; signedAt: string; signatureHash?: string; ip?: string }
-        | undefined;
-      const sigRaw = (quotation as any).signatureData;
-      const signedDate = quotation.signedAt ? new Date(quotation.signedAt as any) : null;
-      if (signedDate && !Number.isNaN(signedDate.getTime()) && sigRaw) {
-        const signedAtIso = signedDate.toISOString();
-        try {
-          const parsed = JSON.parse(sigRaw);
-          signature = {
-            signerName: parsed.name || (quotation as any).signedBy || "Cliente",
-            signerCpf: parsed.cpf || undefined,
-            signedAt: signedAtIso,
-            signatureHash: parsed.hash || undefined,
-            ip: parsed.ip || undefined,
-          };
-        } catch {
-          signature = { signerName: (quotation as any).signedBy || "Cliente", signedAt: signedAtIso };
-        }
-      }
+      // no mesmo PDF da proposta. Origem única: quotations.signedAt/signedBy/signatureData
+      // (montado pelo helper canônico buildProposalSignature).
+      const signature = buildProposalSignature({
+        signedAt: quotation.signedAt as any,
+        signedBy: (quotation as any).signedBy,
+        signatureData: (quotation as any).signatureData,
+      });
 
       await generateProposalPdf({
         ...assembleProposalData({
@@ -800,6 +786,12 @@ export default function QuotationDetail() {
                               name: r.restaurantName || `Restaurante #${r.restaurantId}`,
                               coasterQuantity: r.coasterQuantity,
                             })),
+                            signature: buildOSSignature({
+                              signedAt: (os as any).signedAt,
+                              signedByName: (os as any).signedByName,
+                              signedByCpf: (os as any).signedByCpf,
+                              signatureHash: (os as any).signatureHash,
+                            }),
                           }).catch(() => toast.error("Erro ao gerar PDF da OS"));
                         }}
                       >

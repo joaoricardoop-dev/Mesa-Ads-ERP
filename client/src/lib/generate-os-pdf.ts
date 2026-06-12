@@ -4,11 +4,16 @@ import autoTable from "jspdf-autotable";
 import {
   PDF_FONT as FONT_NAME,
   PDF_COLORS,
+  GREEN,
+  BLACK,
+  DARK_GRAY,
+  GRAY,
   registerPdfFonts,
   drawPdfHeader,
 } from "./pdf-branding";
 import { PROPOSAL_BINDING_CLAUSE_PREFIX, CAMPAIGN_TERM_BINDING_CLAUSE_PREFIX } from "@shared/const";
 import { fetchContractLinks } from "./contract-links";
+import type { ProposalSignature } from "@shared/proposalData";
 
 const TYPE_SUBTITLE: Record<string, string> = {
   anunciante:  "ORDEM DE SERVIÇO — ANUNCIANTE",
@@ -32,6 +37,13 @@ interface OSPDFData {
     name: string;
     coasterQuantity: number;
   }>;
+  /**
+   * Registro de assinatura digital — presente apenas para OSs assinadas.
+   * Origem única: service_orders.signedByName/signedByCpf/signedAt/signatureHash
+   * (montado por buildOSSignature). Quando presente, o PDF mostra o registro
+   * em vez das linhas de assinatura manual "Anunciante / Mesa Ads".
+   */
+  signature?: ProposalSignature;
 }
 
 export async function generateOSPdf(data: OSPDFData) {
@@ -150,22 +162,82 @@ export async function generateOSPdf(data: OSPDFData) {
   drawClauseWithLink(CAMPAIGN_TERM_BINDING_CLAUSE_PREFIX, campaignTermUrl);
 
   y += 8;
-  if (y > pageHeightT - 40) {
-    doc.addPage();
-    y = 20;
-  }
-  doc.setDrawColor(200, 200, 200);
-  doc.line(20, y, 90, y);
-  doc.line(pageWidth - 90, y, pageWidth - 20, y);
-  y += 6;
-  doc.setFontSize(8);
-  doc.setFont(FONT_NAME, "normal");
-  doc.text("Anunciante", 55, y, { align: "center" });
-  doc.text("Mesa Ads", pageWidth - 55, y, { align: "center" });
+  const margin = 20;
+  const contentWidthSig = pageWidth - margin * 2;
+  if (data.signature) {
+    // OS assinada: registra a assinatura digital em vez das linhas manuais.
+    // Espelha o bloco do generate-proposal-pdf.ts. Origem única: buildOSSignature.
+    if (y > pageHeightT - 60) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setDrawColor(...GREEN);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 8;
 
-  y += 12;
-  doc.text(`Data: ____/____/________`, 20, y);
-  doc.text(`Local: ________________________`, pageWidth / 2, y);
+    doc.setFontSize(11);
+    doc.setFont(FONT_NAME, "bold");
+    doc.setTextColor(...BLACK);
+    doc.text("REGISTRO DE ASSINATURA DIGITAL", margin, y);
+    y += 7;
+
+    const signedDateStr = new Date(data.signature.signedAt).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const sigRows: Array<[string, string]> = [["Assinado por:", data.signature.signerName]];
+    if (data.signature.signerCpf) sigRows.push(["CPF:", data.signature.signerCpf]);
+    sigRows.push(["Data/Hora:", signedDateStr]);
+    if (data.signature.ip) sigRows.push(["IP:", data.signature.ip]);
+
+    doc.setFontSize(9);
+    for (const [label, value] of sigRows) {
+      doc.setFont(FONT_NAME, "bold");
+      doc.setTextColor(...DARK_GRAY);
+      doc.text(label, margin, y);
+      doc.setFont(FONT_NAME, "normal");
+      doc.text(value, margin + 32, y);
+      y += 6;
+    }
+
+    if (data.signature.signatureHash) {
+      y += 1;
+      doc.setFontSize(7.5);
+      doc.setFont(FONT_NAME, "normal");
+      doc.setTextColor(...GRAY);
+      doc.text(`Verificação (SHA-256): ${data.signature.signatureHash}`, margin, y, { maxWidth: contentWidthSig });
+      y += 5;
+    }
+
+    doc.setFontSize(7.5);
+    doc.setFont(FONT_NAME, "normal");
+    doc.setTextColor(...GRAY);
+    doc.text("Assinado digitalmente via plataforma mesa.ads.", margin, y, { maxWidth: contentWidthSig });
+  } else {
+    if (y > pageHeightT - 40) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.2);
+    doc.line(20, y, 90, y);
+    doc.line(pageWidth - 90, y, pageWidth - 20, y);
+    y += 6;
+    doc.setFontSize(8);
+    doc.setFont(FONT_NAME, "normal");
+    doc.setTextColor(0, 0, 0);
+    doc.text("Anunciante", 55, y, { align: "center" });
+    doc.text("Mesa Ads", pageWidth - 55, y, { align: "center" });
+
+    y += 12;
+    doc.text(`Data: ____/____/________`, 20, y);
+    doc.text(`Local: ________________________`, pageWidth / 2, y);
+  }
 
   const pageHeight = doc.internal.pageSize.getHeight();
   doc.setFontSize(7);

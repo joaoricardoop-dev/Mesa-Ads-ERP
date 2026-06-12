@@ -86,6 +86,63 @@ export interface ProposalPDFData {
   signature?: ProposalSignature;
 }
 
+/**
+ * Monta o registro de assinatura digital de uma COTAÇÃO a partir da fonte
+ * única `quotations.signatureData` (JSON: name, cpf, ip, hash) + `signedAt` +
+ * `signedBy`. Retorna `undefined` quando não houver assinatura — nesse caso o
+ * PDF mantém as linhas de assinatura manual. Regra: só monta quando `signedAt`
+ * E `signatureData` existem.
+ */
+export function buildProposalSignature(input: {
+  signedAt?: string | Date | null;
+  signedBy?: string | null;
+  signatureData?: string | null;
+}): ProposalSignature | undefined {
+  const { signedAt, signedBy, signatureData } = input;
+  if (!signedAt || !signatureData) return undefined;
+  const signedDate = signedAt instanceof Date ? signedAt : new Date(signedAt);
+  if (Number.isNaN(signedDate.getTime())) return undefined;
+  const signedAtIso = signedDate.toISOString();
+  try {
+    const parsed = JSON.parse(signatureData);
+    return {
+      signerName: parsed.name || signedBy || "Cliente",
+      signerCpf: parsed.cpf || undefined,
+      signedAt: signedAtIso,
+      signatureHash: parsed.hash || undefined,
+      ip: parsed.ip || undefined,
+    };
+  } catch {
+    return { signerName: signedBy || "Cliente", signedAt: signedAtIso };
+  }
+}
+
+/**
+ * Monta o registro de assinatura digital de uma ORDEM DE SERVIÇO a partir da
+ * fonte única `service_orders.signedByName` / `signedByCpf` / `signedAt` (+
+ * `signatureHash`, que é o mesmo hash do `signatureData` da cotação ligada,
+ * gravado na OS no momento da assinatura). Retorna `undefined` quando a OS não
+ * estiver assinada — nesse caso o PDF mantém as linhas manuais. Regra: só monta
+ * quando `signedAt` E `signedByName` existem.
+ */
+export function buildOSSignature(input: {
+  signedAt?: string | Date | null;
+  signedByName?: string | null;
+  signedByCpf?: string | null;
+  signatureHash?: string | null;
+}): ProposalSignature | undefined {
+  const { signedAt, signedByName, signedByCpf, signatureHash } = input;
+  if (!signedAt || !signedByName) return undefined;
+  const signedDate = signedAt instanceof Date ? signedAt : new Date(signedAt);
+  if (Number.isNaN(signedDate.getTime())) return undefined;
+  return {
+    signerName: signedByName,
+    signerCpf: signedByCpf || undefined,
+    signedAt: signedDate.toISOString(),
+    signatureHash: signatureHash || undefined,
+  };
+}
+
 /** Linhas cruas (saved) que alimentam o assembler. */
 export interface AssembleProposalInput {
   quotation: {
