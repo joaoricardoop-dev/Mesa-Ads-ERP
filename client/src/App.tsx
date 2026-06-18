@@ -321,6 +321,11 @@ function ClerkLoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">(() => {
     if (typeof window === "undefined") return "signin";
     const params = new URLSearchParams(window.location.search);
+    // Convite do Clerk: o link traz `__clerk_ticket` (e geralmente
+    // `__clerk_status=sign_up`). O usuário convidado ainda não tem conta, então
+    // precisamos renderizar o <SignUp> — caso contrário o <SignIn> rejeita o
+    // ticket com "This invitation refers to a non-existing identification".
+    if (params.has("__clerk_ticket")) return "signup";
     return params.get("mode") === "signup" ? "signup" : "signin";
   });
   const redirectTo = (() => {
