@@ -184,6 +184,7 @@ vi.mock("../db", () => ({
 import { appRouter } from "../routers";
 import { scheduleInvoicesForCampaign } from "./scheduleInvoices";
 import type { TrpcContext } from "../_core/context";
+import { campaigns, quotations } from "../../drizzle/schema";
 
 type MockedScheduler = ReturnType<typeof vi.fn> & typeof scheduleInvoicesForCampaign;
 const scheduleSpy = scheduleInvoicesForCampaign as unknown as MockedScheduler;
@@ -339,5 +340,127 @@ describe("quotation.markWin auto-schedule", () => {
         endDate: "2026-06-01",
       }),
     ).rejects.toThrow(/schedule blew up/);
+  });
+});
+
+// Task #287 — conversão de cotação nascida de lead (sem clientId direto).
+// Cobre a integração de resolveQuotationClientId nos fluxos internos: o caminho
+// feliz (campanha criada + clientId gravado de volta) e o erro amigável
+// (BAD_REQUEST em vez de erro de banco) quando não há como resolver o cliente.
+describe("quotation conversion without a direct client (lead-based)", () => {
+  it("markWin resolves a lead-based quotation: creates campaign and writes clientId back", async () => {
+    const fake = dbHolder.current;
+    // 1) quotation lookup — clientId NULL, leadId set (nasceu de lead).
+    fake.queueSelect([
+      {
+        id: 9101,
+        quotationNumber: "QOT-2026-0101",
+        clientId: null,
+        leadId: 555,
+        cycles: 2,
+        coasterVolume: 3000,
+        notes: null,
+        isBonificada: true, // pula schedule e autoCreateInvoice
+        productId: null,
+        totalValue: "0",
+        status: "ativa",
+      },
+    ]);
+    // 2) resolveQuotationClientId → busca o lead.
+    fake.queueSelect([
+      { id: 555, name: "Lead Co", company: "Lead Co", cnpj: null, contactEmail: "lead@co.com", contactPhone: null },
+    ]);
+    // 3) resolveQuotationClientId → cliente existente casado por e-mail (reuso).
+    fake.queueSelect([{ id: 77 }]);
+    // 4) lookup do nome do cliente para nomear a campanha.
+    fake.queueSelect([{ name: "Lead Co" }]);
+    fake.queueExecute([{ next_value: 10 }]); // generateCampaignNumber
+    fake.queueSelect([]); // quotationItems → sem itens compartilhados
+
+    const caller = appRouter.createCaller(makeComercialContext());
+    const result = await caller.quotation.markWin({
+      id: 9101,
+      startDate: "2026-05-01",
+      endDate: "2026-08-01",
+    });
+
+    expect(result.quotationId).toBe(9101);
+
+    // Campanha criada com o clientId resolvido (77).
+    const campaignInserts = fake.inserted.get(campaigns) as Array<{ clientId: number }> | undefined;
+    expect(campaignInserts).toBeDefined();
+    expect(campaignInserts).toHaveLength(1);
+    expect(campaignInserts![0].clientId).toBe(77);
+
+    // clientId gravado de volta na cotação (writeback do resolver).
+    const quotationUpdates = fake.updates
+      .filter((u) => u.table === quotations)
+      .map((u) => u.set as Record<string, unknown>);
+    expect(quotationUpdates.some((s) => s.clientId === 77)).toBe(true);
+    // E a cotação foi marcada como "win".
+    expect(quotationUpdates.some((s) => s.status === "win")).toBe(true);
+  });
+
+  it("markWin throws a friendly BAD_REQUEST (not a DB error) when there is no client and no lead", async () => {
+    const fake = dbHolder.current;
+    fake.queueSelect([
+      {
+        id: 9102,
+        quotationNumber: "QOT-2026-0102",
+        clientId: null,
+        leadId: null,
+        cycles: 1,
+        coasterVolume: 1000,
+        notes: null,
+        isBonificada: true,
+        productId: null,
+        totalValue: "0",
+        status: "ativa",
+      },
+    ]);
+
+    const caller = appRouter.createCaller(makeComercialContext());
+    await expect(
+      caller.quotation.markWin({ id: 9102, startDate: "2026-05-01", endDate: "2026-06-01" }),
+    ).rejects.toThrow(/cliente vinculado/i);
+
+    // Nenhuma campanha deve ser inserida — falhou antes do INSERT NOT NULL.
+    expect(fake.inserted.get(campaigns)).toBeUndefined();
+  });
+
+  it("signOS throws a friendly BAD_REQUEST (not a DB error) when there is no client and no lead", async () => {
+    const fake = dbHolder.current;
+    // 1) quotation (status os_gerada, bonificada para pular schedule), sem cliente/lead.
+    fake.queueSelect([
+      {
+        id: 9103,
+        quotationNumber: "QOT-2026-0103",
+        clientId: null,
+        leadId: null,
+        coasterVolume: 1000,
+        notes: null,
+        isBonificada: true,
+        productId: null,
+        totalValue: "0",
+        status: "os_gerada",
+      },
+    ]);
+    // 2) restaurantes alocados (precisa ser não-vazio).
+    fake.queueSelect([{ id: 1, commissionPercent: "20", coasterQuantity: 1000 }]);
+    // 3) batches (precisa casar com input.batchIds.length === 1).
+    fake.queueSelect([{ id: 1, startDate: "2026-05-01", endDate: "2026-05-28" }]);
+    // 4) service order (precisa existir).
+    fake.queueSelect([{ id: 50 }]);
+
+    const caller = appRouter.createCaller(makeComercialContext());
+    await expect(
+      caller.quotation.signOS({
+        quotationId: 9103,
+        signatureUrl: "data:image/png;base64,AAAA",
+        batchIds: [1],
+      }),
+    ).rejects.toThrow(/cliente vinculado/i);
+
+    expect(fake.inserted.get(campaigns)).toBeUndefined();
   });
 });
