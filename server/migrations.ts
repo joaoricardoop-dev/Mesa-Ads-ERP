@@ -2063,6 +2063,22 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
         AND md5(dup."content") = md5(canon."content");
     `,
   },
+  {
+    // Remove as colunas legadas `irpj` / `comRestaurante` / `comComercial`
+    // de `products`. Desde a centralização das premissas (system_config),
+    // essas colunas eram somente leitura/legado e nenhum caminho de cálculo
+    // as consome — todas as alíquotas (IRPJ, comissões) vêm de system_config
+    // (fonte única). Mantê-las só convidava um futuro contribuidor a
+    // re-cabeá-las como fonte de preço, divergindo da fonte canônica.
+    // `IF EXISTS` torna a migration idempotente / no-op em bancos que já
+    // não têm as colunas (ex.: banco de teste E2E recriado após esta migration).
+    name: "drop_legacy_product_premissa_columns",
+    sql: `
+      ALTER TABLE "products" DROP COLUMN IF EXISTS "irpj";
+      ALTER TABLE "products" DROP COLUMN IF EXISTS "comRestaurante";
+      ALTER TABLE "products" DROP COLUMN IF EXISTS "comComercial";
+    `,
+  },
 ];
 
 /**

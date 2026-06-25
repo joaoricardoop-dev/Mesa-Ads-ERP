@@ -384,7 +384,6 @@ export interface PhaseItemLike {
   totalPrice?: string | number | null;
   productionCost?: string | number;
   freightCost?: string | number;
-  productIrpj?: string | number | null;
   vipProviderRepassePercent?: string | number | null;
   productVipProviderCommissionPercent?: string | number | null;
   vipProviderId?: number | null;

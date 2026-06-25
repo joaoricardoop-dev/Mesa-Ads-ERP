@@ -1365,9 +1365,6 @@ export const quotationRouter = router({
       const productRows = await db.select({
         id: products.id,
         name: products.name,
-        irpj: products.irpj,
-        comRestaurante: products.comRestaurante,
-        comComercial: products.comComercial,
         pricingMode: products.pricingMode,
         isActive: products.isActive,
         visibleToPartners: products.visibleToPartners,
