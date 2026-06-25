@@ -106,9 +106,6 @@ interface ProductListItem {
   tipo?: string | null;
   pricingMode?: PricingMode | null;
   entryType?: EntryType | null;
-  irpj?: string | null;
-  comRestaurante?: string | null;
-  comComercial?: string | null;
   defaultSemanas?: number | null;
   isActive?: boolean | null;
   description?: string | null;

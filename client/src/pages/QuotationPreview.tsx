@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useSimulator, type BudgetOption, type ProductTier, type ProductParams, loadSavedBudgetId } from "@/hooks/useSimulator";
+import { useSimulator, type BudgetOption, type ProductTier, type SimulatorPremissas, loadSavedBudgetId } from "@/hooks/useSimulator";
 import { useRestaurantAllocation, type AllocationEntry } from "@/hooks/useRestaurantAllocation";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -195,12 +195,12 @@ export default function QuotationPreview() {
   );
 
   const tiersForSimulator = typedProductTiers.length > 0 ? typedProductTiers : undefined;
-  const paramsForSimulator: ProductParams | undefined = selectedProduct ? {
-    irpj: String(sysPremissas.irpj),
-    comRestaurante: String(sysPremissas.comissaoRestaurante),
-    comComercial: String(sysPremissas.comissaoComercial),
+  const premissasForSimulator: SimulatorPremissas | undefined = selectedProduct ? {
+    irpj: sysPremissas.irpj,
+    comissaoRestaurante: sysPremissas.comissaoRestaurante,
+    comissaoComercial: sysPremissas.comissaoComercial,
   } : undefined;
-  const simulatorBase = useSimulator(selectedBudget, undefined, tiersForSimulator, paramsForSimulator);
+  const simulatorBase = useSimulator(selectedBudget, undefined, tiersForSimulator, undefined, undefined, undefined, undefined, premissasForSimulator);
   const totalCoasters = simulatorBase.inputs.coastersPerRestaurant * simulatorBase.inputs.activeRestaurants;
 
   const allocation = useRestaurantAllocation(restaurantsForAllocation, totalCoasters);
@@ -220,7 +220,7 @@ export default function QuotationPreview() {
     return Math.round(sum / allocated.length);
   }, [isTelasProduct, allocation.hasAllocations, allocation.allocations, restaurantsForAllocation]);
 
-  const simulator = useSimulator(selectedBudget, allocCommission, tiersForSimulator, paramsForSimulator, isTelasProduct ? selectedProduct?.tipo : undefined, avgMonthlyCustomersForSimulator);
+  const simulator = useSimulator(selectedBudget, allocCommission, tiersForSimulator, undefined, isTelasProduct ? selectedProduct?.tipo : undefined, avgMonthlyCustomersForSimulator, undefined, premissasForSimulator);
   const pr = simulator.perRestaurant;
   const ue = simulator.unitEconomics;
   const inputs = simulator.inputs;

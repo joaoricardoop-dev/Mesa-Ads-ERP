@@ -110,10 +110,13 @@ export interface ProductPricingTier {
 export type ProductTier = ProductPricingTier;
 
 export interface ProductParams {
-  irpj: string;
-  comRestaurante: string;
-  comComercial: string;
   pricingMode?: string | null;
+}
+
+export interface SimulatorPremissas {
+  irpj: number;
+  comissaoRestaurante: number;
+  comissaoComercial: number;
 }
 
 const STORAGE_KEY = "mesa-ads-simulator-inputs";
@@ -362,24 +365,22 @@ export function useSimulator(
   productTipo?: string | null,
   avgMonthlyCustomers?: number,
   spotSeconds?: 15 | 30 | null,
+  premissas?: SimulatorPremissas,
 ) {
   const [inputs, setInputs] = useState<SimulatorInputs>(loadInputs);
 
   const isPriceBased = productParams?.pricingMode === "price_based";
 
   useEffect(() => {
-    if (productParams) {
-      const irpj = parseFloat(productParams.irpj || "0");
-      const comRest = parseFloat(productParams.comRestaurante || "0");
-      const comCom = parseFloat(productParams.comComercial || "0");
+    if (premissas) {
       setInputs(prev => ({
         ...prev,
-        taxRate: isNaN(irpj) ? prev.taxRate : irpj,
-        restaurantCommission: isNaN(comRest) ? prev.restaurantCommission : comRest,
-        sellerCommission: isNaN(comCom) ? prev.sellerCommission : comCom,
+        taxRate: Number.isFinite(premissas.irpj) ? premissas.irpj : prev.taxRate,
+        restaurantCommission: Number.isFinite(premissas.comissaoRestaurante) ? premissas.comissaoRestaurante : prev.restaurantCommission,
+        sellerCommission: Number.isFinite(premissas.comissaoComercial) ? premissas.comissaoComercial : prev.sellerCommission,
       }));
     }
-  }, [productParams?.irpj, productParams?.comRestaurante, productParams?.comComercial]);
+  }, [premissas?.irpj, premissas?.comissaoRestaurante, premissas?.comissaoComercial]);
 
   useEffect(() => {
     saveInputs(inputs);
