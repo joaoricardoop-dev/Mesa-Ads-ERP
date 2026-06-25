@@ -24,6 +24,7 @@ import { bankRouter } from "./bankRouter";
 import { opsRouter } from "./opsRouter";
 import { comercialDashboardRouter } from "./comercialDashboardRouter";
 import { configOptionRouter } from "./configOptionRouter";
+import { telaRouter } from "./telaRouter";
 import { systemConfigRouter } from "./systemConfigRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, anuncianteProcedure, restauranteProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
@@ -112,6 +113,7 @@ export const appRouter = router({
   ops: opsRouter,
   comercialDashboard: comercialDashboardRouter,
   configOption: configOptionRouter,
+  tela: telaRouter,
   systemConfig: systemConfigRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
@@ -824,6 +826,12 @@ export const appRouter = router({
           dailyLoops: z.number().int().optional().nullable(),
           descricao: z.string().optional(),
           horarioFuncionamento: z.string().optional(),
+          // ── Precificação de telas por CPM (fonte única) ──
+          screenCpm: z.string().optional().nullable(),
+          screenInsertionsPerHour: z.number().int().optional().nullable(),
+          screenImpactsPerInsertion: z.string().optional().nullable(),
+          screenWeeklyHours: z.string().optional().nullable(),
+          screenExposureSec: z.number().int().optional().nullable(),
         }),
       )
       .mutation(({ input }) => createActiveRestaurant(input)),
@@ -889,6 +897,12 @@ export const appRouter = router({
           dailyLoops: z.number().int().optional().nullable(),
           descricao: z.string().optional(),
           horarioFuncionamento: z.string().optional(),
+          // ── Precificação de telas por CPM (fonte única) ──
+          screenCpm: z.string().optional().nullable(),
+          screenInsertionsPerHour: z.number().int().optional().nullable(),
+          screenImpactsPerInsertion: z.string().optional().nullable(),
+          screenWeeklyHours: z.string().optional().nullable(),
+          screenExposureSec: z.number().int().optional().nullable(),
         }),
       )
       .mutation(({ input }) => {

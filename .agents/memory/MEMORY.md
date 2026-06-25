@@ -7,3 +7,4 @@
 - [Single source of truth](config-options-single-source.md) — one datum = one origin; search before creating, derive from one canonical fn read by all screens/PDF, no recompute, extract shared. Includes config_options (loss reasons + origin categories DB-backed) instance.
 - [Proposal per-line pricing](proposal-line-pricing.md) — per-line proposal prices come from computeProposalLinePrices (shared); never recompute BV scale inline; cents close via largest-remainder.
 - [Proposal/OS PDF assembler](proposal-pdf-assembler.md) — assembleProposalData (shared) is the only builder for generateProposalPdf data; never re-parse notes or recompute monthly/per-rest inline.
+- [Builder pricing dual-path](builder-pricing-dual-path.md) — checkout sends no per-line price; client quotePrice is display-only, server createFromBuilder is the real price; apply new pricing rules in BOTH.

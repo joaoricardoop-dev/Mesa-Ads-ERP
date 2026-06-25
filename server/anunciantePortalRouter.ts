@@ -14,7 +14,9 @@ import {
   campaignPhases,
   campaigns,
   campaignDrafts,
+  telas,
 } from "../drizzle/schema";
+import { parseTelaPhotoUrls } from "./telaRouter";
 import { and, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
@@ -309,12 +311,38 @@ export const anunciantePortalRouter = router({
           monthlyCustomers: activeRestaurants.monthlyCustomers,
           ratingScore: activeRestaurants.ratingScore,
           ratingTier: activeRestaurants.ratingTier,
+          screenCpm: activeRestaurants.screenCpm,
+          screenInsertionsPerHour: activeRestaurants.screenInsertionsPerHour,
+          screenImpactsPerInsertion: activeRestaurants.screenImpactsPerInsertion,
+          screenWeeklyHours: activeRestaurants.screenWeeklyHours,
+          screenExposureSec: activeRestaurants.screenExposureSec,
         })
         .from(activeRestaurants)
         .where(and(eq(activeRestaurants.status, "active"), inArray(activeRestaurants.id, ids)));
 
       if (restaurantRows.length === 0) return [];
       const allowedIds = new Set(restaurantRows.map((r) => r.id));
+
+      // Fotos das telas ativas (exibidas no ecommerce junto do local).
+      const telaRows = await db
+        .select({
+          restaurantId: telas.restaurantId,
+          nome: telas.nome,
+          photoUrls: telas.photoUrls,
+        })
+        .from(telas)
+        .where(
+          and(eq(telas.status, "active"), inArray(telas.restaurantId, Array.from(allowedIds))),
+        );
+
+      const photosByRestaurant = new Map<number, string[]>();
+      for (const t of telaRows) {
+        const urls = parseTelaPhotoUrls(t.photoUrls);
+        if (urls.length === 0) continue;
+        const arr = photosByRestaurant.get(t.restaurantId) ?? [];
+        arr.push(...urls);
+        photosByRestaurant.set(t.restaurantId, arr);
+      }
 
       const slotRows = await db
         .select({
@@ -422,6 +450,16 @@ export const anunciantePortalRouter = router({
           },
           excludedCategories: excluded,
           categoryConflict: hasCategoryConflict(excluded, input.category),
+          photoUrls: photosByRestaurant.get(r.id) ?? [],
+          // Config de precificação CPM da tela (fonte única: shared/cpm-pricing.ts).
+          // Telas só têm preço quando estes campos estão completos.
+          screenCpm: {
+            cpm: r.screenCpm != null ? parseFloat(r.screenCpm) : null,
+            insertionsPerHour: r.screenInsertionsPerHour ?? null,
+            impactsPerInsertion: r.screenImpactsPerInsertion != null ? parseFloat(r.screenImpactsPerInsertion) : null,
+            weeklyHours: r.screenWeeklyHours != null ? parseFloat(r.screenWeeklyHours) : null,
+            exposureSec: r.screenExposureSec ?? null,
+          },
           products: productList,
         };
       });

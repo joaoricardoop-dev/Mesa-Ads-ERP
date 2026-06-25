@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 
-export type ConfigOptionType = "loss_reason" | "origin_category";
+export type ConfigOptionType = "loss_reason" | "origin_category" | "screen_category";
 
 /**
  * Hook único para ler as listas paramétricas (config_options) compartilhadas

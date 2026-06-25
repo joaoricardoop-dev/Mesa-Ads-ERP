@@ -11,7 +11,7 @@ async function getDatabase() {
   return d;
 }
 
-export const CONFIG_OPTION_TYPES = ["loss_reason", "origin_category"] as const;
+export const CONFIG_OPTION_TYPES = ["loss_reason", "origin_category", "screen_category"] as const;
 export type ConfigOptionType = (typeof CONFIG_OPTION_TYPES)[number];
 
 const typeSchema = z.enum(CONFIG_OPTION_TYPES);

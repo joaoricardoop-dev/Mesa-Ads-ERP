@@ -74,6 +74,7 @@ import {
   MapPin,
   ClipboardList,
   Layers,
+  Monitor,
   Eye,
   Package,
   ChevronsUpDown,
@@ -170,6 +171,7 @@ const NAV_ENTRIES: NavEntry[] = [
     label: "Locais",
     items: [
       { icon: UtensilsCrossed, label: "Lista", path: "/restaurantes" },
+      { icon: Monitor, label: "Telas", path: "/restaurantes/telas" },
       { icon: MapPin, label: "Mapa", path: "/restaurantes/mapa" },
     ],
   },

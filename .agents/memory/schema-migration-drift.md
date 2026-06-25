@@ -30,3 +30,14 @@ column declared in `drizzle/schema.ts` (via Drizzle introspection —
 `getTableColumns`/`getTableName`). Any column in `schema.ts` but missing from
 the fresh DB fails the test naming the exact `table.column`. Run it with
 `pnpm exec playwright test e2e/migrations-fresh-db.spec.ts`.
+
+**Corollary — migrations that READ drifted columns also break.** If a new
+migration's `INSERT ... SELECT` reads columns that only ever lived in `schema.ts`
+(never migrated), it fails at runtime with `column ... does not exist` on any DB
+that drifted. The `active_restaurants` embedded screen fields (`categoria`,
+`screen_dimensions`, `screen_layout`, `cms_screen_id`, `spot_duration`,
+`loop_duration`, `daily_loops`, `descricao`, `horario_funcionamento`) were such a
+case. Fix pattern: prepend `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for every
+source column inside the same migration before the SELECT — this preserves real
+data where it exists and creates empty columns where the DB drifted, in one
+idempotent step.

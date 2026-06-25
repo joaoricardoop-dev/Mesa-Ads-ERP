@@ -43,6 +43,15 @@ export interface CartItem {
   cycles: number; // número de ciclos de 4 semanas
   cycleWeeks: number; // tipicamente 4
   volume: number; // produção (qty) por ciclo
+  productTipo?: string | null; // discrimina telas (precificação por CPM)
+  // Config de CPM do local (snapshot p/ telas). Fonte única do cálculo:
+  // shared/cpm-pricing.ts. Null quando o local não tem CPM configurado.
+  screenCpm?: {
+    cpm: number | null;
+    insertionsPerHour: number | null;
+    impactsPerInsertion: number | null;
+    weeklyHours: number | null;
+  } | null;
   estimatedUnitPrice?: number | null; // preço estimado por unidade (UI)
   estimatedTotal?: number | null; // total estimado para todos os ciclos
 }

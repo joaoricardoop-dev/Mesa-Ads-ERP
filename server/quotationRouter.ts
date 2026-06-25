@@ -91,6 +91,7 @@ async function generateOSNumber(db: any) {
 // ser testado isoladamente em vitest. Para a regra "tela vs bolacha" no
 // slice custom-digital, ver `calcCustomVipRepasse` + `materializeCustomVipRepasse`.
 import { computeQuotationCommissionMix } from "./finance/calc";
+import { computeCpmPricing } from "../shared/cpm-pricing";
 
 export const quotationRouter = router({
   list: protectedProcedure
@@ -1365,6 +1366,7 @@ export const quotationRouter = router({
       const productRows = await db.select({
         id: products.id,
         name: products.name,
+        tipo: products.tipo,
         pricingMode: products.pricingMode,
         isActive: products.isActive,
         visibleToPartners: products.visibleToPartners,
@@ -1399,6 +1401,34 @@ export const quotationRouter = router({
         .where(inArray(seasonalMultipliers.productId, productIds));
 
       const venueIdSet = new Set<number>(input.venueIds ?? []);
+
+      // Config de precificação CPM por local (fonte única: shared/cpm-pricing.ts).
+      // Telas são precificadas EXCLUSIVAMENTE por CPM; sem config → erro explícito.
+      const itemRestaurantIds = Array.from(
+        new Set(input.items.map((i) => i.restaurantId).filter((v): v is number => v != null)),
+      );
+      const screenCpmRows = itemRestaurantIds.length > 0
+        ? await db.select({
+            id: activeRestaurants.id,
+            cpm: activeRestaurants.screenCpm,
+            iph: activeRestaurants.screenInsertionsPerHour,
+            ipi: activeRestaurants.screenImpactsPerInsertion,
+            wh: activeRestaurants.screenWeeklyHours,
+          })
+          .from(activeRestaurants)
+          .where(inArray(activeRestaurants.id, itemRestaurantIds))
+        : [];
+      const screenCpmMap = new Map(
+        screenCpmRows.map((r) => [
+          r.id,
+          {
+            cpm: r.cpm != null ? parseFloat(r.cpm) : undefined,
+            insertionsPerHour: r.iph ?? undefined,
+            impactsPerInsertion: r.ipi != null ? parseFloat(r.ipi) : undefined,
+            weeklyHours: r.wh != null ? parseFloat(r.wh) : undefined,
+          },
+        ]),
+      );
 
       function pickSeasonalMultiplier(productId: number, periodStart: string | null, periodEnd: string | null): { mult: number; label: string | null } {
         if (!periodStart || !periodEnd) return { mult: 1, label: null };
@@ -1470,6 +1500,37 @@ export const quotationRouter = router({
 
       for (const item of input.items) {
         const prod = productMap.get(item.productId)!;
+
+        // ── Telas: preço EXCLUSIVO por CPM (não usa tiers/markup) ──
+        if ((prod as any).tipo === "telas") {
+          const cpmCfg = item.restaurantId != null ? screenCpmMap.get(item.restaurantId) : undefined;
+          const cpm = computeCpmPricing(cpmCfg);
+          if (!cpm) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `A tela "${prod.name}" não tem precificação CPM configurada no local. Configure o CPM do local antes de cotar.`,
+            });
+          }
+          const finalTotal = cpm.weeklyRevenue * item.weeks;
+          const finalUnitPrice = item.volume > 0 ? finalTotal / item.volume : finalTotal;
+          computedItems.push({
+            productId: item.productId,
+            productName: prod.name,
+            volume: item.volume,
+            weeks: item.weeks,
+            unitPrice: finalUnitPrice,
+            totalPrice: finalTotal,
+            restaurantId: item.restaurantId,
+            shareIndex: item.shareIndex,
+            cycleWeeks: item.cycleWeeks,
+            cycles: item.cycles,
+            startDate: item.startDate ?? null,
+            endDate: item.endDate ?? null,
+            venueId: item.venueId ?? null,
+          });
+          continue;
+        }
+
         const tiers = pricingTiersRows
           .filter(t => t.productId === item.productId)
           .sort((a, b) => a.volumeMin - b.volumeMin);

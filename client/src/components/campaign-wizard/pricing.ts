@@ -3,11 +3,13 @@ import {
   applyDiscountTierAdv,
   DESCONTOS_PRAZO,
 } from "@/lib/campaign-builder-utils";
+import { computeCpmPricing, type ScreenCpmConfig } from "@shared/cpm-pricing";
 
 export interface ProductLite {
   id: number;
   name: string;
   pricingMode: string | null;
+  tipo?: string | null;
 }
 
 /** Premissas globais (system_config): IRPJ/comissões em %, BV em decimal. */
@@ -54,8 +56,22 @@ export function quotePrice(params: {
   weeks: number;
   hasPartner: boolean;
   premissas: QuotePremissas;
+  cpmConfig?: Partial<ScreenCpmConfig> | null;
 }): PriceQuote {
-  const { product, tiers, discountTiers, volume, weeks, hasPartner, premissas } = params;
+  const { product, tiers, discountTiers, volume, weeks, hasPartner, premissas, cpmConfig } = params;
+
+  // ── Telas: precificação EXCLUSIVA por CPM (fonte única: shared/cpm-pricing.ts).
+  // O motor de markup/tiers não se aplica a telas. Sem CPM configurado no local,
+  // a tela não tem preço (retorna zero — exige configuração).
+  if (product.tipo === "telas") {
+    const cpm = computeCpmPricing(cpmConfig);
+    if (!cpm) {
+      return { unitPrice: 0, totalPrice: 0, baseTotal: 0, prazoDiscountPct: 0, volumeDiscountPct: 0 };
+    }
+    const totalPrice = cpm.weeklyRevenue * weeks;
+    const unitPrice = volume > 0 ? totalPrice / volume : totalPrice;
+    return { unitPrice, totalPrice, baseTotal: totalPrice, prazoDiscountPct: 0, volumeDiscountPct: 0 };
+  }
   const sorted = [...tiers].sort((a, b) => a.volumeMin - b.volumeMin);
   const tier =
     sorted.find((t) => volume >= t.volumeMin && (t.volumeMax == null || volume <= t.volumeMax)) ||

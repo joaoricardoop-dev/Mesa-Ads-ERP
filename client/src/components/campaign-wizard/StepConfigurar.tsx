@@ -81,6 +81,17 @@ function ConfigRow({
         id: product.id,
         name: product.name,
         pricingMode: product.pricingMode ?? null,
+        tipo: (product as any).tipo ?? item.productTipo ?? null,
+      }
+    : null;
+
+  const isScreen = productLite?.tipo === "telas";
+  const cpmConfig = item.screenCpm
+    ? {
+        cpm: item.screenCpm.cpm ?? undefined,
+        insertionsPerHour: item.screenCpm.insertionsPerHour ?? undefined,
+        impactsPerInsertion: item.screenCpm.impactsPerInsertion ?? undefined,
+        weeklyHours: item.screenCpm.weeklyHours ?? undefined,
       }
     : null;
 
@@ -89,7 +100,9 @@ function ConfigRow({
   const totalWeeks = item.cycles * item.cycleWeeks;
 
   const estimated = useMemo(() => {
-    if (!productLite || tiers.length === 0) return null;
+    if (!productLite) return null;
+    // Telas precificam por CPM (sem tiers); demais produtos exigem tiers.
+    if (!isScreen && tiers.length === 0) return null;
     return quotePrice({
       product: productLite,
       tiers: tiers as PricingTier[],
@@ -98,8 +111,10 @@ function ConfigRow({
       weeks: totalWeeks,
       hasPartner,
       premissas: { ...sysPremissas, bvAgencia },
+      cpmConfig,
     });
-  }, [productLite, tiers, discountTiers, item.volume, totalWeeks, hasPartner, sysPremissas, bvAgencia]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productLite, isScreen, tiers, discountTiers, item.volume, totalWeeks, hasPartner, item.screenCpm, sysPremissas, bvAgencia]);
 
   // Atualiza estimativa no store sempre que muda.
   useEffect(() => {

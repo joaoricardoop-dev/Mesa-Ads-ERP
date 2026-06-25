@@ -116,6 +116,20 @@ export function StepProdutosPorLocal({ clientLabel }: Props) {
                       transition={{ duration: 0.25 }}
                       className="border-t border-hairline"
                     >
+                      {Array.isArray(loc.photoUrls) && loc.photoUrls.length > 0 && (
+                        <div className="px-4 pt-4 flex gap-2 overflow-x-auto">
+                          {loc.photoUrls.map((url, i) => (
+                            <img
+                              key={url}
+                              src={url}
+                              alt={`Tela ${i + 1} — ${loc.name}`}
+                              className="h-28 w-44 object-cover rounded-xl border border-hairline shrink-0"
+                              loading="lazy"
+                              data-testid={`tela-photo-${loc.restaurantId}-${i}`}
+                            />
+                          ))}
+                        </div>
+                      )}
                       <div className="p-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {loc.products.map((p) => {
                           const inCartCount = sharesInCartFor(loc.restaurantId, p.productId);
@@ -196,6 +210,8 @@ export function StepProdutosPorLocal({ clientLabel }: Props) {
                                         cycles: 1,
                                         cycleWeeks: p.cycleWeeks ?? cycleWeeksDefault,
                                         volume: 1000,
+                                        productTipo: p.productTipo ?? null,
+                                        screenCpm: (loc as any).screenCpm ?? null,
                                         estimatedUnitPrice: null,
                                         estimatedTotal: null,
                                       });

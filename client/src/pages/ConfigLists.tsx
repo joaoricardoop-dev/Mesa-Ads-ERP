@@ -20,10 +20,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, ListChecks, Tag, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Pencil, Trash2, ListChecks, Tag, ArrowUp, ArrowDown, Monitor } from "lucide-react";
 
 type ConfigOptionRow = RouterOutputs["configOption"]["listAdmin"][number];
-type ListType = "loss_reason" | "origin_category";
+type ListType = "loss_reason" | "origin_category" | "screen_category";
+
+const PLACEHOLDER_BY_TYPE: Record<ListType, string> = {
+  loss_reason: "Ex.: Mudança de prioridade",
+  origin_category: "Ex.: Feira / Networking",
+  screen_category: "Ex.: Shopping",
+};
 
 interface ConfigSectionProps {
   type: ListType;
@@ -178,7 +184,7 @@ function ConfigSection({ type, title, description, icon }: ConfigSectionProps) {
               <Input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder={type === "loss_reason" ? "Ex.: Mudança de prioridade" : "Ex.: Feira / Networking"}
+                placeholder={PLACEHOLDER_BY_TYPE[type]}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
                 data-testid={`input-label-${type}`}
                 autoFocus
@@ -222,6 +228,13 @@ export default function ConfigLists() {
         title="Motivos de perda"
         description="Motivos disponíveis ao marcar uma oportunidade ou cotação como perdida."
         icon={<ListChecks className="w-4 h-4 text-rose-400" />}
+      />
+
+      <ConfigSection
+        type="screen_category"
+        title="Categorias de tela"
+        description="Categorias do ponto de mídia (tela) — usadas no cadastro de telas dos locais."
+        icon={<Monitor className="w-4 h-4 text-emerald-400" />}
       />
     </div>
   );

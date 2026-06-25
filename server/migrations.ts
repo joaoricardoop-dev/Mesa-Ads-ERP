@@ -2079,6 +2079,111 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       ALTER TABLE "products" DROP COLUMN IF EXISTS "comComercial";
     `,
   },
+  {
+    // Task #292 — entidade "telas" como filha do local (1 local → N telas).
+    // Substitui os campos de tela antes embutidos em active_restaurants.
+    // 1) Cria a tabela telas (idempotente).
+    // 2) Semeia config_options(type='screen_category') como fonte única das
+    //    categorias (mesmos códigos do enum embutido legado), sem recriar lista.
+    // 3) Migra UMA tela por local existente, copiando os campos embutidos sem
+    //    perda de dados. Dimensões legadas ("192x108cm") são parseadas em
+    //    largura/altura via regexp (apenas POSIX [0-9], sem barras invertidas
+    //    que o template literal JS comeria). lat/lng/address vêm do local.
+    //    Guarda idempotente: só insere se o local ainda não tiver tela.
+    name: "task_292_create_telas_and_migrate_embedded_screens",
+    sql: `
+      CREATE TABLE IF NOT EXISTS "telas" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "restaurantId" integer NOT NULL REFERENCES "active_restaurants"("id") ON DELETE cascade,
+        "nome" varchar(255),
+        "categoria" varchar(120) NOT NULL DEFAULT 'restaurante',
+        "horario_funcionamento" varchar(100),
+        "descricao" text,
+        "address" text,
+        "lat" numeric(10, 7),
+        "lng" numeric(10, 7),
+        "width" integer,
+        "height" integer,
+        "layout" varchar(20),
+        "cms_screen_id" varchar(100),
+        "spot_duration" integer,
+        "loop_duration" integer,
+        "daily_loops" integer,
+        "status" "status" NOT NULL DEFAULT 'active',
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_telas_restaurant_id" ON "telas" ("restaurantId");
+      CREATE INDEX IF NOT EXISTS "idx_telas_categoria" ON "telas" ("categoria");
+
+      INSERT INTO "config_options" ("type", "code", "label", "sortOrder") VALUES
+        ('screen_category', 'restaurante', 'Restaurante', 0),
+        ('screen_category', 'academia', 'Academia', 1),
+        ('screen_category', 'condominio', 'Condomínio', 2),
+        ('screen_category', 'ponto_transporte', 'Ponto de Transporte', 3),
+        ('screen_category', 'comercial', 'Comercial', 4)
+      ON CONFLICT ("type", "code") DO NOTHING;
+
+      -- Garante paridade entre schema.ts e o banco: os campos de tela embutidos
+      -- existiam em schema.ts mas podiam nunca ter recebido migration (drift), o
+      -- que faria o SELECT abaixo falhar. ADD COLUMN IF NOT EXISTS preserva dados
+      -- reais onde já existem e cria as colunas vazias onde faltavam.
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "categoria" varchar(50) NOT NULL DEFAULT 'restaurante';
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "cms_screen_id" varchar(100);
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "screen_dimensions" varchar(50);
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "screen_layout" varchar(20);
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "spot_duration" integer;
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "loop_duration" integer;
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "daily_loops" integer;
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "descricao" text;
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "horario_funcionamento" varchar(100);
+
+      INSERT INTO "telas" (
+        "restaurantId", "nome", "categoria", "horario_funcionamento", "descricao",
+        "address", "lat", "lng", "width", "height", "layout", "cms_screen_id",
+        "spot_duration", "loop_duration", "daily_loops", "status"
+      )
+      SELECT
+        ar."id",
+        'Tela principal',
+        COALESCE(ar."categoria", 'restaurante'),
+        ar."horario_funcionamento",
+        ar."descricao",
+        ar."address",
+        ar."lat",
+        ar."lng",
+        (regexp_match(ar."screen_dimensions", '([0-9]+)[^0-9]+([0-9]+)'))[1]::int,
+        (regexp_match(ar."screen_dimensions", '([0-9]+)[^0-9]+([0-9]+)'))[2]::int,
+        ar."screen_layout",
+        ar."cms_screen_id",
+        ar."spot_duration",
+        ar."loop_duration",
+        ar."daily_loops",
+        'active'
+      FROM "active_restaurants" ar
+      WHERE NOT EXISTS (
+        SELECT 1 FROM "telas" t WHERE t."restaurantId" = ar."id"
+      );
+    `,
+  },
+  {
+    // Adiciona o campo de fotos das telas (JSON array de URLs). As fotos são
+    // exibidas no ecommerce (/montar-campanha) junto do local. Idempotente.
+    name: "task_292_add_tela_photos",
+    sql: `
+      ALTER TABLE "telas" ADD COLUMN IF NOT EXISTS "photoUrls" text;
+    `,
+  },
+  {
+    name: "task_292_add_screen_cpm_pricing",
+    sql: `
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "screen_cpm" numeric(10,2);
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "screen_insertions_per_hour" integer;
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "screen_impacts_per_insertion" numeric(10,2);
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "screen_weekly_hours" numeric(6,2);
+      ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "screen_exposure_sec" integer;
+    `,
+  },
 ];
 
 /**

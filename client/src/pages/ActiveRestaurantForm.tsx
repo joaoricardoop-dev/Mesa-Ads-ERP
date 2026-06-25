@@ -51,6 +51,7 @@ import {
 } from "@shared/rating-config";
 
 import { EXCLUDED_CATEGORIES } from "@shared/excluded-categories";
+import { computeCpmPricing } from "@shared/cpm-pricing";
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const BUSY_HOURS_OPTIONS = ["06h–09h", "09h–12h", "12h–15h", "15h–18h", "18h–21h", "21h–00h", "00h–03h", "03h–06h"];
@@ -109,6 +110,12 @@ interface FormData {
   dailyLoops: number;
   descricao: string;
   horarioFuncionamento: string;
+  // ── Precificação de telas por CPM (fonte única: shared/cpm-pricing.ts) ──
+  screenCpm: string;
+  screenInsertionsPerHour: number;
+  screenImpactsPerInsertion: string;
+  screenWeeklyHours: string;
+  screenExposureSec: number;
 }
 
 const emptyForm: FormData = {
@@ -164,6 +171,11 @@ const emptyForm: FormData = {
   dailyLoops: 0,
   descricao: "",
   horarioFuncionamento: "",
+  screenCpm: "",
+  screenInsertionsPerHour: 0,
+  screenImpactsPerInsertion: "",
+  screenWeeklyHours: "",
+  screenExposureSec: 0,
 };
 
 interface Socio {
@@ -268,6 +280,11 @@ export default function ActiveRestaurantForm() {
         dailyLoops: (existingRestaurant as any).dailyLoops || 0,
         descricao: (existingRestaurant as any).descricao || "",
         horarioFuncionamento: (existingRestaurant as any).horarioFuncionamento || "",
+        screenCpm: (existingRestaurant as any).screenCpm != null ? String((existingRestaurant as any).screenCpm) : "",
+        screenInsertionsPerHour: (existingRestaurant as any).screenInsertionsPerHour || 0,
+        screenImpactsPerInsertion: (existingRestaurant as any).screenImpactsPerInsertion != null ? String((existingRestaurant as any).screenImpactsPerInsertion) : "",
+        screenWeeklyHours: (existingRestaurant as any).screenWeeklyHours != null ? String((existingRestaurant as any).screenWeeklyHours) : "",
+        screenExposureSec: (existingRestaurant as any).screenExposureSec || 0,
       });
       setStep("form");
     }
@@ -428,6 +445,11 @@ export default function ActiveRestaurantForm() {
       dailyLoops: form.dailyLoops || null,
       descricao: form.descricao || undefined,
       horarioFuncionamento: form.horarioFuncionamento || undefined,
+      screenCpm: form.screenCpm.trim() !== "" ? form.screenCpm.trim() : null,
+      screenInsertionsPerHour: form.screenInsertionsPerHour || null,
+      screenImpactsPerInsertion: form.screenImpactsPerInsertion.trim() !== "" ? form.screenImpactsPerInsertion.trim() : null,
+      screenWeeklyHours: form.screenWeeklyHours.trim() !== "" ? form.screenWeeklyHours.trim() : null,
+      screenExposureSec: form.screenExposureSec || null,
     };
 
     if (isEditing) {
@@ -707,45 +729,106 @@ export default function ActiveRestaurantForm() {
                     </div>
                   </Section>
 
-                  <Section icon={<Monitor className="w-4 h-4" />} title="Inventário de Mídia / Tela">
-                    <p className="text-[10px] text-muted-foreground -mt-1">Dados do ponto de mídia para o plano de mídia e integração com o CMS. Opcional.</p>
-                    <div className="grid grid-cols-2 gap-3">
+                  <Section icon={<Monitor className="w-4 h-4" />} title="Inventário de Mídia / Telas">
+                    <p className="text-[10px] text-muted-foreground -mt-1">
+                      As telas (pontos de mídia) agora são gerenciadas como entidade própria. {isEditing ? "Acesse a aba \"Telas\" no perfil do local para adicionar, editar ou remover telas." : "Após salvar o local, acesse a aba \"Telas\" no perfil para cadastrar as telas."}
+                    </p>
+                  </Section>
+
+                  <Section icon={<Monitor className="w-4 h-4" />} title="Precificação de Telas (CPM)">
+                    <p className="text-[10px] text-muted-foreground -mt-1">
+                      As telas deste local são precificadas exclusivamente por CPM (custo por mil impactos). Sem estes campos preenchidos, as telas ficam sem preço nas cotações.
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Categoria do Local</Label>
-                        <Select value={form.categoria} onValueChange={(v) => setForm(p => ({ ...p, categoria: v }))}>
-                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="restaurante">Restaurante</SelectItem>
-                            <SelectItem value="academia">Academia</SelectItem>
-                            <SelectItem value="condominio">Condomínio</SelectItem>
-                            <SelectItem value="ponto_transporte">Ponto de Transporte</SelectItem>
-                            <SelectItem value="comercial">Comercial</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label className="text-xs text-muted-foreground">CPM (R$ / mil impactos)</Label>
+                        <Input
+                          type="number" step="0.01" min="0" inputMode="decimal"
+                          value={form.screenCpm}
+                          onChange={(e) => setForm(p => ({ ...p, screenCpm: e.target.value }))}
+                          placeholder="29.90"
+                          className="bg-background border-border/30 h-9 text-sm"
+                          data-testid="input-screen-cpm"
+                        />
                       </div>
-                      <Field label="Nº da Tela no CMS" value={form.cmsScreenId} onChange={(v) => setForm(p => ({ ...p, cmsScreenId: v }))} placeholder="SCR-042" icon={<Hash className="w-3 h-3" />} />
-                      <Field label="Dimensões (L×A)" value={form.screenDimensions} onChange={(v) => setForm(p => ({ ...p, screenDimensions: v }))} placeholder="192x108cm" />
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Layout</Label>
-                        <Select value={form.screenLayout || "_none"} onValueChange={(v) => setForm(p => ({ ...p, screenLayout: v === "_none" ? "" : v }))}>
-                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="_none">Não informado</SelectItem>
-                            <SelectItem value="landscape">Landscape (horizontal)</SelectItem>
-                            <SelectItem value="portrait">Portrait (vertical)</SelectItem>
-                            <SelectItem value="square">Square (quadrado)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label className="text-xs text-muted-foreground">Inserções por hora</Label>
+                        <Input
+                          type="number" step="1" min="0" inputMode="numeric"
+                          value={form.screenInsertionsPerHour || ""}
+                          onChange={(e) => setForm(p => ({ ...p, screenInsertionsPerHour: parseInt(e.target.value || "0", 10) }))}
+                          placeholder="10"
+                          className="bg-background border-border/30 h-9 text-sm"
+                          data-testid="input-screen-insertions-hour"
+                        />
                       </div>
-                      <NumberField label="Duração do Spot (s)" value={form.spotDuration} onChange={(v) => setForm(p => ({ ...p, spotDuration: v }))} />
-                      <NumberField label="Duração do Loop (s)" value={form.loopDuration} onChange={(v) => setForm(p => ({ ...p, loopDuration: v }))} />
-                      <NumberField label="Loops por Dia" value={form.dailyLoops} onChange={(v) => setForm(p => ({ ...p, dailyLoops: v }))} />
-                      <Field label="Horário de Funcionamento" value={form.horarioFuncionamento} onChange={(v) => setForm(p => ({ ...p, horarioFuncionamento: v }))} placeholder="Seg-Sex 08h-22h" icon={<Calendar className="w-3 h-3" />} />
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Impactos por inserção</Label>
+                        <Input
+                          type="number" step="0.01" min="0" inputMode="decimal"
+                          value={form.screenImpactsPerInsertion}
+                          onChange={(e) => setForm(p => ({ ...p, screenImpactsPerInsertion: e.target.value }))}
+                          placeholder="33.04"
+                          className="bg-background border-border/30 h-9 text-sm"
+                          data-testid="input-screen-impacts"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Horas de operação / semana</Label>
+                        <Input
+                          type="number" step="0.5" min="0" inputMode="decimal"
+                          value={form.screenWeeklyHours}
+                          onChange={(e) => setForm(p => ({ ...p, screenWeeklyHours: e.target.value }))}
+                          placeholder="65"
+                          className="bg-background border-border/30 h-9 text-sm"
+                          data-testid="input-screen-weekly-hours"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Tempo de exposição (seg) <span className="opacity-60">· informativo</span></Label>
+                        <Input
+                          type="number" step="1" min="0" inputMode="numeric"
+                          value={form.screenExposureSec || ""}
+                          onChange={(e) => setForm(p => ({ ...p, screenExposureSec: parseInt(e.target.value || "0", 10) }))}
+                          placeholder="10"
+                          className="bg-background border-border/30 h-9 text-sm"
+                          data-testid="input-screen-exposure"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Descrição do Ponto</Label>
-                      <Textarea value={form.descricao} onChange={(e) => setForm(p => ({ ...p, descricao: e.target.value }))} placeholder="Descrição do ponto de mídia para o plano de mídia..." className="bg-background border-border/30 min-h-[60px] text-sm" />
-                    </div>
+                    {(() => {
+                      const preview = computeCpmPricing({
+                        cpm: parseFloat(form.screenCpm),
+                        insertionsPerHour: form.screenInsertionsPerHour,
+                        impactsPerInsertion: parseFloat(form.screenImpactsPerInsertion),
+                        weeklyHours: parseFloat(form.screenWeeklyHours),
+                      });
+                      if (!preview) {
+                        return (
+                          <p className="text-[11px] text-muted-foreground mt-3">
+                            Preencha CPM, inserções/hora, impactos/inserção e horas/semana para ver o preço estimado.
+                          </p>
+                        );
+                      }
+                      const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                      const num = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+                      return (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 p-3 rounded-lg bg-muted/40 border border-border/30" data-testid="screen-cpm-preview">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Preço por inserção</div>
+                            <div className="text-sm font-semibold tabular-nums">{brl(preview.pricePerInsertion)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Inserções por semana</div>
+                            <div className="text-sm font-semibold tabular-nums">{num(preview.weeklyInsertions)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Ganho esperado / semana</div>
+                            <div className="text-sm font-semibold tabular-nums text-primary">{brl(preview.weeklyRevenue)}</div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </Section>
 
                   <Section icon={<CreditCard className="w-4 h-4" />} title="Financeiro">

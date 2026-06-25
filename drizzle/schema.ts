@@ -403,6 +403,14 @@ export const activeRestaurants = pgTable("active_restaurants", {
   dailyLoops: integer("daily_loops"),
   descricao: text("descricao"),
   horarioFuncionamento: varchar("horario_funcionamento", { length: 100 }),
+  // ── Precificação de telas por CPM (fonte única: shared/cpm-pricing.ts) ──
+  // Telas-de-mídia são precificadas exclusivamente por CPM, por local.
+  // Sem estes campos preenchidos, a tela não tem preço (exige configuração).
+  screenCpm: decimal("screen_cpm", { precision: 10, scale: 2 }),
+  screenInsertionsPerHour: integer("screen_insertions_per_hour"),
+  screenImpactsPerInsertion: decimal("screen_impacts_per_insertion", { precision: 10, scale: 2 }),
+  screenWeeklyHours: decimal("screen_weekly_hours", { precision: 6, scale: 2 }),
+  screenExposureSec: integer("screen_exposure_sec"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -415,6 +423,45 @@ export const activeRestaurants = pgTable("active_restaurants", {
 
 export type ActiveRestaurant = typeof activeRestaurants.$inferSelect;
 export type InsertActiveRestaurant = typeof activeRestaurants.$inferInsert;
+
+// ─── Telas (inventário de mídia — filhas do local) ───────────────────────────
+// Cada local (active_restaurant) pode ter N telas. Substitui os campos de tela
+// que antes ficavam embutidos em active_restaurants (cms_screen_id,
+// screen_dimensions, screen_layout, categoria, horario_funcionamento, etc.).
+
+export const telas = pgTable("telas", {
+  id: serial("id").primaryKey(),
+  restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  nome: varchar("nome", { length: 255 }),
+  // categoria referencia config_options(type='screen_category').code (fonte única)
+  categoria: varchar("categoria", { length: 120 }).default("restaurante").notNull(),
+  horarioFuncionamento: varchar("horario_funcionamento", { length: 100 }),
+  descricao: text("descricao"),
+  // Localização própria da tela (pode diferir do endereço do local)
+  address: text("address"),
+  lat: decimal("lat", { precision: 10, scale: 7 }),
+  lng: decimal("lng", { precision: 10, scale: 7 }),
+  // Dimensões físicas (cm)
+  width: integer("width"),
+  height: integer("height"),
+  layout: varchar("layout", { length: 20 }), // landscape | portrait | square
+  cmsScreenId: varchar("cms_screen_id", { length: 100 }),
+  spotDuration: integer("spot_duration"),
+  loopDuration: integer("loop_duration"),
+  dailyLoops: integer("daily_loops"),
+  // Fotos da tela (JSON array de URLs servidas por /api/tela-photo/serve/...).
+  // Aparecem no ecommerce (/montar-campanha) junto do local.
+  photoUrls: text("photoUrls"),
+  status: statusEnum("status").default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_telas_restaurant_id").on(t.restaurantId),
+  index("idx_telas_categoria").on(t.categoria),
+]);
+
+export type Tela = typeof telas.$inferSelect;
+export type InsertTela = typeof telas.$inferInsert;
 
 // ─── Restaurant Photos ───────────────────────────────────────────────────────
 

@@ -36,6 +36,7 @@ import {
 } from "@shared/rating-config";
 import RestaurantAvatar from "@/components/RestaurantAvatar";
 import AvatarCropDialog from "@/components/AvatarCropDialog";
+import TelasManager from "@/components/TelasManager";
 import {
   ArrowLeft,
   Pencil,
@@ -70,6 +71,7 @@ import {
   AlertTriangle,
   MessageCircle,
   Store,
+  Monitor,
   Hash,
   FileText,
   Armchair,
@@ -410,6 +412,7 @@ export default function ActiveRestaurantProfile() {
                 <TabsTrigger value="painel" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>
                 <TabsTrigger value="info" className="gap-1.5 text-xs"><Building2 className="w-3.5 h-3.5" /> Informações</TabsTrigger>
                 <TabsTrigger value="campanhas" className="gap-1.5 text-xs"><Megaphone className="w-3.5 h-3.5" /> Campanhas</TabsTrigger>
+                <TabsTrigger value="telas" className="gap-1.5 text-xs"><Monitor className="w-3.5 h-3.5" /> Telas</TabsTrigger>
                 <TabsTrigger value="financeiro" className="gap-1.5 text-xs"><DollarSign className="w-3.5 h-3.5" /> Financeiro</TabsTrigger>
                 <TabsTrigger value="fotos" className="gap-1.5 text-xs"><Camera className="w-3.5 h-3.5" /> Fotos</TabsTrigger>
                 <TabsTrigger value="filiais" className="gap-1.5 text-xs"><Link2 className="w-3.5 h-3.5" /> Filiais</TabsTrigger>
@@ -822,6 +825,16 @@ export default function ActiveRestaurantProfile() {
                   })}
                 </div>
               )}
+            </TabsContent>
+
+            {/* ─── TELAS ─── */}
+            <TabsContent value="telas" className="space-y-4">
+              <TelasManager
+                restaurantId={restaurant.id}
+                defaultAddress={restaurant.address}
+                defaultLat={restaurant.lat}
+                defaultLng={restaurant.lng}
+              />
             </TabsContent>
 
             {/* ─── FINANCEIRO ─── */}

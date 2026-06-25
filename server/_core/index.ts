@@ -16,6 +16,7 @@ import { setupRestaurantOnboardingRoutes } from "../restaurantOnboardingRouter";
 import { setupPublicSigningRoutes } from "../publicSigningRouter";
 import { setupPublicTermsRoutes } from "../publicTermsRouter";
 import { setupPublicLogoUploadRoutes, setupAuthenticatedLogoUploadRoutes } from "../logoUploadRouter";
+import { setupPublicTelaPhotoRoutes, setupAuthenticatedTelaPhotoRoutes } from "../telaPhotoRouter";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 import { runMigrations } from "../migrations";
 import { exchangeCode } from "../melhorEnvioService";
@@ -61,6 +62,7 @@ async function startServer() {
   setupPublicSigningRoutes(app);
   setupPublicTermsRoutes(app);
   setupPublicLogoUploadRoutes(app);
+  setupPublicTelaPhotoRoutes(app);
   registerObjectStorageRoutes(app);
 
   app.get("/api/melhor-envio/callback", async (req, res) => {
@@ -105,6 +107,7 @@ async function startServer() {
   setupClerkAuth(app);
 
   setupAuthenticatedLogoUploadRoutes(app);
+  setupAuthenticatedTelaPhotoRoutes(app);
 
   app.get("/api/auth/user", async (req, res) => {
     try {
