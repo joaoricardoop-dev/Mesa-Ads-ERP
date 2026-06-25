@@ -7,6 +7,7 @@ import { buildCampaignName } from "./utils/campaignName";
 import { withUniqueRetry, describeDbError, isUniqueViolation } from "./utils/uniqueNumberRetry";
 import { nextNumber } from "./utils/numberCounter";
 import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
+import { resolveQuotationClientId } from "./utils/resolveQuotationClient";
 import {
   ensureDefaultQuotationSchedule,
   seedCampaignScheduleFromQuotation,
@@ -215,40 +216,13 @@ export function setupPublicSigningRoutes(app: express.Express) {
         return res.status(400).json({ error: "Nenhum restaurante alocado" });
       }
 
-      // Resolve clientId — cotações criadas via lead podem não ter clientId direto
-      let resolvedClientId = quotation[0].clientId;
-      if (!resolvedClientId && quotation[0].leadId) {
-        const [lead] = await db
-          .select({ id: leads.id, name: leads.name, company: leads.company, cnpj: leads.cnpj, contactEmail: leads.contactEmail, contactPhone: leads.contactPhone })
-          .from(leads)
-          .where(eq(leads.id, quotation[0].leadId));
-        if (lead) {
-          // Procura cliente existente pelo e-mail do lead
-          if (lead.contactEmail) {
-            const [existing] = await db
-              .select({ id: clients.id })
-              .from(clients)
-              .where(eq(clients.contactEmail, lead.contactEmail))
-              .limit(1);
-            if (existing) resolvedClientId = existing.id;
-          }
-          // Se ainda não achou, cria um cliente a partir do lead
-          if (!resolvedClientId) {
-            const [newClient] = await db.insert(clients).values({
-              name: lead.name || lead.company || "Cliente",
-              company: lead.company,
-              cnpj: lead.cnpj,
-              contactEmail: lead.contactEmail,
-              contactPhone: lead.contactPhone,
-              status: "active",
-            }).returning({ id: clients.id });
-            resolvedClientId = newClient.id;
-          }
-          // Atualiza a cotação com o clientId resolvido
-          await db.update(quotations).set({ clientId: resolvedClientId, updatedAt: new Date() })
-            .where(eq(quotations.id, quotation[0].id));
-        }
-      }
+      // Resolve clientId — cotações criadas via lead podem não ter clientId direto.
+      // Fonte única de verdade: resolveQuotationClientId (compartilhado com os fluxos internos).
+      const resolvedClientId = await resolveQuotationClientId(db, {
+        id: quotation[0].id,
+        clientId: quotation[0].clientId,
+        leadId: quotation[0].leadId,
+      });
       if (!resolvedClientId) {
         return res.status(400).json({ error: "Esta cotação não possui um cliente vinculado. Solicite ao consultor Mesa Ads que vincule um cliente antes de assinar." });
       }

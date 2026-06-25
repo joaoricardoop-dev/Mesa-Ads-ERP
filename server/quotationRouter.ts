@@ -14,6 +14,7 @@ import { ensureDefaultQuotationSchedule, seedCampaignScheduleFromQuotation, read
 import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { withUniqueRetry, describeDbError } from "./utils/uniqueNumberRetry";
 import { nextNumber } from "./utils/numberCounter";
+import { resolveQuotationClientId } from "./utils/resolveQuotationClient";
 
 const SELF_SERVICE_USER_ID = "self_service";
 
@@ -584,7 +585,21 @@ export const quotationRouter = router({
         }
       }
 
-      const [cliRow] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, quotation[0].clientId!)).limit(1);
+      // Resolve clientId — cotações criadas via lead podem não ter clientId direto.
+      // Fonte única de verdade: resolveQuotationClientId (compartilhado com a assinatura pública).
+      const resolvedClientId = await resolveQuotationClientId(db, {
+        id: quotation[0].id,
+        clientId: quotation[0].clientId,
+        leadId: quotation[0].leadId,
+      });
+      if (!resolvedClientId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Esta cotação não possui um cliente vinculado. Vincule um cliente (ou um lead com dados) antes de converter.",
+        });
+      }
+
+      const [cliRow] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, resolvedClientId)).limit(1);
       const campaignName = buildCampaignName(cliRow?.name, input.startDate);
 
       // Task #186 — pondera alíquotas entre fatia padrão (defaults) e fatia
@@ -602,7 +617,7 @@ export const quotationRouter = router({
           const num = await generateCampaignNumber(db);
           const [c] = await db.insert(campaigns).values({
             campaignNumber: num,
-            clientId: quotation[0].clientId!,
+            clientId: resolvedClientId,
             name: campaignName,
             startDate: input.startDate,
             endDate: input.endDate,
@@ -1013,7 +1028,21 @@ export const quotationRouter = router({
       }
       const avgCommission = totalCoasters > 0 ? (weightedCommissionSum / totalCoasters).toFixed(2) : "20.00";
 
-      const [cliRow2] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, quotation[0].clientId!)).limit(1);
+      // Resolve clientId — cotações criadas via lead podem não ter clientId direto.
+      // Fonte única de verdade: resolveQuotationClientId (compartilhado com a assinatura pública).
+      const resolvedClientId = await resolveQuotationClientId(db, {
+        id: quotation[0].id,
+        clientId: quotation[0].clientId,
+        leadId: quotation[0].leadId,
+      });
+      if (!resolvedClientId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Esta cotação não possui um cliente vinculado. Vincule um cliente (ou um lead com dados) antes de assinar.",
+        });
+      }
+
+      const [cliRow2] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, resolvedClientId)).limit(1);
       const campaignName = buildCampaignName(cliRow2?.name, derivedStartDate);
       const isBonificada = !!quotation[0].isBonificada;
 
@@ -1035,7 +1064,7 @@ export const quotationRouter = router({
           const num = await generateCampaignNumber(db);
           const [c] = await db.insert(campaigns).values({
             campaignNumber: num,
-            clientId: quotation[0].clientId!,
+            clientId: resolvedClientId,
             name: campaignName,
             startDate: derivedStartDate,
             endDate: derivedEndDate,
