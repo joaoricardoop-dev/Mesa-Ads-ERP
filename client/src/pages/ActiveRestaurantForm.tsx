@@ -38,6 +38,7 @@ import {
   MessageCircle,
   Target,
   Star,
+  Monitor,
 } from "lucide-react";
 import { calcularRating, temCamposRatingCompletos } from "@shared/rating";
 import {
@@ -98,6 +99,16 @@ interface FormData {
   venueType: number;
   digitalPresence: number;
   primaryDrink: string;
+  // ── Inventário de mídia / tela ──
+  categoria: string;
+  cmsScreenId: string;
+  screenDimensions: string;
+  screenLayout: string;
+  spotDuration: number;
+  loopDuration: number;
+  dailyLoops: number;
+  descricao: string;
+  horarioFuncionamento: string;
 }
 
 const emptyForm: FormData = {
@@ -144,6 +155,15 @@ const emptyForm: FormData = {
   venueType: 1,
   digitalPresence: 1,
   primaryDrink: "",
+  categoria: "restaurante",
+  cmsScreenId: "",
+  screenDimensions: "",
+  screenLayout: "",
+  spotDuration: 0,
+  loopDuration: 0,
+  dailyLoops: 0,
+  descricao: "",
+  horarioFuncionamento: "",
 };
 
 interface Socio {
@@ -239,6 +259,15 @@ export default function ActiveRestaurantForm() {
         primaryDrink: existingRestaurant.primaryDrink || "",
         notes: existingRestaurant.notes || "",
         status: existingRestaurant.status,
+        categoria: (existingRestaurant as any).categoria || "restaurante",
+        cmsScreenId: (existingRestaurant as any).cmsScreenId || "",
+        screenDimensions: (existingRestaurant as any).screenDimensions || "",
+        screenLayout: (existingRestaurant as any).screenLayout || "",
+        spotDuration: (existingRestaurant as any).spotDuration || 0,
+        loopDuration: (existingRestaurant as any).loopDuration || 0,
+        dailyLoops: (existingRestaurant as any).dailyLoops || 0,
+        descricao: (existingRestaurant as any).descricao || "",
+        horarioFuncionamento: (existingRestaurant as any).horarioFuncionamento || "",
       });
       setStep("form");
     }
@@ -390,6 +419,15 @@ export default function ActiveRestaurantForm() {
       primaryDrink: form.primaryDrink || undefined,
       notes: form.notes || undefined,
       status: form.status as "active" | "inactive",
+      categoria: (form.categoria || "restaurante") as "restaurante" | "academia" | "condominio" | "ponto_transporte" | "comercial",
+      cmsScreenId: form.cmsScreenId || undefined,
+      screenDimensions: form.screenDimensions || undefined,
+      screenLayout: form.screenLayout || undefined,
+      spotDuration: form.spotDuration || null,
+      loopDuration: form.loopDuration || null,
+      dailyLoops: form.dailyLoops || null,
+      descricao: form.descricao || undefined,
+      horarioFuncionamento: form.horarioFuncionamento || undefined,
     };
 
     if (isEditing) {
@@ -666,6 +704,47 @@ export default function ActiveRestaurantForm() {
                           <SelectItem value="nao">Não</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                  </Section>
+
+                  <Section icon={<Monitor className="w-4 h-4" />} title="Inventário de Mídia / Tela">
+                    <p className="text-[10px] text-muted-foreground -mt-1">Dados do ponto de mídia para o plano de mídia e integração com o CMS. Opcional.</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Categoria do Local</Label>
+                        <Select value={form.categoria} onValueChange={(v) => setForm(p => ({ ...p, categoria: v }))}>
+                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="restaurante">Restaurante</SelectItem>
+                            <SelectItem value="academia">Academia</SelectItem>
+                            <SelectItem value="condominio">Condomínio</SelectItem>
+                            <SelectItem value="ponto_transporte">Ponto de Transporte</SelectItem>
+                            <SelectItem value="comercial">Comercial</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Field label="Nº da Tela no CMS" value={form.cmsScreenId} onChange={(v) => setForm(p => ({ ...p, cmsScreenId: v }))} placeholder="SCR-042" icon={<Hash className="w-3 h-3" />} />
+                      <Field label="Dimensões (L×A)" value={form.screenDimensions} onChange={(v) => setForm(p => ({ ...p, screenDimensions: v }))} placeholder="192x108cm" />
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Layout</Label>
+                        <Select value={form.screenLayout || "_none"} onValueChange={(v) => setForm(p => ({ ...p, screenLayout: v === "_none" ? "" : v }))}>
+                          <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="_none">Não informado</SelectItem>
+                            <SelectItem value="landscape">Landscape (horizontal)</SelectItem>
+                            <SelectItem value="portrait">Portrait (vertical)</SelectItem>
+                            <SelectItem value="square">Square (quadrado)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <NumberField label="Duração do Spot (s)" value={form.spotDuration} onChange={(v) => setForm(p => ({ ...p, spotDuration: v }))} />
+                      <NumberField label="Duração do Loop (s)" value={form.loopDuration} onChange={(v) => setForm(p => ({ ...p, loopDuration: v }))} />
+                      <NumberField label="Loops por Dia" value={form.dailyLoops} onChange={(v) => setForm(p => ({ ...p, dailyLoops: v }))} />
+                      <Field label="Horário de Funcionamento" value={form.horarioFuncionamento} onChange={(v) => setForm(p => ({ ...p, horarioFuncionamento: v }))} placeholder="Seg-Sex 08h-22h" icon={<Calendar className="w-3 h-3" />} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Descrição do Ponto</Label>
+                      <Textarea value={form.descricao} onChange={(e) => setForm(p => ({ ...p, descricao: e.target.value }))} placeholder="Descrição do ponto de mídia para o plano de mídia..." className="bg-background border-border/30 min-h-[60px] text-sm" />
                     </div>
                   </Section>
 

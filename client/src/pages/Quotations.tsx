@@ -264,6 +264,8 @@ export default function Quotations() {
   const [osDialogId, setOsDialogId] = useState<number | null>(null);
   const [osForm, setOsForm] = useState({ description: "", paymentTerms: "" });
   const [osBatchIds, setOsBatchIds] = useState<number[]>([]);
+  const [osPeriodStart, setOsPeriodStart] = useState("");
+  const [osPeriodEnd, setOsPeriodEnd] = useState("");
   const [signOsDialogId, setSignOsDialogId] = useState<number | null>(null);
   const [signForm, setSignForm] = useState({ batchIds: [] as number[], signatureUrl: "" });
   const [restaurantAllocations, setRestaurantAllocations] = useState<Array<{ restaurantId: number; coasterQuantity: number }>>([]);
@@ -871,6 +873,8 @@ export default function Quotations() {
                                 setOsDialogId(q.id);
                                 setOsForm({ description: "", paymentTerms: "" });
                                 setOsBatchIds([]);
+                                setOsPeriodStart((q as any).periodStart || "");
+                                setOsPeriodEnd("");
                               }}
                             >
                               <FileText className="w-3.5 h-3.5" />
@@ -1258,18 +1262,37 @@ export default function Quotations() {
               />
             </div>
             <div className="grid gap-2">
-              <Label>Período (Batches)</Label>
+              <Label>Período da Campanha</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="grid gap-1">
+                  <Label className="text-[10px] text-muted-foreground">Início</Label>
+                  <Input type="date" value={osPeriodStart} onChange={(e) => setOsPeriodStart(e.target.value)} className="bg-background border-border/30 h-9 text-sm" />
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-[10px] text-muted-foreground">Fim</Label>
+                  <Input type="date" value={osPeriodEnd} onChange={(e) => setOsPeriodEnd(e.target.value)} className="bg-background border-border/30 h-9 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label className="text-xs text-muted-foreground">Batches (preset opcional — preenche o período)</Label>
               <div className="bg-background border border-border/30 rounded-lg p-3 max-h-[180px] overflow-y-auto space-y-1">
                 {batchesList.map((batch: any) => (
                   <label key={batch.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/30 cursor-pointer">
                     <Checkbox
                       checked={osBatchIds.includes(batch.id)}
                       onCheckedChange={(checked) => {
-                        setOsBatchIds(prev =>
-                          checked
-                            ? [...prev, batch.id].sort((a, b) => a - b)
-                            : prev.filter(id => id !== batch.id)
-                        );
+                        const newIds = checked
+                          ? [...osBatchIds, batch.id].sort((a, b) => a - b)
+                          : osBatchIds.filter(id => id !== batch.id);
+                        setOsBatchIds(newIds);
+                        const sel = batchesList
+                          .filter((b: any) => newIds.includes(b.id))
+                          .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+                        if (sel.length > 0) {
+                          setOsPeriodStart(sel[0].startDate);
+                          setOsPeriodEnd(sel[sel.length - 1].endDate);
+                        }
                       }}
                     />
                     <span className="text-xs flex-1">{batch.label}</span>
@@ -1311,16 +1334,11 @@ export default function Quotations() {
             <Button
               onClick={() => {
                 if (!osDialogId) return;
-                const selectedBatches = batchesList
-                  .filter((b: any) => osBatchIds.includes(b.id))
-                  .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
-                const periodStart = selectedBatches.length > 0 ? selectedBatches[0].startDate : undefined;
-                const periodEnd = selectedBatches.length > 0 ? selectedBatches[selectedBatches.length - 1].endDate : undefined;
                 generateOSMutation.mutate({
                   id: osDialogId,
                   description: osForm.description || undefined,
-                  periodStart,
-                  periodEnd,
+                  periodStart: osPeriodStart || undefined,
+                  periodEnd: osPeriodEnd || undefined,
                   paymentTerms: osForm.paymentTerms || undefined,
                   batchIds: osBatchIds.length > 0 ? osBatchIds : undefined,
                 });

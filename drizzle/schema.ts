@@ -392,6 +392,17 @@ export const activeRestaurants = pgTable("active_restaurants", {
   status: statusEnum("status").default("active").notNull(),
   logoUrl: varchar("logoUrl", { length: 500 }),
   notes: text("notes"),
+  // ── Inventário de mídia / tela (DOOH) ──
+  categoria: varchar("categoria", { length: 50 }).default("restaurante").notNull(),
+  // restaurante | academia | condominio | ponto_transporte | comercial
+  cmsScreenId: varchar("cms_screen_id", { length: 100 }),
+  screenDimensions: varchar("screen_dimensions", { length: 50 }),
+  screenLayout: varchar("screen_layout", { length: 20 }),
+  spotDuration: integer("spot_duration"),
+  loopDuration: integer("loop_duration"),
+  dailyLoops: integer("daily_loops"),
+  descricao: text("descricao"),
+  horarioFuncionamento: varchar("horario_funcionamento", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -399,6 +410,7 @@ export const activeRestaurants = pgTable("active_restaurants", {
   index("idx_active_restaurants_parent_id").on(t.parentRestaurantId),
   index("idx_active_restaurants_cnpj").on(t.cnpj),
   index("idx_active_restaurants_rating_tier").on(t.ratingTier),
+  index("idx_active_restaurants_categoria").on(t.categoria),
 ]);
 
 export type ActiveRestaurant = typeof activeRestaurants.$inferSelect;
@@ -559,6 +571,9 @@ export const quotations = pgTable("quotations", {
   // Task #226 — vincula a cotação à oportunidade de origem (quando gerada
   // a partir de uma oportunidade ganha no funil de Oportunidades).
   opportunityId: integer("opportunityId").references((): any => opportunities.id, { onDelete: "set null" }),
+  // Snapshot imutável das premissas globais no momento da criação:
+  // { irpj, comissaoRestaurante, comissaoComercial, bvPadraoAgencia }
+  premissasSnapshot: jsonb("premissas_snapshot"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -1021,6 +1036,18 @@ export const campaignBatchAssignments = pgTable("campaign_batch_assignments", {
 
 export type CampaignBatchAssignment = typeof campaignBatchAssignments.$inferSelect;
 
+// ─── System Config (premissas globais: IRPJ, comissões, BV) ──────────────────
+
+export const systemConfig = pgTable("system_config", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  updatedBy: varchar("updatedBy", { length: 255 }),
+});
+
+export type SystemConfig = typeof systemConfig.$inferSelect;
+export type InsertSystemConfig = typeof systemConfig.$inferInsert;
+
 // ─── Contacts (contatos CRM) ─────────────────────────────────────────────────
 
 export const contacts = pgTable("contacts", {
@@ -1214,11 +1241,16 @@ export const quotationItems = pgTable("quotation_items", {
   shareIndex: integer("shareIndex"),
   cycleWeeks: integer("cycleWeeks").default(4),
   cycles: integer("cycles").default(1),
+  // Período e ponto de mídia por item (carrinho unificado)
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  venueId: integer("venue_id").references(() => activeRestaurants.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
   index("idx_quotation_items_quotation_id").on(t.quotationId),
   index("idx_quotation_items_product_id").on(t.productId),
   index("idx_quotation_items_restaurant_id").on(t.restaurantId),
+  index("idx_quotation_items_venue_id").on(t.venueId),
 ]);
 
 export type QuotationItem = typeof quotationItems.$inferSelect;
