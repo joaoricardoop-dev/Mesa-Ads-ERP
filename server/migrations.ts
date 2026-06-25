@@ -2081,7 +2081,7 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
  * normal de conversão; o tracker é marcado ao final para evitar reprocessar a
  * cada boot.
  */
-async function backfillQuotationClientIdsFromLeads(db: any) {
+export async function backfillQuotationClientIdsFromLeads(db: any) {
   const TRACKER = "backfill_quotation_client_id_from_lead_task_286";
 
   const already = await db.execute(sql.raw(
