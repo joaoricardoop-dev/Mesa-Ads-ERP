@@ -259,7 +259,6 @@ export default function QuotationDetail() {
             productUnitLabelPlural: (quotation as any).productUnitLabelPlural,
             periodStart: (quotation as any).periodStart,
             batchWeeks: (quotation as any).batchWeeks,
-            productIrpj: (quotation as any).productIrpj,
             isCustomProduct: (quotation as any).isCustomProduct,
             customProductName: (quotation as any).customProductName,
             customProjectCost: (quotation as any).customProjectCost,
@@ -284,6 +283,7 @@ export default function QuotationDetail() {
             notes: item.notes,
           })),
           billingSchedule: (billingScheduleData as any[]).map((b: any) => ({ sequence: b.sequence, amount: b.amount, dueDate: b.dueDate, notes: b.notes })),
+          irpj: (quotation as any).irpj,
         }),
         signature,
       });

@@ -16,6 +16,7 @@ import {
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { calcPhaseFinancials, type PhaseItemLike, type PhaseOverrides } from "./finance/calc";
+import { getSystemConfig } from "./systemConfigRouter";
 import { materializePayablesForInvoice } from "./finance/payables";
 import { recordAudit } from "./finance/audit";
 import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
@@ -489,6 +490,7 @@ export const campaignPhaseRouter = router({
     .input(z.object({ campaignId: z.number() }))
     .query(async ({ input }) => {
       const db = await getDatabase();
+      const irpjPct = (await getSystemConfig()).irpj * 100;
       const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
       if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
 
@@ -544,16 +546,15 @@ export const campaignPhaseRouter = router({
       // Repasse VIP é cobrado SOBRE a receita líquida de impostos e comissão
       // comercial — espelha calcVipRepasse / DRE da campanha.
       const PIS_COFINS_RATE = 0.0365;
-      const IRPJ_DEFAULT_RATE = 0.06;
+      // IRPJ vem da premissa global (system_config) — fonte única; produtos
+      // não são mais fonte de alíquota.
+      const irpjRateGlobal = irpjPct / 100;
       const sellerRate = (() => {
         const v = parseFloat(String(campaign.sellerCommission ?? "0"));
         return Number.isFinite(v) ? v / 100 : 0;
       })();
       const itemTaxes = (i: typeof items[number]): number => {
-        const irpj = i.productIrpj != null && i.productIrpj !== ""
-          ? parseFloat(String(i.productIrpj)) / 100
-          : IRPJ_DEFAULT_RATE;
-        return itemRevenue(i) * (irpj + PIS_COFINS_RATE);
+        return itemRevenue(i) * (irpjRateGlobal + PIS_COFINS_RATE);
       };
       const itemSellerComm = (i: typeof items[number]): number =>
         itemRevenue(i) * sellerRate;
@@ -880,10 +881,11 @@ export const campaignPhaseRouter = router({
           globalBvGrossUpRate: null,
         },
       } as const;
-      const financials = calcPhaseFinancials({ ...calcInput, overrides });
+      const irpjPct = (await getSystemConfig()).irpj * 100;
+      const financials = calcPhaseFinancials({ ...calcInput, overrides, irpjRatePercent: irpjPct });
       // Para a coluna "Campanha (herdado)" da UI: rodamos o cálculo SEM
       // overrides do batch e devolvemos os valores efetivos resultantes.
-      const financialsInherited = calcPhaseFinancials({ ...calcInput, overrides: {} });
+      const financialsInherited = calcPhaseFinancials({ ...calcInput, overrides: {}, irpjRatePercent: irpjPct });
       const inherited = {
         taxRate: financialsInherited.effective.taxRate.value,
         restaurantCommission: financialsInherited.effective.restaurantCommission.value,
@@ -1077,6 +1079,7 @@ export const campaignPhaseRouter = router({
     .input(z.object({ campaignId: z.number() }))
     .query(async ({ input }) => {
       const db = await getDatabase();
+      const irpjPct = (await getSystemConfig()).irpj * 100;
       const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
       if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
 
@@ -1192,7 +1195,7 @@ export const campaignPhaseRouter = router({
           vipProviderId: r.productVipProviderId ?? null,
         }));
         const overrides = extractOverridesFromPhase(phase);
-        const f = calcPhaseFinancials({ items: itemsForCalc, campaign: campaignCtx, overrides });
+        const f = calcPhaseFinancials({ items: itemsForCalc, campaign: campaignCtx, overrides, irpjRatePercent: irpjPct });
 
         // Fatura ativa mais recente desta fase
         const phaseInvs = invs.filter((i) => i.campaignPhaseId === phase.id && i.status !== "cancelada")

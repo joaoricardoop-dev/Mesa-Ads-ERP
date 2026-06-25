@@ -46,6 +46,7 @@ import {
   type VipProviderLike,
   type TaxKind,
 } from "./calc";
+import { getSystemConfig } from "../systemConfigRouter";
 // Aceita tanto a conexão direta (`getDb()`) quanto um transaction handle
 // passado por `db.transaction(async tx => ...)` — ambos compartilham o mesmo
 // shape funcional em Drizzle.
@@ -94,19 +95,22 @@ export async function materializePayablesForInvoice(
     ? (await db.select().from(products).where(eq(products.id, campaign.productId)).limit(1))[0] ?? null
     : null;
 
+  // IRPJ vem da premissa global (system_config) — fonte única.
+  const irpjPct = (await getSystemConfig()).irpj * 100;
+
   if (event === "emitida") {
-    return materializeTaxes(db, invoice as InvoiceLike, campaign as CampaignLike, product);
+    return materializeTaxes(db, invoice as InvoiceLike, campaign as CampaignLike, product, irpjPct);
   }
 
   // event === 'paga'
   const r1 = await materializeRestaurantCommission(db, invoice as InvoiceLike, campaign as CampaignLike, product);
-  const r2 = await materializeVipRepasse(db, invoice as InvoiceLike, campaign as CampaignLike, product);
+  const r2 = await materializeVipRepasse(db, invoice as InvoiceLike, campaign as CampaignLike, product, irpjPct);
   // Task #186 — repasse VIP da fatia custom (cotação custom-digital com
   // customVipProviderId vinculado). Roda em paralelo ao materializeVipRepasse
   // tradicional (que olha campaign.productId.vipProviderId) — ambos são
   // idempotentes via sourceRef distinto.
-  const r2b = await materializeCustomVipRepasse(db, invoice as InvoiceLike, campaign as CampaignLike);
-  const r3 = await materializePartnerCommission(db, invoice as InvoiceLike, campaign as CampaignLike, product);
+  const r2b = await materializeCustomVipRepasse(db, invoice as InvoiceLike, campaign as CampaignLike, irpjPct);
+  const r3 = await materializePartnerCommission(db, invoice as InvoiceLike, campaign as CampaignLike, product, irpjPct);
   return mergeCounts(r1, r2, r2b, r3);
 }
 
@@ -127,8 +131,9 @@ async function materializeTaxes(
   invoice: InvoiceLike,
   _campaign: CampaignLike,
   product: ProductLike | null,
+  irpjPct: number,
 ): Promise<MaterializeResult> {
-  const taxes = calcTaxes(invoice, product);
+  const taxes = calcTaxes(invoice, product, irpjPct);
   const compMonth = competenceMonthFor(invoice.issueDate);
   const dueDate = safeDueDate(null); // impostos vencem hoje (default); ajuste manual opcional
   let created = 0;
@@ -264,6 +269,7 @@ async function materializeVipRepasse(
   invoice: InvoiceLike,
   campaign: CampaignLike,
   product: ProductLike | null,
+  irpjPct: number,
 ): Promise<MaterializeResult> {
   if (!product || !product.vipProviderId) return EMPTY;
   const [provider] = await db
@@ -271,7 +277,7 @@ async function materializeVipRepasse(
     .from(vipProviders)
     .where(eq(vipProviders.id, product.vipProviderId))
     .limit(1);
-  const amount = calcVipRepasse(invoice, campaign, product, (provider as VipProviderLike) ?? null);
+  const amount = calcVipRepasse(invoice, campaign, product, (provider as VipProviderLike) ?? null, irpjPct);
   if (amount <= 0 || !provider) return EMPTY;
 
   const existing = await db
@@ -321,6 +327,7 @@ async function materializeCustomVipRepasse(
   db: Db,
   invoice: InvoiceLike,
   campaign: CampaignLike,
+  irpjPct: number,
 ): Promise<MaterializeResult> {
   if (!campaign.quotationId) return EMPTY;
   const [quot] = await db
@@ -348,6 +355,7 @@ async function materializeCustomVipRepasse(
     invoice,
     campaign,
     vipProvider: provider as VipProviderLike,
+    irpjRatePercent: irpjPct,
   });
   if (amount <= 0) return EMPTY;
 
@@ -416,11 +424,12 @@ async function materializePartnerCommission(
   invoice: InvoiceLike,
   campaign: CampaignLike,
   product: ProductLike | null,
+  irpjPct: number,
 ): Promise<MaterializeResult> {
   const partner = await resolvePartnerForCampaign(db, campaign);
   if (!partner) return EMPTY;
 
-  const result = calcPartnerCommission(invoice, campaign, product, partner);
+  const result = calcPartnerCommission(invoice, campaign, product, partner, irpjPct);
   if (result.amount <= 0) return EMPTY;
 
   const compMonth = competenceMonthFor(invoice.paymentDate || invoice.issueDate);
@@ -593,6 +602,7 @@ async function cancelDerivedPayables(
 
 async function recomputePartnerAggregate(db: Db, invoiceIds: number[]): Promise<number> {
   let total = 0;
+  const irpjPct = (await getSystemConfig()).irpj * 100;
   for (const id of invoiceIds) {
     const [inv] = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
     if (!inv || !inv.campaignId) continue;
@@ -603,7 +613,7 @@ async function recomputePartnerAggregate(db: Db, invoiceIds: number[]): Promise<
       : null;
     const partner = await resolvePartnerForCampaign(db, camp as CampaignLike);
     if (!partner) continue;
-    const r = calcPartnerCommission(inv as InvoiceLike, camp as CampaignLike, prod, partner);
+    const r = calcPartnerCommission(inv as InvoiceLike, camp as CampaignLike, prod, partner, irpjPct);
     total += r.amount;
   }
   return Math.round(total * 100) / 100;

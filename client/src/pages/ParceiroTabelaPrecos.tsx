@@ -5,6 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Info, Package, Percent, ChevronDown, ChevronRight, Receipt } from "lucide-react";
+import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 
 const SEMANAS_OPTIONS = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52];
 
@@ -85,9 +86,10 @@ function ProductTable({ product, bvPercent, billingMode }: ProductTableProps) {
   const tiers = product.tiers ?? [];
   const discountTiers = product.discountTiers ?? [];
 
-  const irpj = parseFloat(product.irpj ?? "6") / 100;
-  const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
-  const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
+  const { premissas: sysPremissas } = useSystemPremissas();
+  const irpj = sysPremissas.irpj / 100;
+  const comRestaurante = sysPremissas.comissaoRestaurante / 100;
+  const comComercialProduto = sysPremissas.comissaoComercial / 100;
   const comParceiro = bvPercent / 100;
 
   const volumes = useMemo(
@@ -222,8 +224,10 @@ export default function ParceiroTabelaPrecos() {
 
   const billingMode: "bruto" | "liquido" = data?.billingMode ?? "bruto";
 
+  const { premissas: sysPremissas, bvAgencia } = useSystemPremissas();
+
   const [bvPercent, setBvPercent] = useState<number | null>(null);
-  const displayBv = bvPercent ?? 20;
+  const displayBv = bvPercent ?? bvAgencia * 100;
 
   const [refProductId, setRefProductId] = useState<number | null>(null);
 
@@ -295,9 +299,9 @@ export default function ParceiroTabelaPrecos() {
               const refTiers = refProduct?.tiers ?? [];
               const refTier = refTiers.length > 0 ? [...refTiers].sort((a: any, b: any) => a.volumeMin - b.volumeMin)[0] : null;
               if (!refProduct || !refTier) return null;
-              const refIrpj = parseFloat(refProduct.irpj ?? "6") / 100;
-              const refComRest = parseFloat(refProduct.comRestaurante ?? "15") / 100;
-              const refComCom = parseFloat(refProduct.comComercial ?? "10") / 100;
+              const refIrpj = sysPremissas.irpj / 100;
+              const refComRest = sysPremissas.comissaoRestaurante / 100;
+              const refComCom = sysPremissas.comissaoComercial / 100;
               const refVol = refTier.volumeMin;
               const calcParams = {
                 custoUnitario: parseFloat(refTier.custoUnitario),
@@ -431,15 +435,15 @@ export default function ParceiroTabelaPrecos() {
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-            <span>IRPJ: 6% (por produto)</span>
+            <span>IRPJ: {sysPremissas.irpj}% (global)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
-            <span>Com. Local: 15% (por produto)</span>
+            <span>Com. Local: {sysPremissas.comissaoRestaurante}% (global)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0" />
-            <span>Com. Interna: 10% (por produto)</span>
+            <span>Com. Interna: {sysPremissas.comissaoComercial}% (global)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />

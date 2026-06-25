@@ -823,7 +823,6 @@ export default function Quotations() {
                                     productUnitLabelPlural: q.productUnitLabelPlural,
                                     periodStart: q.periodStart,
                                     batchWeeks: q.batchWeeks,
-                                    productIrpj: (q as any).productIrpj,
                                     isCustomProduct: (q as any).isCustomProduct,
                                     customProductName: (q as any).customProductName,
                                     customProjectCost: (q as any).customProjectCost,
@@ -847,6 +846,7 @@ export default function Quotations() {
                                     totalPrice: item.totalPrice,
                                     notes: item.notes,
                                   })),
+                                  irpj: (q as any).irpj,
                                 }),
                                   // Cotação assinada/"win" → embute o registro de
                                   // assinatura. Origem única: quotation.list

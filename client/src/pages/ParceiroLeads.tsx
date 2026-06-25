@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 import type { AppRouter } from "../../../server/routers";
 import type { inferRouterOutputs } from "@trpc/server";
 import { Button } from "@/components/ui/button";
@@ -278,6 +279,7 @@ function CreateQuotationDialog({
   const [semanas, setSemanas] = useState<number>(4);
   const [notes, setNotes] = useState("");
 
+  const { premissas: sysPremissas } = useSystemPremissas();
   const products = priceData?.products ?? [];
   const commissionPercent = priceData?.commissionPercent ?? 10;
   const billingMode = priceData?.billingMode ?? "bruto";
@@ -294,8 +296,8 @@ function CreateQuotationDialog({
     if (!selectedProduct || volumeNum <= 0) return null;
     const tier = getPricingTierForVolume(selectedProduct.tiers ?? [], volumeNum);
     if (!tier) return null;
-    const irpj = parseFloat(selectedProduct.irpj ?? "6") / 100;
-    const comRestaurante = parseFloat(selectedProduct.comRestaurante ?? "0") / 100;
+    const irpj = sysPremissas.irpj / 100;
+    const comRestaurante = sysPremissas.comissaoRestaurante / 100;
     const pricingMode = (selectedProduct.pricingMode ?? "cost_based") as "cost_based" | "price_based";
     const unitPrice = calcQuotationUnitPrice({
       custoUnitario: parseFloat(tier.custoUnitario),
@@ -323,7 +325,7 @@ function CreateQuotationDialog({
     const totalValue = precoPosFaixa * (1 - dsc);
     const effectiveUnitPrice = volumeNum > 0 && cycles > 0 ? totalValue / (volumeNum * cycles) : unitPrice;
     return { unitPrice: effectiveUnitPrice, totalValue, cycles, discount: dsc, descFaixaPerc };
-  }, [selectedProduct, volumeNum, semanas, comComercial, billingMode]);
+  }, [selectedProduct, volumeNum, semanas, comComercial, billingMode, sysPremissas]);
 
   const createMutation = trpc.parceiroPortal.createQuotation.useMutation({
     onSuccess: (data) => {

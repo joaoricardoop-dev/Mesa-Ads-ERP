@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { Calendar, AlertTriangle, Sparkles } from "lucide-react";
 import { trpc, type RouterOutputs } from "@/lib/trpc";
+import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 import { useWizardStore, type CartItem } from "./wizardStore";
 import { WizardShell } from "./WizardShell";
 import { CartSummary } from "./CartSummary";
@@ -73,14 +74,12 @@ function ConfigRow({
   const { data: discountTiers = [] } = trpc.product.listDiscountTiers.useQuery({
     productId: item.productId,
   });
+  const { premissas: sysPremissas, bvAgencia } = useSystemPremissas();
 
   const productLite: ProductLite | null = product
     ? {
         id: product.id,
         name: product.name,
-        irpj: product.irpj ?? null,
-        comRestaurante: product.comRestaurante ?? null,
-        comComercial: product.comComercial ?? null,
         pricingMode: product.pricingMode ?? null,
       }
     : null;
@@ -98,8 +97,9 @@ function ConfigRow({
       volume: item.volume,
       weeks: totalWeeks,
       hasPartner,
+      premissas: { ...sysPremissas, bvAgencia },
     });
-  }, [productLite, tiers, discountTiers, item.volume, totalWeeks, hasPartner]);
+  }, [productLite, tiers, discountTiers, item.volume, totalWeeks, hasPartner, sysPremissas, bvAgencia]);
 
   // Atualiza estimativa no store sempre que muda.
   useEffect(() => {

@@ -3,6 +3,7 @@ import { useState, useMemo, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 
 import { trpc } from "@/lib/trpc";
+import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -337,8 +338,6 @@ interface RestaurantSelection {
   neighborhood: string;
 }
 
-const BV_PADRAO = 0.20;
-
 function DRECampRow({
   label, monthly, pct, contract, bold, accent, warn, sub, muted, separator,
 }: {
@@ -375,6 +374,7 @@ function DRECampRow({
 }
 
 export default function CampaignDetail() {
+  const { bvAgencia } = useSystemPremissas();
   const [, navigate] = useLocation();
   const [matchBatch, batchParams] = useRoute<{ id: string; phaseId: string }>("/campanhas/:id/batch/:phaseId");
   const [matchPhaseLegacy, phaseParamsLegacy] = useRoute<{ id: string; phaseId: string }>("/campanhas/:id/fase/:phaseId");
@@ -1139,8 +1139,8 @@ export default function CampaignDetail() {
 
   const hasAgencyBv = (campaign as any).hasAgencyBv !== false;
   const agencyBvPct = (() => {
-    const v = parseFloat((campaign as any).agencyBvPercent ?? "20");
-    return Number.isFinite(v) ? v / 100 : BV_PADRAO;
+    const v = parseFloat((campaign as any).agencyBvPercent ?? String(bvAgencia * 100));
+    return Number.isFinite(v) ? v / 100 : bvAgencia;
   })();
   const bvMonthly = hasAgencyBv ? p.monthlyRevenue * agencyBvPct : 0;
 

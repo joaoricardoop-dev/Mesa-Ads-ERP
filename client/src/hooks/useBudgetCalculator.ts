@@ -1,15 +1,18 @@
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+import { PREMISSAS_DEFAULTS } from "@shared/premissas";
+
 export const SEMANAS_OPTIONS = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52];
 
 export const DESCONTOS_PRAZO: Record<number, number> = {
   4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11, 28: 13, 32: 15, 36: 17, 40: 19, 44: 21, 48: 23, 52: 25,
 };
 
+// Premissas em PERCENTUAL derivadas da fonte canônica (decimal) em shared.
 export const DEFAULT_PREMISSAS = {
-  irpj: 6,
-  comissaoRestaurante: 15,
-  comissaoComercial: 10,
+  irpj: PREMISSAS_DEFAULTS.irpj * 100,
+  comissaoRestaurante: PREMISSAS_DEFAULTS.comissaoRestaurante * 100,
+  comissaoComercial: PREMISSAS_DEFAULTS.comissaoComercial * 100,
 };
 
 // ─── Types ─────────────────────────────────────────────────────────────────────

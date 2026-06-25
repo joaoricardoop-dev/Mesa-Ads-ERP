@@ -2,6 +2,7 @@ import { formatIsoDateBR } from "@shared/billingSchedule";
 import { useState } from "react";
 import PageContainer from "@/components/PageContainer";
 import { trpc } from "@/lib/trpc";
+import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 import { toast } from "sonner";
 import { generatePriceTablePDF } from "@/lib/generate-price-table-pdf";
 
@@ -175,6 +176,7 @@ const GPC_PRESETS = {
 };
 
 export default function Production() {
+  const { premissas: sysPremissas } = useSystemPremissas();
   const [activeTab, setActiveTab] = useState("budgets");
   const [search, setSearch] = useState("");
 
@@ -527,7 +529,14 @@ export default function Production() {
             variant="outline"
             size="sm"
             className="gap-1.5"
-            onClick={() => { generatePriceTablePDF(0.06); toast.success("PDF gerado!"); }}
+            onClick={() => {
+              generatePriceTablePDF({
+                irpj: sysPremissas.irpj / 100,
+                comRestaurante: sysPremissas.comissaoRestaurante / 100,
+                comComercial: sysPremissas.comissaoComercial / 100,
+              });
+              toast.success("PDF gerado!");
+            }}
           >
             <Download className="w-3.5 h-3.5" />
             Tabela de Preços

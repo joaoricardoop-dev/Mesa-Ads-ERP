@@ -85,15 +85,15 @@ import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 function ProductPriceSheet({ product, hasPartner, open, onClose }: {
   product: any; hasPartner: boolean; open: boolean; onClose: () => void;
 }) {
-  const { bvAgencia } = useSystemPremissas();
+  const { premissas: sysPremissas, bvAgencia } = useSystemPremissas();
   const tiers = product.tiers ?? [];
   const discountTiers = product.discountTiers ?? [];
   const TipoIcon = TIPO_ICONS[product.tipo] ?? Package;
   const colors = TIPO_COLORS[product.tipo] ?? TIPO_COLORS.outro;
 
-  const irpj = parseFloat(product.irpj ?? "6") / 100;
-  const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
-  const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
+  const irpj = sysPremissas.irpj / 100;
+  const comRestaurante = sysPremissas.comissaoRestaurante / 100;
+  const comComercialProduto = sysPremissas.comissaoComercial / 100;
   const comParceiro = bvAgencia;
 
   const volumes = useMemo(
@@ -244,7 +244,7 @@ function ShoppingProductCard({
   hasPartner: boolean;
   onViewDetails: () => void;
 }) {
-  const { bvAgencia } = useSystemPremissas();
+  const { premissas: sysPremissas, bvAgencia } = useSystemPremissas();
   const volumes = useMemo(() =>
     (product.tiers ?? []).map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
     [product.tiers]
@@ -255,9 +255,9 @@ function ShoppingProductCard({
   const TipoIcon = TIPO_ICONS[product.tipo] ?? Package;
   const colors = TIPO_COLORS[product.tipo] ?? TIPO_COLORS.outro;
 
-  const irpj = parseFloat(product.irpj ?? "6") / 100;
-  const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
-  const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
+  const irpj = sysPremissas.irpj / 100;
+  const comRestaurante = sysPremissas.comissaoRestaurante / 100;
+  const comComercialProduto = sysPremissas.comissaoComercial / 100;
   const comParceiro = bvAgencia;
 
   const tiers = product.tiers ?? [];
@@ -365,14 +365,14 @@ function ShoppingProductCard({
 // ─── Price Table (Tabela de Preços tab) ───────────────────────────────────────
 
 function AdvertiserProductTable({ product, hasPartner }: { product: any; hasPartner: boolean }) {
-  const { bvAgencia } = useSystemPremissas();
+  const { premissas: sysPremissas, bvAgencia } = useSystemPremissas();
   const [expanded, setExpanded] = useState(true);
   const tiers = product.tiers ?? [];
   const discountTiers = product.discountTiers ?? [];
 
-  const irpj = parseFloat(product.irpj ?? "6") / 100;
-  const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
-  const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
+  const irpj = sysPremissas.irpj / 100;
+  const comRestaurante = sysPremissas.comissaoRestaurante / 100;
+  const comComercialProduto = sysPremissas.comissaoComercial / 100;
   const comParceiro = bvAgencia;
 
   const volumes = useMemo(

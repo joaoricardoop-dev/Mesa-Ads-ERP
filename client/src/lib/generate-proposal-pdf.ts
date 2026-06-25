@@ -5,6 +5,7 @@ import { computeProposalLinePrices } from "@shared/proposal-line-pricing";
 import { PROPOSAL_BINDING_CLAUSE_PREFIX, CAMPAIGN_TERM_BINDING_CLAUSE_PREFIX } from "@shared/const";
 import { fetchContractLinks } from "./contract-links";
 import type { ProposalPDFData, ProposalItem } from "@shared/proposalData";
+import { PREMISSAS_DEFAULTS } from "@shared/premissas";
 import {
   PDF_FONT as FONT_NAME,
   PDF_COLORS,
@@ -23,9 +24,12 @@ import {
 
 export type { ProposalPDFData, ProposalItem } from "@shared/proposalData";
 
-const DEFAULT_IRPJ = 0.06;
+const DEFAULT_IRPJ = PREMISSAS_DEFAULTS.irpj;
 void PDF_COLORS;
-const PRICING_DEDUCTIONS = { comRestaurante: 0.15, comComercial: 0.10 };
+const PRICING_DEDUCTIONS = {
+  comRestaurante: PREMISSAS_DEFAULTS.comissaoRestaurante,
+  comComercial: PREMISSAS_DEFAULTS.comissaoComercial,
+};
 
 const DEFAULT_CUSTOS_VOLUME: Array<{ vol: number; custoGPC: number; frete: number; artes: number; margem: number }> = [
   { vol: 1000,  custoGPC: 0.4190, frete: 80.38,   artes: 1, margem: 0.50 },

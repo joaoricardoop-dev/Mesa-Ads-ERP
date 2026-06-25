@@ -107,14 +107,21 @@ const STEPS = [
   { key: "confirmacao", label: "Confirmar", icon: CheckCircle2 },
 ];
 
-function calcItemPrice(product: any, volume: number, weeks: number, hasPartner: boolean, bvAgencia: number) {
+function calcItemPrice(
+  product: any,
+  volume: number,
+  weeks: number,
+  hasPartner: boolean,
+  premissas: { irpj: number; comissaoRestaurante: number; comissaoComercial: number; bvAgencia: number },
+) {
   const tiers = product.tiers ?? [];
   const discountTiers = product.discountTiers ?? [];
 
-  const irpj = parseFloat(product.irpj ?? "6") / 100;
-  const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
-  const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-  const comParceiro = bvAgencia;
+  // Premissas globais (system_config) — fonte única, não mais as colunas legadas do produto.
+  const irpj = premissas.irpj / 100;
+  const comRestaurante = premissas.comissaoRestaurante / 100;
+  const comComercialProduto = premissas.comissaoComercial / 100;
+  const comParceiro = premissas.bvAgencia;
 
   const sortedTiers = [...tiers].sort((a: any, b: any) => b.volumeMin - a.volumeMin);
   const tier = sortedTiers.find((t: any) => volume >= t.volumeMin) ?? tiers[0];
@@ -143,7 +150,8 @@ function calcItemPrice(product: any, volume: number, weeks: number, hasPartner: 
 }
 
 export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onClose, onSuccess }: CampaignBuilderProps) {
-  const { bvAgencia } = useSystemPremissas();
+  const { premissas: sysPremissas, bvAgencia } = useSystemPremissas();
+  const calcPremissas = { ...sysPremissas, bvAgencia };
   const [step, setStep] = useState(0);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [campaignName, setCampaignName] = useState("");
@@ -201,7 +209,7 @@ export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onC
       const volumes = (product.tiers ?? []).map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b);
       const defaultVol = product.defaultQtyPerLocation ?? volumes[0] ?? 500;
       const defaultWeeks = 4;
-      const { unitPrice, totalPrice } = calcItemPrice(product, defaultVol, defaultWeeks, hasPartner, bvAgencia);
+      const { unitPrice, totalPrice } = calcItemPrice(product, defaultVol, defaultWeeks, hasPartner, calcPremissas);
       return [...prev, { product, volume: defaultVol, weeks: defaultWeeks, unitPrice, totalPrice }];
     });
   }
@@ -213,7 +221,7 @@ export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onC
   function updateCartItem(productId: number, volume: number, weeks: number) {
     setCart(prev => prev.map(item => {
       if (item.product.id !== productId) return item;
-      const { unitPrice, totalPrice } = calcItemPrice(item.product, volume, weeks, hasPartner, bvAgencia);
+      const { unitPrice, totalPrice } = calcItemPrice(item.product, volume, weeks, hasPartner, calcPremissas);
       return { ...item, volume, weeks, unitPrice, totalPrice };
     }));
   }
@@ -378,6 +386,7 @@ function StepProdutos({ products, cart, hasPartner, bvAgencia, onAdd, onRemove }
   products: any[]; cart: CartItem[]; hasPartner: boolean; bvAgencia: number;
   onAdd: (p: any) => void; onRemove: (id: number) => void;
 }) {
+  const { premissas: sysPremissas } = useSystemPremissas();
   return (
     <div className="p-6 space-y-5">
       <div>
@@ -415,9 +424,9 @@ function StepProdutos({ products, cart, hasPartner, bvAgencia, onAdd, onRemove }
             const discountTiers = product.discountTiers ?? [];
             const smallestVol = volumes[0];
             const smallestTier = tiers.find((t: any) => t.volumeMin === smallestVol);
-            const irpj = parseFloat(product.irpj ?? "6") / 100;
-            const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
-            const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
+            const irpj = sysPremissas.irpj / 100;
+            const comRestaurante = sysPremissas.comissaoRestaurante / 100;
+            const comComercialProduto = sysPremissas.comissaoComercial / 100;
             const comParceiro = bvAgencia;
             let minPrice: number | null = null;
             if (smallestTier && smallestVol != null) {

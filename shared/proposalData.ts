@@ -1,3 +1,5 @@
+import { PREMISSAS_DEFAULTS } from "./premissas";
+
 // Fonte única da MONTAGEM dos dados da proposta/OS.
 //
 // Antes, o parse das notes do item (semanas/spot/impressões) e o cálculo de
@@ -165,7 +167,6 @@ export interface AssembleProposalInput {
     productUnitLabelPlural?: string | null;
     periodStart?: string | null;
     batchWeeks?: number | null;
-    productIrpj?: string | number | null;
     isCustomProduct?: boolean | null;
     customProductName?: string | null;
     customProjectCost?: string | number | null;
@@ -190,6 +191,11 @@ export interface AssembleProposalInput {
     notes?: string | null;
   }>;
   billingSchedule?: Array<{ sequence: number; amount: string | number; dueDate: string; notes?: string | null }>;
+  /**
+   * Alíquota IRPJ (decimal, ex.: 0.06) — premissa global (system_config),
+   * fonte única. Quando ausente, cai no PREMISSAS_DEFAULTS.irpj.
+   */
+  irpj?: number | null;
 }
 
 function num(v: string | number | null | undefined): number {
@@ -291,6 +297,6 @@ export function assembleProposalData(input: AssembleProposalInput): ProposalPDFD
     customSellerCommission: optNum(q.customSellerCommission),
     customFinalPrice: optNum(q.customFinalPrice),
     agencyCommissionPercent: optNum(q.agencyCommissionPercent),
-    irpj: q.productIrpj != null ? num(q.productIrpj) / 100 : 0.06,
+    irpj: input.irpj != null ? input.irpj : PREMISSAS_DEFAULTS.irpj,
   };
 }

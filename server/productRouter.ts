@@ -91,9 +91,8 @@ export const productRouter = router({
       unitLabelPlural: z.string().min(1).default("unidades"),
       defaultQtyPerLocation: z.number().int().min(1).default(500),
       defaultSemanas: z.number().int().default(12),
-      irpj: z.string().default("6.00"),
-      comRestaurante: z.string().default("15.00"),
-      comComercial: z.string().default("10.00"),
+      // irpj/comRestaurante/comComercial são LEGADO (read-only): as premissas
+      // globais vivem em system_config (fonte única). Não aceitar mais no input.
       pricingMode: z.enum(["cost_based", "price_based"]).default("cost_based"),
       entryType: z.enum(["tiers", "fixed_quantities"]).default("tiers"),
       workflowTemplate: z.enum(WORKFLOW_TEMPLATE_ENUM).nullable().optional(),
@@ -135,9 +134,8 @@ export const productRouter = router({
       unitLabelPlural: z.string().min(1).optional(),
       defaultQtyPerLocation: z.number().int().min(1).optional(),
       defaultSemanas: z.number().int().optional(),
-      irpj: z.string().optional(),
-      comRestaurante: z.string().optional(),
-      comComercial: z.string().optional(),
+      // irpj/comRestaurante/comComercial são LEGADO (read-only): premissas
+      // globais vivem em system_config (fonte única). Não aceitar mais no input.
       pricingMode: z.enum(["cost_based", "price_based"]).optional(),
       entryType: z.enum(["tiers", "fixed_quantities"]).optional(),
       workflowTemplate: z.enum(WORKFLOW_TEMPLATE_ENUM).nullable().optional(),

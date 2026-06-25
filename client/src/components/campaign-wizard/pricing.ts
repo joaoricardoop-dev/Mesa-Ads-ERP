@@ -1,17 +1,21 @@
 import {
   calcUnitPriceAdv,
   applyDiscountTierAdv,
-  BV_PADRAO_AGENCIA,
   DESCONTOS_PRAZO,
 } from "@/lib/campaign-builder-utils";
 
 export interface ProductLite {
   id: number;
   name: string;
-  irpj: string | null;
-  comRestaurante: string | null;
-  comComercial: string | null;
   pricingMode: string | null;
+}
+
+/** Premissas globais (system_config): IRPJ/comissões em %, BV em decimal. */
+export interface QuotePremissas {
+  irpj: number;
+  comissaoRestaurante: number;
+  comissaoComercial: number;
+  bvAgencia: number;
 }
 
 export interface PricingTier {
@@ -49,8 +53,9 @@ export function quotePrice(params: {
   volume: number;
   weeks: number;
   hasPartner: boolean;
+  premissas: QuotePremissas;
 }): PriceQuote {
-  const { product, tiers, discountTiers, volume, weeks, hasPartner } = params;
+  const { product, tiers, discountTiers, volume, weeks, hasPartner, premissas } = params;
   const sorted = [...tiers].sort((a, b) => a.volumeMin - b.volumeMin);
   const tier =
     sorted.find((t) => volume >= t.volumeMin && (t.volumeMax == null || volume <= t.volumeMax)) ||
@@ -60,12 +65,13 @@ export function quotePrice(params: {
     return { unitPrice: 0, totalPrice: 0, baseTotal: 0, prazoDiscountPct: 0, volumeDiscountPct: 0 };
   }
 
-  const irpj = parseFloat(product.irpj ?? "6") / 100;
-  const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
-  const comComercial = parseFloat(product.comComercial ?? "10") / 100;
+  // Premissas globais (system_config) — fonte única, não mais as colunas legadas do produto.
+  const irpj = premissas.irpj / 100;
+  const comRestaurante = premissas.comissaoRestaurante / 100;
+  const comComercial = premissas.comissaoComercial / 100;
   // BV de agência/parceiro é sempre embutido no preço público (espelha o backend).
   void hasPartner;
-  const comParceiro = BV_PADRAO_AGENCIA;
+  const comParceiro = premissas.bvAgencia;
 
   let unitPrice = calcUnitPriceAdv({
     custoUnitario: parseFloat(tier.custoUnitario),

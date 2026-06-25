@@ -112,7 +112,6 @@ export default function QuotationSign() {
           productUnitLabelPlural: q?.productUnitLabelPlural,
           periodStart: q?.periodStart,
           batchWeeks: q?.batchWeeks,
-          productIrpj: q?.productIrpj,
           isCustomProduct: q?.isCustomProduct,
           customProductName: q?.customProductName,
           customProjectCost: q?.customProjectCost,
@@ -137,6 +136,7 @@ export default function QuotationSign() {
           notes: it.notes,
         })),
         billingSchedule: data!.billingSchedule,
+        irpj: q?.irpj,
       }),
       signature: {
         signerName,

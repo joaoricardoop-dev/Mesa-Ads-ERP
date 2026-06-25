@@ -1085,6 +1085,9 @@ export const products = pgTable("products", {
   defaultQtyPerLocation: integer("defaultQtyPerLocation").default(500),
   defaultSemanas: integer("defaultSemanas").default(12),
   imagemUrl: text("imagemUrl"),
+  // LEGADO (read-only): premissas globais (IRPJ / comissões) vivem em
+  // system_config — fonte única. Colunas mantidas só para histórico; não são
+  // mais lidas/escritas pelos caminhos de cálculo. NÃO remover (preserva dados).
   irpj: decimal("irpj", { precision: 5, scale: 2 }).default("6.00"),
   comRestaurante: decimal("comRestaurante", { precision: 5, scale: 2 }).default("15.00"),
   comComercial: decimal("comComercial", { precision: 5, scale: 2 }).default("10.00"),

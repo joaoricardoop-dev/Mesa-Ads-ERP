@@ -16,6 +16,7 @@ import {
 import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { TRPCError } from "@trpc/server";
 import { sendEmail } from "./email";
+import { getSystemConfig } from "./systemConfigRouter";
 
 async function getDatabase() {
   const d = await getDb();
@@ -76,7 +77,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
           productId: quotations.productId,
           productName: products.name,
           productUnitLabelPlural: products.unitLabelPlural,
-          productIrpj: products.irpj,
+          premissasSnapshot: quotations.premissasSnapshot,
         })
         .from(quotations)
         .leftJoin(clients, eq(quotations.clientId, clients.id))
@@ -148,8 +149,13 @@ export function setupPublicSigningRoutes(app: express.Express) {
       // deslocamento de vencimentos.
       const billingSchedule = await readBillingSchedule(db, "quotation", quotation[0].id);
 
+      // IRPJ da proposta vem da premissa registrada na cotação (snapshot) ou,
+      // na ausência, da config global vigente — fonte única, sem ler produto.
+      const snap = quotation[0].premissasSnapshot as { irpj?: number } | null;
+      const irpjDecimal = snap?.irpj ?? (await getSystemConfig()).irpj;
+
       res.json({
-        quotation: quotation[0],
+        quotation: { ...quotation[0], irpj: irpjDecimal },
         serviceOrder: {
           orderNumber: os[0].orderNumber,
           description: os[0].description,

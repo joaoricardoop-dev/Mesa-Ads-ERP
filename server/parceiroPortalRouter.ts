@@ -5,6 +5,7 @@ import { partners, leads, quotations, clients, users, leadInteractions, products
 import { eq, desc, and, sql, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createCrmNotification } from "./notificationRouter";
+import { getSystemConfig } from "./systemConfigRouter";
 
 async function getDatabase() {
   const d = await getDb();
@@ -550,10 +551,13 @@ export const parceiroPortalRouter = router({
       }
       if (!matchedTier) throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhuma faixa de preço encontrada para o volume informado." });
 
-      const irpj = parseFloat(String(product.irpj ?? "6")) / 100;
-      const comRestaurante = parseFloat(String(product.comRestaurante ?? "0")) / 100;
-      const comComercialProduto = parseFloat(String(product.comComercial ?? "10")) / 100;
-      const BV_PADRAO = 0.20; // preço público sempre com este BV
+      // Premissas globais (system_config) — fonte única; produtos não definem
+      // mais IRPJ/comissões/BV.
+      const premissas = await getSystemConfig();
+      const irpj = premissas.irpj;
+      const comRestaurante = premissas.comissaoRestaurante;
+      const comComercialProduto = premissas.comissaoComercial;
+      const BV_PADRAO = premissas.bvPadraoAgencia; // preço público sempre com este BV
       const comParceiro = BV_PADRAO;
       const billingMode = (partner.billingMode ?? "bruto") as "bruto" | "liquido";
       const pricingMode = product.pricingMode ?? "cost_based";

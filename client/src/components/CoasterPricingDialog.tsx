@@ -23,7 +23,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronDown, ChevronRight, PackageCheck } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import type { PricingDialogImportResult } from "./BudgetPricingDialog";
-import type { ItemPremissas } from "@/hooks/useBudgetCalculator";
+import { type ItemPremissas, DEFAULT_PREMISSAS } from "@/hooks/useBudgetCalculator";
 
 const SEMANAS = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52];
 
@@ -74,7 +74,7 @@ export function CoasterPricingDialog({
   const [descontoParceiro, setDescontoParceiro] = useState(false);
   const [premissasOpen, setPremissasOpen] = useState(false);
   const [premissas, setPremissas] = useState<ItemPremissas>(
-    initialPremissas ?? { irpj: 6, comissaoRestaurante: 15, comissaoComercial: 10 }
+    initialPremissas ?? DEFAULT_PREMISSAS
   );
 
   const semanaIdx = SEMANAS.indexOf(semanas) >= 0 ? SEMANAS.indexOf(semanas) : 2;

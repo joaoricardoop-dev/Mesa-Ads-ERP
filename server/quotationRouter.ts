@@ -15,7 +15,7 @@ import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { withUniqueRetry, describeDbError } from "./utils/uniqueNumberRetry";
 import { nextNumber } from "./utils/numberCounter";
 import { resolveQuotationClientId } from "./utils/resolveQuotationClient";
-import { getSystemConfig } from "./systemConfigRouter";
+import { getSystemConfig, type SystemPremissas } from "./systemConfigRouter";
 
 const SELF_SERVICE_USER_ID = "self_service";
 
@@ -158,7 +158,7 @@ export const quotationRouter = router({
           productName: products.name,
           productUnitLabel: products.unitLabel,
           productUnitLabelPlural: products.unitLabelPlural,
-          productIrpj: products.irpj,
+          premissasSnapshot: quotations.premissasSnapshot,
           partnerId: quotations.partnerId,
           partnerName: partners.name,
           periodStart: quotations.periodStart,
@@ -173,7 +173,13 @@ export const quotationRouter = router({
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(quotations.createdAt));
 
-      return rows;
+      // IRPJ por cotação: snapshot da cotação ou, na ausência, config global
+      // vigente — fonte única, sem ler o produto.
+      const cfgList = await getSystemConfig();
+      return rows.map((r) => ({
+        ...r,
+        irpj: ((r.premissasSnapshot as SystemPremissas | null)?.irpj) ?? cfgList.irpj,
+      }));
     }),
 
   get: protectedProcedure
@@ -233,7 +239,7 @@ export const quotationRouter = router({
           productName: products.name,
           productUnitLabel: products.unitLabel,
           productUnitLabelPlural: products.unitLabelPlural,
-          productIrpj: products.irpj,
+          premissasSnapshot: quotations.premissasSnapshot,
           partnerId: quotations.partnerId,
           partnerName: partners.name,
           periodStart: quotations.periodStart,
@@ -251,7 +257,9 @@ export const quotationRouter = router({
       // payload so consumers (proposta, PDF, internal detail) don't need
       // a second roundtrip.
       const billingSchedule = await readBillingSchedule(db, "quotation", rows[0].id);
-      return { ...rows[0], billingSchedule };
+      // IRPJ da cotação: snapshot ou config global vigente — fonte única.
+      const irpj = ((rows[0].premissasSnapshot as SystemPremissas | null)?.irpj) ?? (await getSystemConfig()).irpj;
+      return { ...rows[0], billingSchedule, irpj };
     }),
 
   create: comercialProcedure
@@ -607,10 +615,13 @@ export const quotationRouter = router({
 
       // Task #186 — pondera alíquotas entre fatia padrão (defaults) e fatia
       // custom (custom*Commission do header) quando a cotação tem produto custom.
+      // Premissas globais: fatia padrão usa a premissa da cotação (snapshot)
+      // ou, na ausência, a config global vigente — fonte única, sem hardcode.
+      const stdPremMw = (quotation[0].premissasSnapshot as SystemPremissas | null) ?? (await getSystemConfig());
       const mwMix = computeQuotationCommissionMix(quotation[0], {
-        restaurantCommissionPercent: 20,
-        sellerCommissionPercent: 10,
-        agencyBvPercent: 20,
+        restaurantCommissionPercent: stdPremMw.comissaoRestaurante * 100,
+        sellerCommissionPercent: stdPremMw.comissaoComercial * 100,
+        agencyBvPercent: stdPremMw.bvPadraoAgencia * 100,
       });
 
       // Retry on PG 23505 (campaigns_campaignNumber_unique): regenera o número
@@ -1023,14 +1034,18 @@ export const quotationRouter = router({
         .set({ status: "assinada", signatureUrl: input.signatureUrl, updatedAt: new Date() })
         .where(eq(serviceOrders.id, os[0].id));
 
+      // Premissas globais: fatia padrão usa a premissa da cotação (snapshot)
+      // ou, na ausência, a config global vigente — fonte única, sem hardcode.
+      const stdPremSos = (quotation[0].premissasSnapshot as SystemPremissas | null) ?? (await getSystemConfig());
+      const comRestauranteFallback = (stdPremSos.comissaoRestaurante * 100).toFixed(2);
       let totalCoasters = 0;
       let weightedCommissionSum = 0;
       for (const alloc of allocatedRestaurants) {
-        const comm = parseFloat(String(alloc.commissionPercent || "20"));
+        const comm = parseFloat(String(alloc.commissionPercent || comRestauranteFallback));
         totalCoasters += alloc.coasterQuantity;
         weightedCommissionSum += comm * alloc.coasterQuantity;
       }
-      const avgCommission = totalCoasters > 0 ? (weightedCommissionSum / totalCoasters).toFixed(2) : "20.00";
+      const avgCommission = totalCoasters > 0 ? (weightedCommissionSum / totalCoasters).toFixed(2) : comRestauranteFallback;
 
       // Resolve clientId — cotações criadas via lead podem não ter clientId direto.
       // Fonte única de verdade: resolveQuotationClientId (compartilhado com a assinatura pública).
@@ -1057,8 +1072,8 @@ export const quotationRouter = router({
       // aplicar campaign.<rate> × invoice.amount.
       const sosMix = computeQuotationCommissionMix(quotation[0], {
         restaurantCommissionPercent: parseFloat(avgCommission),
-        sellerCommissionPercent: 10,
-        agencyBvPercent: 20,
+        sellerCommissionPercent: stdPremSos.comissaoComercial * 100,
+        agencyBvPercent: stdPremSos.bvPadraoAgencia * 100,
       });
 
       // Retry on PG 23505 (campaigns_campaignNumber_unique): regenera o número
@@ -1418,10 +1433,12 @@ export const quotationRouter = router({
       const DESCONTOS_PRAZO: Record<number, number> = { 4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11 };
       const hasPartner = !!client?.partnerId || isPartnerFlow;
 
-      function computeUnitPrice(prod: { irpj: string | null; comRestaurante: string | null; comComercial: string | null; pricingMode: string | null }, tier: typeof pricingTiersRows[0], volume: number): number {
-        const irpj = parseFloat(prod.irpj ?? "6") / 100;
-        const comRestaurante = parseFloat(prod.comRestaurante ?? "15") / 100;
-        const comComercial = parseFloat(prod.comComercial ?? "10") / 100;
+      // Premissas globais (system_config) — fonte única; produtos não definem
+      // mais IRPJ/comissões.
+      const irpj = premissasSnapshot.irpj;
+      const comRestaurante = premissasSnapshot.comissaoRestaurante;
+      const comComercial = premissasSnapshot.comissaoComercial;
+      function computeUnitPrice(prod: { pricingMode: string | null }, tier: typeof pricingTiersRows[0], volume: number): number {
         const comParceiro = BV_AGENCIA; // sempre embutido no preço público
         const custoUnitario = parseFloat(tier.custoUnitario);
         const frete = parseFloat(tier.frete);

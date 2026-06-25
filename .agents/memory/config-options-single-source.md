@@ -30,3 +30,15 @@ Loss reasons and opportunity origin categories are admin-editable lists stored i
 - Label lookups for display should include inactive options, so historical records whose code was later deactivated still resolve a label.
 - Writing a known-seeded constant code (e.g. the auto-expire reason) is fine — that is not a divergence, only label *display* must come from the single source.
 - `origin_category` stores code == label (legacy compat); loss-reason codes are slugs. Code is immutable after creation; only label/order/active toggle are editable.
+
+## Instance: global premissas (IRPJ / comissão restaurante / comissão comercial / BV padrão agência)
+
+The four global pricing premissas live in `system_config` and are the ONLY source for pricing/finance calc.
+
+**Rule:** Read them via `useSystemPremissas()` (client — returns `premissas` in percent + `bvAgencia` in decimal) and `getSystemConfig()` (server). Pure helpers/PDFs that can't call the hook fall back to `PREMISSAS_DEFAULTS` (`shared/premissas.ts`, decimals). The `products` columns `irpj` / `comRestaurante` / `comComercial` are LEGACY/read-only — never read them as a pricing source and never re-add them to product create/update input or the Products UI.
+
+**Why:** Values were hardcoded (`0.06`/`"6"`, `"15"`, `"10"`, `0.20`) and duplicated across server calc, routers, client components and the products table, so an admin edit in AdminConfiguracoes didn't propagate. Centralizing means one edit flows to quotation, simulator, budget, finance engine, AP, DRE, portals and proposal/price-table PDFs.
+
+**Distinct data — do NOT fold into the global premissa:** partner-specific `commissionPercent` (parceiro portal), product `customPartnerCommission` / `customSellerCommission` overrides, and `PIS_COFINS_RATE` / `descParcPerc`. These are separate origins.
+
+**How to apply:** When wiring premissas into a React sub-component that previously received only some derived values as props (e.g. `bvAgencia`), call `useSystemPremissas()` locally in that sub-component rather than assuming the parent's hook vars are in scope.

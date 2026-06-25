@@ -137,9 +137,6 @@ interface ProductForm {
   unitLabelPlural: string;
   defaultQtyPerLocation: string;
   defaultSemanas: string;
-  irpj: string;
-  comRestaurante: string;
-  comComercial: string;
   pricingMode: PricingMode;
   entryType: EntryType;
   workflowTemplate: WorkflowTemplate | "";
@@ -166,9 +163,6 @@ const emptyProduct: ProductForm = {
   unitLabelPlural: "unidades",
   defaultQtyPerLocation: "500",
   defaultSemanas: "12",
-  irpj: "6.00",
-  comRestaurante: "15.00",
-  comComercial: "10.00",
   pricingMode: "cost_based",
   entryType: "tiers",
   workflowTemplate: "",
@@ -256,9 +250,6 @@ export default function Products() {
       unitLabelPlural: p.unitLabelPlural,
       defaultQtyPerLocation: String(p.defaultQtyPerLocation || 500),
       defaultSemanas: String(p.defaultSemanas || 12),
-      irpj: p.irpj || "6.00",
-      comRestaurante: p.comRestaurante || "15.00",
-      comComercial: p.comComercial || "10.00",
       pricingMode: (p.pricingMode as PricingMode) || "cost_based",
       entryType: (p.entryType as EntryType) || "tiers",
       workflowTemplate: (p.workflowTemplate as WorkflowTemplate) || "",
@@ -290,9 +281,6 @@ export default function Products() {
       unitLabelPlural: form.unitLabelPlural,
       defaultQtyPerLocation: parseInt(form.defaultQtyPerLocation) || 500,
       defaultSemanas: parseInt(form.defaultSemanas) || 12,
-      irpj: form.irpj,
-      comRestaurante: form.comRestaurante,
-      comComercial: form.comComercial,
       pricingMode: form.pricingMode,
       entryType: form.entryType,
       workflowTemplate: (form.workflowTemplate as WorkflowTemplate) || null,
@@ -417,9 +405,6 @@ export default function Products() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Unidade</TableHead>
                 <TableHead>Qtd Padrão/Ponto</TableHead>
-                <TableHead>IRPJ</TableHead>
-                <TableHead>Com. Rest.</TableHead>
-                <TableHead>Com. Com.</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Parceiros</TableHead>
                 <TableHead>Anunciantes</TableHead>
@@ -611,20 +596,6 @@ export default function Products() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <Label>IRPJ (%)</Label>
-                <Input value={form.irpj} onChange={e => setForm({ ...form, irpj: e.target.value })} />
-              </div>
-              <div>
-                <Label>Com. Local (%)</Label>
-                <Input value={form.comRestaurante} onChange={e => setForm({ ...form, comRestaurante: e.target.value })} />
-              </div>
-              <div>
-                <Label>Com. Comercial (%)</Label>
-                <Input value={form.comComercial} onChange={e => setForm({ ...form, comComercial: e.target.value })} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -931,9 +902,6 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
         </TableCell>
         <TableCell className="text-muted-foreground">{p.unitLabelPlural}</TableCell>
         <TableCell>{p.defaultQtyPerLocation?.toLocaleString("pt-BR")}</TableCell>
-        <TableCell>{p.irpj}%</TableCell>
-        <TableCell>{p.comRestaurante}%</TableCell>
-        <TableCell>{p.comComercial}%</TableCell>
         <TableCell>
           <Badge variant={p.isActive ? "default" : "secondary"} className={p.isActive ? "bg-green-600" : ""}>
             {p.isActive ? "Ativo" : "Inativo"}

@@ -7,8 +7,6 @@ export const DESCONTOS_PRAZO: Record<number, number> = {
   4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11,
 };
 
-export const BV_PADRAO_AGENCIA = 0.20;
-
 export const TIPO_LABELS: Record<string, string> = {
   coaster: "Porta-Copos",
   display: "Display",

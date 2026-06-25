@@ -3,21 +3,15 @@ import { z } from "zod";
 import { getDb } from "./db";
 import { systemConfig } from "../drizzle/schema";
 import { TRPCError } from "@trpc/server";
+import { PREMISSAS_DEFAULTS, type SystemPremissas } from "../shared/premissas";
 
-/** Valores padrão usados como fallback quando a tabela ainda não foi populada. */
-export const SYSTEM_CONFIG_DEFAULTS = {
-  irpj: 0.06,
-  comissaoRestaurante: 0.15,
-  comissaoComercial: 0.1,
-  bvPadraoAgencia: 0.2,
-} as const;
+/**
+ * Valores padrão usados como fallback quando a tabela ainda não foi populada.
+ * Reexporta a fonte canônica única (`shared/premissas.ts`) — não duplicar.
+ */
+export const SYSTEM_CONFIG_DEFAULTS = PREMISSAS_DEFAULTS;
 
-export type SystemPremissas = {
-  irpj: number;
-  comissaoRestaurante: number;
-  comissaoComercial: number;
-  bvPadraoAgencia: number;
-};
+export type { SystemPremissas };
 
 /**
  * Fonte de verdade das premissas globais (IRPJ/comissões/BV) em formato decimal.

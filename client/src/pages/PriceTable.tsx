@@ -19,6 +19,7 @@ import PageContainer from "@/components/PageContainer";
 import Section from "@/components/Section";
 import { useRestaurantAllocation, COASTER_CAPACITY_FACTOR } from "@/hooks/useRestaurantAllocation";
 import { useSystemPremissas } from "@/hooks/useSystemPremissas";
+import { PREMISSAS_DEFAULTS } from "@shared/premissas";
 
 const DEFAULT_CUSTOS_VOLUME: Record<number, { custoGPC: number; margem: number; frete: number; artes: number }> = {
   1000:  { custoGPC: 0.4190, margem: 0.50, frete: 80.38,   artes: 1 },
@@ -45,10 +46,11 @@ const DEFAULT_CUSTOS_VOLUME: Record<number, { custoGPC: number; margem: number; 
 
 const VOLUMES = Object.keys(DEFAULT_CUSTOS_VOLUME).map(Number);
 
+// Derivado da fonte canônica (decimal) em shared; aqui em percentual.
 const DEFAULT_PREMISSAS = {
-  irpj: 6,
-  comissaoRestaurante: 15,
-  comissaoComercial: 10,
+  irpj: PREMISSAS_DEFAULTS.irpj * 100,
+  comissaoRestaurante: PREMISSAS_DEFAULTS.comissaoRestaurante * 100,
+  comissaoComercial: PREMISSAS_DEFAULTS.comissaoComercial * 100,
 };
 
 const DEFAULT_DESCONTOS_PRAZO: Record<number, number> = {
@@ -67,8 +69,6 @@ const DEFAULT_PAGAMENTO = {
 
 const SEMANAS = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52];
 
-const BV_PADRAO = 0.20; // BV sempre embutido no preço público
-
 const inputCls = "bg-background border-border/30 h-7 text-xs font-mono px-2 w-20 text-right";
 
 export default function PriceTable() {
@@ -79,7 +79,8 @@ export default function PriceTable() {
   const [presentationMode, setPresentationMode] = useState(false);
   const [descontoParceiro, setDescontoParceiro] = useState(false);
 
-  const { premissas: sysPremissas, isLoading: sysPremissasLoading } = useSystemPremissas();
+  const { premissas: sysPremissas, bvAgencia, isLoading: sysPremissasLoading } = useSystemPremissas();
+  const BV_PADRAO = bvAgencia; // BV global (system_config), sempre embutido no preço público
   const [premissas, setPremissas] = useState(DEFAULT_PREMISSAS);
   const sysPremissasSeeded = useRef(false);
   const [descontosPrazo, setDescontosPrazo] = useState(DEFAULT_DESCONTOS_PRAZO);
@@ -152,18 +153,16 @@ export default function PriceTable() {
 
   useEffect(() => {
     if (selectedProduct) {
-      setPremissas({
-        irpj: parseFloat(selectedProduct.irpj ?? "6"),
-        comissaoRestaurante: parseFloat(selectedProduct.comRestaurante ?? "15"),
-        comissaoComercial: parseFloat(selectedProduct.comComercial ?? "10"),
-      });
+      // Premissas globais (system_config) — fonte única; produto não define mais
+      // IRPJ/comissões.
+      setPremissas(sysPremissas);
       setDescontosPrazo(
         selectedProduct.pricingMode === "price_based"
           ? ZERO_DESCONTOS_PRAZO
           : DEFAULT_DESCONTOS_PRAZO
       );
     }
-  }, [selectedProduct]);
+  }, [selectedProduct, sysPremissas]);
 
   const volumes = useMemo(() => {
     if (productTiers.length > 0) {
@@ -327,15 +326,8 @@ export default function PriceTable() {
   };
 
   const resetPremissas = () => {
-    if (selectedProduct) {
-      setPremissas({
-        irpj: parseFloat(selectedProduct.irpj ?? "6"),
-        comissaoRestaurante: parseFloat(selectedProduct.comRestaurante ?? "15"),
-        comissaoComercial: parseFloat(selectedProduct.comComercial ?? "10"),
-      });
-    } else {
-      setPremissas(sysPremissas);
-    }
+    // Premissas globais (system_config) — fonte única; produto não é mais origem.
+    setPremissas(sysPremissas);
     setDescontosPrazo(isPriceBasedProduct ? ZERO_DESCONTOS_PRAZO : DEFAULT_DESCONTOS_PRAZO);
     setPagamentoConfig(DEFAULT_PAGAMENTO);
     if (productTiers.length > 0) {

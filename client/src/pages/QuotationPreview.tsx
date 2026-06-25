@@ -6,6 +6,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/format";
 import { calcTelaImpressions, TELAS_INSERCOES } from "@/hooks/useBudgetCalculator";
+import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -120,6 +121,7 @@ export default function QuotationPreview() {
   const [hasPartnerDiscount, setHasPartnerDiscount] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
+  const { premissas: sysPremissas } = useSystemPremissas();
   const { data: budgetsList = [] } = trpc.budget.listActiveWithItems.useQuery();
   const { data: clientsData } = trpc.advertiser.list.useQuery();
   const clientsList = clientsData?.items ?? [];
@@ -194,9 +196,9 @@ export default function QuotationPreview() {
 
   const tiersForSimulator = typedProductTiers.length > 0 ? typedProductTiers : undefined;
   const paramsForSimulator: ProductParams | undefined = selectedProduct ? {
-    irpj: selectedProduct.irpj,
-    comRestaurante: selectedProduct.comRestaurante,
-    comComercial: selectedProduct.comComercial,
+    irpj: String(sysPremissas.irpj),
+    comRestaurante: String(sysPremissas.comissaoRestaurante),
+    comComercial: String(sysPremissas.comissaoComercial),
   } : undefined;
   const simulatorBase = useSimulator(selectedBudget, undefined, tiersForSimulator, paramsForSimulator);
   const totalCoasters = simulatorBase.inputs.coastersPerRestaurant * simulatorBase.inputs.activeRestaurants;
@@ -292,7 +294,7 @@ export default function QuotationPreview() {
         neighborhood: r.neighborhood,
         coasters: r.coasters,
       })),
-      irpj: parseFloat(selectedProduct?.irpj ?? "6") / 100,
+      irpj: sysPremissas.irpj / 100,
       ...(isTelasProduct ? {
         isTelas: true,
         productName: selectedProduct?.name,

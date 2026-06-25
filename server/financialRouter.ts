@@ -28,6 +28,7 @@ import { nextNumber } from "./utils/numberCounter";
 import { recordAudit } from "./finance/audit";
 import { audited } from "./finance/auditMiddleware";
 import { financialAuditLog } from "../drizzle/schema";
+import { getSystemConfig } from "./systemConfigRouter";
 
 function requireFinancialAccess(role: string | null) {
   if (role !== "admin" && role !== "financeiro" && role !== "manager") {
@@ -585,7 +586,9 @@ export const financialRouter = router({
     const ytdReceivedVal = parseFloat(ytdReceived[0]?.total || "0");
     const ytdDeductionsVal = parseFloat(ytdDeductions[0]?.total || "0");
     const ytdTotalCosts = totalProduction + totalFreight + ytdDeductionsVal;
-    const ytdIrpj = ytdInvoicedVal * 0.06;
+    // IRPJ vem da premissa global (system_config) — fonte única.
+    const irpjRate = (await getSystemConfig()).irpj;
+    const ytdIrpj = ytdInvoicedVal * irpjRate;
     const ytdGrossProfit = ytdInvoicedVal - ytdTotalCosts;
     const ytdNetProfit = ytdGrossProfit - ytdIrpj;
     const ytdGrossMargin = ytdInvoicedVal > 0 ? ytdGrossProfit / ytdInvoicedVal : 0;
@@ -596,7 +599,7 @@ export const financialRouter = router({
     const currDeductionsVal = parseFloat(currDeductions[0]?.total || "0");
     const currDirectCosts = currDeductionsVal; // produção/frete não tem data
     const currGrossProfit = currInvoicedVal - currDirectCosts;
-    const currIrpj = currInvoicedVal * 0.06;
+    const currIrpj = currInvoicedVal * irpjRate;
     const currNetProfit = currGrossProfit - currIrpj;
     const currGrossMargin = currInvoicedVal > 0 ? currGrossProfit / currInvoicedVal : 0;
 
@@ -2623,7 +2626,8 @@ export const financialRouter = router({
 
       const totalCosts = production + freight + partnerCommission + othersAp + agencyBv + sellerCommission;
       const grossProfit = netRevenue - totalCosts;
-      const irpj = grossRevenue * 0.06;
+      // IRPJ vem da premissa global (system_config) — fonte única.
+      const irpj = grossRevenue * (await getSystemConfig()).irpj;
       const netProfit = grossProfit - irpj;
 
       return {

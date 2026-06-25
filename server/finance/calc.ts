@@ -5,13 +5,18 @@
 // para serem testáveis isoladamente e reutilizadas em UI/relatórios.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { PREMISSAS_DEFAULTS } from "../../shared/premissas";
+
 export const TAX_RATES = {
   // PIS/COFINS — não recolhidos pela empresa (regime atual). Mantido como 0
   // para que toda a estrutura de breakdown continue funcionando sem mudanças
   // no schema; basta voltar para 0.0365 caso o regime mude.
   pisCofins: 0,
-  // IRPJ default quando produto não define (6% padrão histórico).
-  irpjDefault: 0.06,
+  // IRPJ default — último recurso quando o chamador não injeta a alíquota
+  // global. A fonte de verdade é `system_config` (getSystemConfig); este valor
+  // só existe para manter as funções puras testáveis isoladamente e deriva da
+  // origem canônica única (`shared/premissas.ts`).
+  irpjDefault: PREMISSAS_DEFAULTS.irpj,
 } as const;
 
 export interface InvoiceLike {
@@ -92,11 +97,15 @@ export function lastDayOfMonth(yyyymm: string): string {
 export function calcTaxes(
   invoice: InvoiceLike,
   product: ProductLike | null,
+  irpjRatePercent?: number,
 ): Array<{ kind: TaxKind; amount: number; ratePercent: number; description: string }> {
   const gross = num(invoice.amount);
   if (gross <= 0) return [];
 
-  const irpjRate = num(product?.irpj, TAX_RATES.irpjDefault * 100) / 100;
+  // IRPJ vem da premissa global (system_config) injetada pelo chamador.
+  // `product` é mantido apenas por compatibilidade de assinatura; produtos não
+  // são mais fonte de alíquota.
+  const irpjRate = num(irpjRatePercent, TAX_RATES.irpjDefault * 100) / 100;
   const irpjAmount = gross * irpjRate;
 
   const issRate = num(invoice.issRate) / 100;
@@ -170,12 +179,13 @@ export function calcVipRepasse(
   campaign: CampaignLike,
   product: ProductLike | null,
   vipProvider: VipProviderLike | null,
+  irpjRatePercent?: number,
 ): number {
   if (campaign.isBonificada) return 0;
   if (!product || !isDigitalProduct(product)) return 0;
   if (!vipProvider || vipProvider.status !== "active") return 0;
   const gross = num(invoice.amount);
-  const taxesTotal = calcTaxes(invoice, product).reduce((s, t) => s + t.amount, 0);
+  const taxesTotal = calcTaxes(invoice, product, irpjRatePercent).reduce((s, t) => s + t.amount, 0);
   const sellerRate = num(campaign.sellerCommission) / 100;
   const sellerComm = gross * sellerRate;
   const base = gross - taxesTotal - sellerComm;
@@ -196,6 +206,7 @@ export function calcPartnerCommission(
   campaign: CampaignLike,
   product: ProductLike | null,
   partner: PartnerLike | null,
+  irpjRatePercent?: number,
 ): { amount: number; ratePercent: number } {
   if (!partner) return { amount: 0, ratePercent: 0 };
   if (campaign.hasAgencyBv === false) return { amount: 0, ratePercent: 0 };
@@ -205,7 +216,7 @@ export function calcPartnerCommission(
   if (ratePercent <= 0) return { amount: 0, ratePercent };
 
   const gross = num(invoice.amount);
-  const taxesTotal = calcTaxes(invoice, product).reduce((s, t) => s + t.amount, 0);
+  const taxesTotal = calcTaxes(invoice, product, irpjRatePercent).reduce((s, t) => s + t.amount, 0);
   const restComm = calcRestaurantCommission(invoice, campaign, product);
   const base = gross - taxesTotal - restComm;
   if (base <= 0) return { amount: 0, ratePercent };
@@ -298,6 +309,7 @@ export function calcCustomVipRepasse(args: {
   invoice: InvoiceLike;
   campaign: CampaignLike;
   vipProvider: VipProviderLike | null;
+  irpjRatePercent?: number;
 }): number {
   const { quotation, invoice, campaign, vipProvider } = args;
   if (campaign.isBonificada) return 0;
@@ -313,7 +325,7 @@ export function calcCustomVipRepasse(args: {
   if (invoiceCustomShare <= 0) return 0;
 
   // Espelha calcVipRepasse: base = share − impostos da share − sellerComm da share
-  const irpjRate = TAX_RATES.irpjDefault;
+  const irpjRate = num(args.irpjRatePercent, TAX_RATES.irpjDefault * 100) / 100;
   const issRate = num(invoice.issRate) / 100;
   const issShare = invoice.issRetained || issRate <= 0 ? 0 : invoiceCustomShare * issRate;
   const taxesShare = invoiceCustomShare * (irpjRate + TAX_RATES.pisCofins) + issShare;
@@ -465,6 +477,8 @@ export function calcPhaseFinancials(input: {
   campaignTotalRevenue?: number;
   // ISS: se a campanha aplica ISS retido fora da AP (default: 0%).
   issRatePercent?: number;
+  // IRPJ global (system_config) injetado pelo chamador — fonte única.
+  irpjRatePercent?: number;
 }): PhaseFinancials {
   const { items, campaign, overrides } = input;
 
@@ -490,19 +504,10 @@ export function calcPhaseFinancials(input: {
     : (isDigital ? "vip" : (firstPhysical ? "restaurante" : "none"));
 
   // ── Impostos ────────────────────────────────────────────────────────────
-  // Taxa efetiva = override do batch OU média ponderada de products.irpj.
-  const irpjAvg = (() => {
-    if (items.length === 0) return TAX_RATES.irpjDefault * 100;
-    let totW = 0; let acc = 0;
-    for (const it of items) {
-      const w = it.totalPrice != null ? num(it.totalPrice) : it.quantity * num(it.unitPrice);
-      const r = num(it.productIrpj, TAX_RATES.irpjDefault * 100);
-      acc += r * w;
-      totW += w;
-    }
-    return totW > 0 ? acc / totW : TAX_RATES.irpjDefault * 100;
-  })();
-  const irpjEff = effNumeric(overrides.taxRateOverride, irpjAvg);
+  // Taxa base = IRPJ global (system_config) injetado pelo chamador. Produtos
+  // não são mais fonte de alíquota; o override por batch ainda prevalece.
+  const irpjBase = num(input.irpjRatePercent, TAX_RATES.irpjDefault * 100);
+  const irpjEff = effNumeric(overrides.taxRateOverride, irpjBase);
   const irpjAmount = receita * (irpjEff.value / 100);
   const pisCofinsAmount = receita * TAX_RATES.pisCofins;
   const issAmount = receita * ((input.issRatePercent ?? 0) / 100);

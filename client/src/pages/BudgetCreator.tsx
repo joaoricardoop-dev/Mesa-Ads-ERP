@@ -1253,9 +1253,9 @@ export default function BudgetCreator() {
 
   const addFromCatalog = useCallback((product: typeof productsList[number]) => {
     const prodPremissas: ItemPremissas = {
-      irpj: parseFloat(product.irpj ?? "") || sysPremissas.irpj,
-      comissaoRestaurante: parseFloat(product.comRestaurante ?? "") || sysPremissas.comissaoRestaurante,
-      comissaoComercial: parseFloat(product.comComercial ?? "") || sysPremissas.comissaoComercial,
+      irpj: sysPremissas.irpj,
+      comissaoRestaurante: sysPremissas.comissaoRestaurante,
+      comissaoComercial: sysPremissas.comissaoComercial,
     };
     const newItem: BudgetItemState = {
       id: makeItemId(),
