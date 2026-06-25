@@ -1,7 +1,9 @@
 import { getDb } from "./db";
-import { sql } from "drizzle-orm";
+import { sql, and, isNull, isNotNull } from "drizzle-orm";
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { quotations } from "../drizzle/schema";
+import { resolveQuotationClientId } from "./utils/resolveQuotationClient";
 
 const DRIZZLE_DIR = resolve(process.cwd(), "drizzle");
 
@@ -2063,6 +2065,67 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
   },
 ];
 
+/**
+ * Backfill Task #286 — vincula clientes às cotações órfãs já existentes.
+ *
+ * Cotações nascidas de lead (checkout aberto / SDR) podem ter `leadId`
+ * preenchido mas `clientId = NULL` até serem convertidas. Esta rotina percorre
+ * essas cotações órfãs e resolve o `clientId` reusando a MESMA fonte única de
+ * verdade da conversão (`resolveQuotationClientId`): cliente existente pelo
+ * e-mail do lead, senão cria um a partir do lead.
+ *
+ * Roda UMA vez (rastreada em `_applied_migrations`) para não criar clientes
+ * prematuramente para leads ainda não convertidos em boots futuros. É segura
+ * para rodar de novo (a query só pega `clientId IS NULL` e o resolver é
+ * idempotente). Órfãs sem lead resolvível (lead removido) ficam para o fluxo
+ * normal de conversão; o tracker é marcado ao final para evitar reprocessar a
+ * cada boot.
+ */
+async function backfillQuotationClientIdsFromLeads(db: any) {
+  const TRACKER = "backfill_quotation_client_id_from_lead_task_286";
+
+  const already = await db.execute(sql.raw(
+    `SELECT 1 FROM "_applied_migrations" WHERE "name" = '${TRACKER}' LIMIT 1;`,
+  ));
+  const alreadyRows: any[] = Array.isArray(already)
+    ? (already as any[])
+    : ((already as any)?.rows ?? []);
+  if (alreadyRows.length > 0) return;
+
+  const orphans = await db
+    .select({
+      id: quotations.id,
+      clientId: quotations.clientId,
+      leadId: quotations.leadId,
+    })
+    .from(quotations)
+    .where(and(isNull(quotations.clientId), isNotNull(quotations.leadId)));
+
+  let resolved = 0;
+  let unresolved = 0;
+  for (const q of orphans) {
+    try {
+      const clientId = await resolveQuotationClientId(db, q);
+      if (clientId) resolved++;
+      else unresolved++;
+    } catch (err: any) {
+      unresolved++;
+      console.warn(
+        `[Migrations] ${TRACKER}: cotação ${q.id} falhou:`,
+        err?.message?.split("\n")[0],
+      );
+    }
+  }
+
+  console.log(
+    `[Migrations] ${TRACKER}: órfãs=${orphans.length}, resolvidas=${resolved}, não resolvidas=${unresolved}`,
+  );
+
+  await db.execute(sql.raw(
+    `INSERT INTO "_applied_migrations" ("name") VALUES ('${TRACKER}') ON CONFLICT ("name") DO NOTHING;`,
+  ));
+}
+
 export async function runMigrations() {
   const db = await getDb();
   if (!db) {
@@ -2212,4 +2275,15 @@ export async function runMigrations() {
   console.log(
     `[Migrations] done in ${Date.now() - t0}ms (applied=${appliedCount}, skipped=${skippedCount}, total=${MIGRATIONS.length})`,
   );
+
+  // Backfill em código (não-SQL) — reusa a fonte única de verdade da conversão.
+  // Roda após o schema estar garantido e ainda sob o advisory lock acima.
+  try {
+    await backfillQuotationClientIdsFromLeads(db);
+  } catch (err: any) {
+    console.warn(
+      "[Migrations] backfill_quotation_client_id_from_lead_task_286 falhou:",
+      err?.message?.split("\n")[0],
+    );
+  }
 }
