@@ -40,8 +40,9 @@ export interface CartItem {
   productName: string;
   unitLabel?: string | null;
   shareIndex: number; // 1..maxShares
-  cycles: number; // número de ciclos de 4 semanas
+  cycles: number; // ciclos de 4 semanas que o período cobre (derivado das datas)
   cycleWeeks: number; // tipicamente 4
+  days: number; // dias inclusivos do período (datas livres) — base da diária de telas
   volume: number; // produção (qty) por ciclo
   productTipo?: string | null; // discrimina telas (precificação por CPM)
   // Config de CPM do local (snapshot p/ telas). Fonte única do cálculo:
@@ -101,7 +102,7 @@ function defaultRange(): { start: string; end: string } {
   const start = new Date(today);
   start.setDate(start.getDate() + 14);
   const end = new Date(start);
-  end.setDate(end.getDate() + 28); // 4 semanas
+  end.setDate(end.getDate() + 27); // 4 semanas (28 dias inclusivos = 1 ciclo)
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
   return { start: fmt(start), end: fmt(end) };
 }

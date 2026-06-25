@@ -57,6 +57,47 @@ export function computeCpmPricing(
   return { pricePerInsertion, weeklyInsertions, weeklyRevenue };
 }
 
+// ─── Precificação diária de telas (deriva da fonte CPM) ──────────────────────
+// Telas deixam de ser cobradas por ciclo: o preço passa a ser DIÁRIA × nº de
+// dias, com piso de 1 semana (7 dias). A diária NÃO é um novo dado — é derivada
+// da MESMA configuração CPM (receita semanal ÷ 7), preservando o CPM como única
+// origem da economia da tela.
+
+import { SCREEN_MIN_DAYS, billedScreenDays } from "./period";
+
+export interface ScreenDailyResult {
+  /** Receita semanal CPM (fonte). */
+  weeklyRevenue: number;
+  /** Diária = receita semanal ÷ 7. */
+  dailyRate: number;
+  /** Dias efetivamente cobrados (respeita o piso de 7 dias). */
+  billedDays: number;
+  /** Total = diária × dias cobrados. */
+  totalPrice: number;
+}
+
+/**
+ * Calcula o preço diário de uma tela para `days` dias selecionados.
+ * - `dailyRate` deriva do CPM (receita semanal ÷ 7) — fonte única.
+ * - `billedDays` aplica o piso de {@link SCREEN_MIN_DAYS} (1 semana).
+ * Retorna `null` quando a tela não tem CPM configurado (sem preço).
+ */
+export function computeScreenDailyPricing(
+  config: Partial<ScreenCpmConfig> | null | undefined,
+  days: number,
+): ScreenDailyResult | null {
+  const cpm = computeCpmPricing(config);
+  if (!cpm) return null;
+  const dailyRate = cpm.weeklyRevenue / SCREEN_MIN_DAYS; // 7 dias = 1 semana
+  const billedDays = billedScreenDays(days);
+  return {
+    weeklyRevenue: cpm.weeklyRevenue,
+    dailyRate,
+    billedDays,
+    totalPrice: dailyRate * billedDays,
+  };
+}
+
 /** Helper: converte uma string/decimal vinda do banco em número ou undefined. */
 export function parseCpmNumber(v: string | number | null | undefined): number | undefined {
   if (v == null) return undefined;

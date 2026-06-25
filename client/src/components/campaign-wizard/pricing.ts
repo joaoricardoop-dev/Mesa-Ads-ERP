@@ -3,7 +3,7 @@ import {
   applyDiscountTierAdv,
   DESCONTOS_PRAZO,
 } from "@/lib/campaign-builder-utils";
-import { computeCpmPricing, type ScreenCpmConfig } from "@shared/cpm-pricing";
+import { computeScreenDailyPricing, type ScreenCpmConfig } from "@shared/cpm-pricing";
 
 export interface ProductLite {
   id: number;
@@ -46,6 +46,10 @@ export interface PriceQuote {
   baseTotal: number;
   prazoDiscountPct: number;
   volumeDiscountPct: number;
+  /** Telas: diária derivada do CPM (receita semanal ÷ 7). */
+  dailyRate?: number;
+  /** Telas: dias efetivamente cobrados (piso de 7). */
+  billedDays?: number;
 }
 
 export function quotePrice(params: {
@@ -54,23 +58,34 @@ export function quotePrice(params: {
   discountTiers: DiscountTier[];
   volume: number;
   weeks: number;
+  /** Dias selecionados no calendário — usado por telas (preço diário). */
+  days?: number;
   hasPartner: boolean;
   premissas: QuotePremissas;
   cpmConfig?: Partial<ScreenCpmConfig> | null;
 }): PriceQuote {
-  const { product, tiers, discountTiers, volume, weeks, hasPartner, premissas, cpmConfig } = params;
+  const { product, tiers, discountTiers, volume, weeks, days, hasPartner, premissas, cpmConfig } = params;
 
-  // ── Telas: precificação EXCLUSIVA por CPM (fonte única: shared/cpm-pricing.ts).
-  // O motor de markup/tiers não se aplica a telas. Sem CPM configurado no local,
-  // a tela não tem preço (retorna zero — exige configuração).
+  // ── Telas: preço DIÁRIO derivado do CPM (fonte única: shared/cpm-pricing.ts).
+  // Deixa de ser por ciclo: total = diária × dias (mín. 7). O motor de
+  // markup/tiers não se aplica. Sem CPM configurado no local, a tela não tem
+  // preço (retorna zero — exige configuração).
   if (product.tipo === "telas") {
-    const cpm = computeCpmPricing(cpmConfig);
-    if (!cpm) {
+    const daily = computeScreenDailyPricing(cpmConfig, days ?? 0);
+    if (!daily) {
       return { unitPrice: 0, totalPrice: 0, baseTotal: 0, prazoDiscountPct: 0, volumeDiscountPct: 0 };
     }
-    const totalPrice = cpm.weeklyRevenue * weeks;
+    const totalPrice = daily.totalPrice;
     const unitPrice = volume > 0 ? totalPrice / volume : totalPrice;
-    return { unitPrice, totalPrice, baseTotal: totalPrice, prazoDiscountPct: 0, volumeDiscountPct: 0 };
+    return {
+      unitPrice,
+      totalPrice,
+      baseTotal: totalPrice,
+      prazoDiscountPct: 0,
+      volumeDiscountPct: 0,
+      dailyRate: daily.dailyRate,
+      billedDays: daily.billedDays,
+    };
   }
   const sorted = [...tiers].sort((a, b) => a.volumeMin - b.volumeMin);
   const tier =

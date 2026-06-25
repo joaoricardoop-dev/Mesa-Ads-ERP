@@ -209,6 +209,7 @@ export function StepProdutosPorLocal({ clientLabel }: Props) {
                                         shareIndex: nextShare,
                                         cycles: 1,
                                         cycleWeeks: p.cycleWeeks ?? cycleWeeksDefault,
+                                        days: 0, // derivado das datas globais no passo Configurar
                                         volume: 1000,
                                         productTipo: p.productTipo ?? null,
                                         screenCpm: (loc as any).screenCpm ?? null,

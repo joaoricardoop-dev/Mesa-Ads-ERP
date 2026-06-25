@@ -87,6 +87,11 @@ export function StepCheckout({ clientId, clientLabel, hasPartner: _hp, source }:
       shareIndex: c.shareIndex,
       cycleWeeks: c.cycleWeeks,
       cycles: c.cycles,
+      // Datas livres do período (fonte da diária de telas e do arredondamento
+      // por ciclo no backend — ver shared/period.ts).
+      startDate,
+      endDate,
+      days: c.days,
     }));
     const venueIds = Array.from(new Set(cart.map((c) => c.restaurantId)));
     createMutation.mutate({

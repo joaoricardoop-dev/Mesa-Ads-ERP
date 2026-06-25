@@ -91,7 +91,8 @@ async function generateOSNumber(db: any) {
 // ser testado isoladamente em vitest. Para a regra "tela vs bolacha" no
 // slice custom-digital, ver `calcCustomVipRepasse` + `materializeCustomVipRepasse`.
 import { computeQuotationCommissionMix } from "./finance/calc";
-import { computeCpmPricing } from "../shared/cpm-pricing";
+import { computeScreenDailyPricing } from "../shared/cpm-pricing";
+import { daysInRangeInclusive, cyclesForDays } from "../shared/period";
 
 export const quotationRouter = router({
   list: protectedProcedure
@@ -1309,6 +1310,7 @@ export const quotationRouter = router({
         cycles: z.number().int().min(1).optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
+        days: z.number().int().min(1).optional(),
         venueId: z.number().optional().nullable(),
       })).min(1),
     }))
@@ -1494,36 +1496,46 @@ export const quotationRouter = router({
         return price * (1 - parseFloat(t.discountPercent) / 100);
       }
 
-      const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; unitPrice: number; totalPrice: number; restaurantId?: number; shareIndex?: number; cycleWeeks?: number; cycles?: number; startDate?: string | null; endDate?: string | null; venueId?: number | null }> = [];
+      const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; billedDays?: number; unitPrice: number; totalPrice: number; restaurantId?: number; shareIndex?: number; cycleWeeks?: number; cycles?: number; startDate?: string | null; endDate?: string | null; venueId?: number | null }> = [];
 
       const appliedSeasonals: Array<{ productName: string; label: string; multiplier: number }> = [];
 
       for (const item of input.items) {
         const prod = productMap.get(item.productId)!;
 
-        // ── Telas: preço EXCLUSIVO por CPM (não usa tiers/markup) ──
+        // ── Telas: preço DIÁRIO derivado do CPM (não usa tiers/markup) ──
+        // Total = diária (receita semanal CPM ÷ 7) × dias selecionados, com piso
+        // de 1 semana. Fonte única: shared/cpm-pricing.ts. Os ciclos seguem vivos
+        // por baixo (cyclesForDays) só para estoque/DRE — ver shared/period.ts.
         if ((prod as any).tipo === "telas") {
           const cpmCfg = item.restaurantId != null ? screenCpmMap.get(item.restaurantId) : undefined;
-          const cpm = computeCpmPricing(cpmCfg);
-          if (!cpm) {
+          const screenDays =
+            item.days ??
+            (item.startDate && item.endDate
+              ? daysInRangeInclusive(item.startDate, item.endDate)
+              : item.weeks * 7);
+          const daily = computeScreenDailyPricing(cpmCfg, screenDays);
+          if (!daily) {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message: `A tela "${prod.name}" não tem precificação CPM configurada no local. Configure o CPM do local antes de cotar.`,
             });
           }
-          const finalTotal = cpm.weeklyRevenue * item.weeks;
+          const finalTotal = daily.totalPrice;
           const finalUnitPrice = item.volume > 0 ? finalTotal / item.volume : finalTotal;
+          const screenCycles = item.cycles ?? cyclesForDays(daily.billedDays);
           computedItems.push({
             productId: item.productId,
             productName: prod.name,
             volume: item.volume,
             weeks: item.weeks,
+            billedDays: daily.billedDays,
             unitPrice: finalUnitPrice,
             totalPrice: finalTotal,
             restaurantId: item.restaurantId,
             shareIndex: item.shareIndex,
             cycleWeeks: item.cycleWeeks,
-            cycles: item.cycles,
+            cycles: screenCycles,
             startDate: item.startDate ?? null,
             endDate: item.endDate ?? null,
             venueId: item.venueId ?? null,
@@ -1635,6 +1647,10 @@ export const quotationRouter = router({
         const localDesc = item.restaurantId
           ? ` · local #${item.restaurantId}${item.shareIndex ? ` share ${item.shareIndex}` : ""}`
           : "";
+        // Telas: descrição por diária (dias cobrados); demais: por semanas.
+        const duracaoDesc = item.billedDays != null
+          ? `${item.billedDays} dia(s)`
+          : `${item.weeks} semanas`;
         await db.insert(quotationItems).values({
           quotationId: created.id,
           productId: item.productId,
@@ -1646,7 +1662,7 @@ export const quotationRouter = router({
           shareIndex: item.shareIndex ?? null,
           cycleWeeks: item.cycleWeeks ?? 4,
           cycles: item.cycles ?? 1,
-          notes: `${item.productName} — ${item.volume.toLocaleString("pt-BR")} un. × ${item.weeks} semanas${ciclosDesc}${localDesc}`,
+          notes: `${item.productName} — ${item.volume.toLocaleString("pt-BR")} un. × ${duracaoDesc}${ciclosDesc}${localDesc}`,
           startDate: item.startDate ?? null,
           endDate: item.endDate ?? null,
           venueId: item.venueId ?? null,

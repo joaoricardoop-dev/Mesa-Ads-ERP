@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { campaignBatches, campaignBatchAssignments, campaigns } from "../drizzle/schema";
 import { eq, and, desc, asc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { CYCLE_DAYS } from "../shared/period";
 
 async function getDatabase() {
   const d = await getDb();
@@ -97,10 +98,10 @@ function generateBatchesForYear(year: number) {
 
   for (let i = 0; i < 13; i++) {
     const startDate = new Date(cycleStart);
-    startDate.setDate(cycleStart.getDate() + i * 28);
+    startDate.setDate(cycleStart.getDate() + i * CYCLE_DAYS);
 
     const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 27);
+    endDate.setDate(startDate.getDate() + CYCLE_DAYS - 1);
 
     const startMonth = startDate.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
     const endMonth = endDate.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
