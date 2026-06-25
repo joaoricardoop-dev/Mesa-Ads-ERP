@@ -73,6 +73,8 @@ interface CampaignForm {
   name: string;
   status: "draft" | "active" | "paused" | "completed" | "quotation" | "archived" | "briefing" | "design" | "aprovacao" | "producao" | "transito" | "executar" | "distribuicao" | "veiculacao" | "inativa";
   notes: string;
+  startDate: string;
+  endDate: string;
   coastersPerRestaurant: number;
   usagePerDay: number;
   daysPerMonth: number;
@@ -103,6 +105,8 @@ const emptyForm: CampaignForm = {
   name: "",
   status: "draft",
   notes: "",
+  startDate: "",
+  endDate: "",
   coastersPerRestaurant: 500,
   usagePerDay: 3,
   daysPerMonth: 26,
@@ -361,11 +365,18 @@ export default function Campaigns() {
   const derivedStartDate = selectedBatches.length > 0 ? selectedBatches[0].startDate : "";
   const derivedEndDate = selectedBatches.length > 0 ? selectedBatches[selectedBatches.length - 1].endDate : "";
 
+  // Batches funcionam como PRESET: ao selecionar, preenchem início/fim e duração.
+  // O usuário pode sobrescrever as datas manualmente depois (período personalizado).
   useEffect(() => {
     if (selectedBatches.length > 0) {
-      setForm(prev => ({ ...prev, contractDuration: selectedBatches.length }));
+      setForm(prev => ({
+        ...prev,
+        contractDuration: selectedBatches.length,
+        startDate: derivedStartDate,
+        endDate: derivedEndDate,
+      }));
     }
-  }, [selectedBatches.length]);
+  }, [selectedBatches.length, derivedStartDate, derivedEndDate]);
 
   const handleSubmit = () => {
     const result = campaignSchema.safeParse({ name: form.name, clientId: form.clientId ?? undefined });
@@ -376,8 +387,10 @@ export default function Campaigns() {
         if (!errors[field]) errors[field] = e.message;
       });
     }
-    if (selectedBatchIds.length === 0) {
-      errors.batches = "Selecione pelo menos um batch";
+    if (!form.startDate || !form.endDate) {
+      errors.batches = "Informe o período (início e fim) ou selecione um batch";
+    } else if (form.endDate < form.startDate) {
+      errors.batches = "A data de fim deve ser posterior à de início";
     }
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
@@ -388,8 +401,8 @@ export default function Campaigns() {
     const payload = {
       clientId: form.clientId!,
       name: form.name,
-      startDate: derivedStartDate,
-      endDate: derivedEndDate,
+      startDate: form.startDate,
+      endDate: form.endDate,
       status: form.status,
       notes: form.notes,
       coastersPerRestaurant: form.coastersPerRestaurant,
@@ -404,7 +417,7 @@ export default function Campaigns() {
       fixedCommission: String(form.fixedCommission),
       sellerCommission: String(form.sellerCommission),
       taxRate: String(form.taxRate),
-      contractDuration: selectedBatchIds.length,
+      contractDuration: selectedBatchIds.length || form.contractDuration,
       batchSize: form.batchSize,
       batchCost: String(form.batchCost),
       isBonificada: form.isBonificada,
@@ -413,7 +426,9 @@ export default function Campaigns() {
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...payload }, {
         onSuccess: () => {
-          assignBatchesMutation.mutate({ campaignId: editingId, batchIds: selectedBatchIds });
+          if (selectedBatchIds.length > 0) {
+            assignBatchesMutation.mutate({ campaignId: editingId, batchIds: selectedBatchIds });
+          }
         },
       });
     }
@@ -427,6 +442,8 @@ export default function Campaigns() {
       name: c.name,
       status: c.status,
       notes: c.notes || "",
+      startDate: c.startDate || "",
+      endDate: c.endDate || "",
       coastersPerRestaurant: c.coastersPerRestaurant,
       usagePerDay: c.usagePerDay,
       daysPerMonth: c.daysPerMonth,
@@ -957,8 +974,32 @@ export default function Campaigns() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label className={`text-xs ${formErrors.batches ? "text-destructive" : ""}`}>Período da Campanha *</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">Início</Label>
+                        <Input
+                          type="date"
+                          value={form.startDate}
+                          onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">Fim</Label>
+                        <Input
+                          type="date"
+                          value={form.endDate}
+                          onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                    </div>
+                    {formErrors.batches && <p className="text-xs text-destructive">{formErrors.batches}</p>}
+                  </div>
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className={`text-xs ${formErrors.batches ? "text-destructive" : ""}`}>Batches (Período) *</Label>
+                      <Label className="text-xs text-muted-foreground">Batches (preset opcional — preenche o período)</Label>
                       <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setBatchYear(batchYear - 1)}>&lt;</Button>
                         <span className="text-xs font-mono font-semibold">{batchYear}</span>
@@ -1000,7 +1041,6 @@ export default function Campaigns() {
                         Duração: {selectedBatchIds.length} ciclo(s) de 4 semanas
                       </div>
                     )}
-                    {formErrors.batches && <p className="text-xs text-destructive">{formErrors.batches}</p>}
                   </div>
                 </div>
               </div>

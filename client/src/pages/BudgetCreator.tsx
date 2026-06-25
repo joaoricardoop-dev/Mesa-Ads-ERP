@@ -52,6 +52,7 @@ import {
   TIPO_ICONS,
   TIPO_COLORS,
 } from "../lib/campaign-builder-utils";
+import { useSystemPremissas } from "../hooks/useSystemPremissas";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1161,6 +1162,7 @@ function BudgetSummaryPanel({ items, globalParams, clientName, hasPartner, onGer
 
 export default function BudgetCreator() {
   const [, navigate] = useLocation();
+  const { premissas: sysPremissas } = useSystemPremissas();
 
   const [clientId, setClientId] = useState<number | null>(null);
   const [leadId, setLeadId] = useState<number | null>(null);
@@ -1251,9 +1253,9 @@ export default function BudgetCreator() {
 
   const addFromCatalog = useCallback((product: typeof productsList[number]) => {
     const prodPremissas: ItemPremissas = {
-      irpj: parseFloat(product.irpj ?? "") || DEFAULT_PREMISSAS.irpj,
-      comissaoRestaurante: parseFloat(product.comRestaurante ?? "") || DEFAULT_PREMISSAS.comissaoRestaurante,
-      comissaoComercial: parseFloat(product.comComercial ?? "") || DEFAULT_PREMISSAS.comissaoComercial,
+      irpj: parseFloat(product.irpj ?? "") || sysPremissas.irpj,
+      comissaoRestaurante: parseFloat(product.comRestaurante ?? "") || sysPremissas.comissaoRestaurante,
+      comissaoComercial: parseFloat(product.comComercial ?? "") || sysPremissas.comissaoComercial,
     };
     const newItem: BudgetItemState = {
       id: makeItemId(),
@@ -1292,7 +1294,7 @@ export default function BudgetCreator() {
       setItems((prev) => [...prev, newItem]);
       toast.success(`"${product.name}" adicionado ao orçamento`);
     }
-  }, [networkAvgMonthlyCustomers]);
+  }, [networkAvgMonthlyCustomers, sysPremissas]);
 
   const addTelasDual = useCallback((itemId: string, baseItemPatch: Partial<BudgetItemState>) => {
     setItems((prev) => {
@@ -1344,9 +1346,9 @@ export default function BudgetCreator() {
   const agencyBVWeightedIrpj = useMemo(() => {
     const valid = itemCalcs.filter(c => c.calc.precoComDescDuracao > 0);
     const totalPrice = valid.reduce((s, c) => s + c.calc.precoComDescDuracao, 0);
-    if (totalPrice <= 0) return DEFAULT_PREMISSAS.irpj / 100;
+    if (totalPrice <= 0) return sysPremissas.irpj / 100;
     return valid.reduce((s, c) => s + c.calc.precoComDescDuracao * (c.item.premissas.irpj / 100), 0) / totalPrice;
-  }, [itemCalcs]);
+  }, [itemCalcs, sysPremissas.irpj]);
 
   const globalParams: GlobalBudgetParams = useMemo(() => ({
     formaPagamento, descontoParceiro, isBonificada,
@@ -1707,7 +1709,7 @@ export default function BudgetCreator() {
             freeVolume: 100,
             freeManualCost: 0,
             semanas: 12,
-            premissas: { ...DEFAULT_PREMISSAS },
+            premissas: { ...sysPremissas },
             isCustomProduct: true,
             customValues: values,
           };

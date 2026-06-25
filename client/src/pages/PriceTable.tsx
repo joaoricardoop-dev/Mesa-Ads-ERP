@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import autoTable from "jspdf-autotable";
 import PageContainer from "@/components/PageContainer";
 import Section from "@/components/Section";
 import { useRestaurantAllocation, COASTER_CAPACITY_FACTOR } from "@/hooks/useRestaurantAllocation";
+import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 
 const DEFAULT_CUSTOS_VOLUME: Record<number, { custoGPC: number; margem: number; frete: number; artes: number }> = {
   1000:  { custoGPC: 0.4190, margem: 0.50, frete: 80.38,   artes: 1 },
@@ -78,13 +79,24 @@ export default function PriceTable() {
   const [presentationMode, setPresentationMode] = useState(false);
   const [descontoParceiro, setDescontoParceiro] = useState(false);
 
+  const { premissas: sysPremissas, isLoading: sysPremissasLoading } = useSystemPremissas();
   const [premissas, setPremissas] = useState(DEFAULT_PREMISSAS);
+  const sysPremissasSeeded = useRef(false);
   const [descontosPrazo, setDescontosPrazo] = useState(DEFAULT_DESCONTOS_PRAZO);
   const [pagamentoConfig, setPagamentoConfig] = useState(DEFAULT_PAGAMENTO);
   const [custosVolume, setCustosVolume] = useState(DEFAULT_CUSTOS_VOLUME);
   const [allocSearch, setAllocSearch] = useState("");
 
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+
+  // Semeia as premissas globais (system_config) uma vez, enquanto nenhum produto
+  // específico estiver selecionado — substitui o default hardcoded local.
+  useEffect(() => {
+    if (sysPremissasLoading || sysPremissasSeeded.current) return;
+    sysPremissasSeeded.current = true;
+    if (selectedProductId === null) setPremissas(sysPremissas);
+  }, [sysPremissasLoading, sysPremissas, selectedProductId]);
+
   const { data: productsListRaw } = trpc.product.list.useQuery();
   const productsList = useMemo(() => productsListRaw ?? [], [productsListRaw]);
   const { data: productTiersRaw, refetch: refetchTiers } = trpc.product.getTiers.useQuery(
@@ -322,7 +334,7 @@ export default function PriceTable() {
         comissaoComercial: parseFloat(selectedProduct.comComercial ?? "10"),
       });
     } else {
-      setPremissas(DEFAULT_PREMISSAS);
+      setPremissas(sysPremissas);
     }
     setDescontosPrazo(isPriceBasedProduct ? ZERO_DESCONTOS_PRAZO : DEFAULT_DESCONTOS_PRAZO);
     setPagamentoConfig(DEFAULT_PAGAMENTO);

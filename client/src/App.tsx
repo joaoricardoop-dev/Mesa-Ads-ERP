@@ -56,6 +56,7 @@ import { captureTrackingFromUrl } from "./lib/utmTracking";
 import TermTemplates from "./pages/TermTemplates";
 import IntegrationSettings from "./pages/IntegrationSettings";
 import MediaKitSettings from "./pages/MediaKitSettings";
+import AdminConfiguracoes from "./pages/AdminConfiguracoes";
 import QuotationSign from "./pages/QuotationSign";
 import PublicTerm from "./pages/PublicTerm";
 import Products from "./pages/Products";
@@ -149,6 +150,7 @@ function Router() {
       <Route path="/economics" component={Economics} />
       <Route path="/producao" component={Production} />
       <Route path="/operacoes/calendario" component={OperationsCalendar} />
+      <Route path="/configuracoes/premissas" component={AdminConfiguracoes} />
       <Route path="/configuracoes/batches" component={BatchManagement} />
       <Route path="/configuracoes/termos" component={TermTemplates} />
       <Route path="/membros" component={Members} />

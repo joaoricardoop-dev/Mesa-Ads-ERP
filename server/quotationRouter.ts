@@ -15,6 +15,7 @@ import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { withUniqueRetry, describeDbError } from "./utils/uniqueNumberRetry";
 import { nextNumber } from "./utils/numberCounter";
 import { resolveQuotationClientId } from "./utils/resolveQuotationClient";
+import { getSystemConfig } from "./systemConfigRouter";
 
 const SELF_SERVICE_USER_ID = "self_service";
 
@@ -344,6 +345,7 @@ export const quotationRouter = router({
 
       const quotationNumber = await generateQuotationNumber(db);
       const quotationName = generateQuotationName(entityName, input.coasterVolume ?? 0, productName);
+      const premissasSnapshot = await getSystemConfig();
 
       // Sprint 2: validade default = hoje + N dias quando não informada.
       const validUntil = input.validUntil && input.validUntil.trim() !== ""
@@ -382,6 +384,7 @@ export const quotationRouter = router({
         customSellerCommission: input.customSellerCommission,
         customVipProviderId: input.customVipProviderId ?? null,
         agencyCommissionPercent: input.agencyCommissionPercent ?? null,
+        premissasSnapshot,
       }).returning();
 
       // Task #197 — auto-seed do cronograma default (1 parcela, +15d).
@@ -801,6 +804,7 @@ export const quotationRouter = router({
         createdBy: ctx.user?.id ?? null,
         isBonificada: original[0].isBonificada,
         productId: original[0].productId,
+        premissasSnapshot: original[0].premissasSnapshot ?? undefined,
         status: "rascunho",
       }).returning();
 
@@ -1287,6 +1291,9 @@ export const quotationRouter = router({
         shareIndex: z.number().int().min(1).optional(),
         cycleWeeks: z.number().int().min(1).optional(),
         cycles: z.number().int().min(1).optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        venueId: z.number().optional().nullable(),
       })).min(1),
     }))
     .mutation(async ({ input, ctx }) => {
@@ -1406,7 +1413,8 @@ export const quotationRouter = router({
         return { mult: bestMult > 0 ? bestMult : 1, label: bestLabel };
       }
 
-      const BV_AGENCIA = 0.20;
+      const premissasSnapshot = await getSystemConfig();
+      const BV_AGENCIA = premissasSnapshot.bvPadraoAgencia;
       const DESCONTOS_PRAZO: Record<number, number> = { 4: 0, 8: 3, 12: 5, 16: 7, 20: 9, 24: 11 };
       const hasPartner = !!client?.partnerId || isPartnerFlow;
 
@@ -1442,7 +1450,7 @@ export const quotationRouter = router({
         return price * (1 - parseFloat(t.discountPercent) / 100);
       }
 
-      const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; unitPrice: number; totalPrice: number; restaurantId?: number; shareIndex?: number; cycleWeeks?: number; cycles?: number }> = [];
+      const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; unitPrice: number; totalPrice: number; restaurantId?: number; shareIndex?: number; cycleWeeks?: number; cycles?: number; startDate?: string | null; endDate?: string | null; venueId?: number | null }> = [];
 
       const appliedSeasonals: Array<{ productName: string; label: string; multiplier: number }> = [];
 
@@ -1495,6 +1503,9 @@ export const quotationRouter = router({
           shareIndex: item.shareIndex,
           cycleWeeks: item.cycleWeeks,
           cycles: item.cycles,
+          startDate: item.startDate ?? null,
+          endDate: item.endDate ?? null,
+          venueId: item.venueId ?? null,
         });
       }
 
@@ -1534,6 +1545,7 @@ export const quotationRouter = router({
         // Sprint 1: self-service (anunciante/parceiro) preserva o marker
         // textual; canal interno via builder grava o user real.
         createdBy: input.source === "internal" ? (ctx.user?.id ?? null) : SELF_SERVICE_USER_ID,
+        premissasSnapshot,
       };
 
       const [created] = await db.insert(quotations).values(insertValues).returning();
@@ -1560,6 +1572,9 @@ export const quotationRouter = router({
           cycleWeeks: item.cycleWeeks ?? 4,
           cycles: item.cycles ?? 1,
           notes: `${item.productName} — ${item.volume.toLocaleString("pt-BR")} un. × ${item.weeks} semanas${ciclosDesc}${localDesc}`,
+          startDate: item.startDate ?? null,
+          endDate: item.endDate ?? null,
+          venueId: item.venueId ?? null,
         });
       }
 

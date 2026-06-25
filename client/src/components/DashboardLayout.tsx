@@ -86,6 +86,7 @@ import {
   Sparkles,
   ListChecks,
   CalendarRange,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import { NotificationBell } from "./NotificationPanel";
@@ -180,6 +181,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: Package, label: "Produtos & Preços", path: "/produtos", adminOnly: true },
       { icon: Sparkles, label: "Multiplicadores Sazonais", path: "/configuracoes/multiplicadores-sazonais", adminOnly: true },
       { icon: ListChecks, label: "Listas & Categorias", path: "/configuracoes/listas", adminOnly: true },
+      { icon: SlidersHorizontal, label: "Premissas Financeiras", path: "/configuracoes/premissas", adminOnly: true },
       { icon: Calculator, label: "Simulador de Preços", path: "/comercial/tabela-precos", adminOnly: true },
       { icon: DollarSign, label: "Economics", path: "/economics" },
       { icon: Factory, label: "Produção", path: "/producao" },

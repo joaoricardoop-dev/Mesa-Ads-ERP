@@ -227,19 +227,32 @@ export function setupPublicSigningRoutes(app: express.Express) {
         return res.status(400).json({ error: "Esta cotação não possui um cliente vinculado. Solicite ao consultor Mesa Ads que vincule um cliente antes de assinar." });
       }
 
-      if (!os[0].batchSelectionJson) {
-        return res.status(400).json({ error: "Nenhum período selecionado para esta OS" });
+      // Período da campanha: derivado dos batches (preset) quando houver,
+      // senão do período livre informado na OS (periodStart/periodEnd).
+      let batchIds: number[] = [];
+      let batchRecords: Array<{ startDate: string; endDate: string }> = [];
+      let derivedStartDate: string | null = os[0].periodStart;
+      let derivedEndDate: string | null = os[0].periodEnd;
+      if (os[0].batchSelectionJson) {
+        batchIds = JSON.parse(os[0].batchSelectionJson) as number[];
+        if (batchIds.length > 0) {
+          batchRecords = await db
+            .select()
+            .from(campaignBatches)
+            .where(inArray(campaignBatches.id, batchIds))
+            .orderBy(asc(campaignBatches.startDate));
+          if (batchRecords.length === 0 || batchRecords.length !== batchIds.length) {
+            return res.status(400).json({ error: "Um ou mais batches não encontrados" });
+          }
+          derivedStartDate = batchRecords[0].startDate;
+          derivedEndDate = batchRecords[batchRecords.length - 1].endDate;
+        }
       }
-      const batchIds = JSON.parse(os[0].batchSelectionJson) as number[];
-      const batchRecords = await db
-        .select()
-        .from(campaignBatches)
-        .where(inArray(campaignBatches.id, batchIds))
-        .orderBy(asc(campaignBatches.startDate));
-
-      if (batchRecords.length === 0 || batchRecords.length !== batchIds.length) {
-        return res.status(400).json({ error: "Um ou mais batches não encontrados" });
+      if (!derivedStartDate || !derivedEndDate) {
+        return res.status(400).json({ error: "OS sem período definido. Informe início e fim ou selecione um batch." });
       }
+      const campaignStartDate: string = derivedStartDate;
+      const campaignEndDate: string = derivedEndDate;
 
       // Task #197 — valida cronograma de pagamento da cotação antes de
        // converter em campanha (assinatura pública é equivalente a signOS).
@@ -279,9 +292,6 @@ export function setupPublicSigningRoutes(app: express.Express) {
         hash: signatureHash,
       });
 
-      const firstBatch = batchRecords[0];
-      const lastBatch = batchRecords[batchRecords.length - 1];
-
       let totalCoasters = 0;
       let weightedCommissionSum = 0;
       for (const alloc of allocatedRestaurants) {
@@ -292,7 +302,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
       const avgCommission = totalCoasters > 0 ? (weightedCommissionSum / totalCoasters).toFixed(2) : "20.00";
 
       const [cliRowSign] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, resolvedClientId)).limit(1);
-      const campaignName = buildCampaignName(cliRowSign?.name, firstBatch.startDate);
+      const campaignName = buildCampaignName(cliRowSign?.name, campaignStartDate);
       const maskedCpf = `***.***.${cpfClean.substring(6, 9)}-${cpfClean.substring(9)}`;
       const isBonificada = !!quotation[0].isBonificada;
 
@@ -333,8 +343,8 @@ export function setupPublicSigningRoutes(app: express.Express) {
               campaignNumber,
               clientId: resolvedClientId,
               name: campaignName,
-              startDate: firstBatch.startDate,
-              endDate: lastBatch.endDate,
+              startDate: campaignStartDate,
+              endDate: campaignEndDate,
               status: "producao",
               quotationId: quotation[0].id,
               coastersPerRestaurant: allocatedRestaurants.length > 0 ? Math.round(totalCoasters / allocatedRestaurants.length) : quotation[0].coasterVolume,
@@ -349,7 +359,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
               fixedCommission: isBonificada ? "0.00" : "0.0500",
               sellerCommission: isBonificada ? "0.00" : "10.00",
               taxRate: isBonificada ? "0.00" : "15.00",
-              contractDuration: batchIds.length,
+              contractDuration: batchIds.length || 1,
               batchSize: quotation[0].coasterVolume,
               batchCost: "1200.00",
               notes: quotation[0].notes,
@@ -359,14 +369,19 @@ export function setupPublicSigningRoutes(app: express.Express) {
 
             campaignId = campaign.id;
 
-            await tx.insert(campaignBatchAssignments).values(
-              batchIds.map(batchId => ({ campaignId: campaign.id, batchId }))
-            );
+            if (batchIds.length > 0) {
+              await tx.insert(campaignBatchAssignments).values(
+                batchIds.map(batchId => ({ campaignId: campaign.id, batchId }))
+              );
+            }
 
+            const periodLabel = batchIds.length > 0
+              ? `${batchRecords.length} batch(es)`
+              : `período ${campaignStartDate} a ${campaignEndDate}`;
             await tx.insert(campaignHistory).values({
               campaignId: campaign.id,
               action: "created_from_quotation",
-              details: `Campanha criada via assinatura digital por ${signerName} (CPF: ${maskedCpf}) — ${batchRecords.length} batch(es)`,
+              details: `Campanha criada via assinatura digital por ${signerName} (CPF: ${maskedCpf}) — ${periodLabel}`,
             });
 
             if (allocatedRestaurants.length > 0) {
@@ -433,8 +448,8 @@ export function setupPublicSigningRoutes(app: express.Express) {
         quotationName: quotation[0].quotationName,
         totalValue: os[0].totalValue,
         coasterVolume: os[0].coasterVolume,
-        periodStart: firstBatch.startDate,
-        periodEnd: lastBatch.endDate,
+        periodStart: campaignStartDate,
+        periodEnd: campaignEndDate,
         description: os[0].description,
       });
     } catch (err: any) {

@@ -26,7 +26,6 @@ import {
 import {
   SEMANAS_OPTIONS,
   DESCONTOS_PRAZO,
-  BV_PADRAO_AGENCIA,
   TIPO_LABELS,
   TIPO_ICONS,
   TIPO_COLORS,
@@ -37,6 +36,7 @@ import {
   fmtBRL4,
   fmtImpr,
 } from "@/lib/campaign-builder-utils";
+import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 
 interface CartItem {
   product: any;
@@ -107,14 +107,14 @@ const STEPS = [
   { key: "confirmacao", label: "Confirmar", icon: CheckCircle2 },
 ];
 
-function calcItemPrice(product: any, volume: number, weeks: number, hasPartner: boolean) {
+function calcItemPrice(product: any, volume: number, weeks: number, hasPartner: boolean, bvAgencia: number) {
   const tiers = product.tiers ?? [];
   const discountTiers = product.discountTiers ?? [];
 
   const irpj = parseFloat(product.irpj ?? "6") / 100;
   const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
   const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-  const comParceiro = BV_PADRAO_AGENCIA;
+  const comParceiro = bvAgencia;
 
   const sortedTiers = [...tiers].sort((a: any, b: any) => b.volumeMin - a.volumeMin);
   const tier = sortedTiers.find((t: any) => volume >= t.volumeMin) ?? tiers[0];
@@ -143,6 +143,7 @@ function calcItemPrice(product: any, volume: number, weeks: number, hasPartner: 
 }
 
 export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onClose, onSuccess }: CampaignBuilderProps) {
+  const { bvAgencia } = useSystemPremissas();
   const [step, setStep] = useState(0);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [campaignName, setCampaignName] = useState("");
@@ -200,7 +201,7 @@ export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onC
       const volumes = (product.tiers ?? []).map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b);
       const defaultVol = product.defaultQtyPerLocation ?? volumes[0] ?? 500;
       const defaultWeeks = 4;
-      const { unitPrice, totalPrice } = calcItemPrice(product, defaultVol, defaultWeeks, hasPartner);
+      const { unitPrice, totalPrice } = calcItemPrice(product, defaultVol, defaultWeeks, hasPartner, bvAgencia);
       return [...prev, { product, volume: defaultVol, weeks: defaultWeeks, unitPrice, totalPrice }];
     });
   }
@@ -212,7 +213,7 @@ export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onC
   function updateCartItem(productId: number, volume: number, weeks: number) {
     setCart(prev => prev.map(item => {
       if (item.product.id !== productId) return item;
-      const { unitPrice, totalPrice } = calcItemPrice(item.product, volume, weeks, hasPartner);
+      const { unitPrice, totalPrice } = calcItemPrice(item.product, volume, weeks, hasPartner, bvAgencia);
       return { ...item, volume, weeks, unitPrice, totalPrice };
     }));
   }
@@ -295,6 +296,7 @@ export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onC
             products={products}
             cart={cart}
             hasPartner={hasPartner}
+            bvAgencia={bvAgencia}
             onAdd={addToCart}
             onRemove={removeFromCart}
           />
@@ -326,6 +328,7 @@ export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onC
             startDate={startDate}
             briefing={briefing}
             hasPartner={hasPartner}
+            bvAgencia={bvAgencia}
             totalValue={totalValue}
           />
         )}
@@ -371,8 +374,8 @@ export function CampaignBuilder({ clientId, hasPartner, isPartner, products, onC
   );
 }
 
-function StepProdutos({ products, cart, hasPartner, onAdd, onRemove }: {
-  products: any[]; cart: CartItem[]; hasPartner: boolean;
+function StepProdutos({ products, cart, hasPartner, bvAgencia, onAdd, onRemove }: {
+  products: any[]; cart: CartItem[]; hasPartner: boolean; bvAgencia: number;
   onAdd: (p: any) => void; onRemove: (id: number) => void;
 }) {
   return (
@@ -415,7 +418,7 @@ function StepProdutos({ products, cart, hasPartner, onAdd, onRemove }: {
             const irpj = parseFloat(product.irpj ?? "6") / 100;
             const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
             const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-            const comParceiro = BV_PADRAO_AGENCIA;
+            const comParceiro = bvAgencia;
             let minPrice: number | null = null;
             if (smallestTier && smallestVol != null) {
               const unitPrice = calcUnitPriceAdv({
@@ -698,9 +701,9 @@ function StepCampanha({ campaignName, startDate, briefing, onCampaignName, onSta
   );
 }
 
-function StepConfirmacao({ cart, campaignName, startDate, briefing, hasPartner, totalValue }: {
+function StepConfirmacao({ cart, campaignName, startDate, briefing, hasPartner, bvAgencia, totalValue }: {
   cart: CartItem[]; campaignName: string; startDate: string; briefing: string;
-  hasPartner: boolean; totalValue: number;
+  hasPartner: boolean; bvAgencia: number; totalValue: number;
 }) {
   return (
     <div className="p-6 space-y-6 max-w-2xl">

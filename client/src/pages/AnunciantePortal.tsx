@@ -67,7 +67,6 @@ import { CampaignBuilder } from "@/components/CampaignBuilder";
 import {
   SEMANAS_OPTIONS,
   DESCONTOS_PRAZO,
-  BV_PADRAO_AGENCIA,
   TIPO_LABELS,
   TIPO_ICONS,
   TIPO_COLORS,
@@ -79,12 +78,14 @@ import {
   fmtImpr,
   USOS_POR_PORTA_COPO,
 } from "@/lib/campaign-builder-utils";
+import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 
 // ─── Product Price Detail Sheet ───────────────────────────────────────────────
 
 function ProductPriceSheet({ product, hasPartner, open, onClose }: {
   product: any; hasPartner: boolean; open: boolean; onClose: () => void;
 }) {
+  const { bvAgencia } = useSystemPremissas();
   const tiers = product.tiers ?? [];
   const discountTiers = product.discountTiers ?? [];
   const TipoIcon = TIPO_ICONS[product.tipo] ?? Package;
@@ -93,7 +94,7 @@ function ProductPriceSheet({ product, hasPartner, open, onClose }: {
   const irpj = parseFloat(product.irpj ?? "6") / 100;
   const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
   const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-  const comParceiro = BV_PADRAO_AGENCIA;
+  const comParceiro = bvAgencia;
 
   const volumes = useMemo(
     () => tiers.map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
@@ -243,6 +244,7 @@ function ShoppingProductCard({
   hasPartner: boolean;
   onViewDetails: () => void;
 }) {
+  const { bvAgencia } = useSystemPremissas();
   const volumes = useMemo(() =>
     (product.tiers ?? []).map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
     [product.tiers]
@@ -256,7 +258,7 @@ function ShoppingProductCard({
   const irpj = parseFloat(product.irpj ?? "6") / 100;
   const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
   const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-  const comParceiro = BV_PADRAO_AGENCIA;
+  const comParceiro = bvAgencia;
 
   const tiers = product.tiers ?? [];
   const discountTiers = product.discountTiers ?? [];
@@ -363,6 +365,7 @@ function ShoppingProductCard({
 // ─── Price Table (Tabela de Preços tab) ───────────────────────────────────────
 
 function AdvertiserProductTable({ product, hasPartner }: { product: any; hasPartner: boolean }) {
+  const { bvAgencia } = useSystemPremissas();
   const [expanded, setExpanded] = useState(true);
   const tiers = product.tiers ?? [];
   const discountTiers = product.discountTiers ?? [];
@@ -370,7 +373,7 @@ function AdvertiserProductTable({ product, hasPartner }: { product: any; hasPart
   const irpj = parseFloat(product.irpj ?? "6") / 100;
   const comRestaurante = parseFloat(product.comRestaurante ?? "15") / 100;
   const comComercialProduto = parseFloat(product.comComercial ?? "10") / 100;
-  const comParceiro = BV_PADRAO_AGENCIA;
+  const comParceiro = bvAgencia;
 
   const volumes = useMemo(
     () => tiers.map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
@@ -1005,6 +1008,7 @@ type HomeSectionCard = {
 
 export default function AnunciantePortal() {
   const { user } = useAuth();
+  const { bvAgencia } = useSystemPremissas();
   const { data: profile, isLoading: profileLoading } = trpc.portal.myProfile.useQuery();
   const { data: campaignsData = [] } = trpc.portal.myCampaigns.useQuery();
   const campaigns: any[] = campaignsData;

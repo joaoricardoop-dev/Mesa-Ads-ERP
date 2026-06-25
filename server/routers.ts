@@ -24,6 +24,7 @@ import { bankRouter } from "./bankRouter";
 import { opsRouter } from "./opsRouter";
 import { comercialDashboardRouter } from "./comercialDashboardRouter";
 import { configOptionRouter } from "./configOptionRouter";
+import { systemConfigRouter } from "./systemConfigRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, operacoesProcedure, comercialProcedure, internalProcedure, anuncianteProcedure, restauranteProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -111,6 +112,7 @@ export const appRouter = router({
   ops: opsRouter,
   comercialDashboard: comercialDashboardRouter,
   configOption: configOptionRouter,
+  systemConfig: systemConfigRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
 
@@ -812,6 +814,16 @@ export const appRouter = router({
           commissionPercent: z.string().optional(),
           logoUrl: z.string().optional(),
           notes: z.string().optional(),
+          // ── Inventário de mídia / tela ──
+          categoria: z.enum(["restaurante", "academia", "condominio", "ponto_transporte", "comercial"]).optional(),
+          cmsScreenId: z.string().optional(),
+          screenDimensions: z.string().optional(),
+          screenLayout: z.string().optional(),
+          spotDuration: z.number().int().optional().nullable(),
+          loopDuration: z.number().int().optional().nullable(),
+          dailyLoops: z.number().int().optional().nullable(),
+          descricao: z.string().optional(),
+          horarioFuncionamento: z.string().optional(),
         }),
       )
       .mutation(({ input }) => createActiveRestaurant(input)),
@@ -867,6 +879,16 @@ export const appRouter = router({
           logoUrl: z.string().nullable().optional(),
           status: z.enum(["active", "inactive"]).optional(),
           notes: z.string().optional(),
+          // ── Inventário de mídia / tela ──
+          categoria: z.enum(["restaurante", "academia", "condominio", "ponto_transporte", "comercial"]).optional(),
+          cmsScreenId: z.string().optional(),
+          screenDimensions: z.string().optional(),
+          screenLayout: z.string().optional(),
+          spotDuration: z.number().int().optional().nullable(),
+          loopDuration: z.number().int().optional().nullable(),
+          dailyLoops: z.number().int().optional().nullable(),
+          descricao: z.string().optional(),
+          horarioFuncionamento: z.string().optional(),
         }),
       )
       .mutation(({ input }) => {
