@@ -23,7 +23,11 @@ migration.
 
 **How to apply:** When you add/rename a column in `schema.ts`, append a
 reconcile migration. Precedent: `task_213_reconcile_products_table_with_schema`
-and `task_221_reconcile_quotations_table_with_schema`. Drift is now caught
+and `task_221_reconcile_quotations_table_with_schema`. More instances since: the
+entire `system_config` TABLE and the `quotations.premissas_snapshot` column both
+lived only in `schema.ts` (no migration), so fresh/E2E DBs 500'd on the first
+write (any `systemConfig.set*` and every `quotation.create`). Fixed with two
+idempotent migrations. Drift is caught
 automatically: the e2e spec `e2e/migrations-fresh-db.spec.ts` builds a fresh DB
 via `runMigrations()` and diffs `information_schema.columns` against every
 column declared in `drizzle/schema.ts` (via Drizzle introspection —

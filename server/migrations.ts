@@ -2184,6 +2184,28 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "screen_exposure_sec" integer;
     `,
   },
+  {
+    // A tabela `system_config` (premissas globais — fonte única de IRPJ/
+    // comissões/BV) existe em `drizzle/schema.ts`, mas nunca foi incluída nos
+    // snapshots `drizzle/*.sql` que o boot aplica em bancos fresh. Sem ela,
+    // bancos novos (E2E/recriados) caem no fallback de leitura
+    // (getSystemConfig) mas dão 500 em QUALQUER escrita (systemConfig.set/
+    // setMany), pois o ON CONFLICT bate numa relação inexistente. Criar aqui,
+    // idempotente, alinha o runner custom ao schema (replit.md: o runner custom
+    // é a fonte única de mudanças de schema). Colunas idênticas ao schema.ts.
+    name: "create_system_config_table_task_301",
+    sql: `CREATE TABLE IF NOT EXISTS "system_config" ("key" varchar(100) PRIMARY KEY NOT NULL, "value" text NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL, "updatedBy" varchar(255));`,
+  },
+  {
+    // Mesma classe de drift do system_config: a coluna `premissasSnapshot`
+    // (jsonb) existe em `drizzle/schema.ts` (snapshot das premissas vigentes no
+    // momento da criação da cotação — fonte única do IRPJ/comissões da proposta
+    // e do PDF), mas não está em nenhum snapshot `drizzle/*.sql`. Sem ela,
+    // `quotation.create` dá 500 em bancos fresh (E2E/recriados) ao inserir o
+    // snapshot. Idempotente; coluna idêntica ao schema.ts (jsonb, nullable).
+    name: "add_premissas_snapshot_to_quotations_task_301",
+    sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "premissas_snapshot" jsonb;`,
+  },
 ];
 
 /**

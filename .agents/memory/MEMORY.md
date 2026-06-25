@@ -1,6 +1,7 @@
 - [Silent try/catch swallows import errors](silent-catch-import-errors.md) — warn-only try/catch around helpers hides ReferenceError from missing imports; only real-path e2e catches it.
 - [Public signing coherence rules](public-signing-coherence.md) — prices scaled to BV-embedded total; due dates verbatim single source (no auto-shift); ISO dates formatted via formatIsoDateBR (UTC-anchored, no tz off-by-one).
-- [Schema.ts vs runMigrations drift](schema-migration-drift.md) — new schema.ts columns need a custom migration too, else fresh/E2E DBs 500 on any ORM insert.
+- [Schema.ts vs runMigrations drift](schema-migration-drift.md) — new schema.ts columns/tables need a custom migration too, else fresh/E2E DBs 500 on any ORM insert (e.g. system_config table, quotations.premissas_snapshot).
+- [Config hooks must return stable refs](config-hook-stable-refs.md) — config-deriving hooks must useMemo their return, else consumer effects that setState on [hook] loop infinitely ("Maximum update depth").
 - [Resend email graceful degradation](resend-email-degradation.md) — sendEmail never throws; 403 "testing email" in dev/e2e is expected until a domain is verified + RESEND_FROM set.
 - [CRM funnel stages per type](crm-funnel-stages-per-type.md) — leads.type drives which stage set (SDR vs venue); convert fires on ativo_rede/qualificado_handoff; partner portal mirrors SDR.
 - [Parceiro vs Local routing](parceiro-vs-local-routing.md) — "parceiro" is overloaded; public venue onboarding is /locais, /parceiro is redirect-only; never point invites at a foreign onboarding form.

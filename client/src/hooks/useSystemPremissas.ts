@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 
 /**
@@ -17,6 +18,12 @@ const FALLBACK = {
  *
  * `premissas` vem em **percentual** (ex.: irpj 6) para casar com `ItemPremissas`.
  * `bvAgencia` vem em **decimal** (ex.: 0.20) para casar com `BV_PADRAO_AGENCIA`.
+ *
+ * O retorno é memoizado por `values`/`isLoading`: sem isso, cada render produziria
+ * um objeto novo, e qualquer consumidor com `useEffect(..., [sysPremissas])` que
+ * chame `setState` (ex.: o simulador semeando `premissas` ao trocar de produto)
+ * entraria em loop infinito ("Maximum update depth exceeded"). Referência estável
+ * = fonte única previsível.
  */
 export function useSystemPremissas() {
   const { data, isLoading } = trpc.systemConfig.getAll.useQuery(undefined, {
@@ -24,22 +31,24 @@ export function useSystemPremissas() {
   });
   const values = data?.values;
 
-  const pct = (key: keyof typeof FALLBACK): number => {
-    const n = parseFloat(values?.[key] ?? "");
-    return Number.isFinite(n) ? n * 100 : FALLBACK[key];
-  };
-  const dec = (key: keyof typeof FALLBACK): number => {
-    const n = parseFloat(values?.[key] ?? "");
-    return Number.isFinite(n) ? n : FALLBACK[key];
-  };
+  return useMemo(() => {
+    const pct = (key: keyof typeof FALLBACK): number => {
+      const n = parseFloat(values?.[key] ?? "");
+      return Number.isFinite(n) ? n * 100 : FALLBACK[key];
+    };
+    const dec = (key: keyof typeof FALLBACK): number => {
+      const n = parseFloat(values?.[key] ?? "");
+      return Number.isFinite(n) ? n : FALLBACK[key];
+    };
 
-  return {
-    premissas: {
-      irpj: pct("irpj"),
-      comissaoRestaurante: pct("comissaoRestaurante"),
-      comissaoComercial: pct("comissaoComercial"),
-    },
-    bvAgencia: dec("bvPadraoAgencia"),
-    isLoading,
-  };
+    return {
+      premissas: {
+        irpj: pct("irpj"),
+        comissaoRestaurante: pct("comissaoRestaurante"),
+        comissaoComercial: pct("comissaoComercial"),
+      },
+      bvAgencia: dec("bvPadraoAgencia"),
+      isLoading,
+    };
+  }, [values, isLoading]);
 }
