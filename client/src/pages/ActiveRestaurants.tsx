@@ -335,8 +335,14 @@ export default function ActiveRestaurantsPage() {
       lng: r.lng,
     });
 
+  // "Config. pendente" só vale para espaços que DECLARAM ter telas (Nº de telas
+  // > 0, definido no cadastro do espaço). Cadastro individual de telas é opcional
+  // e nunca dispara este alerta; espaços sem telas (screensCount=0) nunca alertam.
+  const isMediaPending = (r: any) =>
+    r.status === "active" && (r.screensCount ?? 0) > 0 && !mediaSetupOf(r).isComplete;
+
   const mediaPendingCount = useMemo(
-    () => restaurants.filter((r) => r.status === "active" && !mediaSetupOf(r).isComplete).length,
+    () => restaurants.filter((r) => isMediaPending(r)).length,
     [restaurants],
   );
 
@@ -346,7 +352,7 @@ export default function ActiveRestaurantsPage() {
         const s = search.toLowerCase();
         if (!r.name.toLowerCase().includes(s) && !r.neighborhood.toLowerCase().includes(s) && !(r.whatsapp && r.whatsapp.includes(s))) return false;
       }
-      if (onlyMediaPending && mediaSetupOf(r).isComplete) return false;
+      if (onlyMediaPending && !isMediaPending(r)) return false;
       return true;
     });
 
@@ -482,8 +488,8 @@ export default function ActiveRestaurantsPage() {
                               </Badge>
                             )}
                             {(() => {
+                              if (!isMediaPending(r)) return null;
                               const setup = mediaSetupOf(r);
-                              if (setup.isComplete) return null;
                               return (
                                 <Badge
                                   variant="outline"

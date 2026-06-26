@@ -53,6 +53,17 @@ export default function TelasPage() {
     return map;
   }, [restaurantsQ.data]);
 
+  // Espaços que DECLARAM ter telas (Nº de telas > 0, definido no cadastro do
+  // espaço). Só estes podem exibir o alerta "Mídia incompleta" — o cadastro
+  // individual de telas é inventário opcional e nunca dispara o alerta.
+  const offersScreenByRestaurant = useMemo(() => {
+    const map = new Map<number, boolean>();
+    for (const r of (restaurantsQ.data ?? []) as any[]) {
+      map.set(r.id, (r.screensCount ?? 0) > 0);
+    }
+    return map;
+  }, [restaurantsQ.data]);
+
   const deleteMut = trpc.tela.delete.useMutation({
     onSuccess: () => {
       toast.success("Tela removida.");
@@ -158,6 +169,7 @@ export default function TelasPage() {
                     {photos.length > 0 && <span className="px-1.5 py-0.5 rounded bg-muted/40">{photos.length} foto(s)</span>}
                   </div>
                   {(() => {
+                    if (!offersScreenByRestaurant.get(t.restaurantId)) return null;
                     const setup = setupByRestaurant.get(t.restaurantId);
                     if (!setup || setup.isComplete) return null;
                     return (

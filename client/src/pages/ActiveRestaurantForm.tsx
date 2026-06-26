@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 
 import { trpc } from "@/lib/trpc";
@@ -41,6 +41,8 @@ import {
   Target,
   Star,
   Monitor,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import { calcularRating, temCamposRatingCompletos } from "@shared/rating";
 import {
@@ -54,6 +56,7 @@ import {
 
 import { EXCLUDED_CATEGORIES } from "@shared/excluded-categories";
 import { computeCpmPricing } from "@shared/cpm-pricing";
+import { OPERATING_DAYS, OPERATING_HOURS, operatingCellKey, operatingHourLabel, parseOperatingHours } from "@shared/screen-schedule";
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const BUSY_HOURS_OPTIONS = ["06h–09h", "09h–12h", "12h–15h", "15h–18h", "18h–21h", "21h–00h", "00h–03h", "03h–06h"];
@@ -112,11 +115,16 @@ interface FormData {
   dailyLoops: number;
   descricao: string;
   horarioFuncionamento: string;
+  // Nº de telas do espaço (fonte única da quantidade de telas na audiência).
+  screensCount: number;
+  // Fotos do espaço (exibidas no ecommerce junto do local).
+  photoUrls: string[];
   // ── Precificação de telas por CPM (fonte única: shared/cpm-pricing.ts) ──
   screenCpm: string;
   screenInsertionsPerHour: number;
   screenImpactsPerInsertion: string;
   screenWeeklyHours: string;
+  screenOperatingHours: string[];
   screenExposureSec: number;
 }
 
@@ -173,12 +181,27 @@ const emptyForm: FormData = {
   dailyLoops: 0,
   descricao: "",
   horarioFuncionamento: "",
+  screensCount: 0,
+  photoUrls: [],
   screenCpm: "",
   screenInsertionsPerHour: 0,
   screenImpactsPerInsertion: "",
   screenWeeklyHours: "",
+  screenOperatingHours: [],
   screenExposureSec: 0,
 };
+
+// Parse do JSON text de fotos do espaço (mesma convenção das telas: array de URLs).
+function parsePhotoUrls(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((u): u is string => typeof u === "string");
+  if (typeof raw !== "string" || raw.trim() === "") return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((u): u is string => typeof u === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 interface Socio {
   nome: string;
@@ -199,6 +222,37 @@ export default function ActiveRestaurantForm() {
   const [cnpjFetched, setCnpjFetched] = useState(false);
   const [sociosList, setSociosList] = useState<Socio[]>([]);
   const [step, setStep] = useState<"cnpj" | "form">(isEditing ? "form" : "cnpj");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  async function handlePhotoUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploadingPhoto(true);
+    try {
+      const uploaded: string[] = [];
+      for (const file of Array.from(files)) {
+        const fd = new FormData();
+        fd.append("photo", file);
+        const res = await fetch("/api/tela-photo/upload", { method: "POST", body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.url) {
+          throw new Error(data?.error || "Falha no upload da foto.");
+        }
+        uploaded.push(data.url as string);
+      }
+      setForm((p) => ({ ...p, photoUrls: [...p.photoUrls, ...uploaded] }));
+      toast.success(uploaded.length > 1 ? "Fotos enviadas." : "Foto enviada.");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erro ao enviar foto.");
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
+  }
+
+  function removePhoto(url: string) {
+    setForm((p) => ({ ...p, photoUrls: p.photoUrls.filter((u) => u !== url) }));
+  }
 
   const utils = trpc.useUtils();
 
@@ -283,10 +337,13 @@ export default function ActiveRestaurantForm() {
         dailyLoops: (existingRestaurant as any).dailyLoops || 0,
         descricao: (existingRestaurant as any).descricao || "",
         horarioFuncionamento: (existingRestaurant as any).horarioFuncionamento || "",
+        screensCount: (existingRestaurant as any).screensCount || 0,
+        photoUrls: parsePhotoUrls((existingRestaurant as any).photoUrls),
         screenCpm: (existingRestaurant as any).screenCpm != null ? String((existingRestaurant as any).screenCpm) : "",
         screenInsertionsPerHour: (existingRestaurant as any).screenInsertionsPerHour || 0,
         screenImpactsPerInsertion: (existingRestaurant as any).screenImpactsPerInsertion != null ? String((existingRestaurant as any).screenImpactsPerInsertion) : "",
         screenWeeklyHours: (existingRestaurant as any).screenWeeklyHours != null ? String((existingRestaurant as any).screenWeeklyHours) : "",
+        screenOperatingHours: parseOperatingHours((existingRestaurant as any).screenOperatingHours),
         screenExposureSec: (existingRestaurant as any).screenExposureSec || 0,
       });
       setStep("form");
@@ -358,6 +415,30 @@ export default function ActiveRestaurantForm() {
         ? prev.busyHours.filter(s => s !== slot)
         : [...prev.busyHours, slot],
     }));
+  };
+
+  // Grade de horário de funcionamento das telas. A contagem de células
+  // selecionadas é a fonte única de screenWeeklyHours (1 célula = 1 hora).
+  const setOperatingHours = (next: string[]) =>
+    setForm(prev => ({ ...prev, screenOperatingHours: next, screenWeeklyHours: String(next.length) }));
+
+  const toggleOperatingCell = (day: number, hour: number) => {
+    const key = operatingCellKey(day, hour);
+    setOperatingHours(
+      form.screenOperatingHours.includes(key)
+        ? form.screenOperatingHours.filter(k => k !== key)
+        : [...form.screenOperatingHours, key],
+    );
+  };
+
+  const toggleOperatingDay = (day: number) => {
+    const dayKeys = OPERATING_HOURS.map(h => operatingCellKey(day, h));
+    const allOn = dayKeys.every(k => form.screenOperatingHours.includes(k));
+    setOperatingHours(
+      allOn
+        ? form.screenOperatingHours.filter(k => !dayKeys.includes(k))
+        : Array.from(new Set([...form.screenOperatingHours, ...dayKeys])),
+    );
   };
 
   const toggleCategory = (cat: string) => {
@@ -448,10 +529,13 @@ export default function ActiveRestaurantForm() {
       dailyLoops: form.dailyLoops || null,
       descricao: form.descricao || undefined,
       horarioFuncionamento: form.horarioFuncionamento || undefined,
+      screensCount: form.screensCount || 0,
+      photoUrls: JSON.stringify(form.photoUrls),
       screenCpm: form.screenCpm.trim() !== "" ? form.screenCpm.trim() : null,
       screenInsertionsPerHour: form.screenInsertionsPerHour || null,
       screenImpactsPerInsertion: form.screenImpactsPerInsertion.trim() !== "" ? form.screenImpactsPerInsertion.trim() : null,
       screenWeeklyHours: form.screenWeeklyHours.trim() !== "" ? form.screenWeeklyHours.trim() : null,
+      screenOperatingHours: form.screenOperatingHours.length > 0 ? JSON.stringify(form.screenOperatingHours) : null,
       screenExposureSec: form.screenExposureSec || null,
       // Coordenadas escolhidas no AddressAutocomplete (origem única). Só enviamos
       // quando o usuário selecionou um endereço; ao editar sem reescolher, coords
@@ -767,100 +851,202 @@ export default function ActiveRestaurantForm() {
                     </p>
                   </Section>
 
-                  <Section icon={<Monitor className="w-4 h-4" />} title="Precificação de Telas (CPM)">
+                  <Section icon={<Monitor className="w-4 h-4" />} title="Espaço de mídia (telas)">
                     <p className="text-[10px] text-muted-foreground -mt-1">
-                      As telas deste local são precificadas exclusivamente por CPM (custo por mil impactos). Sem estes campos preenchidos, as telas ficam sem preço nas cotações.
+                      O que se comercializa é o <strong>espaço</strong>. Informe o nº de telas do local (usado na audiência estimada) e adicione fotos do espaço para o ecommerce. A precificação das telas é por CPM (custo por mil impactos) — sem estes campos a tela fica sem preço nas cotações. O cadastro individual de telas é opcional.
                     </p>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">CPM (R$ / mil impactos)</Label>
-                        <Input
-                          type="number" step="0.01" min="0" inputMode="decimal"
-                          value={form.screenCpm}
-                          onChange={(e) => setForm(p => ({ ...p, screenCpm: e.target.value }))}
-                          placeholder="29.90"
-                          className="bg-background border-border/30 h-9 text-sm"
-                          data-testid="input-screen-cpm"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Inserções por hora</Label>
+                        <Label className="text-xs text-muted-foreground">Nº de telas do espaço</Label>
                         <Input
                           type="number" step="1" min="0" inputMode="numeric"
-                          value={form.screenInsertionsPerHour || ""}
-                          onChange={(e) => setForm(p => ({ ...p, screenInsertionsPerHour: parseInt(e.target.value || "0", 10) }))}
-                          placeholder="10"
+                          value={form.screensCount || ""}
+                          onChange={(e) => setForm(p => ({ ...p, screensCount: parseInt(e.target.value || "0", 10) }))}
+                          placeholder="0"
                           className="bg-background border-border/30 h-9 text-sm"
-                          data-testid="input-screen-insertions-hour"
+                          data-testid="input-screens-count"
                         />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Impactos por inserção</Label>
-                        <Input
-                          type="number" step="0.01" min="0" inputMode="decimal"
-                          value={form.screenImpactsPerInsertion}
-                          onChange={(e) => setForm(p => ({ ...p, screenImpactsPerInsertion: e.target.value }))}
-                          placeholder="33.04"
-                          className="bg-background border-border/30 h-9 text-sm"
-                          data-testid="input-screen-impacts"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Horas de operação / semana</Label>
-                        <Input
-                          type="number" step="0.5" min="0" inputMode="decimal"
-                          value={form.screenWeeklyHours}
-                          onChange={(e) => setForm(p => ({ ...p, screenWeeklyHours: e.target.value }))}
-                          placeholder="65"
-                          className="bg-background border-border/30 h-9 text-sm"
-                          data-testid="input-screen-weekly-hours"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Tempo de exposição (seg) <span className="opacity-60">· informativo</span></Label>
-                        <Input
-                          type="number" step="1" min="0" inputMode="numeric"
-                          value={form.screenExposureSec || ""}
-                          onChange={(e) => setForm(p => ({ ...p, screenExposureSec: parseInt(e.target.value || "0", 10) }))}
-                          placeholder="10"
-                          className="bg-background border-border/30 h-9 text-sm"
-                          data-testid="input-screen-exposure"
-                        />
+                        <p className="text-[10px] text-muted-foreground">0 = este espaço não vende telas (nunca alerta "config pendente").</p>
                       </div>
                     </div>
-                    {(() => {
-                      const preview = computeCpmPricing({
-                        cpm: parseFloat(form.screenCpm),
-                        insertionsPerHour: form.screenInsertionsPerHour,
-                        impactsPerInsertion: parseFloat(form.screenImpactsPerInsertion),
-                        weeklyHours: parseFloat(form.screenWeeklyHours),
-                      });
-                      if (!preview) {
-                        return (
-                          <p className="text-[11px] text-muted-foreground mt-3">
-                            Preencha CPM, inserções/hora, impactos/inserção e horas/semana para ver o preço estimado.
-                          </p>
-                        );
-                      }
-                      const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-                      const num = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-                      return (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 p-3 rounded-lg bg-muted/40 border border-border/30" data-testid="screen-cpm-preview">
-                          <div>
-                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Preço por inserção</div>
-                            <div className="text-sm font-semibold tabular-nums">{brl(preview.pricePerInsertion)}</div>
+
+                    {form.screensCount > 0 ? (
+                      <>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">CPM (R$ / mil impactos)</Label>
+                            <Input
+                              type="number" step="0.01" min="0" inputMode="decimal"
+                              value={form.screenCpm}
+                              onChange={(e) => setForm(p => ({ ...p, screenCpm: e.target.value }))}
+                              placeholder="29.90"
+                              className="bg-background border-border/30 h-9 text-sm"
+                              data-testid="input-screen-cpm"
+                            />
                           </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Inserções por semana</div>
-                            <div className="text-sm font-semibold tabular-nums">{num(preview.weeklyInsertions)}</div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Inserções por hora</Label>
+                            <Input
+                              type="number" step="1" min="0" inputMode="numeric"
+                              value={form.screenInsertionsPerHour || ""}
+                              onChange={(e) => setForm(p => ({ ...p, screenInsertionsPerHour: parseInt(e.target.value || "0", 10) }))}
+                              placeholder="10"
+                              className="bg-background border-border/30 h-9 text-sm"
+                              data-testid="input-screen-insertions-hour"
+                            />
                           </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Ganho esperado / semana</div>
-                            <div className="text-sm font-semibold tabular-nums text-primary">{brl(preview.weeklyRevenue)}</div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Impactos por inserção</Label>
+                            <Input
+                              type="number" step="0.01" min="0" inputMode="decimal"
+                              value={form.screenImpactsPerInsertion}
+                              onChange={(e) => setForm(p => ({ ...p, screenImpactsPerInsertion: e.target.value }))}
+                              placeholder="33.04"
+                              className="bg-background border-border/30 h-9 text-sm"
+                              data-testid="input-screen-impacts"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Tempo de exposição (seg) <span className="opacity-60">· informativo</span></Label>
+                            <Input
+                              type="number" step="1" min="0" inputMode="numeric"
+                              value={form.screenExposureSec || ""}
+                              onChange={(e) => setForm(p => ({ ...p, screenExposureSec: parseInt(e.target.value || "0", 10) }))}
+                              placeholder="10"
+                              className="bg-background border-border/30 h-9 text-sm"
+                              data-testid="input-screen-exposure"
+                            />
                           </div>
                         </div>
-                      );
-                    })()}
+
+                        <div className="space-y-2 mt-4">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs text-muted-foreground">Horário de funcionamento <span className="opacity-60">· define horas/semana</span></Label>
+                            <span className="text-[11px] text-muted-foreground tabular-nums" data-testid="operating-hours-total">{form.screenOperatingHours.length} h/semana</span>
+                          </div>
+                          <div className="overflow-x-auto -mx-1 px-1">
+                            <table className="border-separate border-spacing-1">
+                              <thead>
+                                <tr>
+                                  <th className="w-9" />
+                                  {OPERATING_HOURS.map((h) => (
+                                    <th key={h} className="align-bottom">
+                                      <div className="text-[8px] text-muted-foreground [writing-mode:vertical-rl] mx-auto whitespace-nowrap py-0.5">{operatingHourLabel(h)}</div>
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {OPERATING_DAYS.map((day) => (
+                                  <tr key={day.key}>
+                                    <td>
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleOperatingDay(day.key)}
+                                        className="text-[10px] font-medium text-muted-foreground hover:text-foreground w-9 text-left"
+                                      >
+                                        {day.label}
+                                      </button>
+                                    </td>
+                                    {OPERATING_HOURS.map((h) => {
+                                      const on = form.screenOperatingHours.includes(operatingCellKey(day.key, h));
+                                      return (
+                                        <td key={h}>
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleOperatingCell(day.key, h)}
+                                            aria-pressed={on}
+                                            aria-label={`${day.label} ${operatingHourLabel(h)}`}
+                                            data-testid={`op-cell-${day.key}-${h}`}
+                                            className={`w-5 h-5 rounded-full border transition-colors ${on ? "bg-primary border-primary" : "bg-background border-border/40 hover:border-primary/50"}`}
+                                          />
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">Marque as faixas em que as telas operam (clique no dia para a linha inteira). O total de horas/semana alimenta a precificação por CPM.</p>
+                        </div>
+
+                        {(() => {
+                          const preview = computeCpmPricing({
+                            cpm: parseFloat(form.screenCpm),
+                            insertionsPerHour: form.screenInsertionsPerHour,
+                            impactsPerInsertion: parseFloat(form.screenImpactsPerInsertion),
+                            weeklyHours: parseFloat(form.screenWeeklyHours),
+                          });
+                          if (!preview) {
+                            return (
+                              <p className="text-[11px] text-muted-foreground mt-3">
+                                Preencha CPM, inserções/hora, impactos/inserção e marque o horário de funcionamento para ver o preço estimado.
+                              </p>
+                            );
+                          }
+                          const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                          const num = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+                          return (
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 p-3 rounded-lg bg-muted/40 border border-border/30" data-testid="screen-cpm-preview">
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Inserções / semana</div>
+                                <div className="text-sm font-semibold tabular-nums">{num(preview.weeklyInsertions)}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Preço por inserção</div>
+                                <div className="text-sm font-semibold tabular-nums">{brl(preview.pricePerInsertion)}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Preço / semana · por anunciante (por tela)</div>
+                                <div className="text-sm font-semibold tabular-nums text-primary">{brl(preview.weeklyRevenue)}</div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground mt-3">
+                        Este espaço não vende telas. Defina o <strong>nº de telas</strong> acima para configurar a precificação por CPM e o horário de funcionamento.
+                      </p>
+                    )}
+
+                    <div className="space-y-2 mt-4 pt-4 border-t border-border/30">
+                      <Label className="text-xs text-muted-foreground">Fotos do espaço <span className="opacity-60">· exibidas no ecommerce</span></Label>
+                      <div className="flex flex-wrap gap-2">
+                        {form.photoUrls.map((url) => (
+                          <div key={url} className="relative w-24 h-24 rounded-lg overflow-hidden border border-border/30 group">
+                            <img src={url} alt="Foto do espaço" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            <button
+                              type="button"
+                              onClick={() => removePhoto(url)}
+                              className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5 text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                              data-testid="button-remove-space-photo"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => photoInputRef.current?.click()}
+                          disabled={uploadingPhoto}
+                          className="w-24 h-24 rounded-lg border border-dashed border-border/50 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:bg-muted/20 disabled:opacity-50"
+                          data-testid="button-add-space-photo"
+                        >
+                          {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
+                          <span className="text-[10px]">{uploadingPhoto ? "Enviando..." : "Adicionar"}</span>
+                        </button>
+                      </div>
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handlePhotoUpload(e.target.files)}
+                      />
+                    </div>
                   </Section>
 
                   <Section icon={<CreditCard className="w-4 h-4" />} title="Financeiro">

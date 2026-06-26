@@ -2261,6 +2261,50 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       CREATE INDEX IF NOT EXISTS "idx_quotation_items_venue_id" ON "quotation_items" ("venue_id");
     `,
   },
+  {
+    // Task #362 — comercializar o ESPAÇO, não a tela.
+    // 1) screensCount no espaço passa a ser a fonte única da quantidade de telas
+    //    usada na audiência estimada (substitui a contagem de registros `telas`).
+    // 2) backfill: quem já tem telas cadastradas herda a contagem ativa.
+    // 3) backfill de fotos: o espaço sem fotos próprias herda as fotos das telas
+    //    ativas (preserva a exibição existente no ecommerce durante a transição).
+    name: "task_362_space_screens_count_and_photos",
+    sql: [
+      `ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "screensCount" integer NOT NULL DEFAULT 0;`,
+      `UPDATE "active_restaurants" ar
+         SET "screensCount" = sub.cnt
+         FROM (
+           SELECT t."restaurantId" AS rid, COUNT(*)::int AS cnt
+           FROM "telas" t
+           WHERE t.status = 'active'
+           GROUP BY t."restaurantId"
+         ) sub
+         WHERE ar.id = sub.rid
+           AND ar."screensCount" = 0;`,
+      `UPDATE "active_restaurants" ar
+         SET "photoUrls" = sub.agg
+         FROM (
+           SELECT t."restaurantId" AS rid,
+                  to_json(array_agg(elem ORDER BY elem))::text AS agg
+           FROM "telas" t,
+                LATERAL json_array_elements_text(t."photoUrls"::json) AS elem
+           WHERE t.status = 'active'
+             AND t."photoUrls" IS NOT NULL
+             AND t."photoUrls" <> ''
+             AND t."photoUrls" <> '[]'
+             AND t."photoUrls" ~ '^\\s*\\['
+           GROUP BY t."restaurantId"
+         ) sub
+         WHERE ar.id = sub.rid
+           AND (ar."photoUrls" IS NULL OR ar."photoUrls" = '' OR ar."photoUrls" = '[]');`,
+    ],
+  },
+  {
+    // Task #362 — Grade de horário de funcionamento das telas (7 dias × 24h).
+    // A contagem de células selecionadas é a fonte única de screenWeeklyHours.
+    name: "task_362_screen_operating_hours_column",
+    sql: `ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "screen_operating_hours" text;`,
+  },
 ];
 
 /**

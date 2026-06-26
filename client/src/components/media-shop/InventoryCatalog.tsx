@@ -527,11 +527,26 @@ function LocationCard({
   const { metrics, pricing, screens } = locationMetrics(loc, days);
   const setup = locSetupStatus(loc);
 
+  const coverPhoto = loc.photoUrls?.[0] ?? null;
+
   return (
     <Card
       data-testid={`local-card-${loc.restaurantId}`}
-      className={selected ? "ring-2 ring-primary" : ""}
+      className={`overflow-hidden ${selected ? "ring-2 ring-primary" : ""}`}
     >
+      {coverPhoto && (
+        <div className="aspect-video w-full overflow-hidden bg-muted">
+          <img
+            src={coverPhoto}
+            alt={loc.name}
+            className="w-full h-full object-cover"
+            data-testid={`local-photo-${loc.restaurantId}`}
+            onError={(e) => {
+              (e.target as HTMLImageElement).parentElement!.style.display = "none";
+            }}
+          />
+        </div>
+      )}
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">

@@ -410,7 +410,12 @@ export const activeRestaurants = pgTable("active_restaurants", {
   screenInsertionsPerHour: integer("screen_insertions_per_hour"),
   screenImpactsPerInsertion: decimal("screen_impacts_per_insertion", { precision: 10, scale: 2 }),
   screenWeeklyHours: decimal("screen_weekly_hours", { precision: 6, scale: 2 }),
+  screenOperatingHours: text("screen_operating_hours"),
   screenExposureSec: integer("screen_exposure_sec"),
+  // Nº de telas do ESPAÇO (fonte única da quantidade de telas usada na audiência
+  // estimada). Comercializa-se o espaço inteiro: este número substitui a contagem
+  // de registros individuais da tabela `telas` (que vira inventário opcional).
+  screensCount: integer("screensCount").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [

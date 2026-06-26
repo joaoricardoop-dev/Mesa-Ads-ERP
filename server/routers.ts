@@ -826,11 +826,14 @@ export const appRouter = router({
           dailyLoops: z.number().int().optional().nullable(),
           descricao: z.string().optional(),
           horarioFuncionamento: z.string().optional(),
+          // Nº de telas do espaço (fonte única da quantidade de telas).
+          screensCount: z.number().int().min(0).optional(),
           // ── Precificação de telas por CPM (fonte única) ──
           screenCpm: z.string().optional().nullable(),
           screenInsertionsPerHour: z.number().int().optional().nullable(),
           screenImpactsPerInsertion: z.string().optional().nullable(),
           screenWeeklyHours: z.string().optional().nullable(),
+          screenOperatingHours: z.string().optional().nullable(),
           screenExposureSec: z.number().int().optional().nullable(),
           // ── Coordenadas (origem única: AddressAutocomplete no client) ──
           lat: z.string().optional().nullable(),
@@ -900,11 +903,14 @@ export const appRouter = router({
           dailyLoops: z.number().int().optional().nullable(),
           descricao: z.string().optional(),
           horarioFuncionamento: z.string().optional(),
+          // Nº de telas do espaço (fonte única da quantidade de telas).
+          screensCount: z.number().int().min(0).optional(),
           // ── Precificação de telas por CPM (fonte única) ──
           screenCpm: z.string().optional().nullable(),
           screenInsertionsPerHour: z.number().int().optional().nullable(),
           screenImpactsPerInsertion: z.string().optional().nullable(),
           screenWeeklyHours: z.string().optional().nullable(),
+          screenOperatingHours: z.string().optional().nullable(),
           screenExposureSec: z.number().int().optional().nullable(),
           // ── Coordenadas (origem única: AddressAutocomplete no client) ──
           lat: z.string().optional().nullable(),

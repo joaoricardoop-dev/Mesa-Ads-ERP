@@ -14,7 +14,6 @@ import {
   campaignPhases,
   campaigns,
   campaignDrafts,
-  telas,
 } from "../drizzle/schema";
 import { parseTelaPhotoUrls } from "./telaRouter";
 import { and, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
@@ -172,6 +171,8 @@ export const anunciantePortalRouter = router({
           lng: activeRestaurants.lng,
           categoria: activeRestaurants.categoria,
           dailyLoops: activeRestaurants.dailyLoops,
+          screensCount: activeRestaurants.screensCount,
+          photoUrls: activeRestaurants.photoUrls,
           screenCpm: activeRestaurants.screenCpm,
           screenInsertionsPerHour: activeRestaurants.screenInsertionsPerHour,
           screenImpactsPerInsertion: activeRestaurants.screenImpactsPerInsertion,
@@ -190,21 +191,6 @@ export const anunciantePortalRouter = router({
       }
 
       const allowedRestaurantIds = new Set(restaurantRows.map((r) => r.id));
-
-      // Contagem de telas ativas por local (nº de telas mostrado no card de mídia).
-      const screenCountRows = await db
-        .select({
-          restaurantId: telas.restaurantId,
-          count: sql<number>`count(*)::int`,
-        })
-        .from(telas)
-        .where(
-          and(eq(telas.status, "active"), inArray(telas.restaurantId, Array.from(allowedRestaurantIds))),
-        )
-        .groupBy(telas.restaurantId);
-      const screensByRestaurant = new Map<number, number>(
-        screenCountRows.map((s) => [s.restaurantId, Number(s.count ?? 0)]),
-      );
 
       // 3. Ocupação real: campaignItems vinculados a (productId, restaurantId)
       // cujas fases intersectam o período. Filtramos no SQL quando possível.
@@ -305,7 +291,11 @@ export const anunciantePortalRouter = router({
           categoria: r.categoria,
           lat: r.lat != null ? parseFloat(r.lat) : null,
           lng: r.lng != null ? parseFloat(r.lng) : null,
-          screensCount: screensByRestaurant.get(r.id) ?? 0,
+          // Fonte única da quantidade de telas: coluna do ESPAÇO (não a contagem
+          // de registros individuais da tabela `telas`, que é inventário opcional).
+          screensCount: r.screensCount ?? 0,
+          // Fotos do espaço exibidas no ecommerce junto do local (fonte única).
+          photoUrls: parseTelaPhotoUrls(r.photoUrls),
           dailyLoops: r.dailyLoops,
           // Config CPM da tela (fonte única: shared/cpm-pricing.ts). Telas só têm
           // preço quando estes campos estão completos.
@@ -351,6 +341,7 @@ export const anunciantePortalRouter = router({
           monthlyCustomers: activeRestaurants.monthlyCustomers,
           ratingScore: activeRestaurants.ratingScore,
           ratingTier: activeRestaurants.ratingTier,
+          photoUrls: activeRestaurants.photoUrls,
           screenCpm: activeRestaurants.screenCpm,
           screenInsertionsPerHour: activeRestaurants.screenInsertionsPerHour,
           screenImpactsPerInsertion: activeRestaurants.screenImpactsPerInsertion,
@@ -363,25 +354,14 @@ export const anunciantePortalRouter = router({
       if (restaurantRows.length === 0) return [];
       const allowedIds = new Set(restaurantRows.map((r) => r.id));
 
-      // Fotos das telas ativas (exibidas no ecommerce junto do local).
-      const telaRows = await db
-        .select({
-          restaurantId: telas.restaurantId,
-          nome: telas.nome,
-          photoUrls: telas.photoUrls,
-        })
-        .from(telas)
-        .where(
-          and(eq(telas.status, "active"), inArray(telas.restaurantId, Array.from(allowedIds))),
-        );
-
+      // Fotos do ESPAÇO (fonte única: active_restaurants.photoUrls) exibidas no
+      // ecommerce junto do local. As fotos antes herdadas das telas foram migradas
+      // para o espaço (ver migration task_362), então não lemos mais `telas` aqui.
       const photosByRestaurant = new Map<number, string[]>();
-      for (const t of telaRows) {
-        const urls = parseTelaPhotoUrls(t.photoUrls);
+      for (const r of restaurantRows) {
+        const urls = parseTelaPhotoUrls(r.photoUrls);
         if (urls.length === 0) continue;
-        const arr = photosByRestaurant.get(t.restaurantId) ?? [];
-        arr.push(...urls);
-        photosByRestaurant.set(t.restaurantId, arr);
+        photosByRestaurant.set(r.id, urls);
       }
 
       const slotRows = await db

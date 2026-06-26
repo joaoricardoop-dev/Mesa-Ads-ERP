@@ -11,6 +11,7 @@ import {
   campaignRestaurants,
   campaignHistory,
   activeRestaurants,
+  productLocations,
   restaurantPhotos,
   restaurantPayments,
   suppliers,
@@ -954,7 +955,17 @@ export async function listActiveBudgetsWithItems() {
 export async function listActiveRestaurants() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(activeRestaurants).orderBy(activeRestaurants.name);
+  const rows = await db.select().from(activeRestaurants).orderBy(activeRestaurants.name);
+  // Quais espaços OFERECEM um produto do tipo "telas" (product_locations →
+  // products.tipo='telas'). Só estes podem exigir config CPM / mídia completa —
+  // o cadastro individual de telas é inventário opcional e nunca obriga config.
+  const screenProductRows = await db
+    .selectDistinct({ restaurantId: productLocations.restaurantId })
+    .from(productLocations)
+    .innerJoin(products, eq(products.id, productLocations.productId))
+    .where(eq(products.tipo, "telas"));
+  const offersScreen = new Set(screenProductRows.map((r) => r.restaurantId));
+  return rows.map((r) => ({ ...r, offersScreenProduct: offersScreen.has(r.id) }));
 }
 
 export async function getActiveRestaurant(id: number) {

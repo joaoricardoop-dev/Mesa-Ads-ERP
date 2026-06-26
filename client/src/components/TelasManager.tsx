@@ -80,7 +80,7 @@ export default function TelasManager({ restaurantId, defaultAddress, defaultLat,
             <Monitor className="w-4 h-4 text-primary" /> Telas do local
           </h3>
           <p className="text-xs text-muted-foreground">
-            Cada local pode ter várias telas (pontos de mídia). Gerencie aqui o inventário.
+            Inventário interno e <strong>opcional</strong>: o que se comercializa é o espaço (use "Nº de telas" e fotos no cadastro do local). Detalhar cada tela aqui nunca é obrigatório e não bloqueia a venda.
           </p>
         </div>
         <Button onClick={openCreate} size="sm" className="gap-1.5" data-testid="button-add-tela">
@@ -122,7 +122,7 @@ export default function TelasManager({ restaurantId, defaultAddress, defaultLat,
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                 {t.cmsScreenId && <InfoLine label="CMS" value={t.cmsScreenId} />}
-                {(t.width || t.height) && <InfoLine label="Dimensões" value={`${t.width ?? "?"}×${t.height ?? "?"} cm`} />}
+                {(t.width || t.height) && <InfoLine label="Dimensões" value={`${t.width ?? "?"}×${t.height ?? "?"} px`} />}
                 {t.layout && <InfoLine label="Layout" value={LAYOUT_LABELS[t.layout] ?? t.layout} />}
                 {t.horarioFuncionamento && <InfoLine label="Horário" value={t.horarioFuncionamento} />}
                 {(t.lat && t.lng) && <InfoLine label="Coordenadas" value={`${Number(t.lat).toFixed(5)}, ${Number(t.lng).toFixed(5)}`} />}
@@ -425,11 +425,11 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
             <FieldWrap label="Horário de Funcionamento">
               <Input value={form.horarioFuncionamento} onChange={(e) => setForm((f) => ({ ...f, horarioFuncionamento: e.target.value }))} placeholder="Seg-Sex 08h-22h" />
             </FieldWrap>
-            <FieldWrap label="Largura (cm)">
-              <Input type="number" value={form.width} onChange={(e) => setForm((f) => ({ ...f, width: e.target.value }))} placeholder="192" data-testid="input-tela-width" />
+            <FieldWrap label="Largura (px)">
+              <Input type="number" value={form.width} onChange={(e) => setForm((f) => ({ ...f, width: e.target.value }))} placeholder="1920" data-testid="input-tela-width" />
             </FieldWrap>
-            <FieldWrap label="Altura (cm)">
-              <Input type="number" value={form.height} onChange={(e) => setForm((f) => ({ ...f, height: e.target.value }))} placeholder="108" data-testid="input-tela-height" />
+            <FieldWrap label="Altura (px)">
+              <Input type="number" value={form.height} onChange={(e) => setForm((f) => ({ ...f, height: e.target.value }))} placeholder="1080" data-testid="input-tela-height" />
             </FieldWrap>
             <FieldWrap label="Layout / orientação">
               <Select value={form.layout} onValueChange={(v) => setForm((f) => ({ ...f, layout: v }))}>
