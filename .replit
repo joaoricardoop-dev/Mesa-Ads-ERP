@@ -54,3 +54,7 @@ VITE_CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsubWVzYWFkcy5jb20uYnIk"
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 120000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
