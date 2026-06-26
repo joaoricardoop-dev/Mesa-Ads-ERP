@@ -11,9 +11,10 @@ Canonical loader: `client/src/lib/googleMaps.ts` → `loadGoogleMaps()`. Short-c
 - **Missing/empty** → `loadGoogleMaps()` rejects with `GoogleMapsKeyMissingError` BEFORE injecting any script (never injects `key=undefined`). `MapView` catches and renders a fallback (`data-testid="map-load-error"`); list/cards keep working.
 - **Invalid / no billing** → script still loads (onload fires), Google overlays its own `.gm-err-container` error and calls `window.gm_authFailure`; we register that hook to log a clear console error and set `window._gmapsAuthFailed`.
 
-## Parallel-loader gotcha (single-source debt)
-`client/src/pages/RestaurantsMap.tsx` has its OWN `loadMapScript()` + its own `gm_authFailure`/`_gmapsAuthFailed`/`window.google` Window augmentation — it does NOT use `loadGoogleMaps()`. So Google-Maps key/auth behavior lives in TWO places; touch both when changing it.
-**Why:** found while adding missing/invalid-key handling — the shared loader and RestaurantsMap diverged. Pre-existing `TS2790` on `delete window.google` in RestaurantsMap is unrelated to key changes.
+## Single loader everywhere (parallel loader removed)
+`RestaurantsMap.tsx` now uses `loadGoogleMaps()` like every other map screen — its old `loadMapScript()` + duplicate `gm_authFailure`/`_gmapsAuthFailed`/`window.google` Window augmentation are gone. Key/auth behavior lives ONLY in `googleMaps.ts`; never reintroduce a second loader. The Window globals are declared in `googleMaps.ts` and apply app-wide via its import.
+**Why:** the shared loader and RestaurantsMap had diverged (different libraries, different missing-key handling); consolidating removes the two-places-to-fix debt.
+**How to apply:** RestaurantsMap wraps `loadGoogleMaps()` in try/catch and shows its own fallback overlay on rejection (missing key). Its "Tentar novamente" button resets `window._gmapsLoading`/`window._gmapsAuthFailed` and re-calls `initMap` (a `usePersistFn`).
 
 ## Verifying real pins
 `e2e/builder-locais.spec.ts` = FAKE SDK (deterministic wiring). `e2e/builder-locais-real-maps.spec.ts` = REAL SDK, gated by `RUN_REAL_MAPS=1` + a key on the dev server. It drives marker clicks via the dev-only hook `window.__catalogMapTest.clickMarker(title)` (guarded by `import.meta.env.DEV`, tree-shaken out of prod) instead of guessing Google's internal marker DOM, which is version-unstable.

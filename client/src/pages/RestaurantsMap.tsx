@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { loadGoogleMaps } from "@/lib/googleMaps";
+import { usePersistFn } from "@/hooks/usePersistFn";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -23,56 +25,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-declare global {
-  interface Window {
-    google?: typeof google;
-    _gmapsLoading?: Promise<void>;
-  }
-}
-
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const SAO_PAULO_CENTER = { lat: -23.5505, lng: -46.6333 };
-
-declare global {
-  interface Window {
-    gm_authFailure?: () => void;
-    _gmapsAuthFailed?: boolean;
-  }
-}
-
-function loadMapScript(): Promise<void> {
-  if (window._gmapsAuthFailed) {
-    window._gmapsLoading = undefined;
-    window._gmapsAuthFailed = false;
-    delete window.google;
-  }
-  if (window.google?.maps) return Promise.resolve();
-  if (window._gmapsLoading) return window._gmapsLoading;
-
-  window._gmapsLoading = new Promise<void>((resolve, reject) => {
-    window.gm_authFailure = () => {
-      window._gmapsAuthFailed = true;
-      window._gmapsLoading = undefined;
-      reject(new Error(
-        "Chave da API do Google Maps inválida ou sem permissão. " +
-        "Verifique se a API 'Maps JavaScript API' está ativada no Google Cloud Console " +
-        "e se as restrições de HTTP Referrer permitem o domínio atual."
-      ));
-    };
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,geocoding`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => {
-      window._gmapsLoading = undefined;
-      reject(new Error("Falha ao carregar o script do Google Maps. Verifique sua conexão ou a chave de API."));
-    };
-    document.head.appendChild(script);
-  });
-  return window._gmapsLoading;
-}
 
 const TIER_COLORS: Record<string, string> = {
   platinum: "#a78bfa",
@@ -198,45 +151,46 @@ export default function RestaurantsMap() {
     markersRef.current.set(r.id, marker);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function init() {
-      try {
-        await loadMapScript();
-      } catch (err: any) {
-        if (!cancelled) setMapError(err.message || "Erro ao carregar o Google Maps");
-        return;
-      }
-      if (cancelled || !mapContainer.current) return;
-      if (!mapRef.current) {
-        mapRef.current = new window.google!.maps.Map(mapContainer.current, {
-          zoom: 12,
-          center: SAO_PAULO_CENTER,
-          mapTypeControl: false,
-          fullscreenControl: true,
-          zoomControl: true,
-          streetViewControl: false,
-          mapId: "mesa_ads_restaurants",
-          styles: [
-            { featureType: "all", elementType: "geometry", stylers: [{ color: "#1a1a1a" }] },
-            { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#aaaaaa" }] },
-            { featureType: "all", elementType: "labels.text.stroke", stylers: [{ color: "#111111" }] },
-            { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a2a2a" }] },
-            { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#333333" }] },
-            { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#3d3d3d" }] },
-            { featureType: "water", elementType: "geometry", stylers: [{ color: "#0d1117" }] },
-            { featureType: "poi", elementType: "geometry", stylers: [{ color: "#1e1e1e" }] },
-            { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#1a2a1a" }] },
-            { featureType: "transit", elementType: "geometry", stylers: [{ color: "#222222" }] },
-            { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
-          ],
-        });
-        geocoderRef.current = new window.google!.maps.Geocoder();
-      }
+  const initMap = usePersistFn(async () => {
+    setMapError(null);
+    try {
+      await loadGoogleMaps();
+    } catch (err: any) {
+      console.error("Falha ao carregar o Google Maps", err);
+      setMapError(err?.message || "Erro ao carregar o Google Maps");
+      return;
     }
-    init();
-    return () => { cancelled = true; };
-  }, []);
+    if (!mapContainer.current) return;
+    if (!mapRef.current) {
+      mapRef.current = new window.google!.maps.Map(mapContainer.current, {
+        zoom: 12,
+        center: SAO_PAULO_CENTER,
+        mapTypeControl: false,
+        fullscreenControl: true,
+        zoomControl: true,
+        streetViewControl: false,
+        mapId: "mesa_ads_restaurants",
+        styles: [
+          { featureType: "all", elementType: "geometry", stylers: [{ color: "#1a1a1a" }] },
+          { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#aaaaaa" }] },
+          { featureType: "all", elementType: "labels.text.stroke", stylers: [{ color: "#111111" }] },
+          { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a2a2a" }] },
+          { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#333333" }] },
+          { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#3d3d3d" }] },
+          { featureType: "water", elementType: "geometry", stylers: [{ color: "#0d1117" }] },
+          { featureType: "poi", elementType: "geometry", stylers: [{ color: "#1e1e1e" }] },
+          { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#1a2a1a" }] },
+          { featureType: "transit", elementType: "geometry", stylers: [{ color: "#222222" }] },
+          { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
+        ],
+      });
+      geocoderRef.current = new window.google!.maps.Geocoder();
+    }
+  });
+
+  useEffect(() => {
+    initMap();
+  }, [initMap]);
 
   useEffect(() => {
     if (!mapRef.current || restaurants.length === 0) return;
@@ -374,7 +328,11 @@ export default function RestaurantsMap() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => { setMapError(null); window._gmapsLoading = undefined; window._gmapsAuthFailed = false; }}
+                onClick={() => {
+                  window._gmapsLoading = undefined;
+                  window._gmapsAuthFailed = false;
+                  initMap();
+                }}
               >
                 Tentar novamente
               </Button>
