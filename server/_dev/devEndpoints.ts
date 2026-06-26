@@ -561,6 +561,343 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
     }
   });
 
+  // Setup completo para os testes E2E dos construtores de plano de mídia dos
+  // portais (MediaShopBuilder). Diferente de dev-ensure-screen-location /
+  // dev-ensure-restaurante (que só marcam produtos como visíveis a
+  // ANUNCIANTES), aqui garantimos inventário visível a AMBOS os perfis
+  // (anunciante e parceiro) e com PREÇO determinístico, além do vínculo
+  // parceiro→cliente que o fluxo self_service_parceiro exige:
+  //   1. Produto "telas" visível a anunciantes+parceiros + local com CPM
+  //      completo + ≥1 tela ativa (alimenta a seção de telas do catálogo).
+  //   2. Produto por quantidade visível a anunciantes+parceiros COM tier de
+  //      preço (custoUnitario+margem) — sem o tier o botão "Adicionar" fica
+  //      desabilitado ("Sob consulta").
+  //   3. Parceiro + cliente vinculado (clients.partnerId) + usuário parceiro.
+  //   4. Usuário anunciante com clientId (reusa um existente se houver).
+  // Idempotente via lookup por nome estável + onConflictDoNothing.
+  app.post("/api/dev-ensure-portal-builder", async (_req, res) => {
+    try {
+      if (!(await sentinelAllows(res))) return;
+      const { authStorage } = await import("../replit_integrations/auth");
+      const { getDb } = await import("../db");
+      const {
+        products,
+        productPricingTiers,
+        productLocations,
+        activeRestaurants,
+        telas,
+        partners,
+        clients,
+      } = await import("../../drizzle/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) return res.status(500).json({ message: "Database not available." });
+
+      // Nomes E2E FIXOS (sem timestamp): reusados entre execuções e ÚNICOS no
+      // catálogo, então a suíte localiza exatamente o local/produto que ESTE
+      // endpoint configura (com CPM/tier), sem depender de "o primeiro" do
+      // catálogo — que seria não-determinístico e poderia cair num local sem CPM.
+      const TELAS_PRODUCT_NAME = "E2E Portal Telas";
+      const TELAS_LOCATION_NAME = "E2E Portal Local Telas";
+      const QTY_PRODUCT_NAME = "E2E Portal Bolacha";
+
+      // ── 1. Produto de telas DEDICADO, visível a anunciantes + parceiros ────
+      let telasProduct = (
+        await db
+          .select({ id: products.id })
+          .from(products)
+          .where(and(eq(products.name, TELAS_PRODUCT_NAME), eq(products.tipo, "telas")))
+          .limit(1)
+      )[0];
+      if (!telasProduct) {
+        [telasProduct] = await db
+          .insert(products)
+          .values({
+            name: TELAS_PRODUCT_NAME,
+            tipo: "telas",
+            isActive: true,
+            visibleToAdvertisers: true,
+            visibleToPartners: true,
+          })
+          .returning({ id: products.id });
+      } else {
+        await db
+          .update(products)
+          .set({ isActive: true, visibleToAdvertisers: true, visibleToPartners: true })
+          .where(eq(products.id, telasProduct.id));
+      }
+      const telasProductId = telasProduct.id;
+
+      // ── Local de telas DEDICADO com CPM completo, ligado ao produto ────────
+      const cpmConfig = {
+        screenCpm: "30.00",
+        screenInsertionsPerHour: 12,
+        screenImpactsPerInsertion: "1.50",
+        screenWeeklyHours: "84.00",
+        screenExposureSec: 10,
+        dailyLoops: 144,
+      };
+      let restaurant = (
+        await db
+          .select({ id: activeRestaurants.id })
+          .from(activeRestaurants)
+          .where(eq(activeRestaurants.name, TELAS_LOCATION_NAME))
+          .limit(1)
+      )[0];
+      if (!restaurant) {
+        [restaurant] = await db
+          .insert(activeRestaurants)
+          .values({
+            name: TELAS_LOCATION_NAME,
+            status: "active",
+            address: "Rua E2E Portal, 300",
+            neighborhood: "Centro",
+            contactName: "E2E Contato Portal",
+            contactRole: "Gerente",
+            whatsapp: "11977777777",
+            tableCount: 20,
+            seatCount: 80,
+            monthlyCustomers: 8000,
+            city: "São Paulo",
+            state: "SP",
+            categoria: "restaurante",
+            ...cpmConfig,
+          })
+          .returning({ id: activeRestaurants.id });
+      } else {
+        await db
+          .update(activeRestaurants)
+          .set({ status: "active", ...cpmConfig })
+          .where(eq(activeRestaurants.id, restaurant.id));
+      }
+      const restaurantId = restaurant.id;
+      await db
+        .insert(productLocations)
+        .values({ productId: telasProductId, restaurantId })
+        .onConflictDoNothing({
+          target: [productLocations.productId, productLocations.restaurantId],
+        });
+
+      const activeScreen = (
+        await db
+          .select({ id: telas.id })
+          .from(telas)
+          .where(and(eq(telas.restaurantId, restaurantId), eq(telas.status, "active")))
+          .limit(1)
+      )[0];
+      if (!activeScreen) {
+        await db.insert(telas).values({
+          restaurantId,
+          nome: "E2E Portal Tela 1",
+          categoria: "restaurante",
+          status: "active",
+        });
+      }
+
+      // ── 2. Produto por quantidade DEDICADO visível a ambos COM tier ────────
+      let qtyProduct = (
+        await db
+          .select({ id: products.id })
+          .from(products)
+          .where(and(eq(products.name, QTY_PRODUCT_NAME), eq(products.tipo, "impressos")))
+          .limit(1)
+      )[0];
+      if (!qtyProduct) {
+        [qtyProduct] = await db
+          .insert(products)
+          .values({
+            name: QTY_PRODUCT_NAME,
+            tipo: "impressos",
+            unitLabel: "bolacha",
+            unitLabelPlural: "bolachas",
+            pricingMode: "cost_based",
+            isActive: true,
+            visibleToAdvertisers: true,
+            visibleToPartners: true,
+          })
+          .returning({ id: products.id });
+      } else {
+        await db
+          .update(products)
+          .set({ isActive: true, visibleToAdvertisers: true, visibleToPartners: true })
+          .where(eq(products.id, qtyProduct.id));
+      }
+      const quantityProductId = qtyProduct.id;
+
+      const existingTier = (
+        await db
+          .select({ id: productPricingTiers.id })
+          .from(productPricingTiers)
+          .where(eq(productPricingTiers.productId, quantityProductId))
+          .limit(1)
+      )[0];
+      if (!existingTier) {
+        await db.insert(productPricingTiers).values({
+          productId: quantityProductId,
+          volumeMin: 1,
+          volumeMax: null,
+          custoUnitario: "2.0000",
+          frete: "0.00",
+          margem: "50.00",
+          artes: 1,
+        });
+      }
+
+      // ── 3. Parceiro + cliente vinculado + usuário parceiro ─────────────────
+      let partner = (
+        await db
+          .select({ id: partners.id })
+          .from(partners)
+          .where(eq(partners.status, "active"))
+          .limit(1)
+      )[0];
+      if (!partner) {
+        [partner] = await db
+          .insert(partners)
+          .values({
+            name: `E2E Portal Parceiro ${Date.now()}`,
+            status: "active",
+            commissionPercent: "20.00",
+          })
+          .returning({ id: partners.id });
+      }
+      const partnerId = partner.id;
+
+      let parceiroClient = (
+        await db
+          .select({ id: clients.id })
+          .from(clients)
+          .where(eq(clients.partnerId, partnerId))
+          .limit(1)
+      )[0];
+      if (!parceiroClient) {
+        [parceiroClient] = await db
+          .insert(clients)
+          .values({
+            name: `E2E Portal Cliente Parceiro ${Date.now()}`,
+            company: `E2E Portal Cliente Parceiro ${Date.now()}`,
+            partnerId,
+            status: "active",
+          })
+          .returning({ id: clients.id });
+      }
+      const parceiroClientId = parceiroClient.id;
+
+      const allUsers = await authStorage.listUsers();
+      let parceiroUser = allUsers.find(
+        (u) => u.role === "parceiro" && u.partnerId === partnerId,
+      );
+      if (!parceiroUser) {
+        const pid = `e2e-portal-parceiro-${Date.now()}`;
+        parceiroUser = await authStorage.upsertUser({
+          id: pid,
+          email: `${pid}@e2e.test`,
+          firstName: "E2E",
+          lastName: "Parceiro Portal",
+          role: "parceiro",
+          partnerId,
+          isActive: true,
+          onboardingComplete: true,
+        });
+      }
+
+      // ── 4. Usuário anunciante (reusa existente ou cria com cliente novo) ────
+      let anuncianteUser = allUsers.find(
+        (u) => u.role === "anunciante" && u.clientId != null,
+      );
+      if (!anuncianteUser) {
+        const [seedClient] = await db
+          .insert(clients)
+          .values({
+            name: `E2E Portal Cliente Anunciante ${Date.now()}`,
+            company: `E2E Portal Cliente Anunciante ${Date.now()}`,
+            status: "active",
+          })
+          .returning({ id: clients.id });
+        const aid = `e2e-portal-anunciante-${Date.now()}`;
+        anuncianteUser = await authStorage.upsertUser({
+          id: aid,
+          email: `${aid}@e2e.test`,
+          firstName: "E2E",
+          lastName: "Anunciante Portal",
+          role: "anunciante",
+          clientId: seedClient.id,
+          isActive: true,
+          onboardingComplete: true,
+        });
+      }
+
+      // Nomes reais (o endpoint pode reusar produtos/clientes pré-existentes,
+      // então a suíte NÃO pode assumir nomes fixos — fonte única: estes selects).
+      const quantityProductName = (
+        await db
+          .select({ name: products.name })
+          .from(products)
+          .where(eq(products.id, quantityProductId))
+          .limit(1)
+      )[0]?.name;
+      const telasProductName = (
+        await db
+          .select({ name: products.name })
+          .from(products)
+          .where(eq(products.id, telasProductId))
+          .limit(1)
+      )[0]?.name;
+      const parceiroClientName = (
+        await db
+          .select({ name: clients.name })
+          .from(clients)
+          .where(eq(clients.id, parceiroClientId))
+          .limit(1)
+      )[0]?.name;
+      // Nome do local de telas com CPM configurado — a suíte adiciona ESTE local
+      // específico (e não "o primeiro" do catálogo), garantindo que o item de
+      // tela tenha precificação CPM no createFromBuilder.
+      const restaurantName = (
+        await db
+          .select({ name: activeRestaurants.name })
+          .from(activeRestaurants)
+          .where(eq(activeRestaurants.id, restaurantId))
+          .limit(1)
+      )[0]?.name;
+
+      res.json({
+        anuncianteUserId: anuncianteUser.id,
+        anuncianteClientId: anuncianteUser.clientId,
+        parceiroUserId: parceiroUser.id,
+        partnerId,
+        parceiroClientId,
+        parceiroClientName,
+        telasProductId,
+        telasProductName,
+        quantityProductId,
+        quantityProductName,
+        restaurantId,
+        restaurantName,
+      });
+    } catch (error) {
+      console.error("Dev ensure portal-builder error:", error);
+      const detail = error instanceof Error ? error.message : String(error);
+      const cause = (error as { cause?: unknown })?.cause;
+      const causeDetail =
+        cause && typeof cause === "object"
+          ? {
+              message: (cause as Error).message,
+              code: (cause as { code?: string }).code,
+              detail: (cause as { detail?: string }).detail,
+              column: (cause as { column?: string }).column,
+              table: (cause as { table?: string }).table,
+              constraint: (cause as { constraint?: string }).constraint,
+            }
+          : String(cause ?? "");
+      res.status(500).json({
+        message: "Erro ao garantir setup do portal builder.",
+        detail,
+        cause: causeDetail,
+      });
+    }
+  });
+
   app.get("/api/dev-find-campaign-for-partner", async (req, res) => {
     try {
       const partnerId = Number(req.query.partnerId);
@@ -582,10 +919,10 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
         LIMIT 1;
       `);
       const row =
-        (rows as { rows?: Array<{ id: number; clientId: number; name: string }> })
+        (rows as unknown as { rows?: Array<{ id: number; clientId: number; name: string }> })
           .rows?.[0] ??
         (Array.isArray(rows)
-          ? (rows as Array<{ id: number; clientId: number; name: string }>)[0]
+          ? (rows as unknown as Array<{ id: number; clientId: number; name: string }>)[0]
           : undefined);
       if (!row) return res.status(412).json({ message: "Nenhuma campanha vinculada a esse parceiro." });
       res.json(row);
