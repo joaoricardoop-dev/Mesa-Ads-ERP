@@ -994,6 +994,49 @@ const RATING_FIELDS = [
 ];
 
 /**
+ * Campos de endereço que alimentam `buildGeocodeQuery`. Qualquer mudança em um
+ * deles deve disparar uma nova geocodificação (FONTE ÚNICA: a mesma lista usada
+ * para montar a query é a que decide se o endereço "mudou").
+ */
+const GEOCODE_ADDRESS_FIELDS = [
+  "address",
+  "neighborhood",
+  "city",
+  "state",
+  "cep",
+] as const;
+
+/**
+ * Executa a geocodificação de fato: monta a query a partir do endereço gravado,
+ * chama o Google e sobrescreve lat/lng no registro. Degrada com segurança —
+ * qualquer falha de rede/config/ZERO_RESULTS apenas loga um aviso e retorna o
+ * registro inalterado. Helper interno compartilhado por `autoGeocodeIfMissing`
+ * (preenchimento) e `regeocodeIfAddressChanged` (atualização).
+ */
+async function performGeocode<T extends typeof activeRestaurants.$inferSelect>(
+  restaurant: T,
+): Promise<T> {
+  try {
+    const result = await geocodeAddress(buildGeocodeQuery(restaurant));
+    if (!result) return restaurant;
+    const db = await getDb();
+    if (!db) return restaurant;
+    const updated = await db
+      .update(activeRestaurants)
+      .set({ lat: String(result.lat), lng: String(result.lng), updatedAt: new Date() })
+      .where(eq(activeRestaurants.id, restaurant.id))
+      .returning();
+    return (updated[0] as T) ?? restaurant;
+  } catch (err) {
+    console.warn(
+      `[geocode] Falha ao geocodificar local ${restaurant.id} (${restaurant.name}):`,
+      err instanceof Error ? err.message : err,
+    );
+    return restaurant;
+  }
+}
+
+/**
  * Hook automático de geocodificação. Quando um local ATIVO tem endereço mas
  * está SEM coordenadas (lat/lng NULL/vazio), recupera as coordenadas a partir
  * do endereço já gravado e atualiza o registro. NUNCA sobrescreve coordenadas
@@ -1014,24 +1057,48 @@ export async function autoGeocodeIfMissing<T extends typeof activeRestaurants.$i
 
   if (!restaurant.address || !restaurant.address.trim()) return restaurant;
 
-  try {
-    const result = await geocodeAddress(buildGeocodeQuery(restaurant));
-    if (!result) return restaurant;
-    const db = await getDb();
-    if (!db) return restaurant;
-    const updated = await db
-      .update(activeRestaurants)
-      .set({ lat: String(result.lat), lng: String(result.lng), updatedAt: new Date() })
-      .where(eq(activeRestaurants.id, restaurant.id))
-      .returning();
-    return (updated[0] as T) ?? restaurant;
-  } catch (err) {
-    console.warn(
-      `[geocode] Falha ao geocodificar local ${restaurant.id} (${restaurant.name}):`,
-      err instanceof Error ? err.message : err,
-    );
-    return restaurant;
-  }
+  return performGeocode(restaurant);
+}
+
+/**
+ * Hook de geocodificação para ATUALIZAÇÃO. Diferente de `autoGeocodeIfMissing`,
+ * este SOBRESCREVE coordenadas existentes — mas apenas quando o endereço mudou
+ * de fato nesta requisição E as novas coordenadas NÃO foram enviadas junto.
+ * Assim a regra "nunca sobrescrever silenciosamente coordenadas do
+ * AddressAutocomplete" é preservada: se o client mandou lat/lng (origem única
+ * do autocomplete), respeitamos esses valores; se o endereço foi corrigido sem
+ * coordenadas novas (ex.: edição textual no form interno, conversão de lead),
+ * recalculamos o pin para o novo endereço.
+ *
+ * @param restaurant registro JÁ atualizado (pós-update)
+ * @param data       payload parcial recebido na requisição de update
+ * @param previous   snapshot dos campos de endereço ANTES do update
+ */
+async function regeocodeIfAddressChanged<T extends typeof activeRestaurants.$inferSelect>(
+  restaurant: T | undefined,
+  data: Partial<InsertActiveRestaurant>,
+  previous: Partial<typeof activeRestaurants.$inferSelect> | undefined,
+): Promise<T | undefined> {
+  if (!restaurant) return restaurant;
+  if (restaurant.status !== "active") return restaurant;
+  if (!previous) return restaurant;
+
+  // Se o client enviou coordenadas nesta mesma requisição, são a origem única
+  // (autocomplete) — nunca sobrescrever.
+  const latSupplied = "lat" in data && data.lat != null && String(data.lat).trim() !== "";
+  const lngSupplied = "lng" in data && data.lng != null && String(data.lng).trim() !== "";
+  if (latSupplied || lngSupplied) return restaurant;
+
+  // Detecta se algum campo de endereço foi efetivamente alterado.
+  const norm = (v: unknown) => (v == null ? "" : String(v).trim());
+  const addressChanged = GEOCODE_ADDRESS_FIELDS.some(
+    (field) => field in data && norm((data as any)[field]) !== norm((previous as any)[field]),
+  );
+  if (!addressChanged) return restaurant;
+
+  if (!restaurant.address || !restaurant.address.trim()) return restaurant;
+
+  return performGeocode(restaurant);
 }
 
 export async function createActiveRestaurant(data: InsertActiveRestaurant) {
@@ -1057,6 +1124,12 @@ export async function createActiveRestaurant(data: InsertActiveRestaurant) {
 export async function updateActiveRestaurant(id: number, data: Partial<InsertActiveRestaurant>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
+
+  // Snapshot dos campos de endereço ANTES do update, para detectar se o endereço
+  // mudou de fato e disparar uma nova geocodificação do pin.
+  const before = await db.select().from(activeRestaurants).where(eq(activeRestaurants.id, id)).limit(1);
+  const previous = before[0];
+
   const result = await db.update(activeRestaurants).set({ ...data, updatedAt: new Date() }).where(eq(activeRestaurants.id, id)).returning();
   let restaurant = result[0];
 
@@ -1082,6 +1155,10 @@ export async function updateActiveRestaurant(id: number, data: Partial<InsertAct
     }
   }
 
+  // Primeiro tenta refazer o pin se o endereço mudou (sobrescreve coords antigas
+  // apenas quando o client NÃO enviou coordenadas novas). Em seguida, o fallback
+  // de preenchimento cobre o caso de coords ainda ausentes.
+  restaurant = (await regeocodeIfAddressChanged(restaurant, data, previous)) ?? restaurant;
   return (await autoGeocodeIfMissing(restaurant)) ?? restaurant;
 }
 
