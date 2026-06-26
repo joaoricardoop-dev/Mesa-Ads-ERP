@@ -112,6 +112,7 @@ export function MediaPlanPanel({
   confirmHint,
   showBonificada = true,
   showPaymentTerms = true,
+  indicativePricing = false,
   notesLabel = "Observações",
   notesPlaceholder = "Notas internas (opcional)",
   confirmLabel = "Gerar orçamento",
@@ -124,6 +125,13 @@ export function MediaPlanPanel({
   showBonificada?: boolean;
   /** Condições de pagamento são definidas pelo comercial — escondidas no autosserviço. */
   showPaymentTerms?: boolean;
+  /**
+   * Autosserviço (anunciante/parceiro): o preço exibido aqui é apenas indicativo.
+   * O valor final é calculado no servidor (quotation.createFromBuilder) e
+   * confirmado pela equipe comercial. Quando `true`, o painel rotula o total como
+   * estimativa para não passar a impressão de cotação fechada.
+   */
+  indicativePricing?: boolean;
   notesLabel?: string;
   notesPlaceholder?: string;
   confirmLabel?: string;
@@ -394,7 +402,7 @@ export function MediaPlanPanel({
       {/* Valor */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Valor</CardTitle>
+          <CardTitle className="text-base">{indicativePricing ? "Valor estimado" : "Valor"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <Row label="Subtotal" value={formatCurrency(plan.subtotal)} />
@@ -414,9 +422,15 @@ export function MediaPlanPanel({
           )}
           <Separator />
           <div className="flex items-center justify-between">
-            <span className="font-semibold">Total</span>
+            <span className="font-semibold">{indicativePricing ? "Total estimado" : "Total"}</span>
             <span className="font-display text-xl font-semibold">{formatCurrency(plan.total)}</span>
           </div>
+          {indicativePricing && (
+            <p className="text-xs text-muted-foreground leading-snug">
+              Valor indicativo, sujeito a confirmação. O preço final é calculado e
+              validado pela nossa equipe comercial antes do fechamento.
+            </p>
+          )}
 
           {/* Bonificação: exclui dos KPIs financeiros e dispensa cronograma. */}
           {showBonificada && (

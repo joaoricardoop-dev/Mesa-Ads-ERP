@@ -147,6 +147,7 @@ export function MediaShopBuilder({ clientId, source, onClose, onSuccess }: Media
             confirmHint={confirmHint}
             showBonificada={false}
             showPaymentTerms={false}
+            indicativePricing
             notesLabel="Mensagem para a equipe (opcional)"
             notesPlaceholder="Conte objetivos, datas ou observações da campanha"
             confirmLabel="Enviar proposta"
