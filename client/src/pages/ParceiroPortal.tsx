@@ -30,7 +30,7 @@ import {
   History,
   CalendarDays,
 } from "lucide-react";
-import { CampaignBuilder } from "@/components/CampaignBuilder";
+import { MediaShopBuilder } from "@/components/media-shop/MediaShopBuilder";
 
 const QUOTATION_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   rascunho: { label: "Rascunho", color: "bg-gray-500/10 text-gray-400 border-gray-500/30" },
@@ -153,8 +153,8 @@ export default function ParceiroPortal() {
   const { data: leads = [], isLoading: loadingLeads } = trpc.parceiroPortal.getLeads.useQuery({ adminPartnerId });
   const { data: quotations = [], isLoading: loadingQuotations } = trpc.parceiroPortal.getQuotations.useQuery({ adminPartnerId });
   const { data: myClients = [] } = trpc.parceiroPortal.getMyClients.useQuery({ adminPartnerId });
-  const { data: builderProducts = [] } = trpc.parceiroPortal.getPriceTableForBuilder.useQuery({ adminPartnerId });
   const { data: mediaKitData } = trpc.mediaKit.getPublicData.useQuery();
+  const utils = trpc.useUtils();
 
   const [builderOpen, setBuilderOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
@@ -177,8 +177,6 @@ export default function ParceiroPortal() {
       setClientSelectorOpen(true);
     }
   }
-
-  const hasPartner = true;
 
   const now = new Date();
   const currentMonth = now.toLocaleString("pt-BR", { month: "long", year: "numeric" });
@@ -600,13 +598,15 @@ export default function ParceiroPortal() {
               )}
             </DialogTitle>
           </DialogHeader>
-          {selectedClientId && (
-            <CampaignBuilder
+          {builderOpen && selectedClientId && (
+            <MediaShopBuilder
               clientId={selectedClientId}
-              hasPartner={hasPartner}
-              isPartner={true}
-              products={builderProducts}
+              source="self_service_parceiro"
               onClose={() => setBuilderOpen(false)}
+              onSuccess={() => {
+                utils.parceiroPortal.getQuotations.invalidate();
+                utils.parceiroPortal.getDashboard.invalidate();
+              }}
             />
           )}
         </DialogContent>

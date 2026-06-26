@@ -110,11 +110,23 @@ export function MediaPlanPanel({
   isConfirming,
   canConfirm,
   confirmHint,
+  showBonificada = true,
+  showPaymentTerms = true,
+  notesLabel = "Observações",
+  notesPlaceholder = "Notas internas (opcional)",
+  confirmLabel = "Gerar orçamento",
 }: {
   onConfirm: () => void;
   isConfirming: boolean;
   canConfirm: boolean;
   confirmHint?: string;
+  /** Bonificação (cortesia) é controle interno — escondido no autosserviço. */
+  showBonificada?: boolean;
+  /** Condições de pagamento são definidas pelo comercial — escondidas no autosserviço. */
+  showPaymentTerms?: boolean;
+  notesLabel?: string;
+  notesPlaceholder?: string;
+  confirmLabel?: string;
 }) {
   const {
     campaignName,
@@ -407,16 +419,18 @@ export function MediaPlanPanel({
           </div>
 
           {/* Bonificação: exclui dos KPIs financeiros e dispensa cronograma. */}
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <Label className="text-sm flex items-center gap-1.5">
-              <Gift className="h-3.5 w-3.5 text-muted-foreground" />
-              Bonificação (cortesia)
-            </Label>
-            <Switch checked={isBonificada} onCheckedChange={setBonificada} />
-          </div>
+          {showBonificada && (
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <Label className="text-sm flex items-center gap-1.5">
+                <Gift className="h-3.5 w-3.5 text-muted-foreground" />
+                Bonificação (cortesia)
+              </Label>
+              <Switch checked={isBonificada} onCheckedChange={setBonificada} />
+            </div>
+          )}
 
           {/* Condições de pagamento (parcelas) — escondidas quando bonificada. */}
-          {!isBonificada && (
+          {showPaymentTerms && !isBonificada && (
             <PaymentTermsEditor
               total={plan.total}
               startDate={startDate}
@@ -426,12 +440,12 @@ export function MediaPlanPanel({
           )}
 
           <div className="space-y-1.5 pt-1">
-            <Label className="label-mono text-[11px]">Observações</Label>
+            <Label className="label-mono text-[11px]">{notesLabel}</Label>
             <Textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notas internas (opcional)"
+              placeholder={notesPlaceholder}
             />
           </div>
 
@@ -442,7 +456,7 @@ export function MediaPlanPanel({
             onClick={onConfirm}
           >
             {isConfirming && <Loader2 className="h-4 w-4 animate-spin" />}
-            Gerar orçamento
+            {confirmLabel}
           </Button>
           {!canConfirm && confirmHint && (
             <p className="text-xs text-muted-foreground text-center">{confirmHint}</p>

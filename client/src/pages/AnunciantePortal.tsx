@@ -63,7 +63,7 @@ import {
 import CampaignPhases from "@/components/CampaignPhases";
 import { generateReportPdf } from "@/lib/generate-report-pdf";
 import { generateQuotationSignPdf } from "@/lib/generate-quotation-pdf";
-import { CampaignBuilder } from "@/components/CampaignBuilder";
+import { MediaShopBuilder } from "@/components/media-shop/MediaShopBuilder";
 import {
   SEMANAS_OPTIONS,
   DESCONTOS_PRAZO,
@@ -2333,24 +2333,16 @@ export default function AnunciantePortal() {
               Montar Minha Campanha
             </DialogTitle>
           </DialogHeader>
-          {priceTableData ? (
-            <CampaignBuilder
+          {builderOpen && (
+            <MediaShopBuilder
               clientId={profile.id}
-              hasPartner={priceTableData.hasPartner}
-              isPartner={false}
-              products={priceTableData.products}
+              source="self_service_anunciante"
               onClose={() => setBuilderOpen(false)}
               onSuccess={() => {
                 utils.portal.myQuotations.invalidate();
                 utils.portal.profileCompletionStatus.invalidate();
               }}
             />
-          ) : (
-            <div className="flex flex-col items-center justify-center flex-1 p-8 text-center gap-3">
-              <ShoppingCart className="w-10 h-10 text-muted-foreground/40" />
-              <p className="text-sm font-medium text-muted-foreground">Tabela de preços não configurada</p>
-              <p className="text-xs text-muted-foreground/70">Entre em contato com nossa equipe para configurar sua tabela de preços e começar a montar campanhas.</p>
-            </div>
           )}
         </DialogContent>
       </Dialog>

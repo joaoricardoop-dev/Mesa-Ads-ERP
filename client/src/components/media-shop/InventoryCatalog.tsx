@@ -90,7 +90,15 @@ function SetupPendingBadge({ missing, className }: { missing: string[]; classNam
   );
 }
 
-export function InventoryCatalog() {
+/**
+ * Audiência do catálogo — define quais produtos por quantidade aparecem e se a
+ * seção de telas é exibida. "internal" mostra tudo; anunciante/parceiro só veem
+ * o que está marcado como visível para o respectivo perfil (mesma checagem que o
+ * backend faz em createFromBuilder — evita mostrar produto que seria rejeitado).
+ */
+export type CatalogAudience = "internal" | "anunciante" | "parceiro";
+
+export function InventoryCatalog({ audience = "internal" }: { audience?: CatalogAudience } = {}) {
   const { startDate, endDate, category, neighborhood } = useMediaShopStore();
   const setDates = useMediaShopStore((s) => s.setDates);
   const setCategory = useMediaShopStore((s) => s.setCategory);
@@ -110,6 +118,22 @@ export function InventoryCatalog() {
   });
 
   const locations = useMemo(() => (data ?? []) as LocationRow[], [data]);
+
+  // Visibilidade da seção de telas por audiência. listAvailableLocations já filtra
+  // por visibleToAdvertisers, mas o submit (createFromBuilder) checa
+  // visibleToPartners para parceiros — então gatemos a seção pela flag do perfil
+  // p/ não mostrar telas que o backend rejeitaria. Internal sempre vê.
+  const { data: catalogProducts } = trpc.product.list.useQuery(undefined, {
+    enabled: audience !== "internal",
+  });
+  const showTelas = useMemo(() => {
+    if (audience === "internal") return true;
+    const telas = (catalogProducts ?? []).filter((p) => p.tipo === "telas" && p.isActive);
+    if (telas.length === 0) return true; // indeterminado: não esconde
+    return telas.some((p) =>
+      audience === "anunciante" ? p.visibleToAdvertisers : p.visibleToPartners,
+    );
+  }, [catalogProducts, audience]);
 
   // Locais de mídia = têm slot de telas (inventário por LOCAL). Produtos por
   // quantidade (bolachas/impressos) ficam na seção dedicada abaixo.
@@ -177,6 +201,8 @@ export function InventoryCatalog() {
 
   return (
     <div className="space-y-4">
+      {showTelas && (
+      <>
       {/* Filtros */}
       <Card>
         <CardContent className="p-4 grid gap-3 md:grid-cols-4">
@@ -340,9 +366,11 @@ export function InventoryCatalog() {
           )}
         </div>
       )}
+      </>
+      )}
 
       {/* Produtos por quantidade (não amarrados a local) */}
-      <QuantityProductsSection days={days} />
+      <QuantityProductsSection days={days} audience={audience} />
     </div>
   );
 }
@@ -516,7 +544,7 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
 // ─── Seção de produtos por quantidade ────────────────────────────────────────
 // Bolachas/impressos e demais formatos NÃO são presos a local: compra por qtd.
 // Preço via helper canônico (quoteQuantityItem → quotePrice), sem recálculo.
-function QuantityProductsSection({ days }: { days: number }) {
+function QuantityProductsSection({ days, audience }: { days: number; audience: CatalogAudience }) {
   const sys = useSystemPremissas();
   const quotePremissas: QuotePremissas = useMemo(
     () => ({ ...sys.premissas, bvAgencia: sys.bvAgencia }),
@@ -530,9 +558,17 @@ function QuantityProductsSection({ days }: { days: number }) {
   const quantityCountForProduct = useMediaShopStore((s) => s.quantityCountForProduct);
 
   // Produtos por quantidade = ativos e que NÃO são telas (telas vivem por local).
+  // Para anunciante/parceiro, só os marcados como visíveis ao perfil — mesma
+  // checagem que o backend faz no submit, evita oferecer item que seria rejeitado.
   const products = useMemo(
-    () => (productsData ?? []).filter((p) => p.isActive && p.tipo !== "telas"),
-    [productsData],
+    () =>
+      (productsData ?? []).filter((p) => {
+        if (!p.isActive || p.tipo === "telas") return false;
+        if (audience === "anunciante") return p.visibleToAdvertisers;
+        if (audience === "parceiro") return p.visibleToPartners;
+        return true;
+      }),
+    [productsData, audience],
   );
 
   const tiersByProduct = useMemo(() => {
