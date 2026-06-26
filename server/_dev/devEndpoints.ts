@@ -1356,4 +1356,50 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
       res.status(500).json({ message: "Erro ao remover usuário de teste." });
     }
   });
+
+  // Task #347 — semeia um local ativo COM endereço mas SEM coordenadas
+  // (lat/lng NULL), para exercitar o backfill (activeRestaurant.backfillCoordinates).
+  // O backfill geocodifica o endereço (stub determinístico via GEOCODE_STUB_LATLNG
+  // na suíte E2E) e grava lat/lng. Sempre cria um registro novo com nome único
+  // para isolar entre runs.
+  app.post("/api/dev-seed-location-without-coords", async (_req, res) => {
+    try {
+      if (!(await sentinelAllows(res))) return;
+      const { getDb } = await import("../db");
+      const { activeRestaurants } = await import("../../drizzle/schema");
+      const db = await getDb();
+      if (!db) return res.status(500).json({ message: "Database not available." });
+
+      const [restaurant] = await db
+        .insert(activeRestaurants)
+        .values({
+          name: `E2E Backfill ${Date.now()}`,
+          status: "active",
+          address: "Avenida Paulista, 1578",
+          neighborhood: "Bela Vista",
+          city: "São Paulo",
+          state: "SP",
+          cep: "01310-200",
+          lat: null,
+          lng: null,
+          contactName: "E2E Backfill Contato",
+          contactRole: "Gerente",
+          whatsapp: "11977777777",
+          tableCount: 10,
+          seatCount: 40,
+          monthlyCustomers: 4000,
+          categoria: "restaurante",
+        })
+        .returning({ id: activeRestaurants.id });
+
+      res.json({ restaurantId: restaurant.id });
+    } catch (error) {
+      console.error("Dev seed location-without-coords error:", error);
+      const detail = error instanceof Error ? error.message : String(error);
+      res.status(500).json({
+        message: "Erro ao semear local sem coordenadas.",
+        detail,
+      });
+    }
+  });
 }

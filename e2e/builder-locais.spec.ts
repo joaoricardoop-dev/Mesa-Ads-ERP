@@ -297,6 +297,12 @@ test.describe("builder /montar-campanha — visualização em mapa", () => {
 
     await expect(page.getByText(/inventário/i).first()).toBeVisible();
 
+    // Para anunciante/parceiro o catálogo abre DIRETO no Mapa quando há locais
+    // com coordenadas (Task #334), então os cards da lista não estão montados.
+    // Trocamos explicitamente para a Lista para capturar nome + preço do local
+    // SEMEADO (fonte de comparação) antes de voltar ao mapa.
+    await page.getByRole("button", { name: /^lista$/i }).click();
+
     // Captura nome + preço do local SEMEADO na LISTA (fonte de comparação).
     // Alvejamos pelo restaurantId para não pegar um local legado sem preço.
     const seededCard = page.locator(`[data-testid="local-card-${seededRestaurantId}"]`);

@@ -56,6 +56,23 @@ interface GoogleGeocodeResponse {
 export async function geocodeAddress(
   address: string,
 ): Promise<GeocodeResult | null> {
+  // Stub determinístico para a suíte E2E: gateado ESTRITAMENTE por
+  // DEV_FIXTURES === "1" (nunca setado em produção, ver replit.md) + a env
+  // var GEOCODE_STUB_LATLNG ("lat,lng"). Quando ambos estão presentes,
+  // devolvemos coordenadas fixas SEM bater na Google Geocoding API — o teste
+  // de backfill prova a persistência lat/lng sem rede/billing. Em dev/prod,
+  // sem GEOCODE_STUB_LATLNG, o caminho real (fetch → Google) é preservado.
+  if (process.env.DEV_FIXTURES === "1" && process.env.GEOCODE_STUB_LATLNG) {
+    const [latStr, lngStr] = process.env.GEOCODE_STUB_LATLNG.split(",");
+    const lat = Number(latStr);
+    const lng = Number(lngStr);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      const stubQuery = address.trim();
+      if (!stubQuery) return null;
+      return { lat, lng, formattedAddress: stubQuery };
+    }
+  }
+
   if (!GEOCODE_KEY) {
     throw new Error(
       "VITE_GOOGLE_MAPS_API_KEY ausente — geocodificação no servidor indisponível.",

@@ -41,6 +41,10 @@ export default defineConfig({
           DATABASE_URL: testDatabaseUrl,
           DATABASE_URL_TEST: testDatabaseUrl,
           DEV_FIXTURES: "1",
+          // Stub determinístico da geocodificação (server/_core/geocode.ts):
+          // o backfill de coordenadas devolve estas coords fixas sem bater na
+          // Google Geocoding API. Honrado SOMENTE com DEV_FIXTURES=1.
+          GEOCODE_STUB_LATLNG: "-23.55052,-46.633308",
         },
       },
   projects: [
