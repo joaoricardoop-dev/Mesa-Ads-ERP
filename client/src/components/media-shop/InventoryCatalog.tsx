@@ -39,6 +39,7 @@ import { defaultInsertionsPerDay, computeScreenMetrics } from "@shared/screen-me
 import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 import type { QuotePremissas, PricingTier, DiscountTier } from "@/components/campaign-wizard/pricing";
 import { formatCurrency } from "@/lib/format";
+import { TIPO_LABELS } from "@/lib/campaign-builder-utils";
 import {
   useMediaShopStore,
   cpmConfigForPricing,
@@ -57,6 +58,43 @@ function formatInt(n: number): string {
 
 function telasSlot(loc: LocationRow) {
   return loc.productSlots.find((s) => s.productTipo === "telas") ?? null;
+}
+
+/**
+ * Formatos de mídia que um local oferece, derivados de `productSlots` (fonte
+ * única: Config > Produtos / product_locations). Rótulos amigáveis reaproveitam
+ * TIPO_LABELS (mesma origem das telas de catálogo); fallback no nome do produto.
+ * Deduplica por tipo preservando a ordem dos slots.
+ */
+function formatBadgesForLocation(loc: LocationRow): { tipo: string; label: string }[] {
+  const seen = new Set<string>();
+  const out: { tipo: string; label: string }[] = [];
+  for (const s of loc.productSlots) {
+    const tipo = s.productTipo ?? "outro";
+    if (seen.has(tipo)) continue;
+    seen.add(tipo);
+    out.push({ tipo, label: TIPO_LABELS[tipo] ?? s.productName ?? tipo });
+  }
+  return out;
+}
+
+function FormatBadges({ loc, className }: { loc: LocationRow; className?: string }) {
+  const formats = formatBadgesForLocation(loc);
+  if (formats.length === 0) return null;
+  return (
+    <div className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
+      {formats.map((f) => (
+        <Badge
+          key={f.tipo}
+          variant="secondary"
+          className="font-normal text-[9px] py-0"
+          data-testid={`format-badge-${f.tipo}`}
+        >
+          {f.label}
+        </Badge>
+      ))}
+    </div>
+  );
 }
 
 function locSetupStatus(loc: LocationRow) {
@@ -387,7 +425,7 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
       )}
 
       {/* Produtos por quantidade (não amarrados a local) */}
-      <QuantityProductsSection days={days} audience={audience} />
+      <QuantityProductsSection days={days} audience={audience} locations={locations} />
     </div>
   );
 }
@@ -442,6 +480,7 @@ function LocationListRow({
             </Badge>
           )}
         </p>
+        <FormatBadges loc={loc} className="mt-1" />
       </div>
       <span className="text-xs sm:text-sm sm:text-right flex items-center gap-1 sm:justify-end text-muted-foreground">
         <Tv className="h-3 w-3 sm:hidden" />
@@ -501,6 +540,7 @@ function LocationCard({
               <MapPin className="h-3 w-3" />
               {loc.neighborhood || loc.city || "—"}
             </p>
+            <FormatBadges loc={loc} className="mt-1.5" />
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             {loc.categoria && (
@@ -567,7 +607,15 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
 // ─── Seção de produtos por quantidade ────────────────────────────────────────
 // Bolachas/impressos e demais formatos NÃO são presos a local: compra por qtd.
 // Preço via helper canônico (quoteQuantityItem → quotePrice), sem recálculo.
-function QuantityProductsSection({ days, audience }: { days: number; audience: CatalogAudience }) {
+function QuantityProductsSection({
+  days,
+  audience,
+  locations,
+}: {
+  days: number;
+  audience: CatalogAudience;
+  locations: LocationRow[];
+}) {
   const sys = useSystemPremissas();
   const quotePremissas: QuotePremissas = useMemo(
     () => ({ ...sys.premissas, bvAgencia: sys.bvAgencia }),
@@ -630,6 +678,26 @@ function QuantityProductsSection({ days, audience }: { days: number; audience: C
     return map;
   }, [bundle]);
 
+  // Restaurantes que recebem bolacha = têm slot de produto tipo "coaster" em
+  // productSlots (fonte única: listAvailableLocations / Config > Produtos).
+  // Reaproveita os dados já carregados — não cria query/fonte paralela. Apenas
+  // informativo (onde a bolacha pode ser distribuída); a contratação segue por
+  // quantidade solta, sem qtd por restaurante.
+  const hasCoasterProduct = useMemo(
+    () => products.some((p) => p.tipo === "coaster"),
+    [products],
+  );
+  const coasterRestaurants = useMemo(
+    () =>
+      hasCoasterProduct
+        ? locations
+            .filter((l) => l.productSlots.some((s) => s.productTipo === "coaster"))
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+        : [],
+    [locations, hasCoasterProduct],
+  );
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -675,6 +743,37 @@ function QuantityProductsSection({ days, audience }: { days: number; audience: C
                 }
               />
             ))}
+          </div>
+        )}
+
+        {coasterRestaurants.length > 0 && (
+          <div className="border-t border-border p-4" data-testid="coaster-restaurants">
+            <div className="flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-sm font-medium">Restaurantes disponíveis para bolacha</p>
+              <Badge variant="secondary" className="text-[10px] py-0">
+                {coasterRestaurants.length}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Onde a bolacha pode ser distribuída. A contratação segue por quantidade —
+              a distribuição é definida depois.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {coasterRestaurants.map((r) => (
+                <Badge
+                  key={r.restaurantId}
+                  variant="outline"
+                  className="font-normal"
+                  data-testid={`coaster-restaurant-${r.restaurantId}`}
+                >
+                  {r.name}
+                  {r.neighborhood && (
+                    <span className="ml-1 text-muted-foreground">· {r.neighborhood}</span>
+                  )}
+                </Badge>
+              ))}
+            </div>
           </div>
         )}
       </CardContent>
@@ -828,6 +927,10 @@ function CatalogMap({
         priceEl.style.fontSize = "13px";
         priceEl.textContent = `${priceLabel} · ${days} dia(s)`;
 
+        const formats = formatBadgesForLocation(loc)
+          .map((f) => f.label)
+          .join(" · ");
+
         const btn = document.createElement("button");
         btn.type = "button";
         btn.style.marginTop = "6px";
@@ -850,6 +953,14 @@ function CatalogMap({
         container.appendChild(document.createElement("br"));
         container.appendChild(priceEl);
         container.appendChild(document.createElement("br"));
+        if (formats) {
+          const formatsEl = document.createElement("span");
+          formatsEl.style.fontSize = "11px";
+          formatsEl.style.color = "#888";
+          formatsEl.textContent = `Formatos: ${formats}`;
+          container.appendChild(formatsEl);
+          container.appendChild(document.createElement("br"));
+        }
         container.appendChild(btn);
 
         infoRef.current!.setContent(container);
