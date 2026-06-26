@@ -15,3 +15,4 @@
 - [Screen metrics canonical source](screen-metrics-canonical.md) — shared/screen-metrics.ts is the only origin for inserções/dia default (CPM→dailyLoops, no constant) + exibições/alcance/frequência; per-item override doesn't touch registration or CPM price.
 - [Toast convention (sonner)](toast-convention.md) — no @/hooks/use-toast in repo; import { toast } from "sonner" and call toast.success/error.
 - [Builder shares media-shop store](builder-mediashop-shared.md) — /montar-campanha (StepShop) reuses mediaShopStore + MediaPlanPanel(variant) verbatim from internal Orçamento; store now persists to localStorage so BOTH screens survive reload.
+- [Address autocomplete (Google Places)](address-autocomplete.md) — AddressAutocomplete.tsx is single parse source; uses Places API (New) fetchAutocompleteSuggestions, not legacy widget; loadGoogleMaps single loader.

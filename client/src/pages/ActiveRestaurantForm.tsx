@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import {
   Select,
   SelectContent,
@@ -547,6 +548,23 @@ export default function ActiveRestaurantForm() {
                 <div className="lg:col-span-2 space-y-6">
                   <Section icon={<MapPin className="w-4 h-4" />} title="Local">
                     <Field label="Nome do Estabelecimento *" value={form.name} onChange={(v) => setForm(p => ({ ...p, name: v }))} />
+                    <AddressAutocomplete
+                      label="Buscar endereço"
+                      placeholder="Digite o endereço e escolha uma sugestão"
+                      labelClassName="text-xs text-muted-foreground"
+                      inputClassName="bg-background border-border/30 h-9 text-sm"
+                      data-testid="input-address-search"
+                      onSelect={(a) =>
+                        setForm((p) => ({
+                          ...p,
+                          address: [a.street, a.number].filter(Boolean).join(", ") || p.address,
+                          neighborhood: a.neighborhood || p.neighborhood,
+                          city: a.city || p.city,
+                          state: a.state || p.state,
+                          cep: a.cep || p.cep,
+                        }))
+                      }
+                    />
                     <Field label="Endereço Completo *" value={form.address} onChange={(v) => setForm(p => ({ ...p, address: v }))} placeholder="Rua, número, complemento" />
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Bairro/Zona *" value={form.neighborhood} onChange={(v) => setForm(p => ({ ...p, neighborhood: v }))} />

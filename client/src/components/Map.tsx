@@ -2,33 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { usePersistFn } from "@/hooks/usePersistFn";
+import { loadGoogleMaps } from "@/lib/googleMaps";
 import { cn } from "@/lib/utils";
-
-declare global {
-  interface Window {
-    google?: typeof google;
-    _gmapsLoading?: Promise<void>;
-  }
-}
-
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-function loadMapScript(): Promise<void> {
-  if (window.google?.maps) return Promise.resolve();
-  if (window._gmapsLoading) return window._gmapsLoading;
-
-  window._gmapsLoading = new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Google Maps script"));
-    document.head.appendChild(script);
-  });
-
-  return window._gmapsLoading;
-}
 
 interface MapViewProps {
   className?: string;
@@ -47,7 +22,7 @@ export function MapView({
   const map = useRef<google.maps.Map | null>(null);
 
   const init = usePersistFn(async () => {
-    await loadMapScript();
+    await loadGoogleMaps();
     if (!mapContainer.current || map.current) return;
     map.current = new window.google!.maps.Map(mapContainer.current, {
       zoom: initialZoom,

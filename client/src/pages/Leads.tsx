@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1492,6 +1493,24 @@ export default function Leads() {
         {data.type === "restaurante" && (
           <>
             <Separator className="my-1" />
+            <AddressAutocomplete
+              label="Buscar endereço"
+              placeholder="Digite o endereço e escolha uma sugestão"
+              labelClassName="text-xs"
+              inputClassName="h-8 text-sm"
+              data-testid="input-address-search"
+              onSelect={(a) =>
+                setData({
+                  ...data,
+                  address: a.street || data.address,
+                  addressNumber: a.number || data.addressNumber,
+                  neighborhood: a.neighborhood || data.neighborhood,
+                  city: a.city || data.city,
+                  state: a.state || data.state,
+                  cep: a.cep || data.cep,
+                })
+              }
+            />
             <div className="grid grid-cols-[1fr_80px] gap-2">
               <div className="grid gap-1.5">
                 <Label className="text-xs">Endereço</Label>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { trpc, type RouterOutputs } from "@/lib/trpc";
 import { useConfigOptions } from "@/lib/configOptions";
 import { MapView } from "@/components/Map";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -250,7 +251,6 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
   const [form, setForm] = useState<TelaFormState>(() =>
     buildInitial(editing, { restaurantId, address: defaultAddress, lat: defaultLat, lng: defaultLng }),
   );
-  const [geocoding, setGeocoding] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { options: categoryOptions } = useConfigOptions("screen_category");
@@ -304,54 +304,16 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
     });
   }, [form.lat, form.lng, placeMarker]);
 
-  // Geocodifica o endereço com Nominatim/OpenStreetMap (serviço gratuito) quando
-  // o operador não fixa o pin manualmente. `silent` é usado pela geocodificação
-  // automática (ao digitar) para não disparar toasts a cada tentativa.
-  const lastGeocodedRef = useRef<string>("");
-  async function geocodeAddress(opts?: { silent?: boolean }) {
-    const silent = opts?.silent ?? false;
-    const query = form.address.trim();
-    if (!query) {
-      if (!silent) toast.error("Informe um endereço para geocodificar.");
-      return;
-    }
-    setGeocoding(true);
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
-      const res = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
-      if (!res.ok) throw new Error("Falha ao consultar o serviço de geocodificação.");
-      const data = (await res.json()) as Array<{ lat: string; lon: string }>;
-      lastGeocodedRef.current = query;
-      if (!data.length) {
-        if (!silent) toast.error("Endereço não encontrado. Ajuste o texto ou fixe o pin manualmente.");
-        return;
-      }
-      const lat = parseFloat(data[0].lat);
-      const lng = parseFloat(data[0].lon);
-      setForm((f) => ({ ...f, lat, lng }));
+  // Seleção de uma sugestão do autocomplete do Google: preenche o endereço e
+  // posiciona o pino nas coordenadas retornadas. O ajuste fino segue por
+  // clique/arraste do pino no mapa.
+  function handleAddressSelect(lat: number | null, lng: number | null, address: string) {
+    setForm((f) => ({ ...f, address: address || f.address, lat, lng }));
+    if (lat != null && lng != null) {
       placeMarker(lat, lng);
       mapRef.current?.setZoom(16);
-      if (!silent) toast.success("Localização encontrada. Ajuste o pin se necessário.");
-    } catch (err: any) {
-      if (!silent) toast.error(err?.message ?? "Erro ao geocodificar endereço.");
-    } finally {
-      setGeocoding(false);
     }
   }
-
-  // Geocodificação automática: ao parar de digitar o endereço (debounce), busca
-  // as coordenadas sozinha. Arrastar/clicar o pin altera só lat/lng (não o
-  // endereço), então não dispara nova busca; reeditar o texto sim.
-  useEffect(() => {
-    const query = form.address.trim();
-    if (query.length < 6) return;
-    if (query === lastGeocodedRef.current) return;
-    const handle = setTimeout(() => {
-      geocodeAddress({ silent: true });
-    }, 800);
-    return () => clearTimeout(handle);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.address]);
 
   async function handlePhotoUpload(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -548,20 +510,21 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
 
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Localização</Label>
-            <div className="flex gap-2">
-              <Input
-                value={form.address}
-                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                placeholder="Endereço completo (rua, número, bairro, cidade)"
-                data-testid="input-tela-address"
-              />
-              <Button type="button" variant="outline" onClick={geocodeAddress} disabled={geocoding} className="gap-1.5 shrink-0" data-testid="button-geocode-tela">
-                {geocoding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
-                Geocodificar
-              </Button>
-            </div>
+            <AddressAutocomplete
+              placeholder="Buscar endereço (rua, número, bairro, cidade)"
+              data-testid="input-tela-address-search"
+              onSelect={(a) =>
+                handleAddressSelect(a.lat, a.lng, a.formattedAddress)
+              }
+            />
+            <Input
+              value={form.address}
+              onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+              placeholder="Endereço completo (editável)"
+              data-testid="input-tela-address"
+            />
             <p className="text-[10px] text-muted-foreground">
-              O endereço é convertido em coordenadas automaticamente enquanto você digita (via OpenStreetMap, gratuito). Use "Geocodificar" para forçar a busca, ou arraste o pin / clique no mapa para ajustar manualmente.
+              Busque o endereço acima para posicionar o pino automaticamente. Você pode editar o texto do endereço e arrastar o pin / clicar no mapa para ajustar a posição manualmente.
             </p>
             <div className="rounded-lg overflow-hidden border border-border/30">
               <MapView

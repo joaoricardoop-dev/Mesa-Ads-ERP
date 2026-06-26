@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import AvatarCropDialog from "@/components/AvatarCropDialog";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -523,6 +524,24 @@ export default function RestaurantOnboarding() {
                 <Label className={labelClass}>Razão Social</Label>
                 <Input value={form.razaoSocial} onChange={(e) => update("razaoSocial", e.target.value)} placeholder="Razão social completa" className={inputClass} />
               </div>
+              <AddressAutocomplete
+                label="Buscar endereço"
+                placeholder="Digite o endereço e escolha uma sugestão"
+                labelClassName={labelClass}
+                inputClassName="bg-[hsl(0,0%,11%)] border-[hsl(0,0%,18%)] text-white placeholder:text-[hsl(0,0%,35%)]"
+                data-testid="input-address-search"
+                onSelect={(a) =>
+                  setForm((f) => ({
+                    ...f,
+                    address: a.street || f.address,
+                    addressNumber: a.number || f.addressNumber,
+                    neighborhood: a.neighborhood || f.neighborhood,
+                    city: a.city || f.city,
+                    state: a.state || f.state,
+                    cep: a.cep || f.cep,
+                  }))
+                }
+              />
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2">
                   <Label className={labelClass}>Logradouro *</Label>

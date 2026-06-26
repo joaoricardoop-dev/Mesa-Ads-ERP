@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -648,6 +649,23 @@ export default function Clients() {
             </div>
 
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Endereço</p>
+            <AddressAutocomplete
+              label="Buscar endereço"
+              placeholder="Digite o endereço e escolha uma sugestão"
+              inputClassName="bg-background border-border/30"
+              data-testid="input-address-search"
+              onSelect={(a) =>
+                setForm((f) => ({
+                  ...f,
+                  address: a.street || f.address,
+                  addressNumber: a.number || f.addressNumber,
+                  neighborhood: a.neighborhood || f.neighborhood,
+                  city: a.city || f.city,
+                  state: a.state || f.state,
+                  cep: a.cep || f.cep,
+                }))
+              }
+            />
             <div className="grid grid-cols-[1fr_100px] gap-4">
               <div className="grid gap-2">
                 <Label>Logradouro</Label>
