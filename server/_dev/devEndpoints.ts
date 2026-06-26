@@ -431,6 +431,8 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
         await db
           .update(activeRestaurants)
           .set({
+            lat: "-23.5505",
+            lng: "-46.6333",
             screenCpm: "30.00",
             screenInsertionsPerHour: 12,
             screenImpactsPerInsertion: "1.50",
@@ -447,6 +449,8 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
             status: "active",
             address: "Rua E2E Telas, 200",
             neighborhood: "Centro",
+            lat: "-23.5505",
+            lng: "-46.6333",
             contactName: "E2E Contato Telas",
             contactRole: "Gerente",
             whatsapp: "11988888888",

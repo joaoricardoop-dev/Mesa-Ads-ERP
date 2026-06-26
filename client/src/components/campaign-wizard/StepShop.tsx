@@ -146,7 +146,7 @@ export function StepShop({ clientId, source, role, clientLabel }: Props) {
 
         <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
           <div className="space-y-4">
-            <InventoryCatalog />
+            <InventoryCatalog audience={role} />
           </div>
           <div className="lg:sticky lg:top-4 lg:self-start">
             <MediaPlanPanel
