@@ -105,14 +105,12 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
   const setNeighborhood = useMediaShopStore((s) => s.setNeighborhood);
   const toggleItem = useMediaShopStore((s) => s.toggleItem);
   const isSelected = useMediaShopStore((s) => s.isSelected);
+  // Preferência de view persistida por usuário (localStorage via mediaShopStore).
+  // `null` = nunca escolheu → cai no default por audiência calculado abaixo.
+  const savedView = useMediaShopStore((s) => s.catalogView);
+  const setView = useMediaShopStore((s) => s.setCatalogView);
 
-  const [view, setView] = useState<"list" | "cards" | "map">("list");
   const [onlyPending, setOnlyPending] = useState(false);
-  // Para anunciante/parceiro, abrir direto no Mapa quando houver pelo menos um
-  // local disponível com coordenadas — escolher por bairro vira a primeira ação.
-  // Internal mantém a Lista. Aplicado uma única vez, após o primeiro fetch, para
-  // não sobrescrever a troca manual de view feita pelo usuário.
-  const defaultViewApplied = useRef(false);
 
   const days = daysInRangeInclusive(startDate, endDate);
 
@@ -147,14 +145,17 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
     [locations],
   );
 
-  useEffect(() => {
-    if (defaultViewApplied.current) return;
-    if (audience === "internal") return;
-    if (isLoading || data === undefined) return;
-    defaultViewApplied.current = true;
+  // Default por audiência aplicado SÓ enquanto não há preferência salva: anunciante/
+  // parceiro abrem no Mapa quando há local com coordenadas (escolher por bairro vira
+  // a primeira ação); internal mantém a Lista. Assim que o usuário troca a view, a
+  // escolha persiste (savedView) e passa a vencer o default em toda visita.
+  const audienceDefaultView = useMemo<"list" | "cards" | "map">(() => {
+    if (audience === "internal") return "list";
     const hasCoords = screenLocations.some((l) => l.lat != null && l.lng != null);
-    if (hasCoords) setView("map");
-  }, [audience, isLoading, data, screenLocations]);
+    return hasCoords ? "map" : "list";
+  }, [audience, screenLocations]);
+
+  const view = savedView ?? audienceDefaultView;
 
   const categories = useMemo(() => {
     const set = new Set<string>();

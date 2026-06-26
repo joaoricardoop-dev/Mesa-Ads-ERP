@@ -138,6 +138,9 @@ export function quoteQuantityItem(
   });
 }
 
+/** Modo de visualização do catálogo de inventário (InventoryCatalog). */
+export type CatalogViewMode = "list" | "cards" | "map";
+
 interface MediaShopState {
   clientId: number | null;
   leadId: number | null;
@@ -145,6 +148,10 @@ interface MediaShopState {
   endDate: string;
   category: string | null;
   neighborhood: string | null;
+  /** Preferência de visualização do catálogo escolhida pelo usuário. `null` =
+   *  nunca escolheu → o consumidor aplica o default por audiência. Persiste para
+   *  respeitar a escolha entre visitas. */
+  catalogView: CatalogViewMode | null;
   selected: MediaSelectedItem[];
   quantityItems: MediaQuantityItem[];
   campaignName: string;
@@ -161,6 +168,7 @@ interface MediaShopState {
   setDates: (start: string, end: string) => void;
   setCategory: (category: string | null) => void;
   setNeighborhood: (neighborhood: string | null) => void;
+  setCatalogView: (view: CatalogViewMode) => void;
   addItem: (item: MediaSelectedItem) => void;
   removeItem: (restaurantId: number) => void;
   toggleItem: (item: MediaSelectedItem) => void;
@@ -194,6 +202,7 @@ export const useMediaShopStore = create<MediaShopState>()(
   endDate: DEFAULT_END,
   category: null,
   neighborhood: null,
+  catalogView: null,
   selected: [],
   quantityItems: [],
   campaignName: "",
@@ -207,6 +216,7 @@ export const useMediaShopStore = create<MediaShopState>()(
   setDates: (startDate, endDate) => set({ startDate, endDate }),
   setCategory: (category) => set({ category }),
   setNeighborhood: (neighborhood) => set({ neighborhood }),
+  setCatalogView: (catalogView) => set({ catalogView }),
   addItem: (item) =>
     set((s) =>
       s.selected.some((i) => i.restaurantId === item.restaurantId)
@@ -268,6 +278,7 @@ export const useMediaShopStore = create<MediaShopState>()(
         endDate: s.endDate,
         category: s.category,
         neighborhood: s.neighborhood,
+        catalogView: s.catalogView,
         selected: s.selected,
         quantityItems: s.quantityItems,
         campaignName: s.campaignName,
