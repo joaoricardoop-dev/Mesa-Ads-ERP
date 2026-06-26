@@ -368,6 +368,153 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
     }
   });
 
+  // Garante ≥1 LOCAL DE TELAS (inventário por local, precificado por CPM)
+  // disponível no catálogo de /comercial/orcamento. Diferente de
+  // dev-ensure-restaurante (que cria um produto "impressos" por quantidade),
+  // aqui precisamos de um produto tipo "telas", um active_restaurant com TODAS
+  // as colunas de CPM preenchidas (sem elas computeCpmPricing devolve null e o
+  // local some do catálogo), um product_location ligando os dois, e ≥1 tela
+  // ativa (telas.status='active' alimenta screensCount). Idempotente: reusa um
+  // local de telas existente quando já houver um.
+  app.post("/api/dev-ensure-screen-location", async (_req, res) => {
+    try {
+      if (!(await sentinelAllows(res))) return;
+      const { getDb } = await import("../db");
+      const { activeRestaurants, products, productLocations, telas } =
+        await import("../../drizzle/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) return res.status(500).json({ message: "Database not available." });
+
+      // Produto tipo "telas" visível a anunciantes (fonte do productSlot de telas).
+      let screenProduct = (
+        await db
+          .select({ id: products.id })
+          .from(products)
+          .where(
+            and(
+              eq(products.tipo, "telas"),
+              eq(products.isActive, true),
+              eq(products.visibleToAdvertisers, true),
+            ),
+          )
+          .limit(1)
+      )[0];
+      if (!screenProduct) {
+        [screenProduct] = await db
+          .insert(products)
+          .values({
+            name: `E2E Telas ${Date.now()}`,
+            tipo: "telas",
+            isActive: true,
+            visibleToAdvertisers: true,
+          })
+          .returning({ id: products.id });
+      }
+      const productId = screenProduct.id;
+
+      // Reusa um local que já tenha esse produto de telas vinculado, se houver.
+      const existingLink = (
+        await db
+          .select({ restaurantId: productLocations.restaurantId })
+          .from(productLocations)
+          .where(eq(productLocations.productId, productId))
+          .limit(1)
+      )[0];
+
+      let restaurantId: number;
+      if (existingLink) {
+        restaurantId = existingLink.restaurantId;
+        // Garante que as colunas de CPM estejam preenchidas (um local legado
+        // pode existir sem elas, o que zeraria o preço e o esconderia do
+        // catálogo).
+        await db
+          .update(activeRestaurants)
+          .set({
+            screenCpm: "30.00",
+            screenInsertionsPerHour: 12,
+            screenImpactsPerInsertion: "1.50",
+            screenWeeklyHours: "84.00",
+            screenExposureSec: 10,
+            dailyLoops: 144,
+          })
+          .where(eq(activeRestaurants.id, restaurantId));
+      } else {
+        const [restaurant] = await db
+          .insert(activeRestaurants)
+          .values({
+            name: `E2E Local Telas ${Date.now()}`,
+            status: "active",
+            address: "Rua E2E Telas, 200",
+            neighborhood: "Centro",
+            contactName: "E2E Contato Telas",
+            contactRole: "Gerente",
+            whatsapp: "11988888888",
+            tableCount: 20,
+            seatCount: 80,
+            monthlyCustomers: 8000,
+            city: "São Paulo",
+            state: "SP",
+            categoria: "restaurante",
+            screenCpm: "30.00",
+            screenInsertionsPerHour: 12,
+            screenImpactsPerInsertion: "1.50",
+            screenWeeklyHours: "84.00",
+            screenExposureSec: 10,
+            dailyLoops: 144,
+          })
+          .returning({ id: activeRestaurants.id });
+        restaurantId = restaurant.id;
+
+        await db
+          .insert(productLocations)
+          .values({ productId, restaurantId })
+          .onConflictDoNothing({
+            target: [productLocations.productId, productLocations.restaurantId],
+          });
+      }
+
+      // Garante ≥1 tela ativa (screensCount > 0).
+      const activeScreen = (
+        await db
+          .select({ id: telas.id })
+          .from(telas)
+          .where(and(eq(telas.restaurantId, restaurantId), eq(telas.status, "active")))
+          .limit(1)
+      )[0];
+      if (!activeScreen) {
+        await db.insert(telas).values({
+          restaurantId,
+          nome: "E2E Tela 1",
+          categoria: "restaurante",
+          status: "active",
+        });
+      }
+
+      res.json({ restaurantId, productId });
+    } catch (error) {
+      console.error("Dev ensure screen-location error:", error);
+      const detail = error instanceof Error ? error.message : String(error);
+      const cause = (error as { cause?: unknown })?.cause;
+      const causeDetail =
+        cause && typeof cause === "object"
+          ? {
+              message: (cause as Error).message,
+              code: (cause as { code?: string }).code,
+              detail: (cause as { detail?: string }).detail,
+              column: (cause as { column?: string }).column,
+              table: (cause as { table?: string }).table,
+              constraint: (cause as { constraint?: string }).constraint,
+            }
+          : String(cause ?? "");
+      res.status(500).json({
+        message: "Erro ao garantir local de telas de teste.",
+        detail,
+        cause: causeDetail,
+      });
+    }
+  });
+
   app.post("/api/dev-ensure-parceiro", async (req, res) => {
     try {
       if (!(await sentinelAllows(res))) return;
