@@ -43,6 +43,7 @@ import {
   Trash2,
   ArrowUpDown,
   AlertTriangle,
+  MapPin,
 } from "lucide-react";
 import { screenSetupStatus } from "@shared/cpm-pricing";
 import {
@@ -228,6 +229,23 @@ export default function ActiveRestaurantsPage() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const backfillMutation = trpc.activeRestaurant.backfillCoordinates.useMutation({
+    onSuccess: (res) => {
+      utils.activeRestaurant.list.invalidate();
+      const parts = [`${res.geocoded} geocodificado(s)`];
+      if (res.skipped) parts.push(`${res.skipped} sem endereço`);
+      if (res.failed) parts.push(`${res.failed} falhou(aram)`);
+      if (res.geocoded > 0) toast.success(`Coordenadas preenchidas: ${parts.join(", ")}.`);
+      else toast.message(`Nada para preencher: ${parts.join(", ")}.`);
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const missingCoordsCount = useMemo(
+    () => restaurants.filter((r) => (r.lat == null || r.lng == null) && !!(r as any).address?.trim()).length,
+    [restaurants],
+  );
+
   const handleNew = () => {
     setEditingId(null);
     setForm(emptyForm);
@@ -375,9 +393,26 @@ export default function ActiveRestaurantsPage() {
       title="Locais Ativos"
       description="Rede de parceiros ativa da Mesa Ads"
       actions={
-        <Button onClick={() => navigate("/restaurantes/novo")} className="gap-2">
-          <Plus className="w-4 h-4" /> Novo Local
-        </Button>
+        <div className="flex items-center gap-2">
+          {missingCoordsCount > 0 && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              disabled={backfillMutation.isPending}
+              onClick={() => backfillMutation.mutate()}
+              title="Geocodifica o endereço dos locais sem coordenadas para exibi-los no mapa"
+              data-testid="button-backfill-coords"
+            >
+              <MapPin className="w-4 h-4" />
+              {backfillMutation.isPending
+                ? "Preenchendo..."
+                : `Preencher coordenadas (${missingCoordsCount})`}
+            </Button>
+          )}
+          <Button onClick={() => navigate("/restaurantes/novo")} className="gap-2">
+            <Plus className="w-4 h-4" /> Novo Local
+          </Button>
+        </div>
       }
     >
 

@@ -357,6 +357,7 @@ export default function Leads() {
 
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertForm, setConvertForm] = useState<ConvertRestaurantForm>(emptyConvertRestaurantForm);
+  const [convertCoords, setConvertCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [convertAnuncianteOpen, setConvertAnuncianteOpen] = useState(false);
 
   const [showConfetti, setShowConfetti] = useState(false);
@@ -867,6 +868,7 @@ export default function Leads() {
   function handleConvertRestaurant() {
     if (!selectedLead.data) return;
     prefillConvertForm(selectedLead.data);
+    setConvertCoords(null);
     setConvertOpen(true);
   }
 
@@ -888,6 +890,7 @@ export default function Leads() {
       name: convertForm.name,
       address: convertForm.address,
       neighborhood: convertForm.neighborhood,
+      ...(convertCoords ? { lat: String(convertCoords.lat), lng: String(convertCoords.lng) } : {}),
       googleMapsLink: convertForm.googleMapsLink || undefined,
       instagram: convertForm.instagram || undefined,
       contactType: convertForm.contactType as any,
@@ -2735,10 +2738,32 @@ export default function Leads() {
                 <Label className="text-xs">Nome do Estabelecimento *</Label>
                 <Input value={convertForm.name} onChange={(e) => setConvertForm(p => ({ ...p, name: e.target.value }))} className="bg-background border-border/30" />
               </div>
+              <AddressAutocomplete
+                label="Buscar endereço"
+                placeholder="Digite o endereço e escolha uma sugestão"
+                labelClassName="text-xs"
+                inputClassName="bg-background border-border/30"
+                data-testid="input-convert-address-search"
+                onSelect={(a) => {
+                  setConvertForm(p => ({
+                    ...p,
+                    address: [a.street, a.number].filter(Boolean).join(", ") || p.address,
+                    neighborhood: a.neighborhood || p.neighborhood,
+                  }));
+                  setConvertCoords(a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null);
+                }}
+              />
               <div className="space-y-2">
                 <Label className="text-xs">Endereço Completo *</Label>
                 <Input value={convertForm.address} onChange={(e) => setConvertForm(p => ({ ...p, address: e.target.value }))} className="bg-background border-border/30" />
               </div>
+              {convertCoords && (
+                <LocationPinMap
+                  lat={convertCoords.lat}
+                  lng={convertCoords.lng}
+                  data-testid="map-convert-pin"
+                />
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label className="text-xs">Bairro/Zona *</Label>

@@ -324,6 +324,7 @@ export default function RestaurantOnboarding() {
         state: form.state || undefined,
         cep: form.cep.replace(/\D/g, "") || undefined,
         googleMapsLink: form.googleMapsLink.trim() || undefined,
+        ...(coords ? { lat: String(coords.lat), lng: String(coords.lng) } : {}),
         instagram: form.instagram.trim() || undefined,
         contactType: form.contactType || undefined,
         contactName: form.contactName.trim(),

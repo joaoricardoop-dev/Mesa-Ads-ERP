@@ -453,6 +453,10 @@ export default function ActiveRestaurantForm() {
       screenImpactsPerInsertion: form.screenImpactsPerInsertion.trim() !== "" ? form.screenImpactsPerInsertion.trim() : null,
       screenWeeklyHours: form.screenWeeklyHours.trim() !== "" ? form.screenWeeklyHours.trim() : null,
       screenExposureSec: form.screenExposureSec || null,
+      // Coordenadas escolhidas no AddressAutocomplete (origem única). Só enviamos
+      // quando o usuário selecionou um endereço; ao editar sem reescolher, coords
+      // fica null e o lat/lng existente é preservado.
+      ...(coords ? { lat: String(coords.lat), lng: String(coords.lng) } : {}),
     };
 
     if (isEditing) {

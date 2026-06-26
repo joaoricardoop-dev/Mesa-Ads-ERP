@@ -832,6 +832,9 @@ export const appRouter = router({
           screenImpactsPerInsertion: z.string().optional().nullable(),
           screenWeeklyHours: z.string().optional().nullable(),
           screenExposureSec: z.number().int().optional().nullable(),
+          // ── Coordenadas (origem única: AddressAutocomplete no client) ──
+          lat: z.string().optional().nullable(),
+          lng: z.string().optional().nullable(),
         }),
       )
       .mutation(({ input }) => createActiveRestaurant(input)),
@@ -903,6 +906,9 @@ export const appRouter = router({
           screenImpactsPerInsertion: z.string().optional().nullable(),
           screenWeeklyHours: z.string().optional().nullable(),
           screenExposureSec: z.number().int().optional().nullable(),
+          // ── Coordenadas (origem única: AddressAutocomplete no client) ──
+          lat: z.string().optional().nullable(),
+          lng: z.string().optional().nullable(),
         }),
       )
       .mutation(({ input }) => {
@@ -917,6 +923,70 @@ export const appRouter = router({
     saveCoordinates: protectedProcedure
       .input(z.object({ id: z.number(), lat: z.number(), lng: z.number() }))
       .mutation(({ input }) => updateActiveRestaurant(input.id, { lat: String(input.lat), lng: String(input.lng) } as any)),
+
+    // Backfill idempotente: geocodifica o endereço já cadastrado dos locais
+    // ativos SEM coordenadas (lat/lng NULL) e grava no banco. Só toca registros
+    // sem coordenadas — re-rodar é seguro. A origem de gravação continua sendo
+    // a coluna lat/lng de active_restaurants (fonte única); aqui apenas
+    // recuperamos coordenadas faltantes a partir do endereço.
+    backfillCoordinates: internalProcedure.mutation(async () => {
+      const { getDb } = await import("./db");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível." });
+      const { activeRestaurants } = await import("../drizzle/schema");
+      const { isNull, or } = await import("drizzle-orm");
+      const { geocodeAddress } = await import("./_core/geocode");
+
+      const rows = await db
+        .select({
+          id: activeRestaurants.id,
+          name: activeRestaurants.name,
+          address: activeRestaurants.address,
+          neighborhood: activeRestaurants.neighborhood,
+          city: activeRestaurants.city,
+          state: activeRestaurants.state,
+          cep: activeRestaurants.cep,
+        })
+        .from(activeRestaurants)
+        .where(or(isNull(activeRestaurants.lat), isNull(activeRestaurants.lng)));
+
+      let geocoded = 0;
+      let skipped = 0;
+      const failures: { id: number; name: string; reason: string }[] = [];
+
+      for (const r of rows) {
+        const addressText = [r.address, r.neighborhood, r.city, r.state, r.cep, "Brasil"]
+          .map((p) => (p ?? "").trim())
+          .filter(Boolean)
+          .join(", ");
+        if (!r.address || !r.address.trim()) {
+          skipped++;
+          continue;
+        }
+        try {
+          const result = await geocodeAddress(addressText);
+          if (!result) {
+            failures.push({ id: r.id, name: r.name, reason: "Endereço não encontrado." });
+            continue;
+          }
+          await updateActiveRestaurant(r.id, {
+            lat: String(result.lat),
+            lng: String(result.lng),
+          } as any);
+          geocoded++;
+        } catch (err: any) {
+          failures.push({ id: r.id, name: r.name, reason: err?.message ?? "Falha desconhecida." });
+        }
+      }
+
+      return {
+        candidates: rows.length,
+        geocoded,
+        skipped,
+        failed: failures.length,
+        failures,
+      };
+    }),
 
     getCampaigns: protectedProcedure
       .input(z.object({ restaurantId: z.number() }))
