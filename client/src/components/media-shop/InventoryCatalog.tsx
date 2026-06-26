@@ -859,6 +859,32 @@ function CatalogMap({
       bounds.extend(pos);
     }
     if (withCoords.length > 0) map.fitBounds(bounds);
+
+    // Hook de teste APENAS em dev: expõe os títulos dos markers reais e permite
+    // disparar o click via o event system do SDK do Google. O smoke test com a
+    // chave real (e2e/builder-locais-real-maps.spec.ts) usa isso em vez de
+    // adivinhar o DOM interno do Google Maps (que é instável entre versões).
+    // Em build de produção `import.meta.env.DEV` é `false`, então o bloco é
+    // eliminado pelo tree-shaking do Vite e nada disso vai pro bundle final.
+    if (import.meta.env.DEV) {
+      const handles = markersRef.current;
+      (
+        window as unknown as {
+          __catalogMapTest?: {
+            markerTitles: string[];
+            clickMarker: (title: string) => boolean;
+          };
+        }
+      ).__catalogMapTest = {
+        markerTitles: handles.map((m) => m.getTitle?.() ?? ""),
+        clickMarker: (title: string) => {
+          const target = handles.find((m) => m.getTitle?.() === title);
+          if (!target) return false;
+          google.maps.event.trigger(target, "click");
+          return true;
+        },
+      };
+    }
   }, [map, withCoords, days, onAdd, isSelected]);
 
   return (

@@ -1,6 +1,6 @@
 /// <reference types="@types/google.maps" />
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { loadGoogleMaps } from "@/lib/googleMaps";
 import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from "@/lib/pracas";
@@ -21,9 +21,16 @@ export function MapView({
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const init = usePersistFn(async () => {
-    await loadGoogleMaps();
+    try {
+      await loadGoogleMaps();
+    } catch (err) {
+      console.error("Falha ao carregar o Google Maps", err);
+      setLoadError(true);
+      return;
+    }
     if (!mapContainer.current || map.current) return;
     map.current = new window.google!.maps.Map(mapContainer.current, {
       zoom: initialZoom,
@@ -54,6 +61,21 @@ export function MapView({
   useEffect(() => {
     init();
   }, [init]);
+
+  if (loadError) {
+    return (
+      <div
+        data-testid="map-load-error"
+        className={cn(
+          "w-full h-[500px] flex items-center justify-center rounded-lg border border-dashed bg-muted/30 p-4 text-center text-sm text-muted-foreground",
+          className,
+        )}
+      >
+        Mapa indisponível — não foi possível carregar o Google Maps. Verifique a
+        chave de API (VITE_GOOGLE_MAPS_API_KEY).
+      </div>
+    );
+  }
 
   return (
     <div ref={mapContainer} className={cn("w-full h-[500px]", className)} />
