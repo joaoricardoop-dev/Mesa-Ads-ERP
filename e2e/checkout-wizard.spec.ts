@@ -1,5 +1,6 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
 import { ANUNCIANTE_AUTH_FILE } from "./_auth-paths";
+import { resetTestAdvertiserState } from "./_builder-helpers";
 
 // Marketplace v2 — cobre o checkout completo de /montar-campanha pela tela
 // "shop" (StepShop): seleciona inventário → preenche o plano → "Enviar cotação"
@@ -165,6 +166,14 @@ test.describe("checkout /montar-campanha — anunciante", () => {
         ["comercial", "manager", "operacoes", "financeiro"].includes(u.role),
       )?.id ??
       null;
+  });
+
+  test.beforeEach(async ({ request }) => {
+    // Isolamento entre runs: o /montar-campanha re-hidrata o carrinho do
+    // anunciante a partir de campaign_drafts. Um draft vazado de um run anterior
+    // pode pré-selecionar um local e alterar o plano enviado. Helper
+    // compartilhado zera esse estado (ver _builder-helpers.ts).
+    await resetTestAdvertiserState(request);
   });
 
   test("anunciante monta o plano e cria a cotação", async ({ page }) => {

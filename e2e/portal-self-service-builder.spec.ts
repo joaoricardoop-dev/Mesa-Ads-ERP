@@ -5,6 +5,7 @@ import {
   trpcMutation,
   type DevUser,
 } from "./_finance-helpers";
+import { resetTestAdvertiserState } from "./_builder-helpers";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Construtores de plano de mídia dos portais (MediaShopBuilder) — Task #318.
@@ -177,6 +178,11 @@ test.describe("Portais self-service — MediaShopBuilder → createFromBuilder",
     test.setTimeout(150_000);
     let createdId: number | null = null;
     try {
+      // Isolamento entre runs: o MediaShopBuilder do portal re-hidrata o carrinho
+      // do anunciante a partir de campaign_drafts. Um draft vazado pré-adicionaria
+      // itens e quebraria o plano enviado. Helper compartilhado zera esse estado
+      // (ver _builder-helpers.ts).
+      await resetTestAdvertiserState(page.request);
       await devLoginAs(page.request, s.anuncianteUserId);
       await suppressCompleteProfileDialog(page);
       await page.goto("/");

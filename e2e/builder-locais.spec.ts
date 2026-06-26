@@ -1,5 +1,6 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
 import { ANUNCIANTE_AUTH_FILE } from "./_auth-paths";
+import { resetTestAdvertiserState } from "./_builder-helpers";
 
 // Marketplace v2 — cobre a tela "shop" do builder /montar-campanha, que reusa
 // o ecommerce de mídia interno (InventoryCatalog + MediaPlanPanel).
@@ -277,24 +278,10 @@ test.describe("builder /montar-campanha — visualização em mapa", () => {
     // no servidor (anunciantePortal.saveCartDraft) e re-hidrata na próxima
     // execução. Sem limpar, o local semeado já aparece selecionado e as datas
     // ficam as de um teste anterior (ex.: 2099 do teste de lista) — o popup do
-    // mapa abriria "Remover" em vez de "Adicionar".
-    //
-    // O draft é keyed pelo clientId do ANUNCIANTE de teste (Vexa pay Ltda), que
-    // não é necessariamente o primeiro cliente da tabela — então resolvemos o
-    // clientId via dev-ensure-anunciante e passamos explicitamente.
-    const ensure = await request.post("/api/dev-ensure-anunciante", { data: {} });
-    expect(
-      ensure.ok(),
-      `dev-ensure-anunciante falhou: ${ensure.status()} ${await ensure.text()}`,
-    ).toBeTruthy();
-    const { user } = (await ensure.json()) as { user: { clientId: number | null } };
-    const res = await request.post("/api/dev-clear-cart-draft", {
-      data: user.clientId != null ? { clientId: user.clientId } : {},
-    });
-    expect(
-      res.ok(),
-      `dev-clear-cart-draft falhou: ${res.status()} ${await res.text()}`,
-    ).toBeTruthy();
+    // mapa abriria "Remover" em vez de "Adicionar". O helper compartilhado
+    // resolve o clientId do anunciante de teste e zera o draft (ver
+    // _builder-helpers.ts).
+    await resetTestAdvertiserState(request);
   });
 
   test("anunciante troca para o mapa, vê pins, confere o preço e adiciona pelo popup", async ({
