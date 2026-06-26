@@ -34,6 +34,7 @@ import {
 } from "../drizzle/schema";
 import { calcularRating, temCamposRatingCompletos } from "../shared/rating";
 import { buildCampaignName, isFormattedCampaignName } from "./utils/campaignName";
+import { geocodeAddress, buildGeocodeQuery } from "./_core/geocode";
 
 neonConfig.webSocketConstructor = ws;
 
@@ -992,11 +993,52 @@ const RATING_FIELDS = [
   'locationRating', 'venueType', 'digitalPresence'
 ];
 
+/**
+ * Hook automático de geocodificação. Quando um local ATIVO tem endereço mas
+ * está SEM coordenadas (lat/lng NULL/vazio), recupera as coordenadas a partir
+ * do endereço já gravado e atualiza o registro. NUNCA sobrescreve coordenadas
+ * existentes (origem única: AddressAutocomplete no client). Degrada com
+ * segurança: qualquer falha de rede/config/ZERO_RESULTS apenas loga um aviso e
+ * retorna o registro inalterado — o create/update nunca quebra por causa disso,
+ * e o botão "Preencher coordenadas" segue como fallback.
+ */
+export async function autoGeocodeIfMissing<T extends typeof activeRestaurants.$inferSelect>(
+  restaurant: T | undefined,
+): Promise<T | undefined> {
+  if (!restaurant) return restaurant;
+  if (restaurant.status !== "active") return restaurant;
+
+  const hasLat = restaurant.lat != null && String(restaurant.lat).trim() !== "";
+  const hasLng = restaurant.lng != null && String(restaurant.lng).trim() !== "";
+  if (hasLat && hasLng) return restaurant;
+
+  if (!restaurant.address || !restaurant.address.trim()) return restaurant;
+
+  try {
+    const result = await geocodeAddress(buildGeocodeQuery(restaurant));
+    if (!result) return restaurant;
+    const db = await getDb();
+    if (!db) return restaurant;
+    const updated = await db
+      .update(activeRestaurants)
+      .set({ lat: String(result.lat), lng: String(result.lng), updatedAt: new Date() })
+      .where(eq(activeRestaurants.id, restaurant.id))
+      .returning();
+    return (updated[0] as T) ?? restaurant;
+  } catch (err) {
+    console.warn(
+      `[geocode] Falha ao geocodificar local ${restaurant.id} (${restaurant.name}):`,
+      err instanceof Error ? err.message : err,
+    );
+    return restaurant;
+  }
+}
+
 export async function createActiveRestaurant(data: InsertActiveRestaurant) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const result = await db.insert(activeRestaurants).values(data).returning();
-  const restaurant = result[0];
+  let restaurant = result[0];
 
   if (temCamposRatingCompletos(restaurant)) {
     const rating = calcularRating(restaurant);
@@ -1006,17 +1048,17 @@ export async function createActiveRestaurant(data: InsertActiveRestaurant) {
       ratingMultiplier: String(rating.multiplicador),
       ratingUpdatedAt: new Date(),
     }).where(eq(activeRestaurants.id, restaurant.id)).returning();
-    return updated[0];
+    restaurant = updated[0];
   }
 
-  return restaurant;
+  return (await autoGeocodeIfMissing(restaurant)) ?? restaurant;
 }
 
 export async function updateActiveRestaurant(id: number, data: Partial<InsertActiveRestaurant>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const result = await db.update(activeRestaurants).set({ ...data, updatedAt: new Date() }).where(eq(activeRestaurants.id, id)).returning();
-  const restaurant = result[0];
+  let restaurant = result[0];
 
   const alterouRating = RATING_FIELDS.some(campo => campo in data);
   if (alterouRating) {
@@ -1028,7 +1070,7 @@ export async function updateActiveRestaurant(id: number, data: Partial<InsertAct
         ratingMultiplier: String(rating.multiplicador),
         ratingUpdatedAt: new Date(),
       }).where(eq(activeRestaurants.id, id)).returning();
-      return updated[0];
+      restaurant = updated[0];
     } else {
       const updated = await db.update(activeRestaurants).set({
         ratingScore: null,
@@ -1036,11 +1078,11 @@ export async function updateActiveRestaurant(id: number, data: Partial<InsertAct
         ratingMultiplier: null,
         ratingUpdatedAt: null,
       }).where(eq(activeRestaurants.id, id)).returning();
-      return updated[0];
+      restaurant = updated[0];
     }
   }
 
-  return restaurant;
+  return (await autoGeocodeIfMissing(restaurant)) ?? restaurant;
 }
 
 export async function deleteActiveRestaurant(id: number) {

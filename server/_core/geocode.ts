@@ -20,6 +20,24 @@ export interface GeocodeResult {
   formattedAddress: string;
 }
 
+/**
+ * FONTE ÚNICA da string de busca usada na geocodificação de um local. Tanto o
+ * backfill manual quanto o hook automático de create/update montam o endereço
+ * textual aqui — assim os dois caminhos geocodificam exatamente o mesmo query.
+ */
+export function buildGeocodeQuery(parts: {
+  address?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
+  cep?: string | null;
+}): string {
+  return [parts.address, parts.neighborhood, parts.city, parts.state, parts.cep, "Brasil"]
+    .map((p) => (p ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 interface GoogleGeocodeResponse {
   status: string;
   error_message?: string;

@@ -1,6 +1,6 @@
 import express from "express";
 import { z } from "zod";
-import { getDb } from "./db";
+import { getDb, autoGeocodeIfMissing } from "./db";
 import { activeRestaurants, restaurantTerms, termAcceptances, termTemplates } from "../drizzle/schema";
 import { users } from "../shared/models/auth";
 import { eq, and, sql } from "drizzle-orm";
@@ -383,6 +383,8 @@ export function setupRestaurantOnboardingRoutes(app: express.Express) {
         situacaoCadastral: input.situacaoCadastral,
         socios: input.socios,
       }).returning();
+
+      await autoGeocodeIfMissing(restaurant);
 
       await clerkClient.users.updateUser(tempClerkUser.id, {
         publicMetadata: {

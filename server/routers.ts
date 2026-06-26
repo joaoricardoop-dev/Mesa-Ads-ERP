@@ -935,7 +935,7 @@ export const appRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível." });
       const { activeRestaurants } = await import("../drizzle/schema");
       const { isNull, or } = await import("drizzle-orm");
-      const { geocodeAddress } = await import("./_core/geocode");
+      const { geocodeAddress, buildGeocodeQuery } = await import("./_core/geocode");
 
       const rows = await db
         .select({
@@ -955,10 +955,7 @@ export const appRouter = router({
       const failures: { id: number; name: string; reason: string }[] = [];
 
       for (const r of rows) {
-        const addressText = [r.address, r.neighborhood, r.city, r.state, r.cep, "Brasil"]
-          .map((p) => (p ?? "").trim())
-          .filter(Boolean)
-          .join(", ");
+        const addressText = buildGeocodeQuery(r);
         if (!r.address || !r.address.trim()) {
           skipped++;
           continue;
