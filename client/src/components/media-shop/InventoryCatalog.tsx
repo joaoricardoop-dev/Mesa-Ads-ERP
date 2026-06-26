@@ -858,7 +858,7 @@ function CatalogMap({
   }, [withCoords, days, onAdd, isSelected, mapReady]);
 
   return (
-    <Card>
+    <Card data-testid="catalog-map">
       <CardContent className="p-0 overflow-hidden rounded-lg">
         <MapView
           className="h-[560px]"

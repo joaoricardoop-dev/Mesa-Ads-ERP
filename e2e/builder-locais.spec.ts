@@ -71,4 +71,66 @@ test.describe("builder /montar-campanha — tela de inventário", () => {
     await expect(cards.first()).toBeVisible({ timeout: 10_000 });
     expect(await cards.count()).toBeGreaterThan(0);
   });
+
+  // Task #334 — bloqueia regressão do default de view por audiência. Para
+  // anunciante/parceiro, o catálogo deve abrir DIRETO no Mapa quando há pelo
+  // menos um local com coordenadas (ver InventoryCatalog: defaultViewApplied),
+  // tornando "escolher por bairro" a primeira ação. O fixture global
+  // (dev-ensure-screen-location) sempre semeia locais COM lat/lng, então o
+  // caminho padrão exercitado aqui é o do mapa.
+  test("abre direto no Mapa por padrão quando há locais com coordenadas", async ({
+    page,
+  }) => {
+    // Garante ≥1 local de telas COM coordenadas (lat/lng) no catálogo. O
+    // dev-ensure-restaurante do global.setup cria apenas um produto por
+    // quantidade (impressos, sem local de telas), e o banco de teste
+    // compartilhado pode conter locais de telas legados sem lat/lng — ambos
+    // levariam ao fallback de Lista. Este fixture (idempotente) preenche as
+    // coordenadas, tornando o default = Mapa determinístico.
+    const ensure = await page.request.post("/api/dev-ensure-screen-location", {
+      data: {},
+    });
+    expect(
+      ensure.ok(),
+      `dev-ensure-screen-location falhou: ${ensure.status()} ${await ensure.text()}`,
+    ).toBeTruthy();
+
+    await page.goto("/montar-campanha");
+
+    const cta = page.getByRole("button", { name: /montar plano de mídia/i });
+    await expect(cta).toBeVisible();
+    await cta.click();
+
+    // Tela shop carregada.
+    await expect(page.getByText(/inventário/i).first()).toBeVisible();
+
+    // O container do mapa deve estar visível SEM nenhuma interação — esse é o
+    // default para anunciante. (O mapa só renderiza quando view === "map".)
+    await expect(page.getByTestId("catalog-map")).toBeVisible({ timeout: 15_000 });
+
+    // E as linhas de lista NÃO devem estar montadas: elas só existem nas views
+    // "list"/"cards", logo a sua ausência prova que o mapa é a view ativa.
+    await expect(page.locator("[data-testid^='local-card-']")).toHaveCount(0);
+
+    // Sanidade: trocar para Lista revela as linhas, confirmando que existem
+    // locais (i.e. o mapa não estava ativo por falta de dados).
+    await page.getByRole("button", { name: /^lista$/i }).click();
+    await expect(page.getByTestId("catalog-map")).toHaveCount(0);
+    await expect(page.locator("[data-testid^='local-card-']").first()).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
+  // Fallback (sem coordenadas) — NOTA DE FIXTURE:
+  // Quando NENHUM local disponível tem lat/lng, o catálogo permanece na Lista
+  // (InventoryCatalog: `hasCoords ? setView("map")` — sem coords, mantém o
+  // estado inicial "list"). Esse ramo não é exercitado por um teste dedicado
+  // porque os fixtures compartilhados da suíte (dev-ensure-screen-location e
+  // dev-ensure-restaurante) sempre criam locais COM coordenadas
+  // (lat="-23.5505"/lng="-46.6333"); não há, hoje, um endpoint de fixture que
+  // semeie um local de telas sem coordenadas sem poluir os demais specs que
+  // dependem do default = mapa. Caso esse fixture passe a existir, o teste
+  // deve: (1) garantir que o único local visível ao anunciante não tenha
+  // lat/lng, (2) abrir /montar-campanha, (3) asserir que as linhas
+  // `local-card-*` aparecem sem clique e que `catalog-map` está ausente.
 });
