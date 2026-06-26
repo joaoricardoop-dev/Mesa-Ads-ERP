@@ -1548,6 +1548,36 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     sql: `CREATE TABLE IF NOT EXISTS "e2e_test_db_sentinel" ("allowed" boolean PRIMARY KEY);`,
   },
   {
+    // Task #339 — Limpeza do catálogo de teste. Versões antigas do
+    // /api/dev-ensure-portal-builder criavam produtos/locais com nomes
+    // timestampados ("E2E Telas <ts>", "E2E Produto Bolacha <ts>" em
+    // `products`; "E2E Local Telas <ts>" em `active_restaurants`). Esses
+    // registros se acumulam para sempre no banco de teste isolado e poluem
+    // o catálogo do builder self-service. Hoje o endpoint usa nomes FIXOS
+    // ("E2E Portal Telas", "E2E Portal Local Telas", "E2E Portal Bolacha"),
+    // que NÃO casam com os padrões abaixo (têm conteúdo após o nome base).
+    // Inativamos os antigos seguindo a convenção "inativar em vez de DELETE"
+    // (preserva qualquer trilha amarrada). Defensivamente também cobrimos
+    // eventuais variantes "E2E Portal ... <ts>" — o LIKE com espaço final
+    // nunca casa com os nomes fixos exatos. Idempotente: só toca quem ainda
+    // está ativo.
+    name: "inactivate_leaked_e2e_test_catalog_task_339",
+    sql: `
+      UPDATE "products"
+         SET "isActive" = false, "updatedAt" = NOW()
+       WHERE ("name" LIKE 'E2E Telas %'
+              OR "name" LIKE 'E2E Produto Bolacha %'
+              OR "name" LIKE 'E2E Portal Telas %'
+              OR "name" LIKE 'E2E Portal Bolacha %')
+         AND "isActive" = true;
+      UPDATE "active_restaurants"
+         SET "status" = 'inactive', "updatedAt" = NOW()
+       WHERE ("name" LIKE 'E2E Local Telas %'
+              OR "name" LIKE 'E2E Portal Local Telas %')
+         AND "status" = 'active';
+    `,
+  },
+  {
     // Task #202 — Segunda passada de limpeza retroativa. A migration
     // `inactivate_leaked_e2e_records_task_189` rodou uma vez e marcou os
     // registros existentes naquele momento como `inactive`. Depois disso,
