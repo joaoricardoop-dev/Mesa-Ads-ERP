@@ -2206,6 +2206,31 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     name: "add_premissas_snapshot_to_quotations_task_301",
     sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "premissas_snapshot" jsonb;`,
   },
+  {
+    // Mesma classe de drift: as colunas `start_date`/`end_date`/`venue_id`
+    // (período e ponto de mídia por item do carrinho unificado) existem em
+    // `drizzle/schema.ts` (quotationItems, linhas ~1289-1291) mas nunca foram
+    // migradas. Sem elas, `createFromBuilder` dá 500 ("column does not exist")
+    // ao inserir qualquer item do ecommerce de mídia interno. Idempotente;
+    // colunas idênticas ao schema.ts. venue_id é FK opcional p/ active_restaurants
+    // (ON DELETE SET NULL, igual a restaurantId).
+    name: "add_period_and_venue_to_quotation_items_task_311",
+    sql: `
+      ALTER TABLE "quotation_items" ADD COLUMN IF NOT EXISTS "start_date" date;
+      ALTER TABLE "quotation_items" ADD COLUMN IF NOT EXISTS "end_date" date;
+      ALTER TABLE "quotation_items" ADD COLUMN IF NOT EXISTS "venue_id" integer;
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'quotation_items_venue_id_fkey'
+        ) THEN
+          ALTER TABLE "quotation_items"
+            ADD CONSTRAINT "quotation_items_venue_id_fkey"
+            FOREIGN KEY ("venue_id") REFERENCES "active_restaurants"("id") ON DELETE SET NULL;
+        END IF;
+      END $$;
+      CREATE INDEX IF NOT EXISTS "idx_quotation_items_venue_id" ON "quotation_items" ("venue_id");
+    `,
+  },
 ];
 
 /**

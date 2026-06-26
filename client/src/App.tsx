@@ -71,6 +71,7 @@ import ParceiroOnboarding from "./pages/ParceiroOnboarding";
 import ParceiroTabelaPrecos from "./pages/ParceiroTabelaPrecos";
 import ParceiroLeads from "./pages/ParceiroLeads";
 import BudgetCreator from "./pages/BudgetCreator";
+import MediaBudget from "./pages/MediaBudget";
 import ComercialDashboard from "./pages/ComercialDashboard";
 
 function AnuncianteRouter() {
@@ -113,7 +114,8 @@ function Router() {
       <Route path="/comercial/dashboard" component={ComercialDashboard} />
       <Route path="/comercial/simulador" component={Home} />
       <Route path="/comercial/tabela-precos" component={PriceTable} />
-      <Route path="/comercial/orcamento" component={BudgetCreator} />
+      <Route path="/comercial/orcamento" component={MediaBudget} />
+      <Route path="/comercial/orcamento-classico" component={BudgetCreator} />
       <Route path="/comercial/cotacoes/:id" component={QuotationDetail} />
       <Route path="/comercial/cotacoes" component={Quotations} />
       <Route path="/comercial/leads" component={Leads} />

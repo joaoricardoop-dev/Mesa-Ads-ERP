@@ -76,5 +76,17 @@ export const operacoesProcedure = createRoleProcedure(["operacoes", "manager"]);
 export const financeiroProcedure = createRoleProcedure(["financeiro", "manager"]);
 export const internalProcedure = createRoleProcedure(["comercial", "operacoes", "financeiro", "manager"]);
 export const anuncianteProcedure = createRoleProcedure(["anunciante"]);
+// Leitura do inventário do marketplace (locais/produtos/disponibilidade). É
+// read-only e compartilhada entre o portal do anunciante/parceiro e o ecommerce
+// de mídia interno (aba Orçamento) — fonte única de inventário para todos os
+// fluxos. Mutações de carrinho (saveCartDraft etc.) seguem restritas a anunciante.
+export const marketplaceReadProcedure = createRoleProcedure([
+  "anunciante",
+  "parceiro",
+  "comercial",
+  "operacoes",
+  "financeiro",
+  "manager",
+]);
 export const restauranteProcedure = createRoleProcedure(["restaurante"]);
 export const parceiroProcedure = createRoleProcedure(["parceiro"]);

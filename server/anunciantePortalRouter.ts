@@ -3,7 +3,7 @@
 // checkout) e o calendário operacional Ops. Não fazem reserva: a regra é
 // first-come-first-served no checkout.
 
-import { anuncianteProcedure, router } from "./_core/trpc";
+import { anuncianteProcedure, marketplaceReadProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import {
@@ -67,7 +67,7 @@ export const anunciantePortalRouter = router({
   // (precisa de cadastro pelo admin) de "filtros zeraram a lista". Retorna
   // contagens globais de restaurantes ativos, produtos visíveis a anunciantes
   // e vínculos productLocations existentes.
-  getMarketplaceStats: anuncianteProcedure.query(async () => {
+  getMarketplaceStats: marketplaceReadProcedure.query(async () => {
     const db = await getDatabase();
     const [activeRest] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -94,7 +94,7 @@ export const anunciantePortalRouter = router({
   // Lista locais ativos com seus shares disponíveis no período. Filtros
   // opcionais por tipo de produto, bairro e janela de datas. Retorna também
   // rating, audiência estimada e categorias excluídas (alerta de conflito).
-  listAvailableLocations: anuncianteProcedure
+  listAvailableLocations: marketplaceReadProcedure
     .input(
       z
         .object({
@@ -167,6 +167,16 @@ export const anunciantePortalRouter = router({
           ratingMultiplier: activeRestaurants.ratingMultiplier,
           excludedCategories: activeRestaurants.excludedCategories,
           logoUrl: activeRestaurants.logoUrl,
+          // ── Inventário de mídia (ecommerce de mídia) ──
+          lat: activeRestaurants.lat,
+          lng: activeRestaurants.lng,
+          categoria: activeRestaurants.categoria,
+          dailyLoops: activeRestaurants.dailyLoops,
+          screenCpm: activeRestaurants.screenCpm,
+          screenInsertionsPerHour: activeRestaurants.screenInsertionsPerHour,
+          screenImpactsPerInsertion: activeRestaurants.screenImpactsPerInsertion,
+          screenWeeklyHours: activeRestaurants.screenWeeklyHours,
+          screenExposureSec: activeRestaurants.screenExposureSec,
         })
         .from(activeRestaurants)
         .where(and(...restaurantConditions));
@@ -180,6 +190,21 @@ export const anunciantePortalRouter = router({
       }
 
       const allowedRestaurantIds = new Set(restaurantRows.map((r) => r.id));
+
+      // Contagem de telas ativas por local (nº de telas mostrado no card de mídia).
+      const screenCountRows = await db
+        .select({
+          restaurantId: telas.restaurantId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(telas)
+        .where(
+          and(eq(telas.status, "active"), inArray(telas.restaurantId, Array.from(allowedRestaurantIds))),
+        )
+        .groupBy(telas.restaurantId);
+      const screensByRestaurant = new Map<number, number>(
+        screenCountRows.map((s) => [s.restaurantId, Number(s.count ?? 0)]),
+      );
 
       // 3. Ocupação real: campaignItems vinculados a (productId, restaurantId)
       // cujas fases intersectam o período. Filtramos no SQL quando possível.
@@ -276,6 +301,21 @@ export const anunciantePortalRouter = router({
           productSlots,
           totalAvailableShares: totalAvailable,
           hasAvailability: totalAvailable > 0,
+          // ── Inventário de mídia (ecommerce de mídia) ──
+          categoria: r.categoria,
+          lat: r.lat != null ? parseFloat(r.lat) : null,
+          lng: r.lng != null ? parseFloat(r.lng) : null,
+          screensCount: screensByRestaurant.get(r.id) ?? 0,
+          dailyLoops: r.dailyLoops,
+          // Config CPM da tela (fonte única: shared/cpm-pricing.ts). Telas só têm
+          // preço quando estes campos estão completos.
+          screenCpm: {
+            cpm: r.screenCpm != null ? parseFloat(r.screenCpm) : null,
+            insertionsPerHour: r.screenInsertionsPerHour ?? null,
+            impactsPerInsertion: r.screenImpactsPerInsertion != null ? parseFloat(r.screenImpactsPerInsertion) : null,
+            weeklyHours: r.screenWeeklyHours != null ? parseFloat(r.screenWeeklyHours) : null,
+            exposureSec: r.screenExposureSec ?? null,
+          },
         };
       });
 
@@ -285,7 +325,7 @@ export const anunciantePortalRouter = router({
   // Para um conjunto de restaurantes selecionados, retorna os produtos
   // ofertados em cada um com a ocupação (shares ocupados vs disponíveis) no
   // intervalo informado. Usado pelo passo "produtos por local" do builder.
-  getProductsForLocations: anuncianteProcedure
+  getProductsForLocations: marketplaceReadProcedure
     .input(
       z.object({
         restaurantIds: z.array(z.number().int()).min(1),

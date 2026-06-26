@@ -107,7 +107,10 @@ export function quotePrice(params: {
   let unitPrice = calcUnitPriceAdv({
     custoUnitario: parseFloat(tier.custoUnitario),
     frete: parseFloat(tier.frete),
-    margem: parseFloat(tier.margem),
+    // margem armazenada em % no banco (ex.: 50.00); calcUnitPriceAdv espera
+    // fração decimal — divide por 100 como o servidor canônico (createFromBuilder)
+    // e todos os demais consumidores de calcUnitPriceAdv.
+    margem: parseFloat(tier.margem) / 100,
     artes: tier.artes ?? 1,
     volume,
     irpj,

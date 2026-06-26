@@ -458,6 +458,18 @@ export const productRouter = router({
         .orderBy(asc(productDiscountPriceTiers.priceMin));
     }),
 
+  // Pacote de precificação de TODOS os produtos numa só leitura (tiers de volume +
+  // tiers de desconto). Usado pelo catálogo de "produtos por quantidade" do
+  // Orçamento para precificar via o helper canônico `quotePrice` sem N+1.
+  getPricingBundle: protectedProcedure.query(async () => {
+    const db = await getDatabase();
+    const [tiers, discountTiers] = await Promise.all([
+      db.select().from(productPricingTiers).orderBy(asc(productPricingTiers.volumeMin)),
+      db.select().from(productDiscountPriceTiers).orderBy(asc(productDiscountPriceTiers.priceMin)),
+    ]);
+    return { tiers, discountTiers };
+  }),
+
   upsertDiscountTiers: internalProcedure
     .input(z.object({
       productId: z.number(),

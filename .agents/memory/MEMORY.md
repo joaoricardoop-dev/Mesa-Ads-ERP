@@ -9,3 +9,7 @@
 - [Proposal per-line pricing](proposal-line-pricing.md) — per-line proposal prices come from computeProposalLinePrices (shared); never recompute BV scale inline; cents close via largest-remainder.
 - [Proposal/OS PDF assembler](proposal-pdf-assembler.md) — assembleProposalData (shared) is the only builder for generateProposalPdf data; never re-parse notes or recompute monthly/per-rest inline.
 - [Builder pricing dual-path](builder-pricing-dual-path.md) — checkout sends no per-line price; client quotePrice is display-only, server createFromBuilder is the real price; apply new pricing rules in BOTH.
+- [Media-shop catalog kinds](media-shop-catalog-kinds.md) — internal Orçamento splits inventory: telas=location-based (CPM) vs quantity products (bolachas/impressos, restaurantId null, volume tiers).
+- [Margem unit convention](margem-unit-convention.md) — product_pricing_tiers.margem stored as percent (50.00); calcUnitPriceAdv wants a fraction — divide by 100 at EVERY call site or price collapses to 0 ("Sob consulta").
+- [Screen metrics canonical source](screen-metrics-canonical.md) — shared/screen-metrics.ts is the only origin for inserções/dia default (CPM→dailyLoops, no constant) + exibições/alcance/frequência; per-item override doesn't touch registration or CPM price.
+- [Toast convention (sonner)](toast-convention.md) — no @/hooks/use-toast in repo; import { toast } from "sonner" and call toast.success/error.

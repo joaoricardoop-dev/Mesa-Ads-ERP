@@ -10,7 +10,7 @@ import crypto from "crypto";
 import { createCrmNotification } from "./notificationRouter";
 import { buildCampaignName } from "./utils/campaignName";
 import { scheduleInvoicesForCampaign } from "./utils/scheduleInvoices";
-import { ensureDefaultQuotationSchedule, seedCampaignScheduleFromQuotation, readBillingSchedule } from "./billingScheduleRouter";
+import { ensureDefaultQuotationSchedule, seedCampaignScheduleFromQuotation, readBillingSchedule, replaceBillingSchedule } from "./billingScheduleRouter";
 import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { withUniqueRetry, describeDbError } from "./utils/uniqueNumberRetry";
 import { nextNumber } from "./utils/numberCounter";
@@ -1291,6 +1291,7 @@ export const quotationRouter = router({
   createFromBuilder: protectedProcedure
     .input(z.object({
       clientId: z.number().nullable(),
+      leadId: z.number().nullable().optional(),
       source: z.enum(["self_service_anunciante", "self_service_parceiro", "internal"]),
       campaignName: z.string().min(1),
       startDate: z.string().optional(),
@@ -1298,6 +1299,15 @@ export const quotationRouter = router({
       venueIds: z.array(z.number().int()).optional(),
       estimatedTotal: z.number().optional(),
       estimatedImpressions: z.number().optional(),
+      isBonificada: z.boolean().optional(),
+      // Condições de pagamento (parcelas) opcionais; quando ausente o backend
+      // semeia o cronograma default via ensureDefaultQuotationSchedule.
+      schedule: z.array(z.object({
+        sequence: z.number().int().min(1),
+        amount: z.union([z.number(), z.string()]),
+        dueDate: z.string(),
+        notes: z.string().nullable().optional(),
+      })).optional(),
       items: z.array(z.object({
         productId: z.number(),
         productName: z.string(),
@@ -1620,6 +1630,7 @@ export const quotationRouter = router({
         quotationNumber,
         quotationName,
         clientId: input.clientId,
+        leadId: input.leadId ?? null,
         partnerId: client?.partnerId ?? null,
         coasterVolume: totalVolume,
         totalValue: totalValue.toFixed(2),
@@ -1627,7 +1638,7 @@ export const quotationRouter = router({
         notes: notesText,
         periodStart: input.startDate || null,
         source: input.source,
-        isBonificada: false,
+        isBonificada: input.isBonificada ?? false,
         hasPartnerDiscount: hasPartner,
         // Sprint 1: self-service (anunciante/parceiro) preserva o marker
         // textual; canal interno via builder grava o user real.
@@ -1637,8 +1648,21 @@ export const quotationRouter = router({
 
       const [created] = await db.insert(quotations).values(insertValues).returning();
 
-      // Task #197 — auto-seed do schedule default (1 parcela).
-      try { await ensureDefaultQuotationSchedule(db, created.id); } catch (e) { console.warn("[createFromBuilder] ensureDefaultQuotationSchedule:", (e as Error)?.message); }
+      // Condições de pagamento: parcelas customizadas têm prioridade; se ausentes
+      // (ou bonificada), cai no auto-seed default. Bonificada nunca gera schedule.
+      try {
+        const customSchedule = input.schedule ?? [];
+        if (!insertValues.isBonificada && customSchedule.length > 0) {
+          await replaceBillingSchedule(db, "quotation", created.id, customSchedule.map((p) => ({
+            sequence: p.sequence,
+            amount: typeof p.amount === "number" ? p.amount.toFixed(2) : String(p.amount),
+            dueDate: p.dueDate,
+            notes: p.notes ?? null,
+          })));
+        } else {
+          await ensureDefaultQuotationSchedule(db, created.id);
+        }
+      } catch (e) { console.warn("[createFromBuilder] schedule:", (e as Error)?.message); }
 
       for (const item of computedItems) {
         const ciclosDesc = item.cycles && item.cycleWeeks
