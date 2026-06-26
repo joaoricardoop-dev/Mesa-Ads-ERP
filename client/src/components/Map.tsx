@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { loadGoogleMaps } from "@/lib/googleMaps";
+import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from "@/lib/pracas";
 import { cn } from "@/lib/utils";
 
 interface MapViewProps {
@@ -14,8 +15,8 @@ interface MapViewProps {
 
 export function MapView({
   className,
-  initialCenter = { lat: -23.5505, lng: -46.6333 },
-  initialZoom = 12,
+  initialCenter = DEFAULT_MAP_CENTER,
+  initialZoom = DEFAULT_MAP_ZOOM,
   onMapReady,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);

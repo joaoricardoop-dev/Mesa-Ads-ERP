@@ -14,6 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { LocationPinMap } from "@/components/LocationPinMap";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -344,6 +345,7 @@ export default function Leads() {
   const [interactionContent, setInteractionContent] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<LeadFormData>(emptyForm);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   const [draggedLeadId, setDraggedLeadId] = useState<number | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
@@ -713,6 +715,7 @@ export default function Leads() {
 
   function startEditing() {
     if (!selectedLead.data) return;
+    setCoords(null);
     setIsEditing(true);
   }
 
@@ -843,6 +846,7 @@ export default function Leads() {
     setCnpjInput("");
     setCnpjFetched(false);
     setCreateStep("cnpj");
+    setCoords(null);
     setCreateOpen(true);
   }
 
@@ -1499,7 +1503,7 @@ export default function Leads() {
               labelClassName="text-xs"
               inputClassName="h-8 text-sm"
               data-testid="input-address-search"
-              onSelect={(a) =>
+              onSelect={(a) => {
                 setData({
                   ...data,
                   address: a.street || data.address,
@@ -1508,8 +1512,9 @@ export default function Leads() {
                   city: a.city || data.city,
                   state: a.state || data.state,
                   cep: a.cep || data.cep,
-                })
-              }
+                });
+                setCoords(a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null);
+              }}
             />
             <div className="grid grid-cols-[1fr_80px] gap-2">
               <div className="grid gap-1.5">
@@ -1572,6 +1577,13 @@ export default function Leads() {
                 </div>
               </div>
             </div>
+            {coords && (
+              <LocationPinMap
+                lat={coords.lat}
+                lng={coords.lng}
+                data-testid="map-lead-pin"
+              />
+            )}
           </>
         )}
 

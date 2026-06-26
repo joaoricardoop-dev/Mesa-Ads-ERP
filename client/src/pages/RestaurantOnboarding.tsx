@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import AvatarCropDialog from "@/components/AvatarCropDialog";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { LocationPinMap } from "@/components/LocationPinMap";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -155,6 +156,7 @@ export default function RestaurantOnboarding() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [cropRawSrc, setCropRawSrc] = useState<string | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [form, setForm] = useState<FormData>({
     name: "",
     cnpj: "",
@@ -530,7 +532,7 @@ export default function RestaurantOnboarding() {
                 labelClassName={labelClass}
                 inputClassName="bg-[hsl(0,0%,11%)] border-[hsl(0,0%,18%)] text-white placeholder:text-[hsl(0,0%,35%)]"
                 data-testid="input-address-search"
-                onSelect={(a) =>
+                onSelect={(a) => {
                   setForm((f) => ({
                     ...f,
                     address: a.street || f.address,
@@ -539,8 +541,9 @@ export default function RestaurantOnboarding() {
                     city: a.city || f.city,
                     state: a.state || f.state,
                     cep: a.cep || f.cep,
-                  }))
-                }
+                  }));
+                  setCoords(a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null);
+                }}
               />
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2">
@@ -577,6 +580,13 @@ export default function RestaurantOnboarding() {
                 <Label className={labelClass}>CEP</Label>
                 <Input value={form.cep} onChange={(e) => update("cep", e.target.value)} placeholder="00000-000" className={inputClass} />
               </div>
+              {coords && (
+                <LocationPinMap
+                  lat={coords.lat}
+                  lng={coords.lng}
+                  data-testid="map-restaurant-pin"
+                />
+              )}
               <div>
                 <Label className={labelClass}>Link Google Maps</Label>
                 <Input value={form.googleMapsLink} onChange={(e) => update("googleMapsLink", e.target.value)} placeholder="https://maps.google.com/..." className={inputClass} />

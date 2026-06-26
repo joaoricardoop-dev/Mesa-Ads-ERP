@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { LocationPinMap } from "@/components/LocationPinMap";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -130,6 +131,7 @@ export default function Clients() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ClientForm>(emptyForm);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [formErrors, setFormErrors] = useState<ClientErrors>({});
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -206,6 +208,7 @@ export default function Clients() {
   const handleEdit = (c: any) => {
     setEditingId(c.id);
     setFormErrors({});
+    setCoords(null);
     setForm({
       name: c.name,
       company: c.company || "",
@@ -230,6 +233,7 @@ export default function Clients() {
     setEditingId(null);
     setForm(emptyForm);
     setFormErrors({});
+    setCoords(null);
     setIsDialogOpen(true);
   };
 
@@ -654,7 +658,7 @@ export default function Clients() {
               placeholder="Digite o endereço e escolha uma sugestão"
               inputClassName="bg-background border-border/30"
               data-testid="input-address-search"
-              onSelect={(a) =>
+              onSelect={(a) => {
                 setForm((f) => ({
                   ...f,
                   address: a.street || f.address,
@@ -663,8 +667,9 @@ export default function Clients() {
                   city: a.city || f.city,
                   state: a.state || f.state,
                   cep: a.cep || f.cep,
-                }))
-              }
+                }));
+                setCoords(a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null);
+              }}
             />
             <div className="grid grid-cols-[1fr_100px] gap-4">
               <div className="grid gap-2">
@@ -727,6 +732,13 @@ export default function Clients() {
                 </div>
               </div>
             </div>
+            {coords && (
+              <LocationPinMap
+                lat={coords.lat}
+                lng={coords.lng}
+                data-testid="map-client-pin"
+              />
+            )}
 
             <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mt-2">Contato</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

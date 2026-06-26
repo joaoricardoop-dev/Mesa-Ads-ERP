@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { LocationPinMap } from "@/components/LocationPinMap";
 import {
   Select,
   SelectContent,
@@ -193,6 +194,7 @@ export default function ActiveRestaurantForm() {
   const isEditing = editId !== null;
 
   const [form, setForm] = useState<FormData>(emptyForm);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [cnpjInput, setCnpjInput] = useState("");
   const [cnpjFetched, setCnpjFetched] = useState(false);
   const [sociosList, setSociosList] = useState<Socio[]>([]);
@@ -554,7 +556,7 @@ export default function ActiveRestaurantForm() {
                       labelClassName="text-xs text-muted-foreground"
                       inputClassName="bg-background border-border/30 h-9 text-sm"
                       data-testid="input-address-search"
-                      onSelect={(a) =>
+                      onSelect={(a) => {
                         setForm((p) => ({
                           ...p,
                           address: [a.street, a.number].filter(Boolean).join(", ") || p.address,
@@ -562,10 +564,18 @@ export default function ActiveRestaurantForm() {
                           city: a.city || p.city,
                           state: a.state || p.state,
                           cep: a.cep || p.cep,
-                        }))
-                      }
+                        }));
+                        setCoords(a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null);
+                      }}
                     />
                     <Field label="Endereço Completo *" value={form.address} onChange={(v) => setForm(p => ({ ...p, address: v }))} placeholder="Rua, número, complemento" />
+                    {coords && (
+                      <LocationPinMap
+                        lat={coords.lat}
+                        lng={coords.lng}
+                        data-testid="map-restaurant-pin"
+                      />
+                    )}
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Bairro/Zona *" value={form.neighborhood} onChange={(v) => setForm(p => ({ ...p, neighborhood: v }))} />
                       <Field label="Instagram" value={form.instagram} onChange={(v) => setForm(p => ({ ...p, instagram: v }))} placeholder="@usuario" icon={<Instagram className="w-3 h-3 text-pink-500" />} />

@@ -766,6 +766,7 @@ function CatalogMap({
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const infoRef = useRef<google.maps.InfoWindow | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   const withCoords = useMemo(
     () => locations.filter((l) => l.lat != null && l.lng != null),
@@ -840,7 +841,7 @@ function CatalogMap({
       bounds.extend(pos);
     }
     if (withCoords.length > 0) map.fitBounds(bounds);
-  }, [withCoords, days, onAdd, isSelected]);
+  }, [withCoords, days, onAdd, isSelected, mapReady]);
 
   return (
     <Card>
@@ -849,6 +850,7 @@ function CatalogMap({
           className="h-[560px]"
           onMapReady={(m) => {
             mapRef.current = m;
+            setMapReady(true);
           }}
         />
         {withCoords.length === 0 && (
