@@ -42,7 +42,9 @@ import {
   Pencil,
   Trash2,
   ArrowUpDown,
+  AlertTriangle,
 } from "lucide-react";
+import { screenSetupStatus } from "@shared/cpm-pricing";
 import {
   LOCATION_RATING_LABELS,
   VENUE_TYPE_LABELS,
@@ -194,6 +196,7 @@ export default function ActiveRestaurantsPage() {
   const [form, setForm] = useState<FormData>(emptyForm);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("name");
+  const [onlyMediaPending, setOnlyMediaPending] = useState(false);
 
   const utils = trpc.useUtils();
   const { data: restaurants = [] } = trpc.activeRestaurant.list.useQuery();
@@ -304,12 +307,28 @@ export default function ActiveRestaurantsPage() {
     }
   };
 
+  const mediaSetupOf = (r: any) =>
+    screenSetupStatus({
+      cpm: r.screenCpm,
+      insertionsPerHour: r.screenInsertionsPerHour,
+      impactsPerInsertion: r.screenImpactsPerInsertion,
+      weeklyHours: r.screenWeeklyHours,
+      lat: r.lat,
+      lng: r.lng,
+    });
+
+  const mediaPendingCount = useMemo(
+    () => restaurants.filter((r) => r.status === "active" && !mediaSetupOf(r).isComplete).length,
+    [restaurants],
+  );
+
   const filtered = useMemo(() => {
     let list = restaurants.filter((r) => {
       if (search) {
         const s = search.toLowerCase();
         if (!r.name.toLowerCase().includes(s) && !r.neighborhood.toLowerCase().includes(s) && !(r.whatsapp && r.whatsapp.includes(s))) return false;
       }
+      if (onlyMediaPending && mediaSetupOf(r).isComplete) return false;
       return true;
     });
 
@@ -324,7 +343,7 @@ export default function ActiveRestaurantsPage() {
     }
 
     return list;
-  }, [restaurants, search, sortBy]);
+  }, [restaurants, search, sortBy, onlyMediaPending]);
 
   const activeCount = restaurants.filter((r) => r.status === "active").length;
   const totalTables = restaurants.reduce((s, r) => s + (r.tableCount || 0), 0);
@@ -366,7 +385,7 @@ export default function ActiveRestaurantsPage() {
           <StatCard label="Total" value={restaurants.length} />
           <StatCard label="Ativos" value={activeCount} accent />
           <StatCard label="Total Mesas" value={totalTables} />
-          <StatCard label="Total Assentos" value={totalSeats} />
+          <StatCard label="Mídia pendente" value={mediaPendingCount} warn={mediaPendingCount > 0} />
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
@@ -374,6 +393,17 @@ export default function ActiveRestaurantsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input placeholder="Buscar local..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 bg-card border-border/30" />
           </div>
+          {mediaPendingCount > 0 && (
+            <Button
+              variant={onlyMediaPending ? "default" : "outline"}
+              size="sm"
+              className="gap-1.5 h-9 border-amber-500/40 text-amber-600 dark:text-amber-400 data-[active=true]:text-current"
+              onClick={() => setOnlyMediaPending((v) => !v)}
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              {onlyMediaPending ? "Mostrar todos" : "Config. mídia pendente"}
+            </Button>
+          )}
           <Button
             variant={sortBy === "ratingScore" ? "default" : "outline"}
             size="sm"
@@ -416,6 +446,20 @@ export default function ActiveRestaurantsPage() {
                                 —
                               </Badge>
                             )}
+                            {(() => {
+                              const setup = mediaSetupOf(r);
+                              if (setup.isComplete) return null;
+                              return (
+                                <Badge
+                                  variant="outline"
+                                  title={`Falta configurar: ${setup.missing.join(" · ")}`}
+                                  className="gap-1 text-[10px] border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                >
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Mídia incompleta
+                                </Badge>
+                              );
+                            })()}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5 truncate">
                             {r.neighborhood} · {formatSocialClass(r.socialClass)}
@@ -746,11 +790,11 @@ export default function ActiveRestaurantsPage() {
   );
 }
 
-function StatCard({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+function StatCard({ label, value, accent, warn }: { label: string; value: number; accent?: boolean; warn?: boolean }) {
   return (
     <div className="bg-card border border-border/30 rounded-lg p-3">
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
-      <p className={`text-lg font-bold font-mono mt-1 ${accent ? "text-emerald-400" : ""}`}>{value}</p>
+      <p className={`text-lg font-bold font-mono mt-1 ${accent ? "text-emerald-400" : ""} ${warn ? "text-amber-500" : ""}`}>{value}</p>
     </div>
   );
 }

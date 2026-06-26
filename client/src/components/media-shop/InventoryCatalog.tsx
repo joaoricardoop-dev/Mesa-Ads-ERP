@@ -25,10 +25,16 @@ import {
   Repeat,
   Loader2,
   Package,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { MapView } from "@/components/Map";
 import { daysInRangeInclusive } from "@shared/period";
-import { computeScreenDailyPricing } from "@shared/cpm-pricing";
+import { computeScreenDailyPricing, screenSetupStatus } from "@shared/cpm-pricing";
 import { defaultInsertionsPerDay, computeScreenMetrics } from "@shared/screen-metrics";
 import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 import type { QuotePremissas, PricingTier, DiscountTier } from "@/components/campaign-wizard/pricing";
@@ -53,6 +59,37 @@ function telasSlot(loc: LocationRow) {
   return loc.productSlots.find((s) => s.productTipo === "telas") ?? null;
 }
 
+function locSetupStatus(loc: LocationRow) {
+  return screenSetupStatus({
+    cpm: loc.screenCpm.cpm,
+    insertionsPerHour: loc.screenCpm.insertionsPerHour,
+    impactsPerInsertion: loc.screenCpm.impactsPerInsertion,
+    weeklyHours: loc.screenCpm.weeklyHours,
+    lat: loc.lat,
+    lng: loc.lng,
+  });
+}
+
+function SetupPendingBadge({ missing, className }: { missing: string[]; className?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge
+          variant="outline"
+          className={`gap-1 border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 ${className ?? ""}`}
+        >
+          <AlertTriangle className="h-3 w-3" />
+          Config. pendente
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[220px]">
+        <p className="text-xs font-medium">Falta configurar:</p>
+        <p className="text-xs">{missing.join(" · ")}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function InventoryCatalog() {
   const { startDate, endDate, category, neighborhood } = useMediaShopStore();
   const setDates = useMediaShopStore((s) => s.setDates);
@@ -62,6 +99,7 @@ export function InventoryCatalog() {
   const isSelected = useMediaShopStore((s) => s.isSelected);
 
   const [view, setView] = useState<"list" | "cards" | "map">("list");
+  const [onlyPending, setOnlyPending] = useState(false);
 
   const days = daysInRangeInclusive(startDate, endDate);
 
@@ -86,9 +124,19 @@ export function InventoryCatalog() {
     return Array.from(set).sort();
   }, [screenLocations]);
 
-  const filtered = useMemo(
+  const byCategory = useMemo(
     () => (category ? screenLocations.filter((l) => l.categoria === category) : screenLocations),
     [screenLocations, category],
+  );
+
+  const pendingCount = useMemo(
+    () => byCategory.filter((l) => !locSetupStatus(l).isComplete).length,
+    [byCategory],
+  );
+
+  const filtered = useMemo(
+    () => (onlyPending ? byCategory.filter((l) => !locSetupStatus(l).isComplete) : byCategory),
+    [byCategory, onlyPending],
   );
 
   function buildItem(loc: LocationRow): MediaSelectedItem | null {
@@ -180,12 +228,26 @@ export function InventoryCatalog() {
       </Card>
 
       {/* Header + toggle */}
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
-          {isLoading
-            ? "Carregando inventário…"
-            : `${filtered.length} local(is) de telas · período de ${days} dia(s)`}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-muted-foreground">
+            {isLoading
+              ? "Carregando inventário…"
+              : `${filtered.length} local(is) de telas · período de ${days} dia(s)`}
+          </p>
+          {!isLoading && pendingCount > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant={onlyPending ? "secondary" : "outline"}
+              className="h-7 gap-1.5 border-amber-500/40 text-amber-600 dark:text-amber-400"
+              onClick={() => setOnlyPending((v) => !v)}
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {onlyPending ? "Mostrar todos" : `${pendingCount} sem configuração`}
+            </Button>
+          )}
+        </div>
         <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
           <Button
             type="button"
@@ -315,10 +377,14 @@ function LocationListRow({
   onToggle: () => void;
 }) {
   const { metrics, pricing, screens } = locationMetrics(loc, days);
+  const setup = locSetupStatus(loc);
   return (
     <div className="grid grid-cols-2 sm:grid-cols-[1fr_repeat(4,auto)_auto] items-center gap-x-3 gap-y-1 px-4 py-3">
       <div className="col-span-2 sm:col-span-1 min-w-0">
-        <p className="font-medium text-sm truncate">{loc.name}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="font-medium text-sm truncate">{loc.name}</p>
+          {!setup.isComplete && <SetupPendingBadge missing={setup.missing} className="text-[9px] py-0 shrink-0" />}
+        </div>
         <p className="text-xs text-muted-foreground flex items-center gap-1">
           <MapPin className="h-3 w-3" />
           {loc.neighborhood || loc.city || "—"}
@@ -372,6 +438,7 @@ function LocationCard({
   onToggle: () => void;
 }) {
   const { metrics, pricing, screens } = locationMetrics(loc, days);
+  const setup = locSetupStatus(loc);
 
   return (
     <Card className={selected ? "ring-2 ring-primary" : ""}>
@@ -384,11 +451,14 @@ function LocationCard({
               {loc.neighborhood || loc.city || "—"}
             </p>
           </div>
-          {loc.categoria && (
-            <Badge variant="outline" className="shrink-0 capitalize text-[10px]">
-              {loc.categoria}
-            </Badge>
-          )}
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {loc.categoria && (
+              <Badge variant="outline" className="capitalize text-[10px]">
+                {loc.categoria}
+              </Badge>
+            )}
+            {!setup.isComplete && <SetupPendingBadge missing={setup.missing} className="text-[10px]" />}
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2 text-center">

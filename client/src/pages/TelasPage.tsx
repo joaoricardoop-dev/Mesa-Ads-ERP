@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { TelaDialog } from "@/components/TelasManager";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Monitor, MapPin, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Monitor, MapPin, Search, AlertTriangle } from "lucide-react";
+import { screenSetupStatus } from "@shared/cpm-pricing";
 
 type TelaRow = RouterOutputs["tela"]["listAll"][number];
 
@@ -31,6 +32,26 @@ export default function TelasPage() {
     () => (restaurantsQ.data ?? []).map((r) => ({ id: r.id, name: r.name })),
     [restaurantsQ.data],
   );
+
+  // Status de configuração de mídia por local (fonte única: screenSetupStatus).
+  // A config CPM + coordenadas vivem no registro do local; a tela herda o status.
+  const setupByRestaurant = useMemo(() => {
+    const map = new Map<number, ReturnType<typeof screenSetupStatus>>();
+    for (const r of (restaurantsQ.data ?? []) as any[]) {
+      map.set(
+        r.id,
+        screenSetupStatus({
+          cpm: r.screenCpm,
+          insertionsPerHour: r.screenInsertionsPerHour,
+          impactsPerInsertion: r.screenImpactsPerInsertion,
+          weeklyHours: r.screenWeeklyHours,
+          lat: r.lat,
+          lng: r.lng,
+        }),
+      );
+    }
+    return map;
+  }, [restaurantsQ.data]);
 
   const deleteMut = trpc.tela.delete.useMutation({
     onSuccess: () => {
@@ -136,6 +157,20 @@ export default function TelasPage() {
                     {t.layout && <span className="px-1.5 py-0.5 rounded bg-muted/40">{LAYOUT_LABELS[t.layout] ?? t.layout}</span>}
                     {photos.length > 0 && <span className="px-1.5 py-0.5 rounded bg-muted/40">{photos.length} foto(s)</span>}
                   </div>
+                  {(() => {
+                    const setup = setupByRestaurant.get(t.restaurantId);
+                    if (!setup || setup.isComplete) return null;
+                    return (
+                      <Badge
+                        variant="outline"
+                        title={`Falta configurar no local: ${setup.missing.join(" · ")}`}
+                        className="gap-1 text-[10px] w-fit border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      >
+                        <AlertTriangle className="w-3 h-3" />
+                        Mídia incompleta
+                      </Badge>
+                    );
+                  })()}
                   <div className="flex items-center justify-end gap-1 mt-auto pt-1">
                     <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(t)} data-testid={`button-edit-tela-page-${t.id}`}>
                       <Pencil className="w-3.5 h-3.5" />

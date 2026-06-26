@@ -104,3 +104,78 @@ export function parseCpmNumber(v: string | number | null | undefined): number | 
   const n = typeof v === "number" ? v : parseFloat(v);
   return Number.isFinite(n) ? n : undefined;
 }
+
+// ─── Status de configuração da tela (fonte única) ────────────────────────────
+// Uma tela só mostra preço e audiência reais quando (a) a config CPM está
+// completa (mesmos campos exigidos por computeCpmPricing) e (b) tem coordenadas
+// (lat/lng) para o pin do mapa. Este helper é a ÚNICA origem da regra "tela
+// configurada vs. pendente" — usado pelas telas admin (Locais Ativos, Telas) e
+// pelo catálogo do Orçamento para sinalizar lacunas aos administradores.
+
+/** Rótulos PT-BR dos campos CPM, na ordem de exibição. */
+export const SCREEN_CPM_FIELD_LABELS: Record<keyof ScreenCpmConfig, string> = {
+  cpm: "CPM",
+  insertionsPerHour: "Inserções/hora",
+  impactsPerInsertion: "Impactos/inserção",
+  weeklyHours: "Horas/semana",
+};
+
+export interface ScreenSetupInput {
+  cpm?: string | number | null;
+  insertionsPerHour?: string | number | null;
+  impactsPerInsertion?: string | number | null;
+  weeklyHours?: string | number | null;
+  lat?: string | number | null;
+  lng?: string | number | null;
+}
+
+export interface ScreenSetupStatus {
+  /** Todos os 4 campos CPM positivos e finitos (tela tem preço). */
+  cpmComplete: boolean;
+  /** lat/lng presentes e finitos (e não 0,0) — tela tem pin no mapa. */
+  hasCoordinates: boolean;
+  /** CPM completo E coordenadas presentes. */
+  isComplete: boolean;
+  /** Rótulos dos campos CPM ausentes/zerados. */
+  missingCpmFields: string[];
+  /** Coordenadas ausentes. */
+  missingCoordinates: boolean;
+  /** Todos os rótulos faltantes (CPM + coordenadas), para tooltip/resumo. */
+  missing: string[];
+}
+
+/**
+ * Avalia o que falta para uma tela ficar totalmente configurada.
+ * Aceita valores numéricos ou strings (vindas do banco) e normaliza.
+ */
+export function screenSetupStatus(input: ScreenSetupInput | null | undefined): ScreenSetupStatus {
+  const cpm = parseCpmNumber(input?.cpm);
+  const insertionsPerHour = parseCpmNumber(input?.insertionsPerHour);
+  const impactsPerInsertion = parseCpmNumber(input?.impactsPerInsertion);
+  const weeklyHours = parseCpmNumber(input?.weeklyHours);
+
+  const missingCpmFields: string[] = [];
+  if (!isPositiveFinite(cpm)) missingCpmFields.push(SCREEN_CPM_FIELD_LABELS.cpm);
+  if (!isPositiveFinite(insertionsPerHour)) missingCpmFields.push(SCREEN_CPM_FIELD_LABELS.insertionsPerHour);
+  if (!isPositiveFinite(impactsPerInsertion)) missingCpmFields.push(SCREEN_CPM_FIELD_LABELS.impactsPerInsertion);
+  if (!isPositiveFinite(weeklyHours)) missingCpmFields.push(SCREEN_CPM_FIELD_LABELS.weeklyHours);
+  const cpmComplete = missingCpmFields.length === 0;
+
+  const lat = parseCpmNumber(input?.lat);
+  const lng = parseCpmNumber(input?.lng);
+  const hasCoordinates =
+    typeof lat === "number" && typeof lng === "number" && !(lat === 0 && lng === 0);
+  const missingCoordinates = !hasCoordinates;
+
+  const missing = [...missingCpmFields];
+  if (missingCoordinates) missing.push("Coordenadas (mapa)");
+
+  return {
+    cpmComplete,
+    hasCoordinates,
+    isComplete: cpmComplete && hasCoordinates,
+    missingCpmFields,
+    missingCoordinates,
+    missing,
+  };
+}
