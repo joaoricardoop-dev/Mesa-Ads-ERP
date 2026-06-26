@@ -3,6 +3,7 @@ import { Home } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useWizardStore, STEP_LABELS, type WizardStep } from "./wizardStore";
+import { useMediaShopStore } from "@/components/media-shop/mediaShopStore";
 import { MesaChip } from "./mesa/MesaUI";
 import {
   Breadcrumb,
@@ -48,8 +49,8 @@ function dashboardHrefFor(path: string, isAuthenticated: boolean): {
 export function WizardTopBar({ forceStep, className }: Props) {
   const storeStep = useWizardStore((s) => s.step);
   const goTo = useWizardStore((s) => s.goTo);
-  const cart = useWizardStore((s) => s.cart);
-  const locaisIds = useWizardStore((s) => s.locaisIds);
+  const selected = useMediaShopStore((s) => s.selected);
+  const quantityItems = useMediaShopStore((s) => s.quantityItems);
   const [location, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -67,7 +68,7 @@ export function WizardTopBar({ forceStep, className }: Props) {
 
   const isFinalized = effectiveStep === "success";
   const hasProgress =
-    !isFinalized && (cart.length > 0 || locaisIds.length > 0);
+    !isFinalized && (selected.length > 0 || quantityItems.length > 0);
 
   useEffect(() => {
     if (!hasProgress) return;

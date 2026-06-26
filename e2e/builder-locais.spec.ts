@@ -1,7 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { ANUNCIANTE_AUTH_FILE } from "./_auth-paths";
 
-// Task #165 — cobre o passo "01 · LOCAIS" do builder /montar-campanha.
+// Marketplace v2 — cobre a tela "shop" do builder /montar-campanha, que reusa
+// o ecommerce de mídia interno (InventoryCatalog + MediaPlanPanel).
 // Garante que (a) o anunciante vê pelo menos 1 local com o período padrão,
 // (b) trocar as datas dispara nova busca e (c) o endpoint
 // listAvailableLocations responde antes de exibir o estado vazio.
@@ -14,21 +15,21 @@ import { ANUNCIANTE_AUTH_FILE } from "./_auth-paths";
 // `/api/auth/user` imediatamente em dev sem esperar Clerk.
 test.use({ storageState: ANUNCIANTE_AUTH_FILE });
 
-test.describe("builder /montar-campanha — passo LOCAIS", () => {
+test.describe("builder /montar-campanha — tela de inventário", () => {
   test("lista pelo menos 1 local no período padrão e atualiza ao trocar datas", async ({
     page,
   }) => {
     await page.goto("/montar-campanha");
 
-    // Hero → clica para escolher locais. Como a sessão já vem pronta
-    // via storageState, a CTA aparece em "escolher locais" (não em
+    // Hero → clica para montar o plano de mídia. Como a sessão já vem pronta
+    // via storageState, a CTA aparece em "montar plano de mídia" (não em
     // "quero anunciar") sem que precisemos esperar Clerk inicializar.
-    const cta = page.getByRole("button", { name: /escolher locais/i });
+    const cta = page.getByRole("button", { name: /montar plano de mídia/i });
     await expect(cta).toBeVisible();
     await cta.click();
 
-    // Passo 01 · locais
-    await expect(page.getByText(/01 · locais/i)).toBeVisible();
+    // Tela shop — inventário + plano de mídia
+    await expect(page.getByText(/inventário/i).first()).toBeVisible();
 
     // Pelo menos 1 card de local visível com o período padrão
     const cards = page.locator("[data-testid^='local-card-']");

@@ -24,10 +24,10 @@ export function StepHero({ role: _role }: Props) {
       try {
         localStorage.setItem("mesa-checkout-pending", "1");
       } catch {}
-      setLocation("/?mode=signup&redirect=/montar-campanha%3Fstep%3Dlocais");
+      setLocation("/?mode=signup&redirect=/montar-campanha%3Fstep%3Dshop");
       return;
     }
-    goTo("locais");
+    goTo("shop");
   }
 
   return (
@@ -97,7 +97,7 @@ export function StepHero({ role: _role }: Props) {
                 onClick={handleAdvance}
                 iconRight={<ArrowRight className="w-5 h-5" />}
               >
-                {isAuthenticated ? "escolher locais" : "quero anunciar"}
+                {isAuthenticated ? "montar plano de mídia" : "quero anunciar"}
               </MesaButton>
               {!isAuthenticated && (
                 <span className="text-[12px] text-chalk-dim">

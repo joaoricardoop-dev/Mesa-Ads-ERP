@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { ScreenCpmConfig } from "@shared/cpm-pricing";
 import { cyclesForDays } from "@shared/period";
 import {
@@ -176,13 +177,17 @@ interface MediaShopState {
   setCampaignName: (name: string) => void;
   setCoupon: (pct: number) => void;
   setNotes: (notes: string) => void;
+  /** Mescla um snapshot (ex.: draft do servidor) sobre o estado atual. */
+  hydrate: (partial: Partial<MediaShopState>) => void;
   reset: () => void;
 }
 
 const DEFAULT_START = todayISO();
 const DEFAULT_END = plusDaysISO(DEFAULT_START, 27); // 4 semanas
 
-export const useMediaShopStore = create<MediaShopState>((set, get) => ({
+export const useMediaShopStore = create<MediaShopState>()(
+  persist(
+    (set, get) => ({
   clientId: null,
   leadId: null,
   startDate: DEFAULT_START,
@@ -238,6 +243,7 @@ export const useMediaShopStore = create<MediaShopState>((set, get) => ({
   setCampaignName: (campaignName) => set({ campaignName }),
   setCoupon: (couponPercent) => set({ couponPercent: Math.min(100, Math.max(0, couponPercent)) }),
   setNotes: (notes) => set({ notes }),
+  hydrate: (partial) => set((s) => ({ ...s, ...partial })),
   reset: () =>
     set({
       selected: [],
@@ -250,4 +256,24 @@ export const useMediaShopStore = create<MediaShopState>((set, get) => ({
       category: null,
       neighborhood: null,
     }),
-}));
+    }),
+    {
+      // Persiste a SELEÇÃO + plano (não a entidade interna clientId/leadId nem o
+      // cronograma/bonificação internos) para que o trabalho em andamento
+      // sobreviva a reload/login no fluxo /montar-campanha.
+      name: "mesa-mediashop-v1",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (s) => ({
+        startDate: s.startDate,
+        endDate: s.endDate,
+        category: s.category,
+        neighborhood: s.neighborhood,
+        selected: s.selected,
+        quantityItems: s.quantityItems,
+        campaignName: s.campaignName,
+        couponPercent: s.couponPercent,
+        notes: s.notes,
+      }),
+    },
+  ),
+);

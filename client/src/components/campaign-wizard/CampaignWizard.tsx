@@ -6,12 +6,9 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useWizardStore } from "./wizardStore";
 import { StepHero } from "./StepHero";
-import { StepLocais } from "./StepLocais";
-import { StepProdutosPorLocal } from "./StepProdutosPorLocal";
-import { StepConfigurar } from "./StepConfigurar";
-import { StepCarrinho } from "./StepCarrinho";
-import { StepCheckout } from "./StepCheckout";
+import { StepShop } from "./StepShop";
 import { StepSuccess } from "./StepSuccess";
+import { useMediaShopStore } from "@/components/media-shop/mediaShopStore";
 import { MesaButton, MesaAdsLogo } from "./mesa/MesaUI";
 import { WizardTopBar } from "./WizardTopBar";
 import { cn } from "@/lib/utils";
@@ -185,27 +182,20 @@ function ResolvedWizard({
   const clientLabel = clientId == null ? "Sem cliente específico" : c?.company || c?.name || null;
   const hasPartner = !!c?.partnerId || role === "parceiro";
 
-  // Persistência do carrinho no servidor para anunciantes (Marketplace v2).
-  useCartDraftSync(clientId, role);
+  // Persistência do plano de mídia no servidor para anunciantes (Marketplace v2).
+  useMediaShopDraftSync(clientId, role);
 
   switch (step) {
     case "hero":
       return <StepHero role={role} clientLabel={clientLabel} hasPartner={hasPartner} />;
-    case "locais":
-      return <StepLocais clientLabel={clientLabel} hasPartner={hasPartner} />;
-    case "produtos":
-      return <StepProdutosPorLocal clientLabel={clientLabel} hasPartner={hasPartner} />;
-    case "configurar":
-      return <StepConfigurar clientLabel={clientLabel} hasPartner={hasPartner} />;
-    case "carrinho":
-      return <StepCarrinho clientLabel={clientLabel} hasPartner={hasPartner} />;
-    case "checkout":
+    case "shop":
       return (
-        <StepCheckout
+        <StepShop
           clientId={clientId}
+          source={source}
+          role={role}
           clientLabel={clientLabel}
           hasPartner={hasPartner}
-          source={source}
         />
       );
     default:
@@ -213,17 +203,23 @@ function ResolvedWizard({
   }
 }
 
-// Hook que faz o save/load do carrinho no servidor a cada transição de step.
-function useCartDraftSync(clientId: number | null, role: ResolvedRole) {
-  const cart = useWizardStore((s) => s.cart);
-  const step = useWizardStore((s) => s.step);
-  const locaisIds = useWizardStore((s) => s.locaisIds);
-  const startDate = useWizardStore((s) => s.startDate);
-  const endDate = useWizardStore((s) => s.endDate);
-  const draftLoaded = useWizardStore((s) => s.draftLoaded);
-  const hydrate = useWizardStore((s) => s.hydrateFromDraft);
+// Sincroniza o plano de mídia (mediaShopStore) com o draft no servidor para
+// anunciantes. Carrega uma vez (se o estado local estiver vazio) e salva um
+// snapshot a cada mudança de seleção/produtos. Fonte única: mediaShopStore.
+function useMediaShopDraftSync(clientId: number | null, role: ResolvedRole) {
+  const selected = useMediaShopStore((s) => s.selected);
+  const quantityItems = useMediaShopStore((s) => s.quantityItems);
+  const startDate = useMediaShopStore((s) => s.startDate);
+  const endDate = useMediaShopStore((s) => s.endDate);
+  const campaignName = useMediaShopStore((s) => s.campaignName);
+  const couponPercent = useMediaShopStore((s) => s.couponPercent);
+  const notes = useMediaShopStore((s) => s.notes);
+  const category = useMediaShopStore((s) => s.category);
+  const neighborhood = useMediaShopStore((s) => s.neighborhood);
+  const hydrate = useMediaShopStore((s) => s.hydrate);
 
   const enabled = role === "anunciante" && clientId != null;
+  const loadedRef = useRef(false);
 
   const loadQuery = trpc.anunciantePortal.loadCartDraft.useQuery(
     { clientId: clientId ?? 0 },
@@ -232,37 +228,63 @@ function useCartDraftSync(clientId: number | null, role: ResolvedRole) {
 
   const saveMutation = trpc.anunciantePortal.saveCartDraft.useMutation();
 
-  // Hidrata estado a partir do draft remoto (apenas uma vez).
+  // Hidrata o estado a partir do draft remoto (apenas uma vez, e só se o
+  // estado local estiver vazio para não sobrescrever escolhas em andamento).
   useEffect(() => {
-    if (!enabled || draftLoaded) return;
+    if (!enabled || loadedRef.current) return;
     if (loadQuery.isLoading) return;
-    const remote = loadQuery.data;
-    if (remote && remote.cart && cart.length === 0) {
-      const c: any = remote.cart;
+    loadedRef.current = true;
+    const remote: any = loadQuery.data?.cart;
+    const localEmpty = selected.length === 0 && quantityItems.length === 0;
+    if (remote && localEmpty) {
       hydrate({
-        cart: Array.isArray(c.cart) ? c.cart : [],
-        locaisIds: Array.isArray(c.locaisIds) ? c.locaisIds : [],
-        startDate: c.startDate ?? startDate,
-        endDate: c.endDate ?? endDate,
+        selected: Array.isArray(remote.selected) ? remote.selected : [],
+        quantityItems: Array.isArray(remote.quantityItems) ? remote.quantityItems : [],
+        startDate: remote.startDate ?? startDate,
+        endDate: remote.endDate ?? endDate,
+        campaignName: remote.campaignName ?? campaignName,
+        couponPercent: typeof remote.couponPercent === "number" ? remote.couponPercent : couponPercent,
+        notes: remote.notes ?? notes,
+        category: remote.category ?? null,
+        neighborhood: remote.neighborhood ?? null,
       });
-    } else {
-      hydrate({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, draftLoaded, loadQuery.isLoading, loadQuery.data]);
+  }, [enabled, loadQuery.isLoading, loadQuery.data]);
 
-  // Salva o snapshot do carrinho a cada mudança de step (debounce simples).
+  // Salva o snapshot do plano sempre que a seleção/config mudar (após hidratar).
   const lastSaveRef = useRef<string>("");
   useEffect(() => {
-    if (!enabled) return;
-    const payload = { cart, locaisIds, startDate, endDate };
+    if (!enabled || !loadedRef.current) return;
+    const payload = {
+      selected,
+      quantityItems,
+      startDate,
+      endDate,
+      campaignName,
+      couponPercent,
+      notes,
+      category,
+      neighborhood,
+    };
     const serialized = JSON.stringify(payload);
     if (serialized === lastSaveRef.current) return;
     lastSaveRef.current = serialized;
-    if (cart.length === 0 && locaisIds.length === 0) return;
+    if (selected.length === 0 && quantityItems.length === 0) return;
     saveMutation.mutate({ clientId: clientId!, cart: payload });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, step]);
+  }, [
+    enabled,
+    selected,
+    quantityItems,
+    startDate,
+    endDate,
+    campaignName,
+    couponPercent,
+    notes,
+    category,
+    neighborhood,
+  ]);
 }
 
 function RequireAuthGate() {

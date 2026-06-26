@@ -212,6 +212,7 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
               type="date"
               value={startDate}
               onChange={(e) => setDates(e.target.value, endDate)}
+              data-testid="filter-start"
             />
           </div>
           <div className="space-y-1.5">
@@ -221,6 +222,7 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
               value={endDate}
               min={startDate}
               onChange={(e) => setDates(startDate, e.target.value)}
+              data-testid="filter-end"
             />
           </div>
           <div className="space-y-1.5">
@@ -407,7 +409,10 @@ function LocationListRow({
   const { metrics, pricing, screens } = locationMetrics(loc, days);
   const setup = locSetupStatus(loc);
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-[1fr_repeat(4,auto)_auto] items-center gap-x-3 gap-y-1 px-4 py-3">
+    <div
+      data-testid={`local-card-${loc.restaurantId}`}
+      className="grid grid-cols-2 sm:grid-cols-[1fr_repeat(4,auto)_auto] items-center gap-x-3 gap-y-1 px-4 py-3"
+    >
       <div className="col-span-2 sm:col-span-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <p className="font-medium text-sm truncate">{loc.name}</p>
@@ -469,7 +474,10 @@ function LocationCard({
   const setup = locSetupStatus(loc);
 
   return (
-    <Card className={selected ? "ring-2 ring-primary" : ""}>
+    <Card
+      data-testid={`local-card-${loc.restaurantId}`}
+      className={selected ? "ring-2 ring-primary" : ""}
+    >
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
