@@ -31,6 +31,10 @@ test.describe("builder /montar-campanha — tela de inventário", () => {
     // Tela shop — inventário + plano de mídia
     await expect(page.getByText(/inventário/i).first()).toBeVisible();
 
+    // Para anunciante/parceiro a tela abre direto no Mapa quando há locais com
+    // coordenadas; trocamos para a Lista para asserir as linhas (local-card-*).
+    await page.getByRole("button", { name: /^lista$/i }).click();
+
     // Pelo menos 1 card de local visível com o período padrão
     const cards = page.locator("[data-testid^='local-card-']");
     await expect(cards.first()).toBeVisible({ timeout: 10_000 });

@@ -108,6 +108,11 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
 
   const [view, setView] = useState<"list" | "cards" | "map">("list");
   const [onlyPending, setOnlyPending] = useState(false);
+  // Para anunciante/parceiro, abrir direto no Mapa quando houver pelo menos um
+  // local disponível com coordenadas — escolher por bairro vira a primeira ação.
+  // Internal mantém a Lista. Aplicado uma única vez, após o primeiro fetch, para
+  // não sobrescrever a troca manual de view feita pelo usuário.
+  const defaultViewApplied = useRef(false);
 
   const days = daysInRangeInclusive(startDate, endDate);
 
@@ -141,6 +146,15 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
     () => locations.filter((l) => telasSlot(l) != null),
     [locations],
   );
+
+  useEffect(() => {
+    if (defaultViewApplied.current) return;
+    if (audience === "internal") return;
+    if (isLoading || data === undefined) return;
+    defaultViewApplied.current = true;
+    const hasCoords = screenLocations.some((l) => l.lat != null && l.lng != null);
+    if (hasCoords) setView("map");
+  }, [audience, isLoading, data, screenLocations]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
