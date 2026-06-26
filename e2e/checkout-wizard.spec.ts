@@ -1,6 +1,14 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
+import { ANUNCIANTE_AUTH_FILE } from "./_auth-paths";
 
-const HERO_HEADLINE = /tenta me/i;
+// Marketplace v2 — cobre o checkout completo de /montar-campanha pela tela
+// "shop" (StepShop): seleciona inventário → preenche o plano → "Enviar cotação"
+// → tela de sucesso, exercitando o submit real via quotation.createFromBuilder.
+//
+// Substitui os testes antigos (step-based wizard), que ficaram stale após o
+// commit 243b16f (feat(marketplace-v2)) e estavam `test.describe.skip`. Cobre
+// os dois caminhos do done-looks-like: o anunciante (clientId auto-vinculado,
+// sem picker) e o usuário interno (ClientPicker → cliente → shop).
 
 type DevUser = {
   id: string;
@@ -10,8 +18,6 @@ type DevUser = {
 };
 
 type CreatedQuotation = { id: number; quotationNumber: string };
-
-const INTERNAL_ROLES = ["admin", "comercial", "manager", "operacoes", "financeiro"];
 
 async function fetchDevUsers(request: APIRequestContext): Promise<DevUser[]> {
   const r = await request.get("/api/dev-users");
@@ -28,14 +34,22 @@ async function devLogout(request: APIRequestContext) {
   await request.post("/api/dev-logout");
 }
 
-async function ensureAnuncianteUser(request: APIRequestContext): Promise<{
-  user: DevUser;
-  created: boolean;
-}> {
-  const r = await request.post("/api/dev-ensure-anunciante", { data: {} });
-  expect(r.ok(), `dev-ensure-anunciante failed: ${r.status()}`).toBeTruthy();
-  const body = (await r.json()) as { user: DevUser; created: boolean };
-  return body;
+async function ensureRestaurante(request: APIRequestContext) {
+  // Garante ≥1 local de telas no inventário (idempotente). O global.setup já
+  // chama isto, mas reforçamos aqui para o spec não depender da ordem de boot.
+  const r = await request.post("/api/dev-ensure-restaurante", { data: {} });
+  if (!r.ok()) {
+    console.warn(`[checkout-wizard] dev-ensure-restaurante falhou: ${r.status()}`);
+  }
+}
+
+async function createInternalUser(request: APIRequestContext): Promise<DevUser> {
+  const r = await request.post("/api/dev-create-internal-user", {
+    data: { role: "comercial" },
+  });
+  expect(r.ok(), `dev-create-internal-user failed: ${r.status()}`).toBeTruthy();
+  const body = (await r.json()) as { user: DevUser };
+  return body.user;
 }
 
 async function deleteDevUser(request: APIRequestContext, userId: string) {
@@ -59,8 +73,8 @@ async function deleteQuotationAsAdmin(
     headers: { "content-type": "application/json" },
   });
   if (!res.ok()) {
-    // Cleanup is best-effort; surface the error so it shows up in logs but
-    // don't fail the test on a teardown problem.
+    // Cleanup é best-effort: registra o erro mas não derruba o teste por uma
+    // falha de teardown.
     console.warn(
       `[checkout-wizard cleanup] failed to delete quotation ${quotationId}:`,
       await res.text(),
@@ -69,144 +83,137 @@ async function deleteQuotationAsAdmin(
   await devLogout(request);
 }
 
-async function pickFirstProductAndStart(page: Page) {
-  const products = page.locator("[data-testid^='product-pill-']");
-  await expect(products.first()).toBeVisible();
-  await products.first().click();
+// ─── Helpers de UI da tela "shop" ────────────────────────────────────────────
 
-  const cta = page.getByRole("button", { name: /começar checkout/i });
-  await expect(cta).toBeEnabled();
+async function startMediaPlan(page: Page) {
+  // StepHero — usuário autenticado vê "montar plano de mídia" (guests veriam
+  // "quero anunciar" e seriam redirecionados ao signup).
+  const cta = page.getByRole("button", { name: /montar plano de mídia/i });
+  await expect(cta).toBeVisible();
   await cta.click();
+  // StepShop — cabeçalho do inventário/plano de mídia.
+  await expect(page.getByText(/inventário · plano de mídia/i)).toBeVisible();
 }
 
-async function completeWizardThroughConfirm(page: Page) {
-  // 02 · locais — pick the first venue card (filtered by its MapPin icon)
-  await expect(page.getByText(/02 · locais/i)).toBeVisible();
-  const venueCards = page
-    .locator("main button")
-    .filter({ has: page.locator("svg.lucide-map-pin") });
-  await expect(venueCards.first()).toBeVisible();
-  await venueCards.first().click();
-  await page.getByRole("button", { name: /^continuar$/i }).click();
+async function addFirstLocation(page: Page) {
+  const firstLocal = page.locator("[data-testid^='local-card-']").first();
+  await expect(firstLocal).toBeVisible({ timeout: 15_000 });
+  // LocationListRow (view "list", padrão) tem exatamente um botão: o toggle de
+  // adicionar/remover. Clica nele para incluir o local no plano.
+  await firstLocal.getByRole("button").click();
+}
 
-  // 03 · volume — defaults satisfy the >=100 rule
-  await expect(page.getByText(/03 · volume/i)).toBeVisible();
-  await page.getByRole("button", { name: /^continuar$/i }).click();
-
-  // 04 · duração — default 12 weeks is preselected
-  await expect(page.getByText(/04 · duração/i)).toBeVisible();
-  await page.getByRole("button", { name: /^continuar$/i }).click();
-
-  // 05 · adicionais — skip
-  await expect(page.getByText(/05 · adicionais/i)).toBeVisible();
-  await page.getByRole("button", { name: /pular adicionais/i }).click();
-
-  // 06 · arte — choose "agency" and fill briefing
-  await expect(page.getByText(/06 · arte/i)).toBeVisible();
-  await page.getByRole("button", { name: /quero que a agência crie/i }).click();
-  const briefing = page.getByPlaceholder(/Sobre a marca/i);
-  await expect(briefing).toBeVisible();
-  await briefing.fill(
-    "Briefing automatizado de teste ponta-a-ponta para validar o fluxo de checkout.",
-  );
-  await page.getByRole("button", { name: /^continuar$/i }).click();
-
-  // 07 · revisão — campaign name is pre-filled, just set start date
-  await expect(page.getByText(/07 · revisão/i)).toBeVisible();
-  const today = new Date().toISOString().slice(0, 10);
-  await page.locator('input[type="date"]').fill(today);
+async function fillCampaignName(page: Page, name: string) {
+  await page.getByPlaceholder(/Verão 2026/i).fill(name);
 }
 
 async function submitAndCaptureQuotation(page: Page): Promise<CreatedQuotation> {
+  const submit = page.getByRole("button", { name: /enviar cotação/i });
+  await expect(submit).toBeEnabled();
+
   const responsePromise = page.waitForResponse(
-    (r) => r.url().includes("quotation.createFromBuilder") && r.request().method() === "POST",
+    (r) =>
+      r.url().includes("quotation.createFromBuilder") &&
+      r.request().method() === "POST",
   );
-  await page.getByRole("button", { name: /enviar cotação/i }).click();
+  await submit.click();
   const resp = await responsePromise;
   expect(resp.ok(), `createFromBuilder failed: ${resp.status()}`).toBeTruthy();
   const body = await resp.json();
-  // httpBatchLink wraps responses in an array of { result: { data: { json } } }
+  // httpBatchLink encapsula em array de { result: { data: { json } } }.
   const payload = Array.isArray(body) ? body[0] : body;
   const created = payload?.result?.data?.json as CreatedQuotation | undefined;
   expect(created?.id, "expected quotation id in response").toBeTruthy();
-  expect(created?.quotationNumber, "expected quotation number in response").toBeTruthy();
+  expect(
+    created?.quotationNumber,
+    "expected quotation number in response",
+  ).toBeTruthy();
   return created!;
 }
 
-async function expectSuccessScreen(page: Page, quotationNumber: string) {
-  await expect(page.getByRole("heading", { name: /cotação/i })).toBeVisible();
-  await expect(page.getByText(/enviada/i)).toBeVisible();
-  await expect(page.getByText(quotationNumber, { exact: true }).first()).toBeVisible();
+async function expectSuccessScreen(
+  page: Page,
+  quotationNumber: string,
+  opts: { internal: boolean },
+) {
+  await expect(
+    page.getByRole("heading", { name: /cotação/i }),
+  ).toBeVisible();
+  await expect(page.getByText(quotationNumber, { exact: false }).first()).toBeVisible();
   await expect(page.getByTestId("button-go-portal")).toBeVisible();
+  if (opts.internal) {
+    // O atalho "ver cotação" só aparece para usuários internos.
+    await expect(page.getByTestId("button-view-quotation")).toBeVisible();
+  } else {
+    await expect(page.getByTestId("button-view-quotation")).toHaveCount(0);
+  }
 }
 
-// SKIP: Estes testes começam pegando produto na hero ANTIGA de /montar-campanha
-// (HERO_HEADLINE + product pills). O commit 243b16f (feat(marketplace-v2))
-// reescreveu StepHero em 20/abr/2026 e o wizard agora começa por Locais (não
-// por produto). Os testes ficaram stale e bloqueiam o pre-deploy.sh. Reativar
-// exige reescrever helpers (pickFirstProductAndStart, completeWizardThroughConfirm)
-// e o assertion inicial pro novo fluxo Locais → Produtos por local → Carrinho.
-test.describe.skip("checkout wizard ponta-a-ponta", () => {
+// ─── Caminho anunciante (clientId auto-vinculado, sem picker) ─────────────────
+
+test.describe("checkout /montar-campanha — anunciante", () => {
+  test.use({ storageState: ANUNCIANTE_AUTH_FILE });
+
   let adminUserId: string | null = null;
-  let anuncianteUser: DevUser | null = null;
-  let anuncianteCreated = false;
-  let internalUser: DevUser | null = null;
-  let venueAvailable = false;
-  let firstClientName: string | null = null;
 
   test.beforeAll(async ({ request }) => {
+    await ensureRestaurante(request);
     const users = await fetchDevUsers(request);
-    const admin = users.find((u) => u.role === "admin") ??
-      users.find((u) => INTERNAL_ROLES.includes(u.role));
-    adminUserId = admin?.id ?? null;
-    internalUser = users.find((u) => INTERNAL_ROLES.includes(u.role)) ?? null;
+    adminUserId =
+      users.find((u) => u.role === "admin")?.id ??
+      users.find((u) =>
+        ["comercial", "manager", "operacoes", "financeiro"].includes(u.role),
+      )?.id ??
+      null;
+  });
 
-    // Make sure there is always an anunciante with clientId so the wizard
-    // scenario isn't silently skipped on a fresh dev DB. We fail loudly here
-    // (instead of falling back to "skip") so a regression in the fixture
-    // endpoint surfaces as a real CI failure rather than a hidden coverage gap.
-    const ensured = await ensureAnuncianteUser(request);
-    anuncianteUser = ensured.user;
-    anuncianteCreated = ensured.created;
-    expect(anuncianteUser?.clientId, "anunciante fixture must have a clientId").toBeTruthy();
-
-    // Both probes below need an authenticated session (procedures are protected).
-    if (adminUserId) {
-      await devLogin(request, adminUserId);
-
-      const venuesRes = await request.get(
-        "/api/trpc/activeRestaurant.list?input=" +
-          encodeURIComponent(JSON.stringify({ json: null })),
+  test("anunciante monta o plano e cria a cotação", async ({ page }) => {
+    let createdId: number | null = null;
+    try {
+      await page.goto("/montar-campanha");
+      await startMediaPlan(page);
+      await addFirstLocation(page);
+      await fillCampaignName(
+        page,
+        "E2E Checkout Anunciante " + Date.now(),
       );
-      if (venuesRes.ok()) {
-        const data = await venuesRes.json();
-        const list = data?.result?.data?.json ?? [];
-        venueAvailable = Array.isArray(list) && list.length > 0;
-      }
 
-      const clientsRes = await request.get(
-        "/api/trpc/advertiser.listByPartner?input=" +
-          encodeURIComponent(JSON.stringify({ json: {} })),
-      );
-      if (clientsRes.ok()) {
-        const data = await clientsRes.json();
-        const list = (data?.result?.data?.json ?? []) as Array<{
-          name: string | null;
-          company: string | null;
-        }>;
-        const first = list[0];
-        if (first) {
-          firstClientName = first.company || first.name || null;
-        }
+      const created = await submitAndCaptureQuotation(page);
+      createdId = created.id;
+      await expectSuccessScreen(page, created.quotationNumber, {
+        internal: false,
+      });
+    } finally {
+      if (createdId != null && adminUserId) {
+        await deleteQuotationAsAdmin(page.request, adminUserId, createdId);
       }
-
-      await devLogout(request);
     }
+  });
+});
+
+// ─── Caminho interno (ClientPicker → cliente → shop) ──────────────────────────
+
+test.describe("checkout /montar-campanha — interno (client picker)", () => {
+  let internalUser: DevUser | null = null;
+  let adminUserId: string | null = null;
+
+  test.beforeAll(async ({ request }) => {
+    await ensureRestaurante(request);
+    // Garante que exista ao menos um cliente para o picker (o anunciante de
+    // teste do global.setup já tem clientId, mas reforçamos chamando o
+    // ensure — idempotente).
+    await request.post("/api/dev-ensure-anunciante", { data: {} });
+
+    internalUser = await createInternalUser(request);
+
+    const users = await fetchDevUsers(request);
+    adminUserId =
+      users.find((u) => u.role === "admin")?.id ?? internalUser.id;
   });
 
   test.afterAll(async ({ request }) => {
-    if (anuncianteCreated && anuncianteUser) {
-      await deleteDevUser(request, anuncianteUser.id);
+    if (internalUser) {
+      await deleteDevUser(request, internalUser.id);
     }
   });
 
@@ -214,68 +221,33 @@ test.describe.skip("checkout wizard ponta-a-ponta", () => {
     await context.clearCookies();
   });
 
-  test("anunciante percorre o wizard até a cotação criada", async ({ page }) => {
-    test.skip(!anuncianteUser, "no anunciante user with clientId in dev DB");
-    test.skip(!venueAvailable, "no active restaurants in dev DB");
-    test.skip(!adminUserId, "no internal user available for cleanup");
-
-    let createdId: number | null = null;
-    try {
-      await devLogin(page.request, anuncianteUser!.id);
-      await page.goto("/montar-campanha");
-
-      await expect(page.getByRole("heading", { name: HERO_HEADLINE })).toBeVisible();
-      await pickFirstProductAndStart(page);
-      await completeWizardThroughConfirm(page);
-
-      const created = await submitAndCaptureQuotation(page);
-      createdId = created.id;
-      await expectSuccessScreen(page, created.quotationNumber);
-    } finally {
-      if (createdId != null && adminUserId) {
-        await devLogout(page.request);
-        await deleteQuotationAsAdmin(page.request, adminUserId, createdId);
-      }
-    }
-  });
-
-  test("usuário interno seleciona um cliente no ClientPicker e percorre o wizard", async ({
+  test("interno seleciona um cliente no picker e cria a cotação", async ({
     page,
   }) => {
-    test.skip(!internalUser, "no internal user available in dev DB");
-    test.skip(!venueAvailable, "no active restaurants in dev DB");
-    test.skip(!adminUserId, "no internal user available for cleanup");
-    test.skip(!firstClientName, "no client available in dev DB to pick");
-
     let createdId: number | null = null;
     try {
       await devLogin(page.request, internalUser!.id);
       await page.goto("/montar-campanha");
 
-      // ClientPicker is the first screen for internal users
+      // ClientPicker é a primeira tela para usuários internos.
       await expect(
-        page.getByRole("heading", { name: /Selecione o cliente|Para qual cliente/i }),
+        page.getByRole("heading", { name: /Selecione o cliente/i }),
       ).toBeVisible();
 
-      // Pick a real client from the list (not the "skip" shortcut). The grid
-      // contains one button per client; we click the first by its company name.
-      const clientButton = page
-        .getByRole("button")
-        .filter({ hasText: firstClientName! })
-        .first();
-      await expect(clientButton).toBeVisible();
-      await clientButton.click();
+      // Escolhe o primeiro cliente real da lista (não o atalho "sem cliente").
+      const pick = page.locator("[data-testid^='button-pick-client-']").first();
+      await expect(pick).toBeVisible();
+      await pick.click();
 
-      await expect(page.getByRole("heading", { name: HERO_HEADLINE })).toBeVisible();
-      await pickFirstProductAndStart(page);
-      await completeWizardThroughConfirm(page);
+      await startMediaPlan(page);
+      await addFirstLocation(page);
+      await fillCampaignName(page, "E2E Checkout Interno " + Date.now());
 
       const created = await submitAndCaptureQuotation(page);
       createdId = created.id;
-      await expectSuccessScreen(page, created.quotationNumber);
-
-      // Internal users see the "ver cotação" shortcut
-      await expect(page.getByTestId("button-view-quotation")).toBeVisible();
+      await expectSuccessScreen(page, created.quotationNumber, {
+        internal: true,
+      });
     } finally {
       if (createdId != null && adminUserId) {
         await deleteQuotationAsAdmin(page.request, adminUserId, createdId);
