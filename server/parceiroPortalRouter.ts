@@ -691,25 +691,4 @@ export const parceiroPortalRouter = router({
         .where(eq(clients.partnerId, partnerId));
       return rows;
     }),
-
-  getPriceTableForBuilder: parceiroProcedure
-    .input(z.object({ adminPartnerId: z.number().optional() }).optional())
-    .query(async ({ ctx, input }) => {
-      resolvePartnerId(ctx, input?.adminPartnerId);
-      const db = await getDatabase();
-      const visibleProducts = await db
-        .select()
-        .from(products)
-        .where(and(eq(products.isActive, true), eq(products.visibleToPartners, true)));
-      const productsWithTiers = await Promise.all(
-        visibleProducts.map(async (p) => {
-          const [tiers, discountTiers] = await Promise.all([
-            db.select().from(productPricingTiers).where(eq(productPricingTiers.productId, p.id)).orderBy(asc(productPricingTiers.volumeMin)),
-            db.select().from(productDiscountPriceTiers).where(eq(productDiscountPriceTiers.productId, p.id)).orderBy(asc(productDiscountPriceTiers.priceMin)),
-          ]);
-          return { ...p, tiers, discountTiers };
-        })
-      );
-      return productsWithTiers;
-    }),
 });
