@@ -245,6 +245,43 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
     }
   });
 
+  // Limpa o draft de carrinho (campaignDrafts) do anunciante de teste. O fluxo
+  // /montar-campanha persiste o plano por cliente no servidor (saveCartDraft) e
+  // re-hidrata em execuções seguintes — sem isso, itens/datas de um teste
+  // anterior vazam para o próximo (ex.: o local já aparece selecionado e o popup
+  // do mapa mostra "Remover" em vez de "Adicionar"). Garante isolamento entre runs.
+  app.post("/api/dev-clear-cart-draft", async (req, res) => {
+    try {
+      if (!(await sentinelAllows(res))) return;
+      const { getDb } = await import("../db");
+      const { campaignDrafts, clients } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) {
+        return res.status(500).json({ message: "Database not available." });
+      }
+      const requestedClientId = Number(req.body?.clientId);
+      let clientId: number | null = Number.isFinite(requestedClientId)
+        ? requestedClientId
+        : null;
+      if (clientId == null) {
+        const rows = await db.select({ id: clients.id }).from(clients).limit(1);
+        clientId = rows[0]?.id ?? null;
+      }
+      if (clientId == null) {
+        return res.json({ ok: true, cleared: 0 });
+      }
+      const deleted = await db
+        .delete(campaignDrafts)
+        .where(eq(campaignDrafts.clientId, clientId))
+        .returning({ id: campaignDrafts.id });
+      res.json({ ok: true, cleared: deleted.length, clientId });
+    } catch (error) {
+      console.error("Dev clear cart draft error:", error);
+      res.status(500).json({ message: "Erro ao limpar draft de carrinho de teste." });
+    }
+  });
+
   app.post("/api/dev-ensure-restaurante", async (req, res) => {
     try {
       if (!(await sentinelAllows(res))) return;

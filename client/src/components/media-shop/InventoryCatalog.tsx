@@ -778,10 +778,14 @@ function CatalogMap({
   onAdd: (loc: LocationRow) => void;
   isSelected: (id: number) => boolean;
 }) {
-  const mapRef = useRef<google.maps.Map | null>(null);
+  // `map` precisa ser estado (não ref): o MapView carrega o Google Maps de forma
+  // assíncrona e só então dispara onMapReady. Se guardássemos apenas numa ref, o
+  // efeito que cria os markers rodaria uma única vez (antes do mapa existir) e
+  // nunca mais — nenhum pin apareceria. Como estado, a prontidão do mapa entra
+  // nas deps e o efeito re-roda para plotar os markers.
+  const [map, setMap] = useState<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const infoRef = useRef<google.maps.InfoWindow | null>(null);
-  const [mapReady, setMapReady] = useState(false);
 
   const withCoords = useMemo(
     () => locations.filter((l) => l.lat != null && l.lng != null),
@@ -789,7 +793,6 @@ function CatalogMap({
   );
 
   useEffect(() => {
-    const map = mapRef.current;
     if (!map || typeof google === "undefined") return;
 
     markersRef.current.forEach((m) => m.setMap(null));
@@ -856,7 +859,7 @@ function CatalogMap({
       bounds.extend(pos);
     }
     if (withCoords.length > 0) map.fitBounds(bounds);
-  }, [withCoords, days, onAdd, isSelected, mapReady]);
+  }, [map, withCoords, days, onAdd, isSelected]);
 
   return (
     <Card data-testid="catalog-map">
@@ -864,8 +867,7 @@ function CatalogMap({
         <MapView
           className="h-[560px]"
           onMapReady={(m) => {
-            mapRef.current = m;
-            setMapReady(true);
+            setMap(m);
           }}
         />
         {withCoords.length === 0 && (

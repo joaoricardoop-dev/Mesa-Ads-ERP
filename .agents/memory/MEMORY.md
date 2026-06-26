@@ -17,3 +17,4 @@
 - [Builder shares media-shop store](builder-mediashop-shared.md) — /montar-campanha (StepShop) reuses mediaShopStore + MediaPlanPanel(variant) verbatim from internal Orçamento; store now persists to localStorage so BOTH screens survive reload.
 - [Address autocomplete (Google Places)](address-autocomplete.md) — AddressAutocomplete.tsx is single parse source; uses Places API (New) fetchAutocompleteSuggestions, not legacy widget; loadGoogleMaps single loader.
 - [Portal builder E2E](portal-builder-e2e.md) — MediaShopBuilder e2e: seed fixed-name fixtures w/ CPM, match by EXACT text, suppress complete-profile modal, source per role.
+- [/montar-campanha cart draft](montar-campanha-cart-draft.md) — builder persists cart to DB campaign_drafts per clientId; e2e must clear via dev-clear-cart-draft (resolve advertiser clientId) or state leaks across runs.
