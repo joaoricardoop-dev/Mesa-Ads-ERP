@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { loadGoogleMaps } from "@/lib/googleMaps";
+import { parsePhotoUrls } from "@/lib/photoUrls";
+import { SpacePhotoPlaceholder } from "@/components/media-shop/SpacePhoto";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +76,7 @@ type Restaurant = {
   status: string;
   lat?: string | null;
   lng?: string | null;
+  photoUrls?: string | string[] | null;
 };
 
 export default function RestaurantsMap() {
@@ -363,6 +366,27 @@ export default function RestaurantsMap() {
           {/* Restaurant detail panel */}
           {selected ? (
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {(() => {
+                const cover = parsePhotoUrls(selected.photoUrls)[0] ?? null;
+                return cover ? (
+                  <div className="aspect-video w-full overflow-hidden rounded-lg bg-muted border border-border/30">
+                    <img
+                      src={cover}
+                      alt={selected.name}
+                      className="w-full h-full object-cover"
+                      data-testid={`restaurant-photo-${selected.id}`}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).parentElement!.style.display = "none";
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <SpacePhotoPlaceholder
+                    className="aspect-video w-full overflow-hidden rounded-lg border border-border/30"
+                    testId={`restaurant-photo-placeholder-${selected.id}`}
+                  />
+                );
+              })()}
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h2 className="text-sm font-bold leading-tight">{selected.name}</h2>

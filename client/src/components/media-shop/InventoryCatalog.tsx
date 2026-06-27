@@ -26,7 +26,6 @@ import {
   Loader2,
   Package,
   AlertTriangle,
-  ImageOff,
 } from "lucide-react";
 import {
   Tooltip,
@@ -41,6 +40,10 @@ import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 import type { QuotePremissas, PricingTier, DiscountTier } from "@/components/campaign-wizard/pricing";
 import { formatCurrency } from "@/lib/format";
 import { TIPO_LABELS } from "@/lib/campaign-builder-utils";
+import {
+  SpacePhotoPlaceholder,
+  buildSpacePhotoPlaceholderEl,
+} from "./SpacePhoto";
 import {
   useMediaShopStore,
   cpmConfigForPricing,
@@ -548,13 +551,10 @@ function LocationCard({
           />
         </div>
       ) : (
-        <div
-          className="aspect-video w-full overflow-hidden bg-gradient-to-br from-muted to-muted/40 flex flex-col items-center justify-center gap-1.5 text-muted-foreground border-b border-border"
-          data-testid={`local-photo-placeholder-${loc.restaurantId}`}
-        >
-          <ImageOff className="h-7 w-7 opacity-50" />
-          <span className="label-mono text-[10px]">Foto em breve</span>
-        </div>
+        <SpacePhotoPlaceholder
+          className="aspect-video w-full overflow-hidden border-b border-border"
+          testId={`local-photo-placeholder-${loc.restaurantId}`}
+        />
       )}
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
@@ -937,7 +937,29 @@ function CatalogMap({
         // name/neighborhood vêm do banco e não podem ser tratados como markup.
         const container = document.createElement("div");
         container.style.fontFamily = "sans-serif";
-        container.style.minWidth = "160px";
+        container.style.minWidth = "180px";
+
+        // Foto do espaço (ou placeholder "Foto em breve" — fonte única SpacePhoto)
+        // no topo do popup, para não colapsar/parecer vazio quando não há foto.
+        const coverPhoto = loc.photoUrls?.[0] ?? null;
+        const photoEl = coverPhoto
+          ? (() => {
+              const wrap = document.createElement("div");
+              wrap.className = "w-full overflow-hidden rounded-md bg-muted";
+              wrap.style.aspectRatio = "16 / 9";
+              const img = document.createElement("img");
+              img.src = coverPhoto;
+              img.alt = loc.name;
+              img.className = "w-full h-full object-cover";
+              wrap.appendChild(img);
+              return wrap;
+            })()
+          : buildSpacePhotoPlaceholderEl(
+              "aspect-video w-full overflow-hidden rounded-md",
+              `map-photo-placeholder-${loc.restaurantId}`,
+            );
+        photoEl.style.marginBottom = "6px";
+        container.appendChild(photoEl);
 
         const nameEl = document.createElement("strong");
         nameEl.textContent = loc.name;

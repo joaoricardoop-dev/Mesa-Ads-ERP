@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 
 import { trpc } from "@/lib/trpc";
+import { parsePhotoUrls } from "@/lib/photoUrls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -190,18 +191,6 @@ const emptyForm: FormData = {
   screenOperatingHours: [],
   screenExposureSec: 0,
 };
-
-// Parse do JSON text de fotos do espaço (mesma convenção das telas: array de URLs).
-function parsePhotoUrls(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.filter((u): u is string => typeof u === "string");
-  if (typeof raw !== "string" || raw.trim() === "") return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((u): u is string => typeof u === "string") : [];
-  } catch {
-    return [];
-  }
-}
 
 interface Socio {
   nome: string;

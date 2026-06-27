@@ -2,6 +2,7 @@ import { useState, useMemo, Fragment } from "react";
 import { useLocation } from "wouter";
 
 import { trpc } from "@/lib/trpc";
+import { parsePhotoUrls } from "@/lib/photoUrls";
 import PageContainer from "@/components/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,18 +72,6 @@ function formatSocialClass(value: string): string {
   if (!value) return "—";
   try { const parsed = JSON.parse(value); if (Array.isArray(parsed)) return parsed.map((c: string) => SOCIAL_CLASS_LABELS[c] || c).join(", "); } catch {}
   return SOCIAL_CLASS_LABELS[value] || value;
-}
-
-// Fotos do espaço (JSON text com array de URLs). Mesma convenção do formulário.
-function parsePhotoUrls(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.filter((u): u is string => typeof u === "string");
-  if (typeof raw !== "string" || raw.trim() === "") return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((u): u is string => typeof u === "string") : [];
-  } catch {
-    return [];
-  }
 }
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
