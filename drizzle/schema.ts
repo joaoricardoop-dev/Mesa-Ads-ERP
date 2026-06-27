@@ -465,6 +465,10 @@ export const telas = pgTable("telas", {
   // Fotos da tela (JSON array de URLs servidas por /api/tela-photo/serve/...).
   // Aparecem no ecommerce (/montar-campanha) junto do local.
   photoUrls: text("photoUrls"),
+  // Grade de horário de funcionamento (7 dias × 24h). Mesmo formato canônico
+  // do Local: JSON text de array de chaves "dia-hora" (shared/screen-schedule).
+  // DESCRITIVO apenas — NÃO entra na precificação (o preço vem do Local).
+  screenOperatingHours: text("screen_operating_hours"),
   status: statusEnum("status").default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

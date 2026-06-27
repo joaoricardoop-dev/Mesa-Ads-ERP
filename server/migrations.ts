@@ -2353,6 +2353,14 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
            );`,
     ],
   },
+  {
+    // Task #374 — Grade de horário de funcionamento por TELA (7 dias × 24h).
+    // Mesmo formato canônico do Local (JSON text de chaves "dia-hora"). É
+    // DESCRITIVO apenas: NÃO vira segunda fonte de horas/semana e NÃO entra na
+    // precificação (o preço continua vindo do Local via computeCpmPricing).
+    name: "task_374_tela_screen_operating_hours_column",
+    sql: `ALTER TABLE "telas" ADD COLUMN IF NOT EXISTS "screen_operating_hours" text;`,
+  },
 ];
 
 /**

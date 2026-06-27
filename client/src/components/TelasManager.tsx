@@ -5,6 +5,8 @@ import { trpc, type RouterOutputs } from "@/lib/trpc";
 import { useConfigOptions } from "@/lib/configOptions";
 import { MapView } from "@/components/Map";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { OperatingHoursGrid } from "@/components/OperatingHoursGrid";
+import { parseOperatingHours } from "@shared/screen-schedule";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -124,7 +126,12 @@ export default function TelasManager({ restaurantId, defaultAddress, defaultLat,
                 {t.cmsScreenId && <InfoLine label="CMS" value={t.cmsScreenId} />}
                 {(t.width || t.height) && <InfoLine label="Dimensões" value={`${t.width ?? "?"}×${t.height ?? "?"} px`} />}
                 {t.layout && <InfoLine label="Layout" value={LAYOUT_LABELS[t.layout] ?? t.layout} />}
-                {t.horarioFuncionamento && <InfoLine label="Horário" value={t.horarioFuncionamento} />}
+                {(() => {
+                  const hours = parseOperatingHours((t as any).screenOperatingHours);
+                  if (hours.length > 0) return <InfoLine label="Horário" value={`${hours.length} h/semana`} />;
+                  if (t.horarioFuncionamento) return <InfoLine label="Horário" value={t.horarioFuncionamento} />;
+                  return null;
+                })()}
                 {(t.lat && t.lng) && <InfoLine label="Coordenadas" value={`${Number(t.lat).toFixed(5)}, ${Number(t.lng).toFixed(5)}`} />}
               </div>
               {t.address && <p className="text-[11px] text-muted-foreground flex items-start gap-1"><MapPin className="w-3 h-3 mt-0.5 shrink-0" />{t.address}</p>}
@@ -178,6 +185,7 @@ interface TelaFormState {
   loopDuration: string;
   dailyLoops: string;
   photoUrls: string[];
+  screenOperatingHours: string[];
   status: string;
 }
 
@@ -209,6 +217,7 @@ function buildInitial(
       loopDuration: editing.loopDuration != null ? String(editing.loopDuration) : "",
       dailyLoops: editing.dailyLoops != null ? String(editing.dailyLoops) : "",
       photoUrls: Array.isArray(editing.photoUrls) ? editing.photoUrls : [],
+      screenOperatingHours: parseOperatingHours((editing as any).screenOperatingHours),
       status: editing.status ?? "active",
     };
   }
@@ -229,6 +238,7 @@ function buildInitial(
     loopDuration: "",
     dailyLoops: "",
     photoUrls: [],
+    screenOperatingHours: [],
     status: "active",
   };
 }
@@ -370,6 +380,7 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
       loopDuration: form.loopDuration ? parseInt(form.loopDuration) : null,
       dailyLoops: form.dailyLoops ? parseInt(form.dailyLoops) : null,
       photoUrls: form.photoUrls,
+      screenOperatingHours: form.screenOperatingHours,
       status: form.status as "active" | "inactive",
     };
     if (editing) {
@@ -422,9 +433,6 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
             <FieldWrap label="Nº da Tela no CMS">
               <Input value={form.cmsScreenId} onChange={(e) => setForm((f) => ({ ...f, cmsScreenId: e.target.value }))} placeholder="SCR-042" data-testid="input-tela-cms" />
             </FieldWrap>
-            <FieldWrap label="Horário de Funcionamento">
-              <Input value={form.horarioFuncionamento} onChange={(e) => setForm((f) => ({ ...f, horarioFuncionamento: e.target.value }))} placeholder="Seg-Sex 08h-22h" />
-            </FieldWrap>
             <FieldWrap label="Largura (px)">
               <Input type="number" value={form.width} onChange={(e) => setForm((f) => ({ ...f, width: e.target.value }))} placeholder="1920" data-testid="input-tela-width" />
             </FieldWrap>
@@ -462,6 +470,22 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
             <FieldWrap label="Loops por Dia">
               <Input type="number" value={form.dailyLoops} onChange={(e) => setForm((f) => ({ ...f, dailyLoops: e.target.value }))} />
             </FieldWrap>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Horário de funcionamento</Label>
+              <span className="text-[11px] text-muted-foreground tabular-nums" data-testid="tela-operating-hours-total">{form.screenOperatingHours.length} h/semana</span>
+            </div>
+            <OperatingHoursGrid
+              value={form.screenOperatingHours}
+              onChange={(next) => setForm((f) => ({ ...f, screenOperatingHours: next }))}
+              testIdPrefix="tela-op-cell"
+            />
+            <p className="text-[10px] text-muted-foreground">Marque as faixas em que esta tela opera (clique no dia para a linha inteira). É apenas descritivo — a precificação vem do local.</p>
+            {form.horarioFuncionamento && form.screenOperatingHours.length === 0 && (
+              <p className="text-[10px] text-muted-foreground">Horário antigo (texto): <span className="text-foreground/80">{form.horarioFuncionamento}</span></p>
+            )}
           </div>
 
           <FieldWrap label="Descrição do ponto">

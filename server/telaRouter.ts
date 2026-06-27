@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { telas, activeRestaurants } from "../drizzle/schema";
 import { asc, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { parseOperatingHours } from "../shared/screen-schedule";
 
 async function getDatabase() {
   const d = await getDb();
@@ -30,6 +31,10 @@ const telaFields = {
   dailyLoops: z.number().int().min(0).optional().nullable(),
   // Fotos da tela: array de URLs. Gravado como JSON text na coluna photoUrls.
   photoUrls: z.array(z.string()).optional().nullable(),
+  // Grade de horário de funcionamento: array de chaves "dia-hora" (fonte única
+  // shared/screen-schedule). Gravado como JSON text. DESCRITIVO apenas — não
+  // entra na precificação (o preço vem do Local).
+  screenOperatingHours: z.array(z.string()).optional().nullable(),
   status: z.enum(["active", "inactive"]).optional(),
 };
 
@@ -41,7 +46,7 @@ function toColumns(input: Record<string, unknown>) {
     if (k === "restaurantId" || k === "id") continue;
     if (k === "lat" || k === "lng") {
       out[k] = v == null ? null : String(v);
-    } else if (k === "photoUrls") {
+    } else if (k === "photoUrls" || k === "screenOperatingHours") {
       out[k] = Array.isArray(v) ? JSON.stringify(v) : null;
     } else {
       out[k] = v;
@@ -68,7 +73,11 @@ export function parseTelaPhotoUrls(raw: unknown): string[] {
 
 function parseRow<T extends { photoUrls?: unknown } | undefined>(row: T): T {
   if (!row) return row;
-  return { ...row, photoUrls: parseTelaPhotoUrls((row as any).photoUrls) } as T;
+  return {
+    ...row,
+    photoUrls: parseTelaPhotoUrls((row as any).photoUrls),
+    screenOperatingHours: parseOperatingHours((row as any).screenOperatingHours),
+  } as T;
 }
 
 export const telaRouter = router({

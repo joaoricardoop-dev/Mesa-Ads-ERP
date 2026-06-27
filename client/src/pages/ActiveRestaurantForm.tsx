@@ -57,7 +57,8 @@ import {
 
 import { EXCLUDED_CATEGORIES } from "@shared/excluded-categories";
 import { computeCpmPricing, screenSpaceMissingPhotos } from "@shared/cpm-pricing";
-import { OPERATING_DAYS, OPERATING_HOURS, operatingCellKey, operatingHourLabel, parseOperatingHours } from "@shared/screen-schedule";
+import { parseOperatingHours } from "@shared/screen-schedule";
+import { OperatingHoursGrid } from "@/components/OperatingHoursGrid";
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const BUSY_HOURS_OPTIONS = ["06h–09h", "09h–12h", "12h–15h", "15h–18h", "18h–21h", "21h–00h", "00h–03h", "03h–06h"];
@@ -420,25 +421,6 @@ export default function ActiveRestaurantForm() {
   // selecionadas é a fonte única de screenWeeklyHours (1 célula = 1 hora).
   const setOperatingHours = (next: string[]) =>
     setForm(prev => ({ ...prev, screenOperatingHours: next, screenWeeklyHours: String(next.length) }));
-
-  const toggleOperatingCell = (day: number, hour: number) => {
-    const key = operatingCellKey(day, hour);
-    setOperatingHours(
-      form.screenOperatingHours.includes(key)
-        ? form.screenOperatingHours.filter(k => k !== key)
-        : [...form.screenOperatingHours, key],
-    );
-  };
-
-  const toggleOperatingDay = (day: number) => {
-    const dayKeys = OPERATING_HOURS.map(h => operatingCellKey(day, h));
-    const allOn = dayKeys.every(k => form.screenOperatingHours.includes(k));
-    setOperatingHours(
-      allOn
-        ? form.screenOperatingHours.filter(k => !dayKeys.includes(k))
-        : Array.from(new Set([...form.screenOperatingHours, ...dayKeys])),
-    );
-  };
 
   const toggleCategory = (cat: string) => {
     setForm(prev => ({
@@ -940,50 +922,10 @@ export default function ActiveRestaurantForm() {
                             <Label className="text-xs text-muted-foreground">Horário de funcionamento <span className="opacity-60">· define horas/semana</span></Label>
                             <span className="text-[11px] text-muted-foreground tabular-nums" data-testid="operating-hours-total">{form.screenOperatingHours.length} h/semana</span>
                           </div>
-                          <div className="overflow-x-auto -mx-1 px-1">
-                            <table className="border-separate border-spacing-1">
-                              <thead>
-                                <tr>
-                                  <th className="w-9" />
-                                  {OPERATING_HOURS.map((h) => (
-                                    <th key={h} className="align-bottom">
-                                      <div className="text-[8px] text-muted-foreground [writing-mode:vertical-rl] mx-auto whitespace-nowrap py-0.5">{operatingHourLabel(h)}</div>
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {OPERATING_DAYS.map((day) => (
-                                  <tr key={day.key}>
-                                    <td>
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleOperatingDay(day.key)}
-                                        className="text-[10px] font-medium text-muted-foreground hover:text-foreground w-9 text-left"
-                                      >
-                                        {day.label}
-                                      </button>
-                                    </td>
-                                    {OPERATING_HOURS.map((h) => {
-                                      const on = form.screenOperatingHours.includes(operatingCellKey(day.key, h));
-                                      return (
-                                        <td key={h}>
-                                          <button
-                                            type="button"
-                                            onClick={() => toggleOperatingCell(day.key, h)}
-                                            aria-pressed={on}
-                                            aria-label={`${day.label} ${operatingHourLabel(h)}`}
-                                            data-testid={`op-cell-${day.key}-${h}`}
-                                            className={`w-5 h-5 rounded-full border transition-colors ${on ? "bg-primary border-primary" : "bg-background border-border/40 hover:border-primary/50"}`}
-                                          />
-                                        </td>
-                                      );
-                                    })}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                          <OperatingHoursGrid
+                            value={form.screenOperatingHours}
+                            onChange={setOperatingHours}
+                          />
                           <p className="text-[10px] text-muted-foreground">Marque as faixas em que as telas operam (clique no dia para a linha inteira). O total de horas/semana alimenta a precificação por CPM.</p>
                         </div>
 
