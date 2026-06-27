@@ -44,6 +44,7 @@ import {
   ArrowUpDown,
   AlertTriangle,
   MapPin,
+  ImageOff,
 } from "lucide-react";
 import { screenSetupStatus } from "@shared/cpm-pricing";
 import {
@@ -70,6 +71,18 @@ function formatSocialClass(value: string): string {
   if (!value) return "—";
   try { const parsed = JSON.parse(value); if (Array.isArray(parsed)) return parsed.map((c: string) => SOCIAL_CLASS_LABELS[c] || c).join(", "); } catch {}
   return SOCIAL_CLASS_LABELS[value] || value;
+}
+
+// Fotos do espaço (JSON text com array de URLs). Mesma convenção do formulário.
+function parsePhotoUrls(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((u): u is string => typeof u === "string");
+  if (typeof raw !== "string" || raw.trim() === "") return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((u): u is string => typeof u === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -198,6 +211,7 @@ export default function ActiveRestaurantsPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("name");
   const [onlyMediaPending, setOnlyMediaPending] = useState(false);
+  const [onlyPhotosPending, setOnlyPhotosPending] = useState(false);
 
   const utils = trpc.useUtils();
   const { data: restaurants = [] } = trpc.activeRestaurant.list.useQuery();
@@ -346,6 +360,17 @@ export default function ActiveRestaurantsPage() {
     [restaurants],
   );
 
+  // Espaços que vendem telas (Nº de telas > 0) mas ainda não têm fotos. Sem
+  // imagem, o card do ecommerce/builder fica visualmente incompleto. A regra
+  // espelha isMediaPending mas olha exclusivamente as fotos do espaço.
+  const needsPhotos = (r: any) =>
+    r.status === "active" && (r.screensCount ?? 0) > 0 && parsePhotoUrls(r.photoUrls).length === 0;
+
+  const photosPendingCount = useMemo(
+    () => restaurants.filter((r) => needsPhotos(r)).length,
+    [restaurants],
+  );
+
   const filtered = useMemo(() => {
     let list = restaurants.filter((r) => {
       if (search) {
@@ -353,6 +378,7 @@ export default function ActiveRestaurantsPage() {
         if (!r.name.toLowerCase().includes(s) && !r.neighborhood.toLowerCase().includes(s) && !(r.whatsapp && r.whatsapp.includes(s))) return false;
       }
       if (onlyMediaPending && !isMediaPending(r)) return false;
+      if (onlyPhotosPending && !needsPhotos(r)) return false;
       return true;
     });
 
@@ -367,7 +393,7 @@ export default function ActiveRestaurantsPage() {
     }
 
     return list;
-  }, [restaurants, search, sortBy, onlyMediaPending]);
+  }, [restaurants, search, sortBy, onlyMediaPending, onlyPhotosPending]);
 
   const activeCount = restaurants.filter((r) => r.status === "active").length;
   const totalTables = restaurants.reduce((s, r) => s + (r.tableCount || 0), 0);
@@ -445,6 +471,18 @@ export default function ActiveRestaurantsPage() {
               {onlyMediaPending ? "Mostrar todos" : "Config. mídia pendente"}
             </Button>
           )}
+          {photosPendingCount > 0 && (
+            <Button
+              variant={onlyPhotosPending ? "default" : "outline"}
+              size="sm"
+              className="gap-1.5 h-9 border-amber-500/40 text-amber-600 dark:text-amber-400 data-[active=true]:text-current"
+              onClick={() => setOnlyPhotosPending((v) => !v)}
+              data-testid="button-filter-photos-pending"
+            >
+              <ImageOff className="w-3.5 h-3.5" />
+              {onlyPhotosPending ? "Mostrar todos" : `Sem fotos (${photosPendingCount})`}
+            </Button>
+          )}
           <Button
             variant={sortBy === "ratingScore" ? "default" : "outline"}
             size="sm"
@@ -501,6 +539,17 @@ export default function ActiveRestaurantsPage() {
                                 </Badge>
                               );
                             })()}
+                            {needsPhotos(r) && (
+                              <Badge
+                                variant="outline"
+                                title="Este espaço vende telas mas ainda não tem fotos para o ecommerce"
+                                className="gap-1 text-[10px] border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                data-testid={`badge-no-photos-${r.id}`}
+                              >
+                                <ImageOff className="w-3 h-3" />
+                                Sem fotos
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5 truncate">
                             {r.neighborhood} · {formatSocialClass(r.socialClass)}

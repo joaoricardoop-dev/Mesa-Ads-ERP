@@ -1011,8 +1011,20 @@ export default function ActiveRestaurantForm() {
                       </p>
                     )}
 
-                    <div className="space-y-2 mt-4 pt-4 border-t border-border/30">
-                      <Label className="text-xs text-muted-foreground">Fotos do espaço <span className="opacity-60">· exibidas no ecommerce</span></Label>
+                    <div
+                      className={`space-y-2 mt-4 pt-4 border-t border-border/30 ${form.screensCount > 0 && form.photoUrls.length === 0 ? "-mx-4 px-4 -mb-4 pb-4 rounded-b-xl border border-amber-500/40 bg-amber-500/5" : ""}`}
+                      data-testid="space-photos-section"
+                    >
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <ImagePlus className="w-3.5 h-3.5" />
+                        Fotos do espaço <span className="opacity-60">· exibidas no ecommerce</span>
+                      </Label>
+                      {form.screensCount > 0 && form.photoUrls.length === 0 && (
+                        <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1.5" data-testid="space-photos-warning">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          Este espaço vende telas mas ainda não tem fotos. Adicione ao menos uma para o card do ecommerce ficar completo.
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         {form.photoUrls.map((url) => (
                           <div key={url} className="relative w-24 h-24 rounded-lg overflow-hidden border border-border/30 group">
