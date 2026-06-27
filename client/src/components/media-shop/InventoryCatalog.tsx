@@ -26,6 +26,7 @@ import {
   Loader2,
   Package,
   AlertTriangle,
+  ImageOff,
 } from "lucide-react";
 import {
   Tooltip,
@@ -534,7 +535,7 @@ function LocationCard({
       data-testid={`local-card-${loc.restaurantId}`}
       className={`overflow-hidden ${selected ? "ring-2 ring-primary" : ""}`}
     >
-      {coverPhoto && (
+      {coverPhoto ? (
         <div className="aspect-video w-full overflow-hidden bg-muted">
           <img
             src={coverPhoto}
@@ -545,6 +546,14 @@ function LocationCard({
               (e.target as HTMLImageElement).parentElement!.style.display = "none";
             }}
           />
+        </div>
+      ) : (
+        <div
+          className="aspect-video w-full overflow-hidden bg-gradient-to-br from-muted to-muted/40 flex flex-col items-center justify-center gap-1.5 text-muted-foreground border-b border-border"
+          data-testid={`local-photo-placeholder-${loc.restaurantId}`}
+        >
+          <ImageOff className="h-7 w-7 opacity-50" />
+          <span className="label-mono text-[10px]">Foto em breve</span>
         </div>
       )}
       <CardContent className="p-4 space-y-3">
