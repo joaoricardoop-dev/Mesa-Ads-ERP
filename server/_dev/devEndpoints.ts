@@ -413,6 +413,16 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
   // local some do catálogo), um product_location ligando os dois, e ≥1 tela
   // ativa (telas.status='active' alimenta screensCount). Idempotente: reusa um
   // local de telas existente quando já houver um.
+  // Fonte única (Task #364): a quantidade de telas e as fotos vêm do ESPAÇO
+  // (active_restaurants.screensCount / photoUrls), não da contagem de registros
+  // `telas`. O fixture semeia valores distintivos para o e2e provar que o
+  // catálogo lê do espaço (4 telas + 1 foto-capa), e não cai no default 1.
+  const E2E_SPACE_SCREENS_COUNT = 4;
+  // Data URI 1x1 PNG transparente: carrega sem rede (sem flakiness/onError) e
+  // serve de foto-capa determinística do espaço.
+  const E2E_SPACE_COVER_PHOTO =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
   app.post("/api/dev-ensure-screen-location", async (_req, res) => {
     try {
       if (!(await sentinelAllows(res))) return;
@@ -476,9 +486,11 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
             screenWeeklyHours: "84.00",
             screenExposureSec: 10,
             dailyLoops: 144,
-            // ≥1 foto para o espaço de telas ser publicável no marketplace público
-            // (regra screenSpaceMissingPhotos): sem isso o card some para anunciante.
-            photoUrls: JSON.stringify(["https://placehold.co/640x360?text=E2E+Tela"]),
+            // Fonte única do espaço: quantidade de telas + foto-capa. A foto-capa
+            // (Data URI determinístico, sem rede) também garante ≥1 foto, mantendo
+            // o espaço publicável no marketplace público (regra screenSpaceMissingPhotos).
+            screensCount: E2E_SPACE_SCREENS_COUNT,
+            photoUrls: JSON.stringify([E2E_SPACE_COVER_PHOTO]),
           })
           .where(eq(activeRestaurants.id, restaurantId));
       } else {
@@ -506,9 +518,11 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
             screenWeeklyHours: "84.00",
             screenExposureSec: 10,
             dailyLoops: 144,
-            // ≥1 foto para o espaço de telas ser publicável no marketplace público
-            // (regra screenSpaceMissingPhotos): sem isso o card some para anunciante.
-            photoUrls: JSON.stringify(["https://placehold.co/640x360?text=E2E+Tela"]),
+            // Fonte única do espaço: quantidade de telas + foto-capa. A foto-capa
+            // (Data URI determinístico, sem rede) também garante ≥1 foto, mantendo
+            // o espaço publicável no marketplace público (regra screenSpaceMissingPhotos).
+            screensCount: E2E_SPACE_SCREENS_COUNT,
+            photoUrls: JSON.stringify([E2E_SPACE_COVER_PHOTO]),
           })
           .returning({ id: activeRestaurants.id });
         restaurantId = restaurant.id;
@@ -521,7 +535,9 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
           });
       }
 
-      // Garante ≥1 tela ativa (screensCount > 0).
+      // Garante ≥1 tela ativa como inventário OPCIONAL. A quantidade vendida no
+      // catálogo vem de active_restaurants.screensCount (setado acima), não desta
+      // contagem — a tela aqui só prova que telas individuais são opcionais.
       const activeScreen = (
         await db
           .select({ id: telas.id })
@@ -538,7 +554,12 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
         });
       }
 
-      res.json({ restaurantId, productId });
+      res.json({
+        restaurantId,
+        productId,
+        screensCount: E2E_SPACE_SCREENS_COUNT,
+        coverPhotoUrl: E2E_SPACE_COVER_PHOTO,
+      });
     } catch (error) {
       console.error("Dev ensure screen-location error:", error);
       const detail = error instanceof Error ? error.message : String(error);
@@ -559,6 +580,125 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
         detail,
         cause: causeDetail,
       });
+    }
+  });
+
+  // Semeia dois espaços determinísticos para provar o gating do badge
+  // "Mídia incompleta" (Task #364).
+  //
+  // FONTE ÚNICA DO GATE: o badge no client (ActiveRestaurants.tsx e
+  // TelasPage.tsx) é gated EXCLUSIVAMENTE por `active_restaurants.screensCount
+  // > 0` (+ status active + config de mídia incompleta). O campo derivado
+  // `offersScreenProduct` (server/db.ts, via product_locations → products.tipo
+  // = 'telas') NÃO é consumido pela UI do badge.
+  //
+  // Para isolar a ÚNICA variável que o badge realmente lê, os dois espaços são
+  // IDÊNTICOS em tudo — mesma config de mídia INCOMPLETA (lat/lng/cpm nulos) e
+  // AMBOS vinculados ao MESMO produto tipo "telas" (offersScreenProduct=true
+  // nos dois) — diferindo SOMENTE por screensCount:
+  //   - PENDENTE:  screensCount = 4 → badge DEVE aparecer.
+  //   - ZERADO:    screensCount = 0 → badge NÃO deve aparecer, apesar de
+  //     também oferecer um produto "telas" (offersScreenProduct=true).
+  // Isso prova que o gate é screensCount, não offersScreenProduct. Idempotente
+  // por nome fixo.
+  const E2E_BADGE_PENDING_NAME = "E2E Badge Telas Pendente";
+  const E2E_BADGE_NO_SCREEN_NAME = "E2E Badge Telas Zerado";
+
+  app.post("/api/dev-ensure-badge-fixtures", async (_req, res) => {
+    try {
+      if (!(await sentinelAllows(res))) return;
+      const { getDb } = await import("../db");
+      const { activeRestaurants, products, productLocations } = await import(
+        "../../drizzle/schema"
+      );
+      const { eq, and } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) return res.status(500).json({ message: "Database not available." });
+
+      // Base comum: campos NOT NULL preenchidos, config de mídia INCOMPLETA
+      // (sem lat/lng nem CPM), status ativo.
+      const baseValues = {
+        status: "active" as const,
+        neighborhood: "Centro",
+        contactName: "E2E Contato Badge",
+        contactRole: "Gerente",
+        whatsapp: "11977777777",
+        tableCount: 20,
+        seatCount: 80,
+        monthlyCustomers: 5000,
+        city: "São Paulo",
+        state: "SP",
+      };
+
+      const ensureSpace = async (
+        name: string,
+        screensCount: number,
+      ): Promise<number> => {
+        const existing = (
+          await db!
+            .select({ id: activeRestaurants.id })
+            .from(activeRestaurants)
+            .where(eq(activeRestaurants.name, name))
+            .limit(1)
+        )[0];
+        if (existing) {
+          await db!
+            .update(activeRestaurants)
+            .set({ ...baseValues, screensCount })
+            .where(eq(activeRestaurants.id, existing.id));
+          return existing.id;
+        }
+        const [created] = await db!
+          .insert(activeRestaurants)
+          .values({ name, address: "Rua E2E Badge, 300", ...baseValues, screensCount })
+          .returning({ id: activeRestaurants.id });
+        return created.id;
+      };
+
+      const pendingId = await ensureSpace(E2E_BADGE_PENDING_NAME, 4);
+      const noScreenId = await ensureSpace(E2E_BADGE_NO_SCREEN_NAME, 0);
+
+      // AMBOS os espaços são vinculados ao MESMO produto tipo "telas"
+      // (offersScreenProduct=true nos dois). Assim a única variável que difere
+      // entre eles é screensCount — o gate real do badge.
+      let screenProduct = (
+        await db
+          .select({ id: products.id })
+          .from(products)
+          .where(and(eq(products.tipo, "telas"), eq(products.isActive, true)))
+          .limit(1)
+      )[0];
+      if (!screenProduct) {
+        [screenProduct] = await db
+          .insert(products)
+          .values({
+            name: `E2E Telas Badge ${Date.now()}`,
+            tipo: "telas",
+            isActive: true,
+            visibleToAdvertisers: true,
+          })
+          .returning({ id: products.id });
+      }
+      await db
+        .insert(productLocations)
+        .values([
+          { productId: screenProduct.id, restaurantId: pendingId },
+          { productId: screenProduct.id, restaurantId: noScreenId },
+        ])
+        .onConflictDoNothing({
+          target: [productLocations.productId, productLocations.restaurantId],
+        });
+
+      res.json({
+        pendingId,
+        pendingName: E2E_BADGE_PENDING_NAME,
+        noScreenId,
+        noScreenName: E2E_BADGE_NO_SCREEN_NAME,
+      });
+    } catch (error) {
+      console.error("Dev ensure badge fixtures error:", error);
+      const detail = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ message: "Erro ao semear fixtures do badge.", detail });
     }
   });
 

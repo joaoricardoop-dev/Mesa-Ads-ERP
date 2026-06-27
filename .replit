@@ -23,13 +23,13 @@ args = "Start application"
 name = "Start application"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm run dev"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "DATABASE_URL=\"$DATABASE_URL_TEST\" DEV_FIXTURES=1 GEOCODE_STUB_LATLNG=\"-23.55052,-46.633308\" pnpm run dev"
+waitForPort = 5000
 
 [deployment]
 deploymentTarget = "autoscale"

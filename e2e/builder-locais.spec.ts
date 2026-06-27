@@ -340,3 +340,136 @@ test.describe("builder /montar-campanha — visualização em mapa", () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Espaço como produto (Task #364) — o ESPAÇO (active_restaurants) é a fonte
+// única do que se vende no ecommerce: screensCount + photoUrls vivem na coluna
+// do espaço, NÃO na contagem de registros `telas` (inventário opcional). Este
+// spec prova que o catálogo do builder lê esses dois campos do espaço.
+//
+// O fixture dev-ensure-screen-location semeia o espaço com screensCount=4 e
+// uma foto-capa (data URI), valores distintivos do default (Math.max(1, ...))
+// para que a asserção só passe se a leitura vier mesmo do espaço.
+// ─────────────────────────────────────────────────────────────────────────────
+test.describe("builder /montar-campanha — espaço como produto (screensCount + foto)", () => {
+  let seeded: { restaurantId: number; screensCount: number; coverPhotoUrl: string } | null =
+    null;
+
+  test.beforeAll(async ({ request }) => {
+    const res = await request.post("/api/dev-ensure-screen-location", { data: {} });
+    expect(
+      res.ok(),
+      `dev-ensure-screen-location falhou: ${res.status()} ${await res.text()}`,
+    ).toBeTruthy();
+    seeded = (await res.json()) as {
+      restaurantId: number;
+      screensCount: number;
+      coverPhotoUrl: string;
+    };
+    expect(seeded.screensCount).toBeGreaterThan(1);
+    expect(seeded.coverPhotoUrl.length).toBeGreaterThan(0);
+  });
+
+  test.beforeEach(async ({ request }) => {
+    await resetTestAdvertiserState(request);
+  });
+
+  test("catálogo (view Cards) mostra a quantidade de telas e a foto-capa do espaço", async ({
+    page,
+  }) => {
+    expect(seeded, "local de telas semeado indisponível").toBeTruthy();
+    const { restaurantId, screensCount, coverPhotoUrl } = seeded!;
+
+    await page.goto("/montar-campanha");
+    const cta = page.getByRole("button", { name: /montar plano de mídia/i });
+    await expect(cta).toBeVisible();
+    await cta.click();
+
+    await expect(page.getByText(/inventário/i).first()).toBeVisible();
+
+    // A foto-capa só renderiza na view "Cards"; troca explicitamente para ela.
+    await page.getByRole("button", { name: /^cards$/i }).click();
+
+    const card = page.locator(`[data-testid="local-card-${restaurantId}"]`);
+    await expect(card).toBeVisible({ timeout: 15_000 });
+
+    // (a) Quantidade de telas SOURCED do espaço (screensCount=4), não o default 1.
+    await expect(card).toContainText(new RegExp(`${screensCount}\\s*tela\\(s\\)`, "i"));
+
+    // (b) Foto-capa SOURCED de active_restaurants.photoUrls[0] (fonte única).
+    const photo = page.locator(`[data-testid="local-photo-${restaurantId}"]`);
+    await expect(photo).toBeVisible();
+    await expect(photo).toHaveAttribute("src", coverPhotoUrl);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gating do badge "Mídia incompleta" (Task #364). O alerta de config pendente
+// no client (ActiveRestaurants.tsx / TelasPage.tsx) é gated EXCLUSIVAMENTE por
+// `active_restaurants.screensCount > 0` (+ status active + mídia incompleta). O
+// campo derivado `offersScreenProduct` (server, via product_locations →
+// products.tipo='telas') NÃO é lido pela UI do badge.
+//
+// Para isolar a ÚNICA variável que o badge realmente lê, o fixture
+// dev-ensure-badge-fixtures semeia dois espaços IDÊNTICOS — mesma config de
+// mídia INCOMPLETA e AMBOS vinculados ao MESMO produto "telas"
+// (offersScreenProduct=true nos dois) — diferindo SÓ por screensCount (4 vs 0).
+// Assim o teste prova que o gate é screensCount, e não offersScreenProduct (que
+// é true em ambos). Visto em /restaurantes (admin, ActiveRestaurants). Este
+// describe sobrescreve o storageState (anunciante) e loga como admin.
+// ─────────────────────────────────────────────────────────────────────────────
+test.describe("admin /restaurantes — badge 'Mídia incompleta' gated por screensCount", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  let fixtures: {
+    pendingName: string;
+    noScreenName: string;
+  } | null = null;
+
+  test.beforeEach(async ({ page }) => {
+    // Loga como admin no contexto desta página (cookie dev_user_id). Sem userId
+    // o endpoint resolve/cria um admin — quem tem acesso a /restaurantes.
+    const login = await page.request.post("/api/dev-login", { data: {} });
+    expect(login.ok(), `dev-login admin falhou: ${login.status()}`).toBeTruthy();
+    const admin = (await login.json()) as { role: string };
+    expect(admin.role, "dev-login sem userId deve devolver um admin").toBe("admin");
+
+    const seed = await page.request.post("/api/dev-ensure-badge-fixtures", { data: {} });
+    expect(
+      seed.ok(),
+      `dev-ensure-badge-fixtures falhou: ${seed.status()} ${await seed.text()}`,
+    ).toBeTruthy();
+    fixtures = (await seed.json()) as { pendingName: string; noScreenName: string };
+  });
+
+  test("badge aparece no espaço com screensCount>0 e some no screensCount=0 (offersScreenProduct=true em ambos)", async ({
+    page,
+  }) => {
+    expect(fixtures, "fixtures do badge indisponíveis").toBeTruthy();
+    const { pendingName, noScreenName } = fixtures!;
+
+    await page.goto("/restaurantes");
+
+    const search = page.getByPlaceholder(/buscar local/i);
+    await expect(search).toBeVisible({ timeout: 15_000 });
+
+    // A busca filtra a lista por nome, deixando UM único espaço renderizado por
+    // vez — então o badge na tela inteira pertence inequivocamente a esse espaço.
+
+    // (a) screensCount=4 + mídia incompleta → badge presente.
+    await search.fill(pendingName);
+    await expect(page.getByText(pendingName, { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText(/Mídia incompleta/i).first()).toBeVisible();
+
+    // (b) screensCount=0, MESMA config incompleta e TAMBÉM oferecendo telas
+    // (offersScreenProduct=true) → badge AUSENTE. Prova que o gate é
+    // screensCount, não offersScreenProduct (true em ambos).
+    await search.fill(noScreenName);
+    await expect(page.getByText(noScreenName, { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText(/Mídia incompleta/i)).toHaveCount(0);
+  });
+});
