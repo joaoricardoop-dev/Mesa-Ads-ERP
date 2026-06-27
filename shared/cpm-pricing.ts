@@ -179,3 +179,19 @@ export function screenSetupStatus(input: ScreenSetupInput | null | undefined): S
     missing,
   };
 }
+
+/**
+ * Regra única (fonte de verdade) para "espaço de telas publicável no ecommerce".
+ * Um espaço que vende telas (screensCount > 0) só pode aparecer no builder/ecommerce
+ * público com ao menos uma foto — caso contrário o card ficaria com capa em branco.
+ * Usada tanto na validação de salvamento (ActiveRestaurantForm) quanto no filtro
+ * server-side do inventário público (anunciantePortal.listAvailableLocations).
+ */
+export function screenSpaceMissingPhotos(input: {
+  screensCount?: number | null;
+  photoCount?: number | null;
+}): boolean {
+  const screens = input?.screensCount ?? 0;
+  const photos = input?.photoCount ?? 0;
+  return screens > 0 && photos === 0;
+}

@@ -55,7 +55,7 @@ import {
 } from "@shared/rating-config";
 
 import { EXCLUDED_CATEGORIES } from "@shared/excluded-categories";
-import { computeCpmPricing } from "@shared/cpm-pricing";
+import { computeCpmPricing, screenSpaceMissingPhotos } from "@shared/cpm-pricing";
 import { OPERATING_DAYS, OPERATING_HOURS, operatingCellKey, operatingHourLabel, parseOperatingHours } from "@shared/screen-schedule";
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -450,10 +450,22 @@ export default function ActiveRestaurantForm() {
     }));
   };
 
+  // Avisa, ao salvar, que um espaço que vende telas sem foto não será publicado
+  // no ecommerce de telas até ter ao menos uma foto (mesma regra do server:
+  // screenSpaceMissingPhotos). Mostrado depois do toast de sucesso.
+  const warnIfNotPublishable = () => {
+    if (screenSpaceMissingPhotos({ screensCount: form.screensCount, photoCount: form.photoUrls.length })) {
+      toast.warning(
+        "Este espaço vende telas mas está sem fotos: não aparecerá no ecommerce de telas até você adicionar ao menos uma foto.",
+      );
+    }
+  };
+
   const createMutation = trpc.activeRestaurant.create.useMutation({
     onSuccess: () => {
       utils.activeRestaurant.list.invalidate();
       toast.success("Local cadastrado!");
+      warnIfNotPublishable();
       navigate("/restaurantes");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -463,6 +475,7 @@ export default function ActiveRestaurantForm() {
     onSuccess: () => {
       utils.activeRestaurant.list.invalidate();
       toast.success("Local atualizado!");
+      warnIfNotPublishable();
       navigate("/restaurantes");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),

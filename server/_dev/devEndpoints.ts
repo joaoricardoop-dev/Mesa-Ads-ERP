@@ -476,6 +476,9 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
             screenWeeklyHours: "84.00",
             screenExposureSec: 10,
             dailyLoops: 144,
+            // ≥1 foto para o espaço de telas ser publicável no marketplace público
+            // (regra screenSpaceMissingPhotos): sem isso o card some para anunciante.
+            photoUrls: JSON.stringify(["https://placehold.co/640x360?text=E2E+Tela"]),
           })
           .where(eq(activeRestaurants.id, restaurantId));
       } else {
@@ -503,6 +506,9 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
             screenWeeklyHours: "84.00",
             screenExposureSec: 10,
             dailyLoops: 144,
+            // ≥1 foto para o espaço de telas ser publicável no marketplace público
+            // (regra screenSpaceMissingPhotos): sem isso o card some para anunciante.
+            photoUrls: JSON.stringify(["https://placehold.co/640x360?text=E2E+Tela"]),
           })
           .returning({ id: activeRestaurants.id });
         restaurantId = restaurant.id;

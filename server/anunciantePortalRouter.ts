@@ -16,6 +16,7 @@ import {
   campaignDrafts,
 } from "../drizzle/schema";
 import { parseTelaPhotoUrls } from "./telaRouter";
+import { screenSpaceMissingPhotos } from "@shared/cpm-pricing";
 import { and, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
@@ -105,9 +106,15 @@ export const anunciantePortalRouter = router({
         })
         .optional(),
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDatabase();
       const { productType, neighborhood, startDate, endDate, category } = input ?? {};
+      // Audiência pública do marketplace (anunciante/parceiro). Para esses perfis,
+      // espaços que vendem telas mas estão sem foto não devem aparecer na seção de
+      // telas (card com capa em branco). Equipe interna continua vendo (com o badge
+      // "Sem fotos") para poder completar o cadastro.
+      const isPublicMarketplace =
+        ctx.user.role === "anunciante" || ctx.user.role === "parceiro";
       if (startDate && endDate && startDate > endDate) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "startDate deve ser <= endDate" });
       }
@@ -249,20 +256,30 @@ export const anunciantePortalRouter = router({
 
       const payload = restaurantRows.map((r) => {
         const excluded = parseExcludedCategories(r.excludedCategories);
-        const productSlots = (slotsByRestaurant.get(r.id) ?? []).map((s) => {
-          const cell = availability.get(`${s.productId}:${s.restaurantId}`);
-          return {
-            productId: s.productId,
-            productName: s.productName,
-            productTipo: s.productTipo,
-            unitLabel: s.productUnitLabel,
-            unitLabelPlural: s.productUnitLabelPlural,
-            maxShares: s.maxShares,
-            cycleWeeks: s.cycleWeeks,
-            occupiedShares: cell?.occupiedShares ?? 0,
-            availableShares: cell?.availableShares ?? s.maxShares,
-          };
-        });
+        const photoUrls = parseTelaPhotoUrls(r.photoUrls);
+        // Espaço que vende telas sem foto não é publicável no marketplace público:
+        // removemos os slots de telas (fonte única: screenSpaceMissingPhotos) para
+        // que o card de telas não apareça com capa em branco para anunciante/parceiro.
+        // Demais produtos (bolachas/impressos) do espaço seguem disponíveis.
+        const hideScreenSlots =
+          isPublicMarketplace &&
+          screenSpaceMissingPhotos({ screensCount: r.screensCount ?? 0, photoCount: photoUrls.length });
+        const productSlots = (slotsByRestaurant.get(r.id) ?? [])
+          .filter((s) => !(hideScreenSlots && s.productTipo === "telas"))
+          .map((s) => {
+            const cell = availability.get(`${s.productId}:${s.restaurantId}`);
+            return {
+              productId: s.productId,
+              productName: s.productName,
+              productTipo: s.productTipo,
+              unitLabel: s.productUnitLabel,
+              unitLabelPlural: s.productUnitLabelPlural,
+              maxShares: s.maxShares,
+              cycleWeeks: s.cycleWeeks,
+              occupiedShares: cell?.occupiedShares ?? 0,
+              availableShares: cell?.availableShares ?? s.maxShares,
+            };
+          });
 
         const totalAvailable = productSlots.reduce((sum, p) => sum + p.availableShares, 0);
         const estimatedAudience = (r.monthlyCustomers ?? 0);
@@ -295,7 +312,7 @@ export const anunciantePortalRouter = router({
           // de registros individuais da tabela `telas`, que é inventário opcional).
           screensCount: r.screensCount ?? 0,
           // Fotos do espaço exibidas no ecommerce junto do local (fonte única).
-          photoUrls: parseTelaPhotoUrls(r.photoUrls),
+          photoUrls,
           dailyLoops: r.dailyLoops,
           // Config CPM da tela (fonte única: shared/cpm-pricing.ts). Telas só têm
           // preço quando estes campos estão completos.
