@@ -127,6 +127,10 @@ interface FormData {
   screenWeeklyHours: string;
   screenOperatingHours: string[];
   screenExposureSec: number;
+  // ── Sala VIP (repasse no próprio local — Task #375) ──
+  isVipRoom: boolean;
+  vipRepassePercent: string;
+  vipBillingMode: string;
 }
 
 const emptyForm: FormData = {
@@ -190,6 +194,9 @@ const emptyForm: FormData = {
   screenWeeklyHours: "",
   screenOperatingHours: [],
   screenExposureSec: 0,
+  isVipRoom: false,
+  vipRepassePercent: "30.00",
+  vipBillingMode: "bruto",
 };
 
 interface Socio {
@@ -334,6 +341,9 @@ export default function ActiveRestaurantForm() {
         screenWeeklyHours: (existingRestaurant as any).screenWeeklyHours != null ? String((existingRestaurant as any).screenWeeklyHours) : "",
         screenOperatingHours: parseOperatingHours((existingRestaurant as any).screenOperatingHours),
         screenExposureSec: (existingRestaurant as any).screenExposureSec || 0,
+        isVipRoom: !!(existingRestaurant as any).isVipRoom,
+        vipRepassePercent: (existingRestaurant as any).vipRepassePercent != null ? String((existingRestaurant as any).vipRepassePercent) : "30.00",
+        vipBillingMode: (existingRestaurant as any).vipBillingMode || "bruto",
       });
       setStep("form");
     }
@@ -539,6 +549,10 @@ export default function ActiveRestaurantForm() {
       screenWeeklyHours: form.screenWeeklyHours.trim() !== "" ? form.screenWeeklyHours.trim() : null,
       screenOperatingHours: form.screenOperatingHours.length > 0 ? JSON.stringify(form.screenOperatingHours) : null,
       screenExposureSec: form.screenExposureSec || null,
+      // ── Sala VIP (repasse no próprio local — fonte única; Task #375) ──
+      isVipRoom: form.isVipRoom,
+      vipRepassePercent: form.isVipRoom ? (form.vipRepassePercent.trim() || "30.00") : undefined,
+      vipBillingMode: form.isVipRoom ? (form.vipBillingMode as "bruto" | "liquido") : undefined,
       // Coordenadas escolhidas no AddressAutocomplete (origem única). Só enviamos
       // quando o usuário selecionou um endereço; ao editar sem reescolher, coords
       // fica null e o lat/lng existente é preservado.
@@ -1090,6 +1104,51 @@ export default function ActiveRestaurantForm() {
                               <SelectItem value="inactive">Inativo</SelectItem>
                             </SelectContent>
                           </Select>
+                        </div>
+                      )}
+                    </div>
+                    {/* ── Sala VIP: repasse no próprio local (fonte única; Task #375) ── */}
+                    <div className="rounded-md border border-border/30 p-3 space-y-3">
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={form.isVipRoom}
+                          onCheckedChange={(v) => setForm(p => ({ ...p, isVipRoom: !!v }))}
+                          className="mt-0.5"
+                        />
+                        <span className="space-y-0.5">
+                          <span className="block text-sm font-medium">Este local é uma Sala VIP</span>
+                          <span className="block text-[10px] text-muted-foreground">
+                            O repasse da sala VIP passa a ter este local como recebedor. O percentual e a base abaixo definem o repasse, divididos por sala proporcionalmente à receita atribuída a cada local.
+                          </span>
+                        </span>
+                      </label>
+                      {form.isVipRoom && (
+                        <div className="grid grid-cols-2 gap-3 pl-6">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Repasse Sala VIP (%)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              value={form.vipRepassePercent}
+                              onChange={(e) => setForm(p => ({ ...p, vipRepassePercent: e.target.value }))}
+                              placeholder="30.00"
+                              className="bg-background border-border/30 h-9 text-sm"
+                            />
+                            <p className="text-[10px] text-muted-foreground">Padrão 30%. Editável por local.</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Base do Repasse</Label>
+                            <Select value={form.vipBillingMode} onValueChange={(v) => setForm(p => ({ ...p, vipBillingMode: v }))}>
+                              <SelectTrigger className="bg-background border-border/30 h-9 text-sm"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="bruto">Bruto</SelectItem>
+                                <SelectItem value="liquido">Líquido</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-[10px] text-muted-foreground">Bruto = sobre a receita atribuída. Líquido = após impostos e comissão do vendedor.</p>
+                          </div>
                         </div>
                       )}
                     </div>

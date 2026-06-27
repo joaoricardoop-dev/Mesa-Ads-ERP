@@ -416,6 +416,13 @@ export const activeRestaurants = pgTable("active_restaurants", {
   // estimada). Comercializa-se o espaço inteiro: este número substitui a contagem
   // de registros individuais da tabela `telas` (que vira inventário opcional).
   screensCount: integer("screensCount").default(0).notNull(),
+  // ── Sala VIP (repasse no próprio local — fonte única; Task #375) ──
+  // Marca o local como "sala VIP". O repasse VIP passa a ter o LOCAL como
+  // recebedor; o percentual (default 30%, editável) e a base (bruto/líquido)
+  // vivem aqui, substituindo o cadastro apartado `vip_providers`.
+  isVipRoom: boolean("is_vip_room").default(false).notNull(),
+  vipRepassePercent: decimal("vip_repasse_percent", { precision: 5, scale: 2 }).default("30.00").notNull(),
+  vipBillingMode: billingModeEnum("vip_billing_mode").default("bruto").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -424,6 +431,7 @@ export const activeRestaurants = pgTable("active_restaurants", {
   index("idx_active_restaurants_cnpj").on(t.cnpj),
   index("idx_active_restaurants_rating_tier").on(t.ratingTier),
   index("idx_active_restaurants_categoria").on(t.categoria),
+  index("idx_active_restaurants_is_vip_room").on(t.isVipRoom),
 ]);
 
 export type ActiveRestaurant = typeof activeRestaurants.$inferSelect;

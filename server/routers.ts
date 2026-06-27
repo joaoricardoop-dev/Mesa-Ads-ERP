@@ -835,6 +835,10 @@ export const appRouter = router({
           screenWeeklyHours: z.string().optional().nullable(),
           screenOperatingHours: z.string().optional().nullable(),
           screenExposureSec: z.number().int().optional().nullable(),
+          // ── Sala VIP (repasse no próprio local — Task #375) ──
+          isVipRoom: z.boolean().optional(),
+          vipRepassePercent: z.string().optional(),
+          vipBillingMode: z.enum(["bruto", "liquido"]).optional(),
           // ── Coordenadas (origem única: AddressAutocomplete no client) ──
           lat: z.string().optional().nullable(),
           lng: z.string().optional().nullable(),
@@ -912,6 +916,10 @@ export const appRouter = router({
           screenWeeklyHours: z.string().optional().nullable(),
           screenOperatingHours: z.string().optional().nullable(),
           screenExposureSec: z.number().int().optional().nullable(),
+          // ── Sala VIP (repasse no próprio local — Task #375) ──
+          isVipRoom: z.boolean().optional(),
+          vipRepassePercent: z.string().optional(),
+          vipBillingMode: z.enum(["bruto", "liquido"]).optional(),
           // ── Coordenadas (origem única: AddressAutocomplete no client) ──
           lat: z.string().optional().nullable(),
           lng: z.string().optional().nullable(),

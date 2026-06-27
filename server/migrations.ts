@@ -2305,6 +2305,54 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     name: "task_362_screen_operating_hours_column",
     sql: `ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "screen_operating_hours" text;`,
   },
+  {
+    // Task #375 — Sala VIP vira local. O repasse VIP passa a ter o LOCAL como
+    // recebedor; percentual (default 30%, editável) e base (bruto/líquido)
+    // vivem no próprio cadastro do local. Substitui o cadastro apartado
+    // `vip_providers` como fonte única do repasse.
+    name: "task_375_active_restaurants_vip_room_fields",
+    sql: [
+      `ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "is_vip_room" boolean NOT NULL DEFAULT false;`,
+      `ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "vip_repasse_percent" numeric(5,2) NOT NULL DEFAULT 30.00;`,
+      `ALTER TABLE "active_restaurants" ADD COLUMN IF NOT EXISTS "vip_billing_mode" "billing_mode" NOT NULL DEFAULT 'bruto';`,
+      `CREATE INDEX IF NOT EXISTS "idx_active_restaurants_is_vip_room" ON "active_restaurants" ("is_vip_room");`,
+    ],
+  },
+  {
+    // Task #375 — Backfill: migra a config de repasse dos `vip_providers`
+    // para o local correspondente (match por CNPJ só-dígitos → nome). Marca o
+    // local como sala VIP e copia percentual + base. NÃO apaga `vip_providers`
+    // (preserva o histórico financeiro já materializado em accounts_payable).
+    // Idempotente: só toca locais ainda não marcados (is_vip_room = false).
+    name: "task_375_backfill_vip_providers_into_locais",
+    sql: [
+      // 1) Match por CNPJ normalizado (apenas dígitos).
+      `UPDATE "active_restaurants" ar
+         SET "is_vip_room" = true,
+             "vip_repasse_percent" = vp."repassePercent",
+             "vip_billing_mode" = vp."billingMode"
+         FROM "vip_providers" vp
+         WHERE vp."cnpj" IS NOT NULL AND ar."cnpj" IS NOT NULL
+           AND regexp_replace(vp."cnpj", '\\D', '', 'g') <> ''
+           AND regexp_replace(vp."cnpj", '\\D', '', 'g') = regexp_replace(ar."cnpj", '\\D', '', 'g')
+           AND ar."is_vip_room" = false;`,
+      // 2) Match por nome (case-insensitive, trim) para os provedores que NÃO
+      //    casaram por CNPJ (provider sem CNPJ ou sem local de mesmo CNPJ).
+      `UPDATE "active_restaurants" ar
+         SET "is_vip_room" = true,
+             "vip_repasse_percent" = vp."repassePercent",
+             "vip_billing_mode" = vp."billingMode"
+         FROM "vip_providers" vp
+         WHERE lower(btrim(vp."name")) = lower(btrim(ar."name"))
+           AND ar."is_vip_room" = false
+           AND NOT EXISTS (
+             SELECT 1 FROM "active_restaurants" a2
+             WHERE a2."cnpj" IS NOT NULL AND vp."cnpj" IS NOT NULL
+               AND regexp_replace(a2."cnpj", '\\D', '', 'g') <> ''
+               AND regexp_replace(a2."cnpj", '\\D', '', 'g') = regexp_replace(vp."cnpj", '\\D', '', 'g')
+           );`,
+    ],
+  },
 ];
 
 /**
