@@ -3,53 +3,55 @@ name: VIP room repasse = local (not provider)
 description: Where the VIP repasse config lives, how it's split, and the bruto-projection vs liquido-ledger single-source boundary.
 ---
 
-# VIP room is a LOCAL (active_restaurants), not a separate provider
+# VIP room is a LOCAL, not a separate provider
 
-A "sala VIP" is a location row in `active_restaurants` with `is_vip_room`,
-`vip_repasse_percent` (default 30, editable) and `vip_billing_mode`
-(`bruto`/`liquido`, default `bruto`). This replaces the old `vip_providers`
-table as the *source* of the repasse config. Old `vip_providers` rows and old
-`accounts_payable` APs carrying `vipProviderId` are kept intact (financial
-history is never deleted); the legacy `custom` VIP slice
-(`calcCustomVipRepasse` / `materializeCustomVipRepasse`) is preserved untouched.
+The VIP-room repasse config (is-vip-room flag, repasse percent default 30
+editable, billing mode bruto/liquido default bruto) lives on the location record
+(`active_restaurants`), not on a separate provider table. The old `vip_providers`
+table is no longer the *source* of the config, but its rows and any historical
+`accounts_payable` carrying a provider reference are kept intact — financial
+history is never deleted. The legacy "custom" VIP slice (for sob-medida
+quotations) is preserved untouched alongside the new "local" slice.
 
 Repasse is **split per VIP room**, proportional to revenue attributed to each
 location via `campaign_items` (phase scope when the invoice is phase-specific,
-else whole-campaign scope). Canonical math = `calcVipRepasseLocal` in
-`server/finance/calc.ts`:
-- `bruto`  = attributedShare × rate
-- `liquido`= (attributedShare − taxes×ratio − sellerComm×ratio) × rate
+else whole-campaign scope). The canonical math is one shared function
+(`calcVipRepasseLocal`): bruto = share × rate; liquido = (share − taxes×ratio −
+sellerComm×ratio) × rate.
+
+## AP idempotency key MUST include slice + recipient
+**Rule:** the natural/unique key for a `vip_repasse` accounts-payable row is
+`(invoiceId, slice, recipient)` — NOT invoiceId alone.
+**Why:** the per-room split creates N AP rows per invoice (one per VIP local). An
+invoiceId-only unique index silently drops every row after the first via
+`ON CONFLICT DO NOTHING`, collapsing the split. This bit once.
+**How to apply:** recipient = restaurantId for local slice, providerId for
+custom/legacy; COALESCE to a non-null string in the index (Postgres treats NULLs
+as distinct, which would let true duplicates through). Slice defaults to
+'standard' for legacy rows with no slice.
 
 ## Single-source boundary: bruto projection vs liquido ledger
-**Rule:** the authoritative realized repasse lives in the `accounts_payable`
-ledger, materialized by `materializeVipRepasse` using `calcVipRepasseLocal`
-(honors BOTH modes). The financial-dashboard aggregate
-(`VIP_REPASSE_DEDUCTION_SQL` in `server/financialRouter.ts`) is a **projection**
-that assumes `bruto` only.
+**Rule:** the authoritative realized repasse is the `accounts_payable` ledger
+(materialized by the per-local math, honoring BOTH modes). The financial-
+dashboard aggregate SQL is a **projection** that assumes bruto only.
+**Why:** porting the liquido branch into SQL would re-implement the whole tax
+stack in SQL — a *second* source of truth for taxes, a worse violation of the
+"fonte única de verdade" mandate than the bounded projection gap. All rooms are
+bruto by default + migration, so a liquido room is a rare manual override.
+**How to apply:** keep the dashboard projection bruto-only; never duplicate tax
+math in SQL. The real single-source fix is aggregates reading the AP ledger, but
+that breaks projection for not-yet-paid invoices — left as a deliberate gap.
 
-**Why:** porting the `liquido` branch into SQL would require re-implementing the
-whole `calcTaxes` stack in SQL — a *second* source of truth for taxes, which is
-a worse violation of the project's OBRIGATÓRIO "fonte única de verdade" mandate
-than the bounded projection gap. User decision was bruto everywhere (default +
-migration standardizes all rooms to bruto), so a `liquido` room is a rare manual
-override.
-
-**How to apply:** keep the dashboard projection bruto-only; never duplicate the
-tax math in SQL. The real single-source fix is to have aggregates read the AP
-ledger (covers liquido), but that breaks projection for not-yet-paid invoices —
-deferred as a follow-up.
-
-## Known DRE gap (must fix before unlinking products from vipProviderId)
-`calcPhaseFinancials` (DRE batch, `server/finance/calc.ts`) still computes VIP
-from `products.vipProviderId` + provider rate on a liquido-style base — NOT the
-new per-local attribution. It was deliberately not aligned. **It HARD-BLOCKS the
-DOOH consolidation phase:** once products stop linking to `vipProviderId`, DRE
-VIP would collapse to 0. Align DRE to `calcVipRepasseLocal`/per-local
-attribution before that phase.
+## DRE batch still on the legacy provider path (blocks DOOH consolidation)
+The per-phase DRE computation still derives VIP repasse from the product→provider
+link on a liquido-style base, NOT the new per-local attribution. It was
+deliberately not aligned. It HARD-BLOCKS the digital/DOOH consolidation phase:
+once products stop linking to a provider, DRE VIP collapses to 0. Align DRE to
+the per-local math before that phase.
 
 ## Provider→local backfill matching
 Backfill marks a local as VIP by matching provider→local on normalized CNPJ then
-exact name. No match → NOT auto-linked (would misroute repasse money); instead
-`logUnmatchedVipProviders` logs it once so an operator marks the room manually in
-the location form. Real data seen: provider "Harmony Lounge" (no CNPJ) vs local
-"Harmony Lounge - Sala VIP ..." legitimately does NOT auto-match.
+exact name. No match → NOT auto-linked (would misroute repasse money); a one-time
+log lists unmatched providers so an operator marks the room manually. Exact name
+match is intentional: a provider named "X" vs a local "X - Sala VIP ..."
+legitimately does NOT auto-match.

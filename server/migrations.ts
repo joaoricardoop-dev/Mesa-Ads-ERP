@@ -2357,6 +2357,33 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     ],
   },
   {
+    // Task #375 — A unicidade antiga de repasse VIP (`uq_ap_vip_repasse_invoice`)
+    // era por sourceRef.invoiceId APENAS, o que assumia 1 AP de repasse por
+    // fatura. Agora o repasse é DIVIDIDO por sala VIP (1 AP por (fatura, local)),
+    // então a chave natural precisa incluir a fatia (slice) e o recebedor. Sem
+    // isso, o segundo local da mesma fatura colide no índice e é descartado pelo
+    // ON CONFLICT DO NOTHING, quebrando o rateio.
+    //
+    // Nova chave: (invoiceId, slice, recipient), onde:
+    //   slice     = COALESCE(sourceRef.slice, 'standard')   -- legado sem slice
+    //   recipient = COALESCE(sourceRef.restaurantId, sourceRef.vipProviderId, '')
+    // COALESCE evita NULLs (que o Postgres trata como distintos, permitindo
+    // duplicatas). Linhas 'local' usam restaurantId; 'custom'/'standard' usam
+    // vipProviderId. Substitui o índice antigo (DROP + CREATE idempotentes).
+    name: "task_375_ap_vip_repasse_natural_key_per_slice",
+    sql: [
+      `DROP INDEX IF EXISTS "uq_ap_vip_repasse_invoice";`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "uq_ap_vip_repasse_invoice_slice"
+         ON "accounts_payable" (
+           ("sourceRef"->>'invoiceId'),
+           COALESCE("sourceRef"->>'slice', 'standard'),
+           COALESCE("sourceRef"->>'restaurantId', "sourceRef"->>'vipProviderId', '')
+         )
+         WHERE "sourceType" = 'vip_repasse'
+           AND "status" <> 'cancelada';`,
+    ],
+  },
+  {
     // Task #374 — Grade de horário de funcionamento por TELA (7 dias × 24h).
     // Mesmo formato canônico do Local (JSON text de chaves "dia-hora"). É
     // DESCRITIVO apenas: NÃO vira segunda fonte de horas/semana e NÃO entra na
