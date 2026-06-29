@@ -108,14 +108,14 @@ const NET_AMOUNT_SQL = sql<string>`
 `;
 
 // Helpers para agregar net sobre um conjunto de condições. A query resultante
-// já inclui os joins necessários com campaigns/products/vip_providers.
+// já inclui os joins necessários com campaigns/products. O repasse VIP não
+// depende mais de vip_providers (sai dos LOCAIS via VIP_REPASSE_DEDUCTION_SQL).
 function buildNetInvoiceQuery(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
   return db
     .select({ total: sql<string>`COALESCE(SUM(${NET_AMOUNT_SQL}), 0)` })
     .from(invoices)
     .leftJoin(campaigns, eq(campaigns.id, invoices.campaignId))
-    .leftJoin(products, eq(products.id, campaigns.productId))
-    .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId));
+    .leftJoin(products, eq(products.id, campaigns.productId));
 }
 
 function buildNetInvoiceCountQuery(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
@@ -126,8 +126,7 @@ function buildNetInvoiceCountQuery(db: NonNullable<Awaited<ReturnType<typeof get
     })
     .from(invoices)
     .leftJoin(campaigns, eq(campaigns.id, invoices.campaignId))
-    .leftJoin(products, eq(products.id, campaigns.productId))
-    .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId));
+    .leftJoin(products, eq(products.id, campaigns.productId));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -165,8 +164,7 @@ function buildDeductionQuery(db: NonNullable<Awaited<ReturnType<typeof getDb>>>)
     .select({ total: sql<string>`COALESCE(SUM(${DEDUCTION_AMOUNT_SQL}), 0)` })
     .from(invoices)
     .leftJoin(campaigns, eq(campaigns.id, invoices.campaignId))
-    .leftJoin(products, eq(products.id, campaigns.productId))
-    .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId));
+    .leftJoin(products, eq(products.id, campaigns.productId));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

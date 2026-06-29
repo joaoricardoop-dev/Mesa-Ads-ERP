@@ -1546,8 +1546,12 @@ export const accountsPayable = pgTable("accounts_payable", {
   uniqueIndex("uq_ap_tax_invoice_kind")
     .on(sql`("sourceRef"->>'invoiceId')`, sql`("sourceRef"->>'kind')`)
     .where(sql`"sourceType" = 'tax'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text`),
-  uniqueIndex("uq_ap_vip_repasse_invoice")
-    .on(sql`("sourceRef"->>'invoiceId')`)
+  uniqueIndex("uq_ap_vip_repasse_invoice_slice")
+    .on(
+      sql`("sourceRef"->>'invoiceId')`,
+      sql`COALESCE("sourceRef"->>'slice', 'standard')`,
+      sql`COALESCE("sourceRef"->>'restaurantId', "sourceRef"->>'vipProviderId', '')`,
+    )
     .where(sql`"sourceType" = 'vip_repasse'::accounts_payable_source_type AND (status)::text <> 'cancelada'::text`),
 ]);
 
