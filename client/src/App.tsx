@@ -37,7 +37,6 @@ import ServiceOrders from "./pages/ServiceOrders";
 import BatchManagement from "./pages/BatchManagement";
 import FinancialDashboard from "./pages/financial/FinancialDashboard";
 import Invoicing from "./pages/financial/Invoicing";
-import VipProvidersPage from "./pages/financial/VipProvidersPage";
 import OperationalCosts from "./pages/financial/OperationalCosts";
 import FinancialReport from "./pages/financial/FinancialReport";
 import PartnerCommissionReport from "./pages/financial/PartnerCommissionReport";
@@ -139,12 +138,15 @@ function Router() {
       <Route path="/financeiro/glossario" component={FinancialGlossary} />
       <Route path="/financeiro/comissao-parceiros" component={PartnerCommissionReport} />
       <Route path="/financeiro/auditoria" component={FinancialAuditLog} />
-      <Route path="/configuracoes/provedores-sala-vip" component={VipProvidersPage} />
+      {/* Task #375 — Provedores Sala VIP aposentado: a sala VIP virou um local
+          (active_restaurants.is_vip_room) com o repasse no próprio cadastro do
+          local. Rota/menu removidos do fluxo ativo; dados/histórico preservados. */}
+      <Route path="/configuracoes/provedores-sala-vip">{() => <Redirect to="/restaurantes" />}</Route>
       {/* Redirects (rotas antigas → novas) */}
       <Route path="/financeiro/pagamentos">{() => <Redirect to="/financeiro/contas-pagar?tab=restaurant_commission" />}</Route>
       <Route path="/financeiro/custos">{() => <Redirect to="/financeiro/contas-pagar?tab=supplier_cost" />}</Route>
       <Route path="/financeiro/fornecedores">{() => <Redirect to="/producao?tab=suppliers" />}</Route>
-      <Route path="/financeiro/provedores-vip">{() => <Redirect to="/configuracoes/provedores-sala-vip" />}</Route>
+      <Route path="/financeiro/provedores-vip">{() => <Redirect to="/restaurantes" />}</Route>
       <Route path="/campanhas/:id/batch/:phaseId" component={CampaignDetail} />
       {/* Rota antiga mantida como alias pra não quebrar links existentes */}
       <Route path="/campanhas/:id/fase/:phaseId" component={CampaignDetail} />

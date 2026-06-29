@@ -195,6 +195,58 @@ export function calcVipRepasse(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Task #375 — Repasse Sala VIP por LOCAL (fonte única do repasse)
+//
+// A partir da unificação "sala VIP = local", o repasse deixa de sair do
+// cadastro apartado `vip_providers` e passa a sair do próprio local
+// (`active_restaurants.is_vip_room` + `vip_repasse_percent` + `vip_billing_mode`).
+//
+// O repasse é DIVIDIDO por sala, proporcional à receita atribuída a cada local
+// (campaign_items). O chamador (materializer / view) calcula a fatia da fatura
+// atribuída ao local (`attributedShare = invoice.amount × localRev/totalRev`)
+// e passa para cá; esta função aplica a regra de base:
+//   • base BRUTO    → repasse = attributedShare × repassePercent
+//   • base LÍQUIDO  → repasse = (attributedShare − impostos − comissão vendedor,
+//                     rateados proporcionalmente à fatia) × repassePercent
+//
+// Regras gerais (espelham calcVipRepasse): bonificada → 0; share/percent ≤ 0 → 0.
+// O gate "produto digital" (regra tela vs bolacha) é responsabilidade do
+// chamador — aqui só entram fatias de salas VIP já elegíveis.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface VipRoomLike {
+  vipRepassePercent: string | number | null;
+  vipBillingMode: "bruto" | "liquido" | null;
+}
+export function calcVipRepasseLocal(args: {
+  attributedShare: number;
+  invoice: InvoiceLike;
+  campaign: CampaignLike;
+  room: VipRoomLike;
+  irpjRatePercent?: number;
+}): number {
+  const { attributedShare, invoice, campaign, room } = args;
+  if (campaign.isBonificada) return 0;
+  if (attributedShare <= 0) return 0;
+  const rate = num(room.vipRepassePercent) / 100;
+  if (rate <= 0) return 0;
+
+  if ((room.vipBillingMode ?? "bruto") === "bruto") {
+    return roundCents(attributedShare * rate);
+  }
+
+  // Base líquida: deduz impostos + comissão do vendedor proporcionalmente à
+  // fatia atribuída (mesmos componentes de calcVipRepasse, rateados).
+  const gross = num(invoice.amount);
+  if (gross <= 0) return 0;
+  const ratio = attributedShare / gross;
+  const taxesTotal = calcTaxes(invoice, null, args.irpjRatePercent).reduce((s, t) => s + t.amount, 0);
+  const sellerComm = gross * (num(campaign.sellerCommission) / 100);
+  const base = attributedShare - taxesTotal * ratio - sellerComm * ratio;
+  if (base <= 0) return 0;
+  return roundCents(base * rate);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Comissão Parceiro (BV)
 //   Base = gross − impostos − comissão restaurante.
 //   Taxa = campaign.agencyBvPercent (se hasAgencyBv true e definido)

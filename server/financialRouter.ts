@@ -51,20 +51,51 @@ async function getDatabase() {
 // Esta expressão SQL é usada tanto em agregações (SUM) quanto em linhas
 // individuais. O FROM precisa fazer LEFT JOIN em campaigns + products + vip_providers.
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Task #375 — Dedução do repasse VIP por LOCAL (fonte única do repasse).
+// O repasse deixou de sair de products.vipProviderId e passa a sair dos LOCAIS
+// marcados como sala VIP (active_restaurants.is_vip_room), DIVIDIDO por sala
+// proporcionalmente à receita atribuída a cada local (campaign_items). Esta
+// expressão rateia o bruto da fatura pelas salas VIP do escopo (fase da fatura,
+// ou campanha inteira quando a fatura não é de fase específica).
+//
+// BASE: bruto (padrão do sistema e de todas as salas migradas/criadas). Salas
+// configuradas com base 'líquido' (config rara) são honradas exatamente apenas
+// no ledger autoritativo accounts_payable (materializeVipRepasse); esta VIEW
+// agregada assume bruto. Mantém o gate "tela vs bolacha" (só produto digital).
+// ─────────────────────────────────────────────────────────────────────────────
+const VIP_REPASSE_DEDUCTION_SQL = sql<string>`
+  CASE
+    WHEN ${products.tipo} IN ('telas', 'janelas_digitais')
+    THEN ${invoices.amount}::numeric * COALESCE((
+      SELECT
+        SUM(
+          CASE WHEN ar."is_vip_room"
+            THEN COALESCE(ci."totalPrice"::numeric, ci."quantity"::numeric * ci."unitPrice"::numeric)
+                 * (ar."vip_repasse_percent"::numeric / 100)
+            ELSE 0
+          END
+        )
+        / NULLIF(SUM(COALESCE(ci."totalPrice"::numeric, ci."quantity"::numeric * ci."unitPrice"::numeric)), 0)
+      FROM "campaign_items" ci
+      JOIN "campaign_phases" cp ON cp."id" = ci."campaignPhaseId"
+      LEFT JOIN "active_restaurants" ar ON ar."id" = ci."restaurantId"
+      WHERE CASE
+              WHEN ${invoices.campaignPhaseId} IS NOT NULL
+                THEN ci."campaignPhaseId" = ${invoices.campaignPhaseId}
+              ELSE cp."campaignId" = ${invoices.campaignId}
+            END
+    ), 0)
+    ELSE 0
+  END
+`;
+
 const NET_AMOUNT_SQL = sql<string>`
   CASE WHEN COALESCE(${campaigns.isBonificada}, false) THEN ${invoices.amount}::numeric
   ELSE
     ${invoices.amount}::numeric
     - (${invoices.amount}::numeric * (COALESCE(${campaigns.restaurantCommission}, 0)::numeric / 100))
-    - (
-        CASE
-          WHEN ${products.tipo} IN ('telas', 'janelas_digitais') AND ${products.vipProviderId} IS NOT NULL
-          THEN ${invoices.amount}::numeric * (
-            COALESCE(${products.vipProviderCommissionPercent}::numeric, ${vipProviders.repassePercent}::numeric, 0) / 100
-          )
-          ELSE 0
-        END
-      )
+    - (${VIP_REPASSE_DEDUCTION_SQL})
     - (
         -- ISS retido pelo tomador reduz o líquido que recebemos.
         -- ISS não retido: empresa recolhe depois; não entra aqui.
@@ -125,15 +156,7 @@ const DEDUCTION_AMOUNT_SQL = sql<string>`
   CASE WHEN COALESCE(${campaigns.isBonificada}, false) THEN 0
   ELSE
     (${invoices.amount}::numeric * (COALESCE(${campaigns.restaurantCommission}, 0)::numeric / 100))
-    + (
-        CASE
-          WHEN ${products.tipo} IN ('telas', 'janelas_digitais') AND ${products.vipProviderId} IS NOT NULL
-          THEN ${invoices.amount}::numeric * (
-            COALESCE(${products.vipProviderCommissionPercent}::numeric, ${vipProviders.repassePercent}::numeric, 0) / 100
-          )
-          ELSE 0
-        END
-      )
+    + (${VIP_REPASSE_DEDUCTION_SQL})
   END
 `;
 
@@ -745,14 +768,11 @@ export const financialRouter = router({
             END
           `,
           productTipo: products.tipo,
+          // Task #375 — repasse por LOCAL (fonte única VIP_REPASSE_DEDUCTION_SQL).
           vipRepasseAmount: sql<string>`
             CASE
               WHEN COALESCE(${campaigns.isBonificada}, false) THEN 0
-              WHEN ${products.tipo} IN ('telas', 'janelas_digitais') AND ${products.vipProviderId} IS NOT NULL
-              THEN ${invoices.amount}::numeric * (
-                COALESCE(${products.vipProviderCommissionPercent}::numeric, ${vipProviders.repassePercent}::numeric, 0) / 100
-              )
-              ELSE 0
+              ELSE (${VIP_REPASSE_DEDUCTION_SQL})
             END
           `,
           vipProviderName: vipProviders.name,

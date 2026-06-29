@@ -8,6 +8,7 @@
 - [Single source of truth](config-options-single-source.md) — one datum = one origin; search before creating, derive from one canonical fn read by all screens/PDF, no recompute, extract shared. Includes config_options (loss reasons + origin categories DB-backed) instance.
 - [Proposal per-line pricing](proposal-line-pricing.md) — per-line proposal prices come from computeProposalLinePrices (shared); never recompute BV scale inline; cents close via largest-remainder.
 - [Proposal/OS PDF assembler](proposal-pdf-assembler.md) — assembleProposalData (shared) is the only builder for generateProposalPdf data; never re-parse notes or recompute monthly/per-rest inline.
+- [VIP room = local](vip-room-as-local.md) — repasse config lives on active_restaurants (is_vip_room/percent/mode), split per-local via campaign_items; AP ledger honors liquido, dashboard SQL projects bruto only; DRE batch still on old provider path (blocks DOOH).
 - [Builder pricing dual-path](builder-pricing-dual-path.md) — checkout sends no per-line price; client quotePrice is display-only, server createFromBuilder is the real price; apply new pricing rules in BOTH.
 - [Self-service builder](self-service-builder.md) — anunciante/parceiro portals reuse media-shop builder via MediaShopBuilder; source must match role (server-enforced); no parallel builder.
 - [Media-shop catalog kinds](media-shop-catalog-kinds.md) — internal Orçamento splits inventory: telas=location-based (CPM) vs quantity products (bolachas/impressos, restaurantId null, volume tiers).

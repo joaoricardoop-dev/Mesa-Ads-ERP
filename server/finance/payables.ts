@@ -18,11 +18,14 @@
 //                   (restaurante/VIP/parceiro); bloqueia se algum desses
 //                   já está pago. Impostos seguem ativos.
 // ─────────────────────────────────────────────────────────────────────────────
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import {
   accountsPayable,
   invoices,
   campaigns,
+  campaignItems,
+  campaignPhases,
+  activeRestaurants,
   clients,
   products,
   vipProviders,
@@ -32,7 +35,7 @@ import {
 import {
   calcTaxes,
   calcRestaurantCommission,
-  calcVipRepasse,
+  calcVipRepasseLocal,
   calcCustomVipRepasse,
   calcPartnerCommission,
   competenceMonthFor,
@@ -263,7 +266,16 @@ async function materializeRestaurantCommission(
   return { created: 1, updated: 0, cancelled: 0 };
 }
 
-// ─── REPASSE VIP ────────────────────────────────────────────────────────────
+// ─── REPASSE VIP (por LOCAL — Task #375) ────────────────────────────────────
+// O repasse VIP passa a ter o LOCAL (active_restaurants.is_vip_room) como
+// recebedor, DIVIDIDO por sala proporcionalmente à receita atribuída a cada
+// local (campaign_items). Percentual e base (bruto/líquido) vêm do próprio
+// local — fonte única. Gera 1 AP por (invoice, local VIP), idempotente via
+// sourceRef { invoiceId, restaurantId, slice:'local' }.
+//
+// Gate "tela vs bolacha": só produtos digitais (telas/janelas_digitais) geram
+// repasse. APs antigas com slice 'standard' (vipProviderId) permanecem
+// intactas como histórico; este materializador não as toca.
 async function materializeVipRepasse(
   db: Db,
   invoice: InvoiceLike,
@@ -271,50 +283,104 @@ async function materializeVipRepasse(
   product: ProductLike | null,
   irpjPct: number,
 ): Promise<MaterializeResult> {
-  if (!product || !product.vipProviderId) return EMPTY;
-  const [provider] = await db
-    .select()
-    .from(vipProviders)
-    .where(eq(vipProviders.id, product.vipProviderId))
-    .limit(1);
-  const amount = calcVipRepasse(invoice, campaign, product, (provider as VipProviderLike) ?? null, irpjPct);
-  if (amount <= 0 || !provider) return EMPTY;
+  if (campaign.isBonificada) return EMPTY;
+  if (!product || (product.tipo !== "telas" && product.tipo !== "janelas_digitais")) return EMPTY;
+  if (!invoice.campaignId) return EMPTY;
 
-  const existing = await db
+  // Receita atribuída por local (fonte única: campaign_items). Escopo: se a
+  // fatura é de uma fase específica, só os itens daquela fase; senão, todos os
+  // itens da campanha (todas as fases).
+  const itemRows = await db
+    .select({
+      restaurantId: campaignItems.restaurantId,
+      totalPrice: campaignItems.totalPrice,
+      quantity: campaignItems.quantity,
+      unitPrice: campaignItems.unitPrice,
+    })
+    .from(campaignItems)
+    .innerJoin(campaignPhases, eq(campaignPhases.id, campaignItems.campaignPhaseId))
+    .where(
+      invoice.campaignPhaseId
+        ? eq(campaignItems.campaignPhaseId, invoice.campaignPhaseId)
+        : eq(campaignPhases.campaignId, invoice.campaignId),
+    );
+  if (itemRows.length === 0) return EMPTY;
+
+  const itemRev = (r: { totalPrice: string | null; quantity: number; unitPrice: string }) =>
+    r.totalPrice != null ? num(r.totalPrice) : num(r.quantity) * num(r.unitPrice);
+  const totalRev = itemRows.reduce((s, r) => s + itemRev(r), 0);
+  if (totalRev <= 0) return EMPTY;
+
+  // Agrega receita por local.
+  const revByLocal = new Map<number, number>();
+  for (const r of itemRows) {
+    if (r.restaurantId == null) continue;
+    revByLocal.set(r.restaurantId, (revByLocal.get(r.restaurantId) ?? 0) + itemRev(r));
+  }
+  if (revByLocal.size === 0) return EMPTY;
+
+  // Filtra apenas os locais que são salas VIP.
+  const rooms = await db
     .select()
-    .from(accountsPayable)
+    .from(activeRestaurants)
     .where(
       and(
-        eq(accountsPayable.sourceType, "vip_repasse"),
-        sql`${accountsPayable.sourceRef}->>'invoiceId' = ${String(invoice.id)}`,
-        // Task #186 — distingue slice "standard" (este materializador) de
-        // "custom" (materializeCustomVipRepasse) para idempotência segura
-        // mesmo se ordem de execução mudar.
-        sql`COALESCE(${accountsPayable.sourceRef}->>'slice', 'standard') = 'standard'`,
+        inArray(activeRestaurants.id, Array.from(revByLocal.keys())),
+        eq(activeRestaurants.isVipRoom, true),
       ),
     );
-  // Ignora linhas canceladas: permitir re-materialização após reversão.
-  if (existing.some((r) => r.status !== "cancelada")) return EMPTY;
+  if (rooms.length === 0) return EMPTY;
 
   const compMonth = competenceMonthFor(invoice.paymentDate || invoice.issueDate);
-  const rate = num(product.vipProviderCommissionPercent ?? provider.repassePercent);
-  await db.insert(accountsPayable).values({
-    campaignId: invoice.campaignId,
-    campaignPhaseId: invoice.campaignPhaseId ?? null,
-    invoiceId: invoice.id,
-    vipProviderId: provider.id,
-    type: "repasse_vip",
-    description: `Repasse Sala VIP - ${provider.name} (${rate.toFixed(2)}%) - NF ${invoice.invoiceNumber || invoice.id}`,
-    amount: amount.toFixed(2),
-    recipientType: "vip_provider",
-    status: "pendente",
-    dueDate: safeDueDate(invoice.paymentDate || null),
-    sourceType: "vip_repasse",
-    sourceRef: { invoiceId: invoice.id, vipProviderId: provider.id, slice: "standard" },
-    competenceMonth: compMonth,
-    createdBySystem: true,
-  }).onConflictDoNothing();
-  return { created: 1, updated: 0, cancelled: 0 };
+  let created = 0;
+  for (const room of rooms) {
+    const localRev = revByLocal.get(room.id) ?? 0;
+    const attributedShare = num(invoice.amount) * (localRev / totalRev);
+    const amount = calcVipRepasseLocal({
+      attributedShare,
+      invoice,
+      campaign,
+      room: {
+        vipRepassePercent: room.vipRepassePercent,
+        vipBillingMode: room.vipBillingMode as "bruto" | "liquido" | null,
+      },
+      irpjRatePercent: irpjPct,
+    });
+    if (amount <= 0) continue;
+
+    const existing = await db
+      .select()
+      .from(accountsPayable)
+      .where(
+        and(
+          eq(accountsPayable.sourceType, "vip_repasse"),
+          sql`${accountsPayable.sourceRef}->>'invoiceId' = ${String(invoice.id)}`,
+          sql`${accountsPayable.sourceRef}->>'slice' = 'local'`,
+          sql`${accountsPayable.sourceRef}->>'restaurantId' = ${String(room.id)}`,
+        ),
+      );
+    // Ignora linhas canceladas: permitir re-materialização após reversão.
+    if (existing.some((r) => r.status !== "cancelada")) continue;
+
+    const rate = num(room.vipRepassePercent);
+    await db.insert(accountsPayable).values({
+      campaignId: invoice.campaignId,
+      campaignPhaseId: invoice.campaignPhaseId ?? null,
+      invoiceId: invoice.id,
+      type: "repasse_vip",
+      description: `Repasse Sala VIP - ${room.name} (${rate.toFixed(2)}%) - NF ${invoice.invoiceNumber || invoice.id}`,
+      amount: amount.toFixed(2),
+      recipientType: "vip_provider",
+      status: "pendente",
+      dueDate: safeDueDate(invoice.paymentDate || null),
+      sourceType: "vip_repasse",
+      sourceRef: { invoiceId: invoice.id, restaurantId: room.id, slice: "local" },
+      competenceMonth: compMonth,
+      createdBySystem: true,
+    }).onConflictDoNothing();
+    created++;
+  }
+  return { created, updated: 0, cancelled: 0 };
 }
 
 // ─── REPASSE VIP — FATIA CUSTOM (Task #186) ─────────────────────────────────

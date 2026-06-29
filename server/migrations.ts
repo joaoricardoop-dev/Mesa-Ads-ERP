@@ -2321,8 +2321,11 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
   {
     // Task #375 — Backfill: migra a config de repasse dos `vip_providers`
     // para o local correspondente (match por CNPJ só-dígitos → nome). Marca o
-    // local como sala VIP e copia percentual + base. NÃO apaga `vip_providers`
-    // (preserva o histórico financeiro já materializado em accounts_payable).
+    // local como sala VIP e copia o percentual de repasse. A BASE é padronizada
+    // para 'bruto' (decisão do usuário: todas as salas migradas usam base bruto,
+    // que coincide com a base já usada nas visões NET/dedução do financeiro).
+    // NÃO apaga `vip_providers` (preserva o histórico financeiro já
+    // materializado em accounts_payable).
     // Idempotente: só toca locais ainda não marcados (is_vip_room = false).
     name: "task_375_backfill_vip_providers_into_locais",
     sql: [
@@ -2330,7 +2333,7 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       `UPDATE "active_restaurants" ar
          SET "is_vip_room" = true,
              "vip_repasse_percent" = vp."repassePercent",
-             "vip_billing_mode" = vp."billingMode"
+             "vip_billing_mode" = 'bruto'
          FROM "vip_providers" vp
          WHERE vp."cnpj" IS NOT NULL AND ar."cnpj" IS NOT NULL
            AND regexp_replace(vp."cnpj", '\\D', '', 'g') <> ''
@@ -2341,7 +2344,7 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       `UPDATE "active_restaurants" ar
          SET "is_vip_room" = true,
              "vip_repasse_percent" = vp."repassePercent",
-             "vip_billing_mode" = vp."billingMode"
+             "vip_billing_mode" = 'bruto'
          FROM "vip_providers" vp
          WHERE lower(btrim(vp."name")) = lower(btrim(ar."name"))
            AND ar."is_vip_room" = false
@@ -2418,6 +2421,61 @@ export async function backfillQuotationClientIdsFromLeads(db: any) {
   console.log(
     `[Migrations] ${TRACKER}: órfãs=${orphans.length}, resolvidas=${resolved}, não resolvidas=${unresolved}`,
   );
+
+  await db.execute(sql.raw(
+    `INSERT INTO "_applied_migrations" ("name") VALUES ('${TRACKER}') ON CONFLICT ("name") DO NOTHING;`,
+  ));
+}
+
+/**
+ * Task #375 — Loga os `vip_providers` que NÃO casaram com nenhum local no
+ * backfill (`task_375_backfill_vip_providers_into_locais`). O match é por CNPJ
+ * normalizado → nome exato (mesma regra do backfill). Provedores sem local
+ * correspondente NÃO viram sala VIP automaticamente (evita repontar repasse
+ * financeiro para o local errado); o operador deve marcar o local como sala VIP
+ * manualmente na tela de cadastro. Apenas LÊ e loga — não altera dados. Roda uma
+ * vez (rastreada) para não poluir o log a cada boot.
+ */
+export async function logUnmatchedVipProviders(db: any) {
+  const TRACKER = "log_unmatched_vip_providers_task_375";
+
+  const already = await db.execute(sql.raw(
+    `SELECT 1 FROM "_applied_migrations" WHERE "name" = '${TRACKER}' LIMIT 1;`,
+  ));
+  const alreadyRows: any[] = Array.isArray(already)
+    ? (already as any[])
+    : ((already as any)?.rows ?? []);
+  if (alreadyRows.length > 0) return;
+
+  const res = await db.execute(sql.raw(`
+    SELECT vp."id" AS id, vp."name" AS name, vp."cnpj" AS cnpj
+    FROM "vip_providers" vp
+    WHERE NOT EXISTS (
+      SELECT 1 FROM "active_restaurants" ar
+      WHERE ar."cnpj" IS NOT NULL AND vp."cnpj" IS NOT NULL
+        AND regexp_replace(vp."cnpj", '\\D', '', 'g') <> ''
+        AND regexp_replace(vp."cnpj", '\\D', '', 'g') = regexp_replace(ar."cnpj", '\\D', '', 'g')
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM "active_restaurants" ar
+      WHERE lower(btrim(vp."name")) = lower(btrim(ar."name"))
+    )
+    ORDER BY vp."id";
+  `));
+  const rows: any[] = Array.isArray(res)
+    ? (res as any[])
+    : ((res as any)?.rows ?? []);
+
+  if (rows.length > 0) {
+    const labels = rows
+      .map((r) => `#${r.id} "${r.name}"${r.cnpj ? ` (CNPJ ${r.cnpj})` : " (sem CNPJ)"}`)
+      .join(", ");
+    console.warn(
+      `[Migrations] ${TRACKER}: ${rows.length} provedor(es) VIP sem local correspondente (marcar sala VIP manualmente no cadastro do local): ${labels}`,
+    );
+  } else {
+    console.log(`[Migrations] ${TRACKER}: todos os provedores VIP casaram com um local (ou não há provedores).`);
+  }
 
   await db.execute(sql.raw(
     `INSERT INTO "_applied_migrations" ("name") VALUES ('${TRACKER}') ON CONFLICT ("name") DO NOTHING;`,
@@ -2581,6 +2639,16 @@ export async function runMigrations() {
   } catch (err: any) {
     console.warn(
       "[Migrations] backfill_quotation_client_id_from_lead_task_286 falhou:",
+      err?.message?.split("\n")[0],
+    );
+  }
+
+  // Task #375 — loga provedores VIP que não casaram com nenhum local no backfill.
+  try {
+    await logUnmatchedVipProviders(db);
+  } catch (err: any) {
+    console.warn(
+      "[Migrations] log_unmatched_vip_providers_task_375 falhou:",
       err?.message?.split("\n")[0],
     );
   }
