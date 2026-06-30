@@ -259,72 +259,110 @@ export async function generateProposalPdf(
     const totalVolume = items.reduce((s, i) => s + i.volume, 0);
     const scaledLines = computeProposalLinePrices(items, itemsSubtotalForPdf);
     const itemsFootLabel = isMixed ? "Subtotal itens" : "Total";
-    const hasCircuitItems = items.some(i => i.circuitName !== undefined);
-    const hasTelasItems = items.some(i => i.spotSeconds !== null && i.spotSeconds !== undefined);
+    // Em orçamentos MISTOS (circuitos + telas + produtos por quantidade)
+    // renderizamos UMA tabela por tipo, cada uma com suas colunas de custo de
+    // referência. Todas indexam o MESMO `scaledLines` (escala BV única), então
+    // os subtotais por grupo somam exatamente `itemsSubtotalForPdf` — sem
+    // recálculo de preço por grupo (fonte única preservada).
+    const circuitIdx: number[] = [];
+    const telasIdx: number[] = [];
+    const qtyIdx: number[] = [];
+    items.forEach((it, idx) => {
+      if (it.circuitName !== undefined) circuitIdx.push(idx);
+      else if (it.spotSeconds !== null && it.spotSeconds !== undefined) telasIdx.push(idx);
+      else qtyIdx.push(idx);
+    });
+    const nonEmptyGroups = [circuitIdx, telasIdx, qtyIdx].filter(g => g.length > 0).length;
+    const groupSubtotal = (idxs: number[]) => idxs.reduce((s, i) => s + scaledLines[i].totalPrice, 0);
+    // Com 1 só grupo, o rodapé da tabela é o total dos itens (igual ao layout
+    // anterior). Com múltiplos grupos, cada rodapé mostra o subtotal do grupo e
+    // o total combinado vem numa linha logo abaixo das tabelas.
+    const groupFootLabel = nonEmptyGroups > 1 ? "Subtotal" : itemsFootLabel;
+    const sharedTableStyles = {
+      theme: "grid" as const,
+      styles: { font: FONT_NAME, fontSize: 8 },
+      headStyles: { fillColor: [...BLACK] as [number, number, number], textColor: [...WHITE] as [number, number, number], fontSize: 8, fontStyle: "bold" as const, font: FONT_NAME },
+      bodyStyles: { textColor: [40, 40, 40] as [number, number, number], font: FONT_NAME },
+      footStyles: { fillColor: [...LIGHT_GRAY] as [number, number, number], textColor: [...BLACK] as [number, number, number], fontSize: 8, fontStyle: "bold" as const, font: FONT_NAME },
+      alternateRowStyles: { fillColor: [250, 250, 250] as [number, number, number] },
+      margin: { left: margin, right: margin },
+    };
+    const advanceY = () => {
+      y = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y + 40;
+      y += 6;
+    };
 
-    if (hasCircuitItems) {
-      // Circuitos DOOH: Local | Circuito | Semanas | Custo/semana | Total.
-      // Custo/semana = total escalado ÷ semanas (fonte: scaledLines, mesma
-      // escala BV das demais telas — não recalcula preço por conta própria).
+    if (circuitIdx.length) {
+      // Circuitos DOOH: Local | Circuito | Cotas | Semanas | Custo/sem. | Desc. | Total.
+      // Custo/sem. = custo de referência por cota (item.weeklyCost, vindo do
+      // marcador — valor canônico do servidor). Desc. = desconto da linha (%).
+      // Total = scaledLines (mesma escala BV — não recalcula preço aqui).
+      y = checkPageBreak(doc, y, 40);
       autoTable(doc, {
         startY: y,
-        head: [["Local", "Circuito", "Semanas", "Custo/semana", "Total"]],
-        body: items.map((item, idx) => {
+        head: [["Local", "Circuito", "Cotas", "Semanas", "Custo/sem.", "Desc.", "Total"]],
+        body: circuitIdx.map((idx) => {
+          const item = items[idx];
           const weeks = Math.max(1, item.semanas);
           const lineTotal = scaledLines[idx].totalPrice;
+          const cotas = item.cotas && item.cotas > 0 ? item.cotas : 1;
+          // Referência: custo/semana por cota do marcador; fallback derivado.
+          const refWeekly = item.weeklyCost ?? lineTotal / weeks / cotas;
+          const disc = item.lineDiscountPercent ?? 0;
           return [
             item.locationName || "—",
             item.circuitName || item.productName,
+            `${cotas}`,
             `${item.semanas}`,
-            isBonificada ? "—" : fmtCurrency(lineTotal / weeks),
+            isBonificada ? "—" : fmtCurrency(refWeekly),
+            disc > 0 ? `${fmtNumber(disc)}%` : "—",
             isBonificada ? "Bonificado" : fmtCurrency(lineTotal),
           ];
         }),
         foot: [[
-          `${items.length} circuito${items.length !== 1 ? "s" : ""}`,
+          `${circuitIdx.length} circuito${circuitIdx.length !== 1 ? "s" : ""}`,
           "",
           "",
-          itemsFootLabel,
-          isBonificada ? "R$ 0,00" : fmtCurrency(itemsSubtotalForPdf),
+          "",
+          "",
+          groupFootLabel,
+          isBonificada ? "R$ 0,00" : fmtCurrency(groupSubtotal(circuitIdx)),
         ]],
-        theme: "grid",
-        styles: { font: FONT_NAME, fontSize: 8 },
-        headStyles: { fillColor: [...BLACK], textColor: [...WHITE], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
-        bodyStyles: { textColor: [40, 40, 40], font: FONT_NAME },
-        footStyles: { fillColor: [...LIGHT_GRAY], textColor: [...BLACK], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
-        alternateRowStyles: { fillColor: [250, 250, 250] },
-        margin: { left: margin, right: margin },
+        ...sharedTableStyles,
         columnStyles: {
-          2: { halign: "center", cellWidth: 20 },
-          3: { halign: "right", cellWidth: 32 },
-          4: { halign: "right", fontStyle: "bold", cellWidth: 32 },
+          2: { halign: "center", cellWidth: 16 },
+          3: { halign: "center", cellWidth: 18 },
+          4: { halign: "right", cellWidth: 26 },
+          5: { halign: "center", cellWidth: 16 },
+          6: { halign: "right", fontStyle: "bold", cellWidth: 28 },
         },
       });
-    } else if (hasTelasItems) {
+      advanceY();
+    }
+
+    if (telasIdx.length) {
+      y = checkPageBreak(doc, y, 40);
       autoTable(doc, {
         startY: y,
         head: [["Produto", "Duração", "Spot", "Impressões/Rest./Mês", "Total"]],
-        body: items.map((item, idx) => [
-          item.productName,
-          `${item.semanas} sem.`,
-          item.spotSeconds ? `${item.spotSeconds}s` : "—",
-          item.impressionsPerRestaurant !== undefined ? fmtNumber(item.impressionsPerRestaurant) : "—",
-          isBonificada ? "Bonificado" : fmtCurrency(scaledLines[idx].totalPrice),
-        ]),
+        body: telasIdx.map((idx) => {
+          const item = items[idx];
+          return [
+            item.productName,
+            `${item.semanas} sem.`,
+            item.spotSeconds ? `${item.spotSeconds}s` : "—",
+            item.impressionsPerRestaurant !== undefined ? fmtNumber(item.impressionsPerRestaurant) : "—",
+            isBonificada ? "Bonificado" : fmtCurrency(scaledLines[idx].totalPrice),
+          ];
+        }),
         foot: [[
-          `${items.length} produto${items.length !== 1 ? "s" : ""}`,
+          `${telasIdx.length} produto${telasIdx.length !== 1 ? "s" : ""}`,
           "",
           "",
-          itemsFootLabel,
-          isBonificada ? "R$ 0,00" : fmtCurrency(itemsSubtotalForPdf),
+          groupFootLabel,
+          isBonificada ? "R$ 0,00" : fmtCurrency(groupSubtotal(telasIdx)),
         ]],
-        theme: "grid",
-        styles: { font: FONT_NAME, fontSize: 8 },
-        headStyles: { fillColor: [...BLACK], textColor: [...WHITE], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
-        bodyStyles: { textColor: [40, 40, 40], font: FONT_NAME },
-        footStyles: { fillColor: [...LIGHT_GRAY], textColor: [...BLACK], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
-        alternateRowStyles: { fillColor: [250, 250, 250] },
-        margin: { left: margin, right: margin },
+        ...sharedTableStyles,
         columnStyles: {
           1: { halign: "center", cellWidth: 20 },
           2: { halign: "center", cellWidth: 16 },
@@ -332,41 +370,58 @@ export async function generateProposalPdf(
           4: { halign: "right", fontStyle: "bold", cellWidth: 32 },
         },
       });
-    } else {
-      autoTable(doc, {
-        startY: y,
-        head: [["Produto", "Duração", "Volume", "Preço/un.", "Total"]],
-        body: items.map((item, idx) => [
-          item.productName,
-          `${item.semanas} sem.`,
-          fmtNumber(item.volume) + " un.",
-          isBonificada ? "—" : `R$ ${scaledLines[idx].unitPrice.toFixed(4)}`,
-          isBonificada ? "Bonificado" : fmtCurrency(scaledLines[idx].totalPrice),
-        ]),
-        foot: [[
-          `${items.length} produto${items.length !== 1 ? "s" : ""}`,
-          "",
-          fmtNumber(totalVolume) + " un.",
-          itemsFootLabel,
-          isBonificada ? "R$ 0,00" : fmtCurrency(itemsSubtotalForPdf),
-        ]],
-        theme: "grid",
-        styles: { font: FONT_NAME, fontSize: 8 },
-        headStyles: { fillColor: [...BLACK], textColor: [...WHITE], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
-        bodyStyles: { textColor: [40, 40, 40], font: FONT_NAME },
-        footStyles: { fillColor: [...LIGHT_GRAY], textColor: [...BLACK], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
-        alternateRowStyles: { fillColor: [250, 250, 250] },
-        margin: { left: margin, right: margin },
-        columnStyles: {
-          1: { halign: "center", cellWidth: 22 },
-          2: { halign: "right", cellWidth: 28 },
-          3: { halign: "right", cellWidth: 28 },
-          4: { halign: "right", fontStyle: "bold", cellWidth: 32 },
-        },
-      });
+      advanceY();
     }
 
-    y = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y + 40;
+    if (qtyIdx.length) {
+      // Produtos por quantidade: Produto | Duração | Volume | Custo/un. | Desc. | Total.
+      // Custo/un. = custo unitário de referência (item.unitCost do marcador;
+      // fallback ao preço/un. escalado). Desc. = desconto da linha. Total =
+      // scaledLines (mesma escala BV — não recalcula preço aqui).
+      const qtyVolume = qtyIdx.reduce((s, i) => s + items[i].volume, 0);
+      y = checkPageBreak(doc, y, 40);
+      autoTable(doc, {
+        startY: y,
+        head: [["Produto", "Duração", "Volume", "Custo/un.", "Desc.", "Total"]],
+        body: qtyIdx.map((idx) => {
+          const item = items[idx];
+          const refUnit = item.unitCost ?? scaledLines[idx].unitPrice;
+          const disc = item.lineDiscountPercent ?? 0;
+          return [
+            item.productName,
+            `${item.semanas} sem.`,
+            fmtNumber(item.volume) + " un.",
+            isBonificada ? "—" : `R$ ${refUnit.toFixed(4)}`,
+            disc > 0 ? `${fmtNumber(disc)}%` : "—",
+            isBonificada ? "Bonificado" : fmtCurrency(scaledLines[idx].totalPrice),
+          ];
+        }),
+        foot: [[
+          `${qtyIdx.length} produto${qtyIdx.length !== 1 ? "s" : ""}`,
+          "",
+          fmtNumber(qtyVolume) + " un.",
+          "",
+          groupFootLabel,
+          isBonificada ? "R$ 0,00" : fmtCurrency(groupSubtotal(qtyIdx)),
+        ]],
+        ...sharedTableStyles,
+        columnStyles: {
+          1: { halign: "center", cellWidth: 22 },
+          2: { halign: "right", cellWidth: 26 },
+          3: { halign: "right", cellWidth: 28 },
+          4: { halign: "center", cellWidth: 16 },
+          5: { halign: "right", fontStyle: "bold", cellWidth: 30 },
+        },
+      });
+      advanceY();
+    }
+
+    // Total combinado dos itens quando há mais de um tipo de tabela. Reconcilia
+    // com a soma dos subtotais (mesmo scaledLines), valor único = itemsSubtotalForPdf.
+    if (nonEmptyGroups > 1) {
+      y = checkPageBreak(doc, y, 16);
+      y = drawInfoRow(doc, `${itemsFootLabel}:`, isBonificada ? "R$ 0,00" : fmtCurrency(itemsSubtotalForPdf), y, margin);
+    }
     y += 8;
 
     // Service info below table

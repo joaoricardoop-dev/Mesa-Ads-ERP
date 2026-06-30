@@ -170,6 +170,55 @@ export function computeCircuitTotal(
   return { ...base, weeks, totalPrice: base.weeklyCost * weeks };
 }
 
+// ─── Linha de circuito: cotas + desconto de linha (fonte única) ──────────────
+// A multiplicação por cotas e o líquido pós-desconto de linha vivem AQUI (um
+// único ponto), lidos pelo catálogo, painel do plano, servidor e PDF. NUNCA
+// recalcular cotas/desconto de linha de circuito inline em outro lugar.
+
+import { applyLineDiscount, clampLineDiscountPercent } from "./proposal-line-pricing";
+
+/** Normaliza o nº de cotas para inteiro ≥ 1 (default 1). */
+export function clampCotas(cotas: number | null | undefined): number {
+  const n = Math.floor(Number(cotas));
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+export interface CircuitLineResult extends CircuitTotalResult {
+  /** Nº de cotas do circuito (≥ 1). */
+  cotas: number;
+  /** Total bruto = custo/semana × semanas × cotas (antes do desconto de linha). */
+  grossTotal: number;
+  /** Desconto de linha normalizado (0–100). */
+  lineDiscountPercent: number;
+  /** Total líquido após o desconto de linha (entra no subtotal do plano). */
+  netTotal: number;
+}
+
+/**
+ * Total de uma LINHA de circuito no Orçamento: parte de
+ * {@link computeCircuitTotal} (preço de 1 cota), multiplica por `cotas` e aplica
+ * o desconto de linha via {@link applyLineDiscount} (fonte única do líquido).
+ * Retorna `null` quando o circuito não tem preço configurado.
+ */
+export function computeCircuitLineTotal(
+  config: CircuitPricingConfig | null | undefined,
+  days: number,
+  cotas?: number | null,
+  lineDiscountPercent?: number | null,
+): CircuitLineResult | null {
+  const base = computeCircuitTotal(config, days);
+  if (!base) return null;
+  const safeCotas = clampCotas(cotas);
+  const grossTotal = base.totalPrice * safeCotas;
+  return {
+    ...base,
+    cotas: safeCotas,
+    grossTotal,
+    lineDiscountPercent: clampLineDiscountPercent(lineDiscountPercent),
+    netTotal: applyLineDiscount(grossTotal, lineDiscountPercent),
+  };
+}
+
 // ─── Status de configuração da tela (fonte única) ────────────────────────────
 // Uma tela só mostra preço e audiência reais quando (a) a config CPM está
 // completa (mesmos campos exigidos por computeCpmPricing) e (b) tem coordenadas

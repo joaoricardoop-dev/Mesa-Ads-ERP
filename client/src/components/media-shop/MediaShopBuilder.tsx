@@ -89,7 +89,9 @@ export function MediaShopBuilder({ clientId, source, onClose, onSuccess }: Media
         productId: it.productId,
         productName: it.productName,
         telaId: it.telaId,
-        volume: 1,
+        volume: Math.max(1, it.cotas),
+        cotas: it.cotas,
+        lineDiscountPercent: it.lineDiscountPercent,
         weeks: Math.max(1, it.weeks),
         restaurantId: it.restaurantId,
         startDate: lineStart,
@@ -108,6 +110,7 @@ export function MediaShopBuilder({ clientId, source, onClose, onSuccess }: Media
         productId: it.productId,
         productName: it.productName,
         volume: Math.max(1, it.quantity),
+        lineDiscountPercent: it.lineDiscountPercent,
         weeks: quantityWeeksForDays(lineDays),
         startDate: lineStart,
         endDate: lineEnd,
@@ -123,6 +126,7 @@ export function MediaShopBuilder({ clientId, source, onClose, onSuccess }: Media
       // Mensagem do cliente vira briefing da cotação (campo livre do painel).
       briefing: notes.trim() || undefined,
       estimatedTotal: plan.total,
+      couponPercent: plan.couponPercent,
       // Autosserviço nunca é bonificação e não define parcelas — o backend semeia
       // o cronograma default e o comercial ajusta depois.
       isBonificada: false,

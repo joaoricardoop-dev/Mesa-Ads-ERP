@@ -30,6 +30,13 @@ export interface MediaSelectedItem {
   /** Snapshot da precificação do circuito (fonte: cadastro de telas). */
   insertionsPerWeek: number;
   costPerInsertion: number;
+  /** Nº de cotas do circuito (default 1). O preço escala linearmente: total =
+   *  (custo/semana × semanas) × cotas. Fonte única da multiplicação:
+   *  computeCircuitLineTotal (shared/cpm-pricing.ts). */
+  cotas?: number;
+  /** Desconto da linha em % (0–100), aplicado ANTES do desconto global ("Cupom
+   *  %"). Fonte única do líquido: applyLineDiscount (shared/proposal-line-pricing). */
+  lineDiscountPercent?: number;
   /** Período de veiculação próprio da linha (opcional). Quando nulo, usa o
    *  período global do plano. Persiste em quotation_items.start_date/end_date. */
   startDate?: string | null;
@@ -77,6 +84,9 @@ export interface MediaQuantityItem {
   pricingMode: string | null;
   unitLabel: string;
   quantity: number;
+  /** Desconto da linha em % (0–100), aplicado ANTES do desconto global ("Cupom
+   *  %"). Fonte única do líquido: applyLineDiscount (shared/proposal-line-pricing). */
+  lineDiscountPercent?: number;
   /** Período próprio da linha (recorrência). Quando nulo, usa o período global
    *  do plano. Persiste em quotation_items.start_date/end_date. */
   startDate?: string | null;

@@ -24,3 +24,4 @@
 - [Server auto-geocode hook](server-auto-geocode.md) — autoGeocodeIfMissing in db.ts fills lat/lng on create/update only when missing+active+has address; never overwrites autocomplete coords; buildGeocodeQuery is the shared query source.
 - [Space is the unit of sale](space-is-unit-of-sale.md) — active_restaurants.screensCount+photoUrls is the canonical ecommerce source; telas optional; pending badge gates on offersScreenProduct (products.tipo='telas').
 - [pricingMode vs tipo](pricing-mode-vs-tipo.md) — PRICE decision branches on pricingMode (cost_based/price_based/cpm); operational semantics (digital/VIP/commissions/phases/audience/spot) stay on tipo.
+- [Orçamento cotas + line discount](orcamento-discount-order.md) — discount order line→coupon→BV; coupon persisted into totalValue server-side; mixed PDF = one table per product type.

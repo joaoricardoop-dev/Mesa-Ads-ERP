@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Loader2, Package, Gift } from "lucide-react";
 import { daysInRangeInclusive } from "@shared/period";
 import { splitAmount, addDaysIso, scheduleMatchesTotal } from "@shared/billingSchedule";
-import { computeCircuitTotal, circuitWeeksForDays } from "@shared/cpm-pricing";
+import { computeCircuitLineTotal, circuitWeeksForDays, clampCotas } from "@shared/cpm-pricing";
+import { applyLineDiscount, clampLineDiscountPercent } from "@shared/proposal-line-pricing";
 import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 import type { QuotePremissas } from "@/components/campaign-wizard/pricing";
 import { formatCurrency } from "@/lib/format";
@@ -26,16 +27,29 @@ function formatInt(n: number): string {
 }
 
 export interface MediaPlanComputedItem extends MediaSelectedItem {
+  /** Total líquido da linha (cotas + desconto de linha aplicados). */
   totalPrice: number;
   /** Semanas cobradas no período da linha (fonte: circuitWeeksForDays). */
   weeks: number;
-  /** Custo por semana = inserções/semana × custo/inserção. */
+  /** Custo por semana = inserções/semana × custo/inserção (referência, 1 cota). */
   weeklyCost: number;
+  /** Nº de cotas (≥ 1). */
+  cotas: number;
+  /** Total bruto = custo/semana × semanas × cotas (antes do desconto de linha). */
+  grossTotal: number;
+  /** Desconto da linha normalizado (0–100). */
+  lineDiscountPercent: number;
 }
 
 export interface MediaPlanQuantityItem extends MediaQuantityItem {
+  /** Total líquido da linha (desconto de linha aplicado). */
   totalPrice: number;
+  /** Custo unitário de referência (preço/un. bruto, antes do desconto de linha). */
   unitPrice: number;
+  /** Total bruto da linha (antes do desconto de linha). */
+  grossTotal: number;
+  /** Desconto da linha normalizado (0–100). */
+  lineDiscountPercent: number;
 }
 
 export function useMediaPlan() {
@@ -58,12 +72,18 @@ export function useMediaPlan() {
         it.startDate && it.endDate
           ? daysInRangeInclusive(it.startDate, it.endDate)
           : days;
-      const circuit = computeCircuitTotal(it, lineDays);
+      const cotas = clampCotas(it.cotas);
+      // Fonte única: cotas (multiplicação) + desconto de linha (líquido) vivem
+      // em computeCircuitLineTotal — nunca recalcular aqui.
+      const line = computeCircuitLineTotal(it, lineDays, cotas, it.lineDiscountPercent);
       return {
         ...it,
-        totalPrice: circuit?.totalPrice ?? 0,
-        weeks: circuit?.weeks ?? circuitWeeksForDays(lineDays),
-        weeklyCost: circuit?.weeklyCost ?? 0,
+        cotas,
+        lineDiscountPercent: clampLineDiscountPercent(it.lineDiscountPercent),
+        weeks: line?.weeks ?? circuitWeeksForDays(lineDays),
+        weeklyCost: line?.weeklyCost ?? 0,
+        grossTotal: line?.grossTotal ?? 0,
+        totalPrice: line?.netTotal ?? 0,
       };
     });
     const qtyItems: MediaPlanQuantityItem[] = quantityItems.map((it) => {
@@ -74,7 +94,15 @@ export function useMediaPlan() {
           ? daysInRangeInclusive(it.startDate, it.endDate)
           : days;
       const quote = quoteQuantityItem(it, lineDays, quotePremissas);
-      return { ...it, totalPrice: quote.totalPrice, unitPrice: quote.unitPrice };
+      // Fonte única do líquido pós-desconto de linha: applyLineDiscount.
+      const netTotal = applyLineDiscount(quote.totalPrice, it.lineDiscountPercent);
+      return {
+        ...it,
+        unitPrice: quote.unitPrice,
+        grossTotal: quote.totalPrice,
+        totalPrice: netTotal,
+        lineDiscountPercent: clampLineDiscountPercent(it.lineDiscountPercent),
+      };
     });
     const screensSubtotal = items.reduce((s, i) => s + i.totalPrice, 0);
     const quantitySubtotal = qtyItems.reduce((s, i) => s + i.totalPrice, 0);
@@ -87,6 +115,7 @@ export function useMediaPlan() {
       days,
       subtotal,
       discount,
+      couponPercent,
       total,
     };
   }, [selected, quantityItems, days, couponPercent, quotePremissas]);
@@ -215,13 +244,64 @@ export function MediaPlanPanel({
                 <div className="text-xs text-muted-foreground space-y-0.5">
                   <p>
                     {it.weeks} semana(s) × {formatCurrency(it.weeklyCost)}/sem
+                    {it.cotas > 1 ? ` × ${it.cotas} cotas` : ""}
                   </p>
                   <p>
                     {formatInt(it.insertionsPerWeek)} inserções/sem ·{" "}
                     {formatCurrency(it.costPerInsertion)}/inserção
                   </p>
                 </div>
-                <p className="font-semibold text-sm">{formatCurrency(it.totalPrice)}</p>
+                <div className="text-right">
+                  {it.lineDiscountPercent > 0 && (
+                    <p className="text-[11px] text-muted-foreground line-through">
+                      {formatCurrency(it.grossTotal)}
+                    </p>
+                  )}
+                  <p className="font-semibold text-sm">{formatCurrency(it.totalPrice)}</p>
+                </div>
+              </div>
+
+              {/* Cotas + desconto da linha. Cotas escala o preço linearmente; o
+                  desconto da linha é aplicado ANTES do desconto global (Cupom). */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="space-y-1">
+                  <Label className="label-mono text-[10px] text-muted-foreground">
+                    Cotas
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="h-8"
+                    value={it.cotas}
+                    onChange={(e) =>
+                      updateItem(it.telaId, {
+                        cotas: Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                      })
+                    }
+                    aria-label={`Cotas de ${it.circuitName}`}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="label-mono text-[10px] text-muted-foreground">
+                    Desconto da linha (%)
+                  </Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className="h-8"
+                    value={it.lineDiscountPercent}
+                    onChange={(e) =>
+                      updateItem(it.telaId, {
+                        lineDiscountPercent: Math.min(
+                          100,
+                          Math.max(0, Number(e.target.value) || 0),
+                        ),
+                      })
+                    }
+                    aria-label={`Desconto da linha de ${it.circuitName}`}
+                  />
+                </div>
               </div>
 
               {/* Período de veiculação próprio da linha (opcional). Vazio = usa o
@@ -298,7 +378,40 @@ export function MediaPlanPanel({
                     }
                   />
                 </div>
-                <p className="font-semibold text-sm">{formatCurrency(it.totalPrice)}</p>
+                <div className="text-right">
+                  <p className="text-[11px] text-muted-foreground">
+                    {formatCurrency(it.unitPrice)}/{it.unitLabel}
+                  </p>
+                  {it.lineDiscountPercent > 0 && (
+                    <p className="text-[11px] text-muted-foreground line-through">
+                      {formatCurrency(it.grossTotal)}
+                    </p>
+                  )}
+                  <p className="font-semibold text-sm">{formatCurrency(it.totalPrice)}</p>
+                </div>
+              </div>
+
+              {/* Desconto da linha, aplicado ANTES do desconto global (Cupom). */}
+              <div className="space-y-1 pt-1">
+                <Label className="label-mono text-[10px] text-muted-foreground">
+                  Desconto da linha (%)
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  className="h-8"
+                  value={it.lineDiscountPercent}
+                  onChange={(e) =>
+                    updateQuantityItem(it.uid, {
+                      lineDiscountPercent: Math.min(
+                        100,
+                        Math.max(0, Number(e.target.value) || 0),
+                      ),
+                    })
+                  }
+                  aria-label={`Desconto da linha de ${it.productName}`}
+                />
               </div>
 
               {/* Recorrência: agendamento próprio da linha (opcional). Vazio =

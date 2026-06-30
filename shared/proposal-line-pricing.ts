@@ -8,6 +8,38 @@
  * eliminando recomputações divergentes em PDF e telas.
  */
 
+/**
+ * Limita um desconto percentual de linha ao intervalo [0, 100]. Fonte única da
+ * normalização do desconto por linha (catálogo/painel, servidor e PDF).
+ */
+export function clampLineDiscountPercent(pct: number | null | undefined): number {
+  const n = Number(pct);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(100, Math.max(0, n));
+}
+
+/**
+ * Aplica o desconto de LINHA sobre o total BRUTO da linha e retorna o líquido.
+ *
+ * Ordem canônica de descontos no Orçamento de mídia:
+ *   1. desconto de LINHA (%) — aplicado aqui, por linha;
+ *   2. desconto GLOBAL ("Cupom %") — aplicado sobre o subtotal já líquido das
+ *      linhas (soma dos `netTotal`);
+ *   3. escalonamento BV/comissão — em {@link computeProposalLinePrices}, sobre o
+ *      total-alvo já líquido dos dois descontos acima.
+ *
+ * Este é o ÚNICO ponto que calcula o líquido pós-desconto de linha; painel,
+ * servidor e PDF o reutilizam (nunca recalculam inline).
+ */
+export function applyLineDiscount(
+  grossTotal: number,
+  lineDiscountPercent: number | null | undefined,
+): number {
+  const gross = Number(grossTotal) || 0;
+  const disc = clampLineDiscountPercent(lineDiscountPercent);
+  return gross * (1 - disc / 100);
+}
+
 export interface ProposalLineItemInput {
   /** Quantidade/volume da linha (usado para derivar o preço/un.). */
   volume: number;

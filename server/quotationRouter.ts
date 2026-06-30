@@ -91,7 +91,8 @@ async function generateOSNumber(db: any) {
 // ser testado isoladamente em vitest. Para a regra "tela vs bolacha" no
 // slice custom-digital, ver `calcCustomVipRepasse` + `materializeCustomVipRepasse`.
 import { computeQuotationCommissionMix } from "./finance/calc";
-import { computeScreenDailyPricing, computeCircuitTotal } from "../shared/cpm-pricing";
+import { computeScreenDailyPricing, computeCircuitLineTotal, clampCotas } from "../shared/cpm-pricing";
+import { applyLineDiscount, clampLineDiscountPercent } from "../shared/proposal-line-pricing";
 import { daysInRangeInclusive, cyclesForDays } from "../shared/period";
 
 export const quotationRouter = router({
@@ -1298,6 +1299,9 @@ export const quotationRouter = router({
       briefing: z.string().optional(),
       venueIds: z.array(z.number().int()).optional(),
       estimatedTotal: z.number().optional(),
+      // Desconto global "Cupom %" (0–100), aplicado APÓS o desconto de linha
+      // e ANTES da escala BV. Fonte única do total do contrato (totalValue).
+      couponPercent: z.number().min(0).max(100).optional(),
       estimatedImpressions: z.number().optional(),
       isBonificada: z.boolean().optional(),
       // Condições de pagamento (parcelas) opcionais; quando ausente o backend
@@ -1313,6 +1317,12 @@ export const quotationRouter = router({
         productName: z.string(),
         volume: z.number().int().min(1),
         weeks: z.number().int().min(1),
+        // Cotas do circuito (default 1). Preço escala linearmente. Fonte única
+        // da multiplicação: computeCircuitLineTotal.
+        cotas: z.number().int().min(1).optional(),
+        // Desconto da linha em % (0–100), aplicado ANTES do desconto global.
+        // Fonte única do líquido: applyLineDiscount.
+        lineDiscountPercent: z.number().min(0).max(100).optional(),
         // Circuito DOOH (telas row). Quando presente, o preço é recalculado a
         // partir da `telas` row (fonte única) — inserções/semana × custo/inserção.
         telaId: z.number().int().optional(),
@@ -1509,7 +1519,7 @@ export const quotationRouter = router({
         return price * (1 - parseFloat(t.discountPercent) / 100);
       }
 
-      const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; billedDays?: number; unitPrice: number; totalPrice: number; restaurantId?: number; shareIndex?: number; cycleWeeks?: number; cycles?: number; startDate?: string | null; endDate?: string | null; venueId?: number | null; telaId?: number; circuitName?: string; locationName?: string; weeklyCost?: number }> = [];
+      const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; billedDays?: number; unitPrice: number; totalPrice: number; restaurantId?: number; shareIndex?: number; cycleWeeks?: number; cycles?: number; startDate?: string | null; endDate?: string | null; venueId?: number | null; telaId?: number; circuitName?: string; locationName?: string; weeklyCost?: number; cotas?: number; lineDiscountPercent?: number; unitCost?: number }> = [];
 
       // Pré-carrega circuitos DOOH (telas rows) referenciados pelos itens, para
       // recalcular o preço a partir da fonte única (telas.insertionsPerWeek ×
@@ -1564,9 +1574,14 @@ export const quotationRouter = router({
             (item.startDate && item.endDate
               ? daysInRangeInclusive(item.startDate, item.endDate)
               : item.weeks * 7);
-          const circuit = computeCircuitTotal(
+          const cotas = clampCotas(item.cotas);
+          // FONTE ÚNICA: computeCircuitLineTotal aplica cotas (×) + desconto de
+          // linha (líquido) sobre o preço do circuito. Nunca recalcular aqui.
+          const circuit = computeCircuitLineTotal(
             { insertionsPerWeek: tela.insertionsPerWeek, costPerInsertion: tela.costPerInsertion },
             screenDays,
+            cotas,
+            item.lineDiscountPercent,
           );
           if (!circuit) {
             throw new TRPCError({
@@ -1576,13 +1591,15 @@ export const quotationRouter = router({
           }
           const locationName =
             (tela.restaurantId != null ? circuitRestaurantNameMap.get(tela.restaurantId) : undefined) ?? "";
+          // 1 item = 1 circuito; quantity = cotas. O total persistido é o
+          // líquido (cotas + desconto de linha); unitPrice = líquido / cotas.
           computedItems.push({
             productId: item.productId,
             productName: prod.name,
-            volume: 1,
+            volume: cotas,
             weeks: circuit.weeks,
-            unitPrice: circuit.totalPrice,
-            totalPrice: circuit.totalPrice,
+            unitPrice: circuit.netTotal / cotas,
+            totalPrice: circuit.netTotal,
             restaurantId: tela.restaurantId ?? item.restaurantId,
             startDate: item.startDate ?? null,
             endDate: item.endDate ?? null,
@@ -1590,6 +1607,8 @@ export const quotationRouter = router({
             circuitName: tela.nome ?? "",
             locationName,
             weeklyCost: circuit.weeklyCost,
+            cotas,
+            lineDiscountPercent: circuit.lineDiscountPercent,
           });
           continue;
         }
@@ -1671,7 +1690,12 @@ export const quotationRouter = router({
           appliedSeasonals.push({ productName: prod.name, label: seasonal.label, multiplier: seasonal.mult });
         }
 
-        const finalUnitPrice = item.volume > 0 ? finalTotal / item.volume : 0;
+        // Custo unitário de referência (bruto, antes do desconto de linha).
+        const grossUnitPrice = item.volume > 0 ? finalTotal / item.volume : 0;
+        // FONTE ÚNICA do líquido pós-desconto de linha: applyLineDiscount.
+        const lineDiscountPercent = clampLineDiscountPercent(item.lineDiscountPercent);
+        const netTotal = applyLineDiscount(finalTotal, lineDiscountPercent);
+        const finalUnitPrice = item.volume > 0 ? netTotal / item.volume : 0;
 
         computedItems.push({
           productId: item.productId,
@@ -1679,7 +1703,7 @@ export const quotationRouter = router({
           volume: item.volume,
           weeks: item.weeks,
           unitPrice: finalUnitPrice,
-          totalPrice: finalTotal,
+          totalPrice: netTotal,
           restaurantId: item.restaurantId,
           shareIndex: item.shareIndex,
           cycleWeeks: item.cycleWeeks,
@@ -1687,11 +1711,25 @@ export const quotationRouter = router({
           startDate: item.startDate ?? null,
           endDate: item.endDate ?? null,
           venueId: item.venueId ?? null,
+          lineDiscountPercent,
+          unitCost: grossUnitPrice,
         });
       }
 
       const entityName = client?.company || client?.name || "Sem cliente específico";
       const totalVolume = computedItems.reduce((sum, i) => sum + i.volume, 0);
+      // Desconto global "Cupom %": aplicado APÓS o desconto de linha (já embutido
+      // em computedItems[].totalPrice) como fator uniforme, de modo que
+      // sum(itens) continue == totalValue (fonte única do total do contrato) e o
+      // PDF — que reescala as linhas para contractTotal — bata com a tela.
+      const couponPercent = Math.min(100, Math.max(0, input.couponPercent ?? 0));
+      const couponFactor = 1 - couponPercent / 100;
+      if (couponFactor !== 1) {
+        for (const item of computedItems) {
+          item.totalPrice = item.totalPrice * couponFactor;
+          item.unitPrice = item.unitPrice * couponFactor;
+        }
+      }
       const totalValue = computedItems.reduce((sum, i) => sum + i.totalPrice, 0);
 
       const quotationNumber = await generateQuotationNumber(db);
@@ -1761,9 +1799,17 @@ export const quotationRouter = router({
           : `${item.weeks} semanas`;
         // Circuito DOOH: marcador canônico parseado por assembleProposalData
         // (shared/proposalData.ts) para renderizar a tabela Local|Circuito|...
+        // Tokens extras (cotas/custo-semana/desconto/custo-un.) são METADADOS DE
+        // EXIBIÇÃO — o preço final do PDF sai de computeProposalLinePrices sobre o
+        // totalPrice persistido, nunca recalculado a partir destes tokens.
+        const cotasDesc = item.cotas && item.cotas > 1 ? ` · ${item.cotas}cota` : "";
+        const lineDescDesc =
+          item.lineDiscountPercent && item.lineDiscountPercent > 0
+            ? ` · desc ${item.lineDiscountPercent}%`
+            : "";
         const notes = item.telaId != null
-          ? `[CIRCUITO] ${item.circuitName ?? ""} @ ${item.locationName ?? ""} · ${item.weeks}sem`
-          : `${item.productName} — ${item.volume.toLocaleString("pt-BR")} un. × ${duracaoDesc}${ciclosDesc}${localDesc}`;
+          ? `[CIRCUITO] ${item.circuitName ?? ""} @ ${item.locationName ?? ""} · ${item.weeks}sem${cotasDesc} · custo/sem ${(item.weeklyCost ?? 0).toFixed(2)}${lineDescDesc}`
+          : `${item.productName} — ${item.volume.toLocaleString("pt-BR")} un. × ${duracaoDesc}${ciclosDesc}${localDesc} · custo/un ${(item.unitCost ?? item.unitPrice).toFixed(2)}${lineDescDesc}`;
         await db.insert(quotationItems).values({
           quotationId: created.id,
           productId: item.productId,

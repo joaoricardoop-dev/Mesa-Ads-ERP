@@ -23,6 +23,14 @@ export interface ProposalItem {
    * nas notes do item, gravado por createFromBuilder (fonte única telas row). */
   circuitName?: string;
   locationName?: string;
+  /** Nº de cotas do circuito (≥ 1). Metadado de EXIBIÇÃO vindo do marcador. */
+  cotas?: number;
+  /** Custo/semana de referência do circuito (1 cota). Exibição. */
+  weeklyCost?: number;
+  /** Custo unitário de referência (produtos por quantidade). Exibição. */
+  unitCost?: number;
+  /** Desconto da linha em % (já embutido no totalPrice). Exibição. */
+  lineDiscountPercent?: number;
 }
 
 export interface ProposalSignature {
@@ -244,6 +252,17 @@ export function assembleProposalData(input: AssembleProposalInput): ProposalPDFD
         // Circuito DOOH: marcador canônico `[CIRCUITO] <circuito> @ <local> · Nsem`
         // gravado por createFromBuilder. Quando presente, o PDF usa a tabela de
         // circuitos (Local|Circuito|Semanas|Custo/semana|Total).
+        // Tokens de exibição (cotas/custo-semana/custo-un./desconto), comuns a
+        // circuito e produto por quantidade. São metadados — o preço cobrado
+        // continua vindo do totalPrice persistido.
+        const cotasMatch = item.notes?.match(/·\s*(\d+)cota/);
+        const weeklyCostMatch = item.notes?.match(/custo\/sem\s+([\d.]+)/);
+        const unitCostMatch = item.notes?.match(/custo\/un\s+([\d.]+)/);
+        const lineDiscMatch = item.notes?.match(/desc\s+([\d.]+)%/);
+        const itemCotas = cotasMatch ? parseInt(cotasMatch[1]) : undefined;
+        const itemWeeklyCost = weeklyCostMatch ? parseFloat(weeklyCostMatch[1]) : undefined;
+        const itemUnitCost = unitCostMatch ? parseFloat(unitCostMatch[1]) : undefined;
+        const itemLineDisc = lineDiscMatch ? parseFloat(lineDiscMatch[1]) : undefined;
         const circuitMatch = item.notes?.match(/^\[CIRCUITO\]\s*(.+?)\s*@\s*(.+?)\s*·/);
         if (circuitMatch) {
           return {
@@ -254,6 +273,9 @@ export function assembleProposalData(input: AssembleProposalInput): ProposalPDFD
             totalPrice: num(item.totalPrice),
             circuitName: circuitMatch[1].trim(),
             locationName: circuitMatch[2].trim(),
+            cotas: itemCotas ?? 1,
+            weeklyCost: itemWeeklyCost,
+            lineDiscountPercent: itemLineDisc,
           };
         }
         const spotMatch = item.notes?.match(/Spot(30|15)s/);
@@ -273,6 +295,8 @@ export function assembleProposalData(input: AssembleProposalInput): ProposalPDFD
           totalPrice: num(item.totalPrice),
           spotSeconds: spotSec,
           impressionsPerRestaurant,
+          unitCost: itemUnitCost,
+          lineDiscountPercent: itemLineDisc,
         };
       })
     : undefined;
