@@ -1,7 +1,7 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices, seasonalMultipliers, campaignPhases, campaignItems, opportunities } from "../drizzle/schema";
+import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices, seasonalMultipliers, campaignPhases, campaignItems, opportunities, telas } from "../drizzle/schema";
 import { getActiveConfigCodes } from "./configOptionRouter";
 import { QUOTATION_DEFAULT_VALIDITY_DAYS, addDaysISO } from "../shared/commercial-config";
 import { eq, desc, sql, and, inArray, asc } from "drizzle-orm";
@@ -91,7 +91,7 @@ async function generateOSNumber(db: any) {
 // ser testado isoladamente em vitest. Para a regra "tela vs bolacha" no
 // slice custom-digital, ver `calcCustomVipRepasse` + `materializeCustomVipRepasse`.
 import { computeQuotationCommissionMix } from "./finance/calc";
-import { computeScreenDailyPricing } from "../shared/cpm-pricing";
+import { computeScreenDailyPricing, computeCircuitTotal } from "../shared/cpm-pricing";
 import { daysInRangeInclusive, cyclesForDays } from "../shared/period";
 
 export const quotationRouter = router({
@@ -1313,6 +1313,9 @@ export const quotationRouter = router({
         productName: z.string(),
         volume: z.number().int().min(1),
         weeks: z.number().int().min(1),
+        // Circuito DOOH (telas row). Quando presente, o preço é recalculado a
+        // partir da `telas` row (fonte única) — inserções/semana × custo/inserção.
+        telaId: z.number().int().optional(),
         // Marketplace v2 — opcionais para back-compat com fluxo antigo (single product).
         restaurantId: z.number().int().optional(),
         shareIndex: z.number().int().min(1).optional(),
@@ -1506,12 +1509,90 @@ export const quotationRouter = router({
         return price * (1 - parseFloat(t.discountPercent) / 100);
       }
 
-      const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; billedDays?: number; unitPrice: number; totalPrice: number; restaurantId?: number; shareIndex?: number; cycleWeeks?: number; cycles?: number; startDate?: string | null; endDate?: string | null; venueId?: number | null }> = [];
+      const computedItems: Array<{ productId: number; productName: string; volume: number; weeks: number; billedDays?: number; unitPrice: number; totalPrice: number; restaurantId?: number; shareIndex?: number; cycleWeeks?: number; cycles?: number; startDate?: string | null; endDate?: string | null; venueId?: number | null; telaId?: number; circuitName?: string; locationName?: string; weeklyCost?: number }> = [];
+
+      // Pré-carrega circuitos DOOH (telas rows) referenciados pelos itens, para
+      // recalcular o preço a partir da fonte única (telas.insertionsPerWeek ×
+      // telas.costPerInsertion). Inclui o nome do local (activeRestaurants) p/ PDF.
+      const circuitTelaIds = Array.from(
+        new Set(input.items.map((it) => it.telaId).filter((id): id is number => id != null)),
+      );
+      const circuitTelaMap = new Map<number, { id: number; nome: string | null; insertionsPerWeek: number | null; costPerInsertion: string | null; restaurantId: number | null }>();
+      const circuitRestaurantNameMap = new Map<number, string>();
+      if (circuitTelaIds.length > 0) {
+        const telaRows = await db
+          .select({
+            id: telas.id,
+            nome: telas.nome,
+            insertionsPerWeek: telas.insertionsPerWeek,
+            costPerInsertion: telas.costPerInsertion,
+            restaurantId: telas.restaurantId,
+          })
+          .from(telas)
+          .where(inArray(telas.id, circuitTelaIds));
+        for (const t of telaRows) circuitTelaMap.set(t.id, t);
+        const circuitRestaurantIds = Array.from(
+          new Set(telaRows.map((t) => t.restaurantId).filter((id): id is number => id != null)),
+        );
+        if (circuitRestaurantIds.length > 0) {
+          const restRows = await db
+            .select({ id: activeRestaurants.id, name: activeRestaurants.name })
+            .from(activeRestaurants)
+            .where(inArray(activeRestaurants.id, circuitRestaurantIds));
+          for (const r of restRows) circuitRestaurantNameMap.set(r.id, r.name);
+        }
+      }
 
       const appliedSeasonals: Array<{ productName: string; label: string; multiplier: number }> = [];
 
       for (const item of input.items) {
         const prod = productMap.get(item.productId)!;
+
+        // ── Circuito DOOH: preço = inserções/semana × custo/inserção (telas row) ──
+        // FONTE ÚNICA: a `telas` row. 1 item = 1 circuito. O total é
+        // computeCircuitTotal(tela, dias) → weeklyCost × semanas (piso 1).
+        if (item.telaId != null) {
+          const tela = circuitTelaMap.get(item.telaId);
+          if (!tela) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Circuito (tela #${item.telaId}) não encontrado.`,
+            });
+          }
+          const screenDays =
+            item.days ??
+            (item.startDate && item.endDate
+              ? daysInRangeInclusive(item.startDate, item.endDate)
+              : item.weeks * 7);
+          const circuit = computeCircuitTotal(
+            { insertionsPerWeek: tela.insertionsPerWeek, costPerInsertion: tela.costPerInsertion },
+            screenDays,
+          );
+          if (!circuit) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `O circuito "${tela.nome}" não tem preço configurado (inserções/semana e custo/inserção). Configure o circuito antes de cotar.`,
+            });
+          }
+          const locationName =
+            (tela.restaurantId != null ? circuitRestaurantNameMap.get(tela.restaurantId) : undefined) ?? "";
+          computedItems.push({
+            productId: item.productId,
+            productName: prod.name,
+            volume: 1,
+            weeks: circuit.weeks,
+            unitPrice: circuit.totalPrice,
+            totalPrice: circuit.totalPrice,
+            restaurantId: tela.restaurantId ?? item.restaurantId,
+            startDate: item.startDate ?? null,
+            endDate: item.endDate ?? null,
+            telaId: tela.id,
+            circuitName: tela.nome ?? "",
+            locationName,
+            weeklyCost: circuit.weeklyCost,
+          });
+          continue;
+        }
 
         // ── Modo CPM: preço DIÁRIO derivado do CPM do local (não usa tiers/markup) ──
         // O DRIVER do preço é o modo de precificação ('cpm'), NÃO o tipo do
@@ -1678,6 +1759,11 @@ export const quotationRouter = router({
         const duracaoDesc = item.billedDays != null
           ? `${item.billedDays} dia(s)`
           : `${item.weeks} semanas`;
+        // Circuito DOOH: marcador canônico parseado por assembleProposalData
+        // (shared/proposalData.ts) para renderizar a tabela Local|Circuito|...
+        const notes = item.telaId != null
+          ? `[CIRCUITO] ${item.circuitName ?? ""} @ ${item.locationName ?? ""} · ${item.weeks}sem`
+          : `${item.productName} — ${item.volume.toLocaleString("pt-BR")} un. × ${duracaoDesc}${ciclosDesc}${localDesc}`;
         await db.insert(quotationItems).values({
           quotationId: created.id,
           productId: item.productId,
@@ -1689,7 +1775,7 @@ export const quotationRouter = router({
           shareIndex: item.shareIndex ?? null,
           cycleWeeks: item.cycleWeeks ?? 4,
           cycles: item.cycles ?? 1,
-          notes: `${item.productName} — ${item.volume.toLocaleString("pt-BR")} un. × ${duracaoDesc}${ciclosDesc}${localDesc}`,
+          notes,
           startDate: item.startDate ?? null,
           endDate: item.endDate ?? null,
           venueId: item.venueId ?? null,

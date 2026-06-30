@@ -462,6 +462,11 @@ export const telas = pgTable("telas", {
   spotDuration: integer("spot_duration"),
   loopDuration: integer("loop_duration"),
   dailyLoops: integer("daily_loops"),
+  // Precificação DOOH por circuito (fonte única: shared/cpm-pricing.ts →
+  // computeCircuitWeeklyCost). Preço = inserções/semana × custo/inserção.
+  // Substitui o CPM para DOOH; o circuito só tem preço quando ambos > 0.
+  insertionsPerWeek: integer("insertions_per_week"),
+  costPerInsertion: decimal("cost_per_insertion", { precision: 10, scale: 2 }),
   // Fotos da tela (JSON array de URLs servidas por /api/tela-photo/serve/...).
   // Aparecem no ecommerce (/montar-campanha) junto do local.
   photoUrls: text("photoUrls"),

@@ -7,6 +7,8 @@ import { MapView } from "@/components/Map";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { OperatingHoursGrid } from "@/components/OperatingHoursGrid";
 import { parseOperatingHours } from "@shared/screen-schedule";
+import { computeCircuitWeeklyCost } from "@shared/cpm-pricing";
+import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -184,6 +186,8 @@ interface TelaFormState {
   spotDuration: string;
   loopDuration: string;
   dailyLoops: string;
+  insertionsPerWeek: string;
+  costPerInsertion: string;
   photoUrls: string[];
   screenOperatingHours: string[];
   status: string;
@@ -216,6 +220,8 @@ function buildInitial(
       spotDuration: editing.spotDuration != null ? String(editing.spotDuration) : "",
       loopDuration: editing.loopDuration != null ? String(editing.loopDuration) : "",
       dailyLoops: editing.dailyLoops != null ? String(editing.dailyLoops) : "",
+      insertionsPerWeek: editing.insertionsPerWeek != null ? String(editing.insertionsPerWeek) : "",
+      costPerInsertion: editing.costPerInsertion != null ? String(editing.costPerInsertion) : "",
       photoUrls: Array.isArray(editing.photoUrls) ? editing.photoUrls : [],
       screenOperatingHours: parseOperatingHours((editing as any).screenOperatingHours),
       status: editing.status ?? "active",
@@ -237,6 +243,8 @@ function buildInitial(
     spotDuration: "",
     loopDuration: "",
     dailyLoops: "",
+    insertionsPerWeek: "",
+    costPerInsertion: "",
     photoUrls: [],
     screenOperatingHours: [],
     status: "active",
@@ -379,6 +387,8 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
       spotDuration: form.spotDuration ? parseInt(form.spotDuration) : null,
       loopDuration: form.loopDuration ? parseInt(form.loopDuration) : null,
       dailyLoops: form.dailyLoops ? parseInt(form.dailyLoops) : null,
+      insertionsPerWeek: form.insertionsPerWeek ? parseInt(form.insertionsPerWeek) : null,
+      costPerInsertion: form.costPerInsertion ? parseFloat(form.costPerInsertion) : null,
       photoUrls: form.photoUrls,
       screenOperatingHours: form.screenOperatingHours,
       status: form.status as "active" | "inactive",
@@ -470,6 +480,59 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
             <FieldWrap label="Loops por Dia">
               <Input type="number" value={form.dailyLoops} onChange={(e) => setForm((f) => ({ ...f, dailyLoops: e.target.value }))} />
             </FieldWrap>
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-border/40 bg-muted/20 p-3">
+            <Label className="text-xs font-medium">Precificação DOOH (circuito)</Label>
+            <p className="text-[10px] text-muted-foreground">
+              O preço deste circuito = inserções/semana × custo/inserção. Esta é a única
+              origem do preço DOOH no Orçamento.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <FieldWrap label="Inserções / semana">
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.insertionsPerWeek}
+                  onChange={(e) => setForm((f) => ({ ...f, insertionsPerWeek: e.target.value }))}
+                  placeholder="650"
+                  data-testid="input-tela-insertions-per-week"
+                />
+              </FieldWrap>
+              <FieldWrap label="Custo / inserção (R$)">
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.costPerInsertion}
+                  onChange={(e) => setForm((f) => ({ ...f, costPerInsertion: e.target.value }))}
+                  placeholder="0,99"
+                  data-testid="input-tela-cost-per-insertion"
+                />
+              </FieldWrap>
+            </div>
+            {(() => {
+              const pricing = computeCircuitWeeklyCost({
+                insertionsPerWeek: form.insertionsPerWeek,
+                costPerInsertion: form.costPerInsertion,
+              });
+              return (
+                <p className="text-xs" data-testid="tela-weekly-cost-preview">
+                  {pricing ? (
+                    <>
+                      Custo por semana:{" "}
+                      <span className="font-semibold text-foreground">
+                        {formatCurrency(pricing.weeklyCost)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      Preencha inserções/semana e custo/inserção para precificar o circuito.
+                    </span>
+                  )}
+                </p>
+              );
+            })()}
           </div>
 
           <div className="space-y-2">

@@ -6,17 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Eye, Users, Repeat, Tv, Loader2, Package, Gift } from "lucide-react";
+import { Trash2, Loader2, Package, Gift } from "lucide-react";
 import { daysInRangeInclusive } from "@shared/period";
 import { splitAmount, addDaysIso, scheduleMatchesTotal } from "@shared/billingSchedule";
-import { computeScreenDailyPricing } from "@shared/cpm-pricing";
-import { computeScreenMetrics } from "@shared/screen-metrics";
+import { computeCircuitTotal, circuitWeeksForDays } from "@shared/cpm-pricing";
 import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 import type { QuotePremissas } from "@/components/campaign-wizard/pricing";
 import { formatCurrency } from "@/lib/format";
 import {
   useMediaShopStore,
-  cpmConfigForPricing,
   quoteQuantityItem,
   type MediaSelectedItem,
   type MediaQuantityItem,
@@ -29,9 +27,10 @@ function formatInt(n: number): string {
 
 export interface MediaPlanComputedItem extends MediaSelectedItem {
   totalPrice: number;
-  billedDays: number;
-  exibicoes: number;
-  alcance: number;
+  /** Semanas cobradas no período da linha (fonte: circuitWeeksForDays). */
+  weeks: number;
+  /** Custo por semana = inserções/semana × custo/inserção. */
+  weeklyCost: number;
 }
 
 export interface MediaPlanQuantityItem extends MediaQuantityItem {
@@ -50,27 +49,21 @@ export function useMediaPlan() {
 
   return useMemo(() => {
     const items: MediaPlanComputedItem[] = selected.map((it) => {
-      // Período de veiculação por linha: quando definido, preço/métricas usam os
-      // dias da linha; senão herda o período global do plano (fonte única:
-      // daysInRangeInclusive de @shared/period).
+      // Período de veiculação por linha: quando definido, o preço usa os dias da
+      // linha; senão herda o período global do plano (fonte única:
+      // daysInRangeInclusive de @shared/period). Preço do circuito DOOH vem do
+      // helper canônico computeCircuitTotal (inserções/semana × custo/inserção ×
+      // semanas) — nunca recalcular inline.
       const lineDays =
         it.startDate && it.endDate
           ? daysInRangeInclusive(it.startDate, it.endDate)
           : days;
-      const pricing = computeScreenDailyPricing(cpmConfigForPricing(it.cpm), lineDays);
-      const metrics = computeScreenMetrics({
-        insertionsPerDay: it.insertionsPerDay,
-        impactsPerInsertion: it.cpm.impactsPerInsertion,
-        monthlyCustomers: it.monthlyCustomers,
-        days: lineDays,
-        screens: it.screens,
-      });
+      const circuit = computeCircuitTotal(it, lineDays);
       return {
         ...it,
-        totalPrice: pricing?.totalPrice ?? 0,
-        billedDays: pricing?.billedDays ?? lineDays,
-        exibicoes: metrics.exibicoes,
-        alcance: metrics.alcance,
+        totalPrice: circuit?.totalPrice ?? 0,
+        weeks: circuit?.weeks ?? circuitWeeksForDays(lineDays),
+        weeklyCost: circuit?.weeklyCost ?? 0,
       };
     });
     const qtyItems: MediaPlanQuantityItem[] = quantityItems.map((it) => {
@@ -88,9 +81,6 @@ export function useMediaPlan() {
     const subtotal = screensSubtotal + quantitySubtotal;
     const discount = subtotal * (couponPercent / 100);
     const total = subtotal - discount;
-    const exibicoes = items.reduce((s, i) => s + i.exibicoes, 0);
-    const alcance = items.reduce((s, i) => s + i.alcance, 0);
-    const frequencia = alcance > 0 ? exibicoes / alcance : 0;
     return {
       items,
       quantityItems: qtyItems,
@@ -98,9 +88,6 @@ export function useMediaPlan() {
       subtotal,
       discount,
       total,
-      exibicoes,
-      alcance,
-      frequencia,
     };
   }, [selected, quantityItems, days, couponPercent, quotePremissas]);
 }
@@ -206,10 +193,11 @@ export function MediaPlanPanel({
             </p>
           )}
           {plan.items.map((it) => (
-            <div key={it.restaurantId} className="rounded-md border border-border p-3 space-y-2">
+            <div key={it.telaId} className="rounded-md border border-border p-3 space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-medium text-sm truncate">{it.restaurantName}</p>
+                  <p className="text-xs text-muted-foreground truncate">{it.circuitName}</p>
                   <p className="text-xs text-muted-foreground">{it.neighborhood || "—"}</p>
                 </div>
                 <Button
@@ -217,55 +205,21 @@ export function MediaPlanPanel({
                   size="icon"
                   variant="ghost"
                   className="h-7 w-7 shrink-0"
-                  onClick={() => removeItem(it.restaurantId)}
+                  onClick={() => removeItem(it.telaId)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
 
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Tv className="h-3 w-3" /> {it.screens} tela(s)
-                </span>
-                <span className="flex items-center gap-1">
-                  <Eye className="h-3 w-3" /> {formatInt(it.exibicoes)}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Users className="h-3 w-3" /> {formatInt(it.alcance)}
-                </span>
-              </div>
-
               <div className="flex items-end justify-between gap-2">
-                <div className="space-y-1">
-                  <Label className="label-mono text-[10px] text-muted-foreground">
-                    Inserções/dia por tela
-                  </Label>
-                  <div className="flex items-center gap-1.5">
-                    <Input
-                      type="number"
-                      min={0}
-                      className="h-8 w-24"
-                      value={Math.round(it.insertionsPerDay)}
-                      onChange={(e) =>
-                        updateItem(it.restaurantId, {
-                          insertionsPerDay: Math.max(0, Number(e.target.value) || 0),
-                        })
-                      }
-                    />
-                    {Math.round(it.insertionsPerDay) !== Math.round(it.insertionsPerDayDefault) && (
-                      <button
-                        type="button"
-                        className="text-[10px] text-primary underline"
-                        onClick={() =>
-                          updateItem(it.restaurantId, {
-                            insertionsPerDay: it.insertionsPerDayDefault,
-                          })
-                        }
-                      >
-                        cadastro: {Math.round(it.insertionsPerDayDefault)}
-                      </button>
-                    )}
-                  </div>
+                <div className="text-xs text-muted-foreground space-y-0.5">
+                  <p>
+                    {it.weeks} semana(s) × {formatCurrency(it.weeklyCost)}/sem
+                  </p>
+                  <p>
+                    {formatInt(it.insertionsPerWeek)} inserções/sem ·{" "}
+                    {formatCurrency(it.costPerInsertion)}/inserção
+                  </p>
                 </div>
                 <p className="font-semibold text-sm">{formatCurrency(it.totalPrice)}</p>
               </div>
@@ -282,7 +236,7 @@ export function MediaPlanPanel({
                     className="h-8"
                     value={it.startDate ?? ""}
                     onChange={(e) =>
-                      updateItem(it.restaurantId, { startDate: e.target.value || null })
+                      updateItem(it.telaId, { startDate: e.target.value || null })
                     }
                   />
                 </div>
@@ -296,7 +250,7 @@ export function MediaPlanPanel({
                     min={it.startDate ?? undefined}
                     value={it.endDate ?? ""}
                     onChange={(e) =>
-                      updateItem(it.restaurantId, { endDate: e.target.value || null })
+                      updateItem(it.telaId, { endDate: e.target.value || null })
                     }
                   />
                 </div>
@@ -383,22 +337,6 @@ export function MediaPlanPanel({
         </CardContent>
       </Card>
 
-      {/* Performance projetada */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Performance projetada</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-2 text-center">
-          <Stat icon={<Eye className="h-3.5 w-3.5" />} label="Exibições" value={formatInt(plan.exibicoes)} />
-          <Stat icon={<Users className="h-3.5 w-3.5" />} label="Alcance" value={formatInt(plan.alcance)} />
-          <Stat
-            icon={<Repeat className="h-3.5 w-3.5" />}
-            label="Frequência"
-            value={plan.frequencia > 0 ? plan.frequencia.toFixed(1) : "—"}
-          />
-        </CardContent>
-      </Card>
-
       {/* Valor */}
       <Card>
         <CardHeader className="pb-3">
@@ -477,18 +415,6 @@ export function MediaPlanPanel({
           )}
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="rounded-md bg-muted/50 py-2">
-      <div className="flex items-center justify-center gap-1 text-muted-foreground">
-        {icon}
-        <span className="label-mono text-[9px]">{label}</span>
-      </div>
-      <p className="text-base font-semibold mt-0.5">{value}</p>
     </div>
   );
 }

@@ -29,6 +29,10 @@ const telaFields = {
   spotDuration: z.number().int().min(0).optional().nullable(),
   loopDuration: z.number().int().min(0).optional().nullable(),
   dailyLoops: z.number().int().min(0).optional().nullable(),
+  // Precificação DOOH por circuito (fonte única shared/cpm-pricing.ts):
+  // preço = inserções/semana × custo/inserção.
+  insertionsPerWeek: z.number().int().min(0).optional().nullable(),
+  costPerInsertion: z.number().min(0).optional().nullable(),
   // Fotos da tela: array de URLs. Gravado como JSON text na coluna photoUrls.
   photoUrls: z.array(z.string()).optional().nullable(),
   // Grade de horário de funcionamento: array de chaves "dia-hora" (fonte única
@@ -44,7 +48,7 @@ function toColumns(input: Record<string, unknown>) {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(input)) {
     if (k === "restaurantId" || k === "id") continue;
-    if (k === "lat" || k === "lng") {
+    if (k === "lat" || k === "lng" || k === "costPerInsertion") {
       out[k] = v == null ? null : String(v);
     } else if (k === "photoUrls" || k === "screenOperatingHours") {
       out[k] = Array.isArray(v) ? JSON.stringify(v) : null;

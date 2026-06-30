@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { cyclesForDays, daysInRangeInclusive } from "@shared/period";
+import { daysInRangeInclusive } from "@shared/period";
 import { InventoryCatalog } from "@/components/media-shop/InventoryCatalog";
 import { MediaPlanPanel, useMediaPlan } from "@/components/media-shop/MediaPlanPanel";
 import {
@@ -61,22 +61,21 @@ export function StepShop({ clientId, source, role, clientLabel }: Props) {
     // por linha derivam das fontes únicas (shared/period). O cliente não envia
     // preço — o backend (createFromBuilder) recalcula como fonte de verdade.
     const screenItems = plan.items.map((it) => {
+      // 1 linha = 1 circuito DOOH. Enviamos a identidade do circuito (telaId) +
+      // período; o backend recalcula o preço da `telas` row (fonte única).
       const lineStart = it.startDate || startDate;
       const lineEnd = it.endDate || endDate;
       const lineDays =
         it.startDate && it.endDate
           ? Math.max(1, daysInRangeInclusive(it.startDate, it.endDate))
           : plan.days;
-      const lineCycles = Math.max(1, cyclesForDays(lineDays));
       return {
         productId: it.productId,
         productName: it.productName,
-        volume: Math.max(1, it.screens),
-        weeks: Math.max(1, lineCycles * (it.cycleWeeks || 4)),
+        telaId: it.telaId,
+        volume: 1,
+        weeks: Math.max(1, it.weeks),
         restaurantId: it.restaurantId,
-        shareIndex: it.shareIndex,
-        cycleWeeks: it.cycleWeeks || 4,
-        cycles: lineCycles,
         startDate: lineStart,
         endDate: lineEnd,
         days: lineDays,
@@ -106,7 +105,6 @@ export function StepShop({ clientId, source, role, clientLabel }: Props) {
       campaignName: campaignName.trim(),
       startDate,
       estimatedTotal: plan.total,
-      estimatedImpressions: plan.exibicoes,
       briefing: notes.trim() || undefined,
       items: [...screenItems, ...qtyItems],
     });

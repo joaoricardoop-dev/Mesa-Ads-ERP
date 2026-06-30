@@ -2523,6 +2523,12 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
          );`,
     ],
   },
+  {
+    // Precificação DOOH por circuito (telas row): preço = inserções/semana ×
+    // custo/inserção (fonte única shared/cpm-pricing.ts computeCircuitWeeklyCost).
+    name: "add_circuit_pricing_to_telas",
+    sql: `ALTER TABLE "telas" ADD COLUMN IF NOT EXISTS "insertions_per_week" integer; ALTER TABLE "telas" ADD COLUMN IF NOT EXISTS "cost_per_insertion" numeric(10, 2);`,
+  },
 ];
 
 /**

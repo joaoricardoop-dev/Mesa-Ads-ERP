@@ -259,9 +259,48 @@ export async function generateProposalPdf(
     const totalVolume = items.reduce((s, i) => s + i.volume, 0);
     const scaledLines = computeProposalLinePrices(items, itemsSubtotalForPdf);
     const itemsFootLabel = isMixed ? "Subtotal itens" : "Total";
+    const hasCircuitItems = items.some(i => i.circuitName !== undefined);
     const hasTelasItems = items.some(i => i.spotSeconds !== null && i.spotSeconds !== undefined);
 
-    if (hasTelasItems) {
+    if (hasCircuitItems) {
+      // Circuitos DOOH: Local | Circuito | Semanas | Custo/semana | Total.
+      // Custo/semana = total escalado ÷ semanas (fonte: scaledLines, mesma
+      // escala BV das demais telas — não recalcula preço por conta própria).
+      autoTable(doc, {
+        startY: y,
+        head: [["Local", "Circuito", "Semanas", "Custo/semana", "Total"]],
+        body: items.map((item, idx) => {
+          const weeks = Math.max(1, item.semanas);
+          const lineTotal = scaledLines[idx].totalPrice;
+          return [
+            item.locationName || "—",
+            item.circuitName || item.productName,
+            `${item.semanas}`,
+            isBonificada ? "—" : fmtCurrency(lineTotal / weeks),
+            isBonificada ? "Bonificado" : fmtCurrency(lineTotal),
+          ];
+        }),
+        foot: [[
+          `${items.length} circuito${items.length !== 1 ? "s" : ""}`,
+          "",
+          "",
+          itemsFootLabel,
+          isBonificada ? "R$ 0,00" : fmtCurrency(itemsSubtotalForPdf),
+        ]],
+        theme: "grid",
+        styles: { font: FONT_NAME, fontSize: 8 },
+        headStyles: { fillColor: [...BLACK], textColor: [...WHITE], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
+        bodyStyles: { textColor: [40, 40, 40], font: FONT_NAME },
+        footStyles: { fillColor: [...LIGHT_GRAY], textColor: [...BLACK], fontSize: 8, fontStyle: "bold", font: FONT_NAME },
+        alternateRowStyles: { fillColor: [250, 250, 250] },
+        margin: { left: margin, right: margin },
+        columnStyles: {
+          2: { halign: "center", cellWidth: 20 },
+          3: { halign: "right", cellWidth: 32 },
+          4: { halign: "right", fontStyle: "bold", cellWidth: 32 },
+        },
+      });
+    } else if (hasTelasItems) {
       autoTable(doc, {
         startY: y,
         head: [["Produto", "Duração", "Spot", "Impressões/Rest./Mês", "Total"]],

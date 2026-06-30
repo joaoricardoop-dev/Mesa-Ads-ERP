@@ -19,10 +19,6 @@ import {
   Map as MapIcon,
   Plus,
   Check,
-  Tv,
-  Users,
-  Eye,
-  Repeat,
   Loader2,
   Package,
   AlertTriangle,
@@ -34,8 +30,7 @@ import {
 } from "@/components/ui/tooltip";
 import { MapView } from "@/components/Map";
 import { daysInRangeInclusive } from "@shared/period";
-import { computeScreenDailyPricing, screenSetupStatus } from "@shared/cpm-pricing";
-import { defaultInsertionsPerDay, computeScreenMetrics } from "@shared/screen-metrics";
+import { computeCircuitTotal } from "@shared/cpm-pricing";
 import { useSystemPremissas } from "@/hooks/useSystemPremissas";
 import type { QuotePremissas, PricingTier, DiscountTier } from "@/components/campaign-wizard/pricing";
 import { formatCurrency } from "@/lib/format";
@@ -46,15 +41,20 @@ import {
 } from "./SpacePhoto";
 import {
   useMediaShopStore,
-  cpmConfigForPricing,
   quoteQuantityItem,
   type MediaSelectedItem,
-  type MediaCpmSnapshot,
   type MediaQuantityItem,
 } from "./mediaShopStore";
 
 type LocationRow = RouterOutputs["anunciantePortal"]["listAvailableLocations"][number];
+type CircuitRow = LocationRow["circuits"][number];
 type ProductRow = RouterOutputs["product"]["list"][number];
+
+/** Par (local, circuito) achatado — 1 linha do catálogo = 1 circuito DOOH. */
+interface CircuitEntry {
+  loc: LocationRow;
+  circuit: CircuitRow;
+}
 
 function formatInt(n: number): string {
   return Math.round(n).toLocaleString("pt-BR");
@@ -64,52 +64,25 @@ function telasSlot(loc: LocationRow) {
   return loc.productSlots.find((s) => s.productTipo === "telas") ?? null;
 }
 
-/**
- * Formatos de mídia que um local oferece, derivados de `productSlots` (fonte
- * única: Config > Produtos / product_locations). Rótulos amigáveis reaproveitam
- * TIPO_LABELS (mesma origem das telas de catálogo); fallback no nome do produto.
- * Deduplica por tipo preservando a ordem dos slots.
- */
-function formatBadgesForLocation(loc: LocationRow): { tipo: string; label: string }[] {
-  const seen = new Set<string>();
-  const out: { tipo: string; label: string }[] = [];
-  for (const s of loc.productSlots) {
-    const tipo = s.productTipo ?? "outro";
-    if (seen.has(tipo)) continue;
-    seen.add(tipo);
-    out.push({ tipo, label: TIPO_LABELS[tipo] ?? s.productName ?? tipo });
-  }
-  return out;
-}
-
-function FormatBadges({ loc, className }: { loc: LocationRow; className?: string }) {
-  const formats = formatBadgesForLocation(loc);
-  if (formats.length === 0) return null;
-  return (
-    <div className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
-      {formats.map((f) => (
-        <Badge
-          key={f.tipo}
-          variant="secondary"
-          className="font-normal text-[9px] py-0"
-          data-testid={`format-badge-${f.tipo}`}
-        >
-          {f.label}
-        </Badge>
-      ))}
-    </div>
+/** Preço do circuito no período (fonte única: computeCircuitTotal). `null` =
+ *  circuito sem precificação (precisa configurar no cadastro de telas). */
+function circuitPricing(circuit: CircuitRow, days: number) {
+  return computeCircuitTotal(
+    { insertionsPerWeek: circuit.insertionsPerWeek, costPerInsertion: circuit.costPerInsertion },
+    days,
   );
 }
 
-function locSetupStatus(loc: LocationRow) {
-  return screenSetupStatus({
-    cpm: loc.screenCpm.cpm,
-    insertionsPerHour: loc.screenCpm.insertionsPerHour,
-    impactsPerInsertion: loc.screenCpm.impactsPerInsertion,
-    weeklyHours: loc.screenCpm.weeklyHours,
-    lat: loc.lat,
-    lng: loc.lng,
-  });
+/**
+ * Status de configuração de um circuito DOOH (display-only). Pendente quando o
+ * circuito não tem preço (faltam inserções/semana ou custo/inserção — fonte
+ * única computeCircuitTotal) ou o local não tem coordenadas para o pin do mapa.
+ */
+function circuitSetupStatus(circuit: CircuitRow, loc: LocationRow) {
+  const missing: string[] = [];
+  if (!circuitPricing(circuit, 7)) missing.push("preço do circuito (inserções/semana e custo/inserção)");
+  if (loc.lat == null || loc.lng == null) missing.push("coordenadas (mapa)");
+  return { isComplete: missing.length === 0, missing };
 }
 
 function SetupPendingBadge({ missing, className }: { missing: string[]; className?: string }) {
@@ -210,49 +183,44 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
     [screenLocations, category],
   );
 
-  const pendingCount = useMemo(
-    () => byCategory.filter((l) => !locSetupStatus(l).isComplete).length,
+  // Achata locais → 1 entrada por circuito (a unidade de venda DOOH). Cada
+  // circuito vira uma linha/card selecionável independente.
+  const circuitEntries = useMemo<CircuitEntry[]>(
+    () => byCategory.flatMap((loc) => loc.circuits.map((circuit) => ({ loc, circuit }))),
     [byCategory],
   );
 
-  const filtered = useMemo(
-    () => (onlyPending ? byCategory.filter((l) => !locSetupStatus(l).isComplete) : byCategory),
-    [byCategory, onlyPending],
+  const pendingCount = useMemo(
+    () => circuitEntries.filter((e) => !circuitSetupStatus(e.circuit, e.loc).isComplete).length,
+    [circuitEntries],
   );
 
-  function buildItem(loc: LocationRow): MediaSelectedItem | null {
+  const filtered = useMemo(
+    () =>
+      onlyPending
+        ? circuitEntries.filter((e) => !circuitSetupStatus(e.circuit, e.loc).isComplete)
+        : circuitEntries,
+    [circuitEntries, onlyPending],
+  );
+
+  function buildCircuitItem(loc: LocationRow, circuit: CircuitRow): MediaSelectedItem | null {
     const slot = telasSlot(loc);
     if (!slot) return null;
-    const cpmSnap: MediaCpmSnapshot = {
-      cpm: loc.screenCpm.cpm,
-      insertionsPerHour: loc.screenCpm.insertionsPerHour,
-      impactsPerInsertion: loc.screenCpm.impactsPerInsertion,
-      weeklyHours: loc.screenCpm.weeklyHours,
-    };
-    const insDefault = defaultInsertionsPerDay({
-      insertionsPerHour: loc.screenCpm.insertionsPerHour,
-      weeklyHours: loc.screenCpm.weeklyHours,
-      dailyLoops: loc.dailyLoops,
-    });
     return {
+      telaId: circuit.telaId,
       restaurantId: loc.restaurantId,
       restaurantName: loc.name,
       neighborhood: loc.neighborhood,
-      categoria: loc.categoria ?? "restaurante",
+      circuitName: circuit.nome || `Circuito #${circuit.telaId}`,
       productId: slot.productId,
       productName: slot.productName,
-      cycleWeeks: slot.cycleWeeks ?? 4,
-      shareIndex: 1,
-      screens: Math.max(1, loc.screensCount || 1),
-      insertionsPerDayDefault: insDefault,
-      insertionsPerDay: insDefault,
-      monthlyCustomers: loc.monthlyCustomers ?? null,
-      cpm: cpmSnap,
+      insertionsPerWeek: circuit.insertionsPerWeek ?? 0,
+      costPerInsertion: circuit.costPerInsertion ?? 0,
     };
   }
 
-  function onToggleLoc(loc: LocationRow) {
-    const item = buildItem(loc);
+  function onToggleCircuit(loc: LocationRow, circuit: CircuitRow) {
+    const item = buildCircuitItem(loc, circuit);
     if (item) toggleItem(item);
   }
 
@@ -370,9 +338,9 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
         </div>
       ) : view === "map" ? (
         <CatalogMap
-          locations={filtered}
+          locations={byCategory}
           days={days}
-          onAdd={onToggleLoc}
+          onAdd={onToggleCircuit}
           isSelected={isSelected}
         />
       ) : view === "list" ? (
@@ -380,25 +348,25 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
           <CardContent className="p-0">
             {filtered.length === 0 ? (
               <p className="py-12 text-center text-sm text-muted-foreground">
-                Nenhum local de mídia (telas) disponível para os filtros selecionados.
+                Nenhum circuito de mídia (telas) disponível para os filtros selecionados.
               </p>
             ) : (
               <div className="divide-y divide-border">
-                <div className="hidden sm:grid grid-cols-[1fr_repeat(4,auto)_auto] gap-3 px-4 py-2 text-[10px] label-mono text-muted-foreground">
+                <div className="hidden sm:grid grid-cols-[1fr_1fr_auto_auto_auto] gap-3 px-4 py-2 text-[10px] label-mono text-muted-foreground">
                   <span>Local</span>
-                  <span className="text-right">Telas</span>
-                  <span className="text-right">Exibições</span>
-                  <span className="text-right">Alcance</span>
-                  <span className="text-right">Valor</span>
+                  <span>Circuito</span>
+                  <span className="text-right">Semanas</span>
+                  <span className="text-right">Custo/semana</span>
                   <span />
                 </div>
-                {filtered.map((loc) => (
-                  <LocationListRow
-                    key={loc.restaurantId}
-                    loc={loc}
+                {filtered.map((e) => (
+                  <CircuitListRow
+                    key={e.circuit.telaId}
+                    loc={e.loc}
+                    circuit={e.circuit}
                     days={days}
-                    selected={isSelected(loc.restaurantId)}
-                    onToggle={() => onToggleLoc(loc)}
+                    selected={isSelected(e.circuit.telaId)}
+                    onToggle={() => onToggleCircuit(e.loc, e.circuit)}
                   />
                 ))}
               </div>
@@ -407,19 +375,20 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
         </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((loc) => (
-            <LocationCard
-              key={loc.restaurantId}
-              loc={loc}
+          {filtered.map((e) => (
+            <CircuitCard
+              key={e.circuit.telaId}
+              loc={e.loc}
+              circuit={e.circuit}
               days={days}
-              selected={isSelected(loc.restaurantId)}
-              onToggle={() => onToggleLoc(loc)}
+              selected={isSelected(e.circuit.telaId)}
+              onToggle={() => onToggleCircuit(e.loc, e.circuit)}
             />
           ))}
           {filtered.length === 0 && (
             <Card className="sm:col-span-2 xl:col-span-3">
               <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                Nenhum local de mídia (telas) disponível para os filtros selecionados.
+                Nenhum circuito de mídia (telas) disponível para os filtros selecionados.
               </CardContent>
             </Card>
           )}
@@ -434,41 +403,25 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
   );
 }
 
-function locationMetrics(loc: LocationRow, days: number) {
-  const insPerDay = defaultInsertionsPerDay({
-    insertionsPerHour: loc.screenCpm.insertionsPerHour,
-    weeklyHours: loc.screenCpm.weeklyHours,
-    dailyLoops: loc.dailyLoops,
-  });
-  const screens = Math.max(1, loc.screensCount || 1);
-  const metrics = computeScreenMetrics({
-    insertionsPerDay: insPerDay,
-    impactsPerInsertion: loc.screenCpm.impactsPerInsertion,
-    monthlyCustomers: loc.monthlyCustomers,
-    days,
-    screens,
-  });
-  const pricing = computeScreenDailyPricing(cpmConfigForPricing(loc.screenCpm), days);
-  return { metrics, pricing, screens };
-}
-
-function LocationListRow({
+function CircuitListRow({
   loc,
+  circuit,
   days,
   selected,
   onToggle,
 }: {
   loc: LocationRow;
+  circuit: CircuitRow;
   days: number;
   selected: boolean;
   onToggle: () => void;
 }) {
-  const { metrics, pricing, screens } = locationMetrics(loc, days);
-  const setup = locSetupStatus(loc);
+  const pricing = circuitPricing(circuit, days);
+  const setup = circuitSetupStatus(circuit, loc);
   return (
     <div
-      data-testid={`local-card-${loc.restaurantId}`}
-      className="grid grid-cols-2 sm:grid-cols-[1fr_repeat(4,auto)_auto] items-center gap-x-3 gap-y-1 px-4 py-3"
+      data-testid={`circuito-card-${circuit.telaId}`}
+      className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto_auto_auto] items-center gap-x-3 gap-y-1 px-4 py-3"
     >
       <div className="col-span-2 sm:col-span-1 min-w-0">
         <div className="flex items-center gap-1.5">
@@ -484,22 +437,20 @@ function LocationListRow({
             </Badge>
           )}
         </p>
-        <FormatBadges loc={loc} className="mt-1" />
+      </div>
+      <div className="col-span-2 sm:col-span-1 min-w-0">
+        <p className="text-sm truncate">{circuit.nome || `Circuito #${circuit.telaId}`}</p>
+        {pricing && (
+          <p className="text-[11px] text-muted-foreground">
+            {formatInt(pricing.insertionsPerWeek)} inserções/sem · {formatCurrency(pricing.costPerInsertion)}/inserção
+          </p>
+        )}
       </div>
       <span className="text-xs sm:text-sm sm:text-right flex items-center gap-1 sm:justify-end text-muted-foreground">
-        <Tv className="h-3 w-3 sm:hidden" />
-        {screens}
+        {pricing ? `${pricing.weeks} sem` : "—"}
       </span>
-      <span className="text-xs sm:text-sm sm:text-right flex items-center gap-1 sm:justify-end text-muted-foreground">
-        <Eye className="h-3 w-3 sm:hidden" />
-        {formatInt(metrics.exibicoes)}
-      </span>
-      <span className="text-xs sm:text-sm sm:text-right flex items-center gap-1 sm:justify-end text-muted-foreground">
-        <Users className="h-3 w-3 sm:hidden" />
-        {formatInt(metrics.alcance)}
-      </span>
-      <span className="text-sm font-semibold sm:text-right">
-        {pricing ? formatCurrency(pricing.totalPrice) : "Sob consulta"}
+      <span className="text-sm font-semibold sm:text-right whitespace-nowrap">
+        {pricing ? formatCurrency(pricing.weeklyCost) : "Sob consulta"}
       </span>
       <div className="flex justify-end">
         <Button
@@ -517,25 +468,27 @@ function LocationListRow({
   );
 }
 
-function LocationCard({
+function CircuitCard({
   loc,
+  circuit,
   days,
   selected,
   onToggle,
 }: {
   loc: LocationRow;
+  circuit: CircuitRow;
   days: number;
   selected: boolean;
   onToggle: () => void;
 }) {
-  const { metrics, pricing, screens } = locationMetrics(loc, days);
-  const setup = locSetupStatus(loc);
+  const pricing = circuitPricing(circuit, days);
+  const setup = circuitSetupStatus(circuit, loc);
 
   const coverPhoto = loc.photoUrls?.[0] ?? null;
 
   return (
     <Card
-      data-testid={`local-card-${loc.restaurantId}`}
+      data-testid={`circuito-card-${circuit.telaId}`}
       className={`overflow-hidden ${selected ? "ring-2 ring-primary" : ""}`}
     >
       {coverPhoto ? (
@@ -560,11 +513,13 @@ function LocationCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="font-semibold leading-tight truncate">{loc.name}</p>
+            <p className="text-sm text-muted-foreground truncate">
+              {circuit.nome || `Circuito #${circuit.telaId}`}
+            </p>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
               <MapPin className="h-3 w-3" />
               {loc.neighborhood || loc.city || "—"}
             </p>
-            <FormatBadges loc={loc} className="mt-1.5" />
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             {loc.categoria && (
@@ -576,29 +531,28 @@ function LocationCard({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <Metric icon={<Eye className="h-3 w-3" />} label="Exibições" value={formatInt(metrics.exibicoes)} />
-          <Metric icon={<Users className="h-3 w-3" />} label="Alcance" value={formatInt(metrics.alcance)} />
-          <Metric
-            icon={<Repeat className="h-3 w-3" />}
-            label="Frequência"
-            value={metrics.frequencia > 0 ? metrics.frequencia.toFixed(1) : "—"}
-          />
-        </div>
-
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Tv className="h-3.5 w-3.5" /> {screens} tela(s)
-          </span>
-          <span>{days} dia(s)</span>
-        </div>
+        {pricing && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              {formatInt(pricing.insertionsPerWeek)} inserções/sem · {formatCurrency(pricing.costPerInsertion)}/inserção
+            </span>
+            <span>
+              {pricing.weeks} sem · {days} dia(s)
+            </span>
+          </div>
+        )}
 
         <div className="flex items-end justify-between gap-2 pt-1 border-t border-border">
           <div>
-            <p className="label-mono text-[10px] text-muted-foreground">Valor no período</p>
+            <p className="label-mono text-[10px] text-muted-foreground">Custo/semana</p>
             <p className="font-display text-lg font-semibold">
-              {pricing ? formatCurrency(pricing.totalPrice) : "Sob consulta"}
+              {pricing ? formatCurrency(pricing.weeklyCost) : "Sob consulta"}
             </p>
+            {pricing && (
+              <p className="text-[11px] text-muted-foreground">
+                Total {formatCurrency(pricing.totalPrice)}
+              </p>
+            )}
           </div>
           <Button
             type="button"
@@ -613,18 +567,6 @@ function LocationCard({
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="rounded-md bg-muted/50 py-1.5">
-      <div className="flex items-center justify-center gap-1 text-muted-foreground">
-        {icon}
-        <span className="label-mono text-[9px]">{label}</span>
-      </div>
-      <p className="text-sm font-semibold mt-0.5">{value}</p>
-    </div>
   );
 }
 
@@ -900,7 +842,7 @@ function CatalogMap({
 }: {
   locations: LocationRow[];
   days: number;
-  onAdd: (loc: LocationRow) => void;
+  onAdd: (loc: LocationRow, circuit: CircuitRow) => void;
   isSelected: (id: number) => boolean;
 }) {
   // `map` precisa ser estado (não ref): o MapView carrega o Google Maps de forma
@@ -927,19 +869,17 @@ function CatalogMap({
     const bounds = new google.maps.LatLngBounds();
     for (const loc of withCoords) {
       const pos = { lat: loc.lat as number, lng: loc.lng as number };
-      const { pricing } = locationMetrics(loc, days);
       const marker = new google.maps.Marker({
         position: pos,
         map,
         title: loc.name,
       });
       marker.addListener("click", () => {
-        const priceLabel = pricing ? formatCurrency(pricing.totalPrice) : "Sob consulta";
         // Construção via DOM + textContent (NUNCA HTML interpolado) — os campos
         // name/neighborhood vêm do banco e não podem ser tratados como markup.
         const container = document.createElement("div");
         container.style.fontFamily = "sans-serif";
-        container.style.minWidth = "180px";
+        container.style.minWidth = "200px";
 
         // Foto do espaço (ou placeholder "Foto em breve" — fonte única SpacePhoto)
         // no topo do popup, para não colapsar/parecer vazio quando não há foto.
@@ -971,45 +911,65 @@ function CatalogMap({
         hoodEl.style.fontSize = "12px";
         hoodEl.textContent = loc.neighborhood ?? "";
 
-        const priceEl = document.createElement("span");
-        priceEl.style.fontSize = "13px";
-        priceEl.textContent = `${priceLabel} · ${days} dia(s)`;
-
-        const formats = formatBadgesForLocation(loc)
-          .map((f) => f.label)
-          .join(" · ");
-
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.style.marginTop = "6px";
-        btn.style.padding = "4px 8px";
-        btn.style.borderRadius = "6px";
-        btn.style.border = "none";
-        btn.style.background = "#00c238";
-        btn.style.color = "#fff";
-        btn.style.cursor = "pointer";
-        btn.style.fontSize = "12px";
-        btn.textContent = isSelected(loc.restaurantId) ? "Remover" : "Adicionar";
-        btn.addEventListener("click", () => {
-          onAdd(loc);
-          infoRef.current!.close();
-        });
-
         container.appendChild(nameEl);
         container.appendChild(document.createElement("br"));
         container.appendChild(hoodEl);
-        container.appendChild(document.createElement("br"));
-        container.appendChild(priceEl);
-        container.appendChild(document.createElement("br"));
-        if (formats) {
-          const formatsEl = document.createElement("span");
-          formatsEl.style.fontSize = "11px";
-          formatsEl.style.color = "#888";
-          formatsEl.textContent = `Formatos: ${formats}`;
-          container.appendChild(formatsEl);
-          container.appendChild(document.createElement("br"));
+
+        // Uma linha por circuito do local, com custo/semana e botão add/remove.
+        if (loc.circuits.length === 0) {
+          const emptyEl = document.createElement("p");
+          emptyEl.style.fontSize = "12px";
+          emptyEl.style.color = "#888";
+          emptyEl.style.marginTop = "6px";
+          emptyEl.textContent = "Nenhum circuito cadastrado.";
+          container.appendChild(emptyEl);
+        } else {
+          for (const circuit of loc.circuits) {
+            const pricing = circuitPricing(circuit, days);
+            const row = document.createElement("div");
+            row.style.display = "flex";
+            row.style.alignItems = "center";
+            row.style.justifyContent = "space-between";
+            row.style.gap = "8px";
+            row.style.marginTop = "6px";
+            row.style.paddingTop = "6px";
+            row.style.borderTop = "1px solid #eee";
+
+            const info = document.createElement("div");
+            const cName = document.createElement("span");
+            cName.style.fontSize = "12px";
+            cName.style.fontWeight = "600";
+            cName.textContent = circuit.nome || `Circuito #${circuit.telaId}`;
+            const cPrice = document.createElement("span");
+            cPrice.style.fontSize = "11px";
+            cPrice.style.color = "#666";
+            cPrice.textContent = pricing
+              ? ` · ${formatCurrency(pricing.weeklyCost)}/sem · ${pricing.weeks} sem`
+              : " · Sob consulta";
+            info.appendChild(cName);
+            info.appendChild(cPrice);
+
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.style.padding = "4px 8px";
+            btn.style.borderRadius = "6px";
+            btn.style.border = "none";
+            btn.style.background = "#00c238";
+            btn.style.color = "#fff";
+            btn.style.cursor = "pointer";
+            btn.style.fontSize = "11px";
+            btn.style.whiteSpace = "nowrap";
+            btn.textContent = isSelected(circuit.telaId) ? "Remover" : "Adicionar";
+            btn.addEventListener("click", () => {
+              onAdd(loc, circuit);
+              infoRef.current!.close();
+            });
+
+            row.appendChild(info);
+            row.appendChild(btn);
+            container.appendChild(row);
+          }
         }
-        container.appendChild(btn);
 
         infoRef.current!.setContent(container);
         infoRef.current!.open(map, marker);

@@ -105,6 +105,71 @@ export function parseCpmNumber(v: string | number | null | undefined): number | 
   return Number.isFinite(n) ? n : undefined;
 }
 
+// ─── Precificação DOOH por circuito (fonte única) ────────────────────────────
+// Modelo SIMPLES por circuito (uma `telas` row = um circuito): preço =
+// inserções/semana × custo/inserção. Substitui o CPM para o DOOH. Esta é a única
+// origem do cálculo — lida por: form de cadastro de tela (preview), catálogo do
+// Orçamento, conversão da cotação (createFromBuilder) e PDF da proposta. NUNCA
+// recalcular essa multiplicação inline em outro lugar.
+
+export interface CircuitPricingConfig {
+  insertionsPerWeek?: string | number | null;
+  costPerInsertion?: string | number | null;
+}
+
+export interface CircuitPricingResult {
+  insertionsPerWeek: number;
+  costPerInsertion: number;
+  /** Custo por semana = inserções/semana × custo/inserção. */
+  weeklyCost: number;
+}
+
+/**
+ * Calcula o custo semanal de um circuito DOOH. Retorna `null` quando qualquer
+ * insumo está ausente ou não-positivo — nesse caso o circuito NÃO tem preço e
+ * exige configuração no cadastro de telas.
+ */
+export function computeCircuitWeeklyCost(
+  config: CircuitPricingConfig | null | undefined,
+): CircuitPricingResult | null {
+  const insertionsPerWeek = parseCpmNumber(config?.insertionsPerWeek);
+  const costPerInsertion = parseCpmNumber(config?.costPerInsertion);
+  if (!isPositiveFinite(insertionsPerWeek) || !isPositiveFinite(costPerInsertion)) {
+    return null;
+  }
+  return {
+    insertionsPerWeek,
+    costPerInsertion,
+    weeklyCost: insertionsPerWeek * costPerInsertion,
+  };
+}
+
+/** Semanas cobradas para `days` dias (piso de 1 semana). Fonte única DOOH. */
+export function circuitWeeksForDays(days: number): number {
+  if (!Number.isFinite(days) || days <= 0) return 1;
+  return Math.max(1, Math.ceil(days / 7));
+}
+
+export interface CircuitTotalResult extends CircuitPricingResult {
+  weeks: number;
+  /** Total = custo/semana × semanas. */
+  totalPrice: number;
+}
+
+/**
+ * Total de um circuito para `days` dias: custo/semana × semanas (ceil de
+ * days/7, piso 1). Retorna `null` quando o circuito não tem preço.
+ */
+export function computeCircuitTotal(
+  config: CircuitPricingConfig | null | undefined,
+  days: number,
+): CircuitTotalResult | null {
+  const base = computeCircuitWeeklyCost(config);
+  if (!base) return null;
+  const weeks = circuitWeeksForDays(days);
+  return { ...base, weeks, totalPrice: base.weeklyCost * weeks };
+}
+
 // ─── Status de configuração da tela (fonte única) ────────────────────────────
 // Uma tela só mostra preço e audiência reais quando (a) a config CPM está
 // completa (mesmos campos exigidos por computeCpmPricing) e (b) tem coordenadas

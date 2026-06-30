@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Building2, UserPlus } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { cyclesForDays, daysInRangeInclusive } from "@shared/period";
+import { daysInRangeInclusive } from "@shared/period";
 import { cn } from "@/lib/utils";
 import { InventoryCatalog } from "@/components/media-shop/InventoryCatalog";
 import { MediaPlanPanel, useMediaPlan } from "@/components/media-shop/MediaPlanPanel";
@@ -85,24 +85,22 @@ export default function MediaBudget() {
   function handleConfirm() {
     if (!canConfirm || !hasEntity) return;
     const screenItems = plan.items.map((it) => {
-      // Período de veiculação por linha: quando definido, dias/ciclos derivam do
-      // período próprio (fonte única: daysInRangeInclusive / cyclesForDays);
-      // senão herda o período global do plano.
+      // 1 linha = 1 circuito DOOH. O período da linha (quando definido) dita os
+      // dias; senão herda o período global do plano. O preço é recalculado no
+      // backend a partir da `telas` row (fonte única) — aqui só enviamos a
+      // identidade do circuito + período.
       const lineStart = it.startDate || startDate;
       const lineEnd = it.endDate || endDate;
       const lineDays = it.startDate && it.endDate
         ? Math.max(1, daysInRangeInclusive(it.startDate, it.endDate))
         : plan.days;
-      const lineCycles = Math.max(1, cyclesForDays(lineDays));
       return {
         productId: it.productId,
         productName: it.productName,
-        volume: Math.max(1, it.screens),
-        weeks: Math.max(1, lineCycles * (it.cycleWeeks || 4)),
+        telaId: it.telaId,
+        volume: 1,
+        weeks: Math.max(1, it.weeks),
         restaurantId: it.restaurantId,
-        shareIndex: it.shareIndex,
-        cycleWeeks: it.cycleWeeks || 4,
-        cycles: lineCycles,
         startDate: lineStart,
         endDate: lineEnd,
         days: lineDays,
@@ -136,7 +134,6 @@ export default function MediaBudget() {
       campaignName: campaignName.trim(),
       startDate,
       estimatedTotal: plan.total,
-      estimatedImpressions: plan.exibicoes,
       isBonificada,
       schedule: isBonificada ? [] : schedule,
       items,

@@ -14,6 +14,7 @@ import {
   campaignPhases,
   campaigns,
   campaignDrafts,
+  telas,
 } from "../drizzle/schema";
 import { parseTelaPhotoUrls } from "./telaRouter";
 import { screenSpaceMissingPhotos } from "@shared/cpm-pricing";
@@ -199,6 +200,33 @@ export const anunciantePortalRouter = router({
 
       const allowedRestaurantIds = new Set(restaurantRows.map((r) => r.id));
 
+      // Circuitos DOOH (uma `telas` row = um circuito selecionável). Cada circuito
+      // tem sua própria precificação (inserções/semana × custo/inserção — fonte
+      // única shared/cpm-pricing.ts). Carregamos só os circuitos ativos dos locais
+      // permitidos; o catálogo os achata em 1 linha por circuito.
+      const telaRows = await db
+        .select({
+          id: telas.id,
+          restaurantId: telas.restaurantId,
+          nome: telas.nome,
+          insertionsPerWeek: telas.insertionsPerWeek,
+          costPerInsertion: telas.costPerInsertion,
+        })
+        .from(telas)
+        .where(
+          and(
+            eq(telas.status, "active"),
+            inArray(telas.restaurantId, Array.from(allowedRestaurantIds)),
+          ),
+        );
+
+      const telasByRestaurant = new Map<number, typeof telaRows>();
+      for (const t of telaRows) {
+        const arr = telasByRestaurant.get(t.restaurantId) ?? [];
+        arr.push(t);
+        telasByRestaurant.set(t.restaurantId, arr);
+      }
+
       // 3. Ocupação real: campaignItems vinculados a (productId, restaurantId)
       // cujas fases intersectam o período. Filtramos no SQL quando possível.
       const occupationConditions: SQL[] = [
@@ -281,6 +309,18 @@ export const anunciantePortalRouter = router({
             };
           });
 
+        // Circuitos DOOH do local. Quando os slots de telas estão escondidos
+        // (marketplace público sem foto), não expomos circuitos — o local não é
+        // publicável como mídia de telas.
+        const circuits = hideScreenSlots
+          ? []
+          : (telasByRestaurant.get(r.id) ?? []).map((t) => ({
+              telaId: t.id,
+              nome: t.nome,
+              insertionsPerWeek: t.insertionsPerWeek ?? null,
+              costPerInsertion: t.costPerInsertion != null ? parseFloat(t.costPerInsertion) : null,
+            }));
+
         const totalAvailable = productSlots.reduce((sum, p) => sum + p.availableShares, 0);
         const estimatedAudience = (r.monthlyCustomers ?? 0);
 
@@ -302,6 +342,7 @@ export const anunciantePortalRouter = router({
           excludedCategories: excluded,
           categoryConflict: hasCategoryConflict(excluded, category),
           productSlots,
+          circuits,
           totalAvailableShares: totalAvailable,
           hasAvailability: totalAvailable > 0,
           // ── Inventário de mídia (ecommerce de mídia) ──

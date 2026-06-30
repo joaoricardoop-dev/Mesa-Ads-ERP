@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { ScreenCpmConfig } from "@shared/cpm-pricing";
 import { cyclesForDays } from "@shared/period";
 import {
   quotePrice,
@@ -14,38 +13,27 @@ import {
 // ser reutilizado pelo construtor do cliente final (tarefa downstream).
 //
 // Fontes únicas que este store NÃO duplica (apenas guarda snapshots p/ derivar):
-//   - preço de tela → shared/cpm-pricing.ts (computeScreenDailyPricing)
-//   - métricas/inserções → shared/screen-metrics.ts
+//   - preço de circuito DOOH → shared/cpm-pricing.ts (computeCircuitTotal)
 //   - período/ciclos → shared/period.ts
 
-export interface MediaCpmSnapshot {
-  cpm: number | null;
-  insertionsPerHour: number | null;
-  impactsPerInsertion: number | null;
-  weeklyHours: number | null;
-}
-
+// Um item selecionado = UM circuito DOOH (uma `telas` row). Preço = inserções/
+// semana × custo/inserção × semanas (fonte única: shared/cpm-pricing.ts). Não há
+// mais impressões/alcance — o circuito é a unidade de venda.
 export interface MediaSelectedItem {
+  telaId: number;
   restaurantId: number;
   restaurantName: string;
   neighborhood: string | null;
-  categoria: string;
+  circuitName: string;
   productId: number;
   productName: string;
-  cycleWeeks: number;
-  shareIndex: number;
-  screens: number;
-  /** Inserções/dia padrão derivadas do cadastro (fonte: shared/screen-metrics). */
-  insertionsPerDayDefault: number;
-  /** Inserções/dia efetivas — editáveis por item, sem alterar o cadastro. */
-  insertionsPerDay: number;
-  monthlyCustomers: number | null;
+  /** Snapshot da precificação do circuito (fonte: cadastro de telas). */
+  insertionsPerWeek: number;
+  costPerInsertion: number;
   /** Período de veiculação próprio da linha (opcional). Quando nulo, usa o
    *  período global do plano. Persiste em quotation_items.start_date/end_date. */
   startDate?: string | null;
   endDate?: string | null;
-  /** Snapshot da config CPM do local p/ precificar (fonte: shared/cpm-pricing). */
-  cpm: MediaCpmSnapshot;
 }
 
 function todayISO(): string {
@@ -71,15 +59,6 @@ export interface DraftParcela {
   amount: string;
   dueDate: string;
   notes: string;
-}
-
-export function cpmConfigForPricing(c: MediaCpmSnapshot): Partial<ScreenCpmConfig> {
-  return {
-    cpm: c.cpm ?? undefined,
-    insertionsPerHour: c.insertionsPerHour ?? undefined,
-    impactsPerInsertion: c.impactsPerInsertion ?? undefined,
-    weeklyHours: c.weeklyHours ?? undefined,
-  };
 }
 
 // ─── Produtos por quantidade (bolachas/impressos e demais formatos) ──────────
@@ -170,10 +149,10 @@ interface MediaShopState {
   setNeighborhood: (neighborhood: string | null) => void;
   setCatalogView: (view: CatalogViewMode) => void;
   addItem: (item: MediaSelectedItem) => void;
-  removeItem: (restaurantId: number) => void;
+  removeItem: (telaId: number) => void;
   toggleItem: (item: MediaSelectedItem) => void;
-  isSelected: (restaurantId: number) => boolean;
-  updateItem: (restaurantId: number, patch: Partial<MediaSelectedItem>) => void;
+  isSelected: (telaId: number) => boolean;
+  updateItem: (telaId: number, patch: Partial<MediaSelectedItem>) => void;
   /** Sempre adiciona uma NOVA linha (recorrência). uid é gerado aqui. */
   addQuantityItem: (item: Omit<MediaQuantityItem, "uid">) => void;
   removeQuantityItem: (uid: string) => void;
@@ -219,22 +198,22 @@ export const useMediaShopStore = create<MediaShopState>()(
   setCatalogView: (catalogView) => set({ catalogView }),
   addItem: (item) =>
     set((s) =>
-      s.selected.some((i) => i.restaurantId === item.restaurantId)
+      s.selected.some((i) => i.telaId === item.telaId)
         ? s
         : { selected: [...s.selected, item] },
     ),
-  removeItem: (restaurantId) =>
-    set((s) => ({ selected: s.selected.filter((i) => i.restaurantId !== restaurantId) })),
+  removeItem: (telaId) =>
+    set((s) => ({ selected: s.selected.filter((i) => i.telaId !== telaId) })),
   toggleItem: (item) =>
     set((s) =>
-      s.selected.some((i) => i.restaurantId === item.restaurantId)
-        ? { selected: s.selected.filter((i) => i.restaurantId !== item.restaurantId) }
+      s.selected.some((i) => i.telaId === item.telaId)
+        ? { selected: s.selected.filter((i) => i.telaId !== item.telaId) }
         : { selected: [...s.selected, item] },
     ),
-  isSelected: (restaurantId) => get().selected.some((i) => i.restaurantId === restaurantId),
-  updateItem: (restaurantId, patch) =>
+  isSelected: (telaId) => get().selected.some((i) => i.telaId === telaId),
+  updateItem: (telaId, patch) =>
     set((s) => ({
-      selected: s.selected.map((i) => (i.restaurantId === restaurantId ? { ...i, ...patch } : i)),
+      selected: s.selected.map((i) => (i.telaId === telaId ? { ...i, ...patch } : i)),
     })),
   addQuantityItem: (item) =>
     set((s) => ({

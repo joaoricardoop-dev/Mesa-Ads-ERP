@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { cyclesForDays, daysInRangeInclusive } from "@shared/period";
+import { daysInRangeInclusive } from "@shared/period";
 import { InventoryCatalog, type CatalogAudience } from "./InventoryCatalog";
 import { MediaPlanPanel, useMediaPlan } from "./MediaPlanPanel";
 import { useMediaShopStore, quantityWeeksForDays } from "./mediaShopStore";
@@ -75,8 +75,9 @@ export function MediaShopBuilder({ clientId, source, onClose, onSuccess }: Media
 
   function handleConfirm() {
     if (!canConfirm) return;
-    // Telas: período por linha quando definido; senão herda o período global do
-    // plano (fonte única: daysInRangeInclusive / cyclesForDays de @shared/period).
+    // 1 linha = 1 circuito DOOH. Período por linha quando definido; senão herda o
+    // global. Enviamos só a identidade do circuito (telaId) + período; o backend
+    // recalcula o preço da `telas` row (fonte única).
     const screenItems = plan.items.map((it) => {
       const lineStart = it.startDate || startDate;
       const lineEnd = it.endDate || endDate;
@@ -84,16 +85,13 @@ export function MediaShopBuilder({ clientId, source, onClose, onSuccess }: Media
         it.startDate && it.endDate
           ? Math.max(1, daysInRangeInclusive(it.startDate, it.endDate))
           : plan.days;
-      const lineCycles = Math.max(1, cyclesForDays(lineDays));
       return {
         productId: it.productId,
         productName: it.productName,
-        volume: Math.max(1, it.screens),
-        weeks: Math.max(1, lineCycles * (it.cycleWeeks || 4)),
+        telaId: it.telaId,
+        volume: 1,
+        weeks: Math.max(1, it.weeks),
         restaurantId: it.restaurantId,
-        shareIndex: it.shareIndex,
-        cycleWeeks: it.cycleWeeks || 4,
-        cycles: lineCycles,
         startDate: lineStart,
         endDate: lineEnd,
         days: lineDays,
@@ -125,7 +123,6 @@ export function MediaShopBuilder({ clientId, source, onClose, onSuccess }: Media
       // Mensagem do cliente vira briefing da cotação (campo livre do painel).
       briefing: notes.trim() || undefined,
       estimatedTotal: plan.total,
-      estimatedImpressions: plan.exibicoes,
       // Autosserviço nunca é bonificação e não define parcelas — o backend semeia
       // o cronograma default e o comercial ajusta depois.
       isBonificada: false,

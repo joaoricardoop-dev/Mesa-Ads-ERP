@@ -18,6 +18,11 @@ export interface ProposalItem {
   spotSeconds?: 15 | 30 | null;
   impressionsPerRestaurant?: number;
   numRestaurants?: number;
+  /** Circuito DOOH (telas row). Quando presente, o PDF usa a tabela
+   * Local|Circuito|Semanas|Custo/semana|Total. Origem: marcador `[CIRCUITO]`
+   * nas notes do item, gravado por createFromBuilder (fonte única telas row). */
+  circuitName?: string;
+  locationName?: string;
 }
 
 export interface ProposalSignature {
@@ -236,6 +241,21 @@ export function assembleProposalData(input: AssembleProposalInput): ProposalPDFD
     ? rawItems.map((item) => {
         const semanasMatch = item.notes?.match(/(\d+)sem/);
         const itemSemanas = semanasMatch ? parseInt(semanasMatch[1]) : duration * 4;
+        // Circuito DOOH: marcador canônico `[CIRCUITO] <circuito> @ <local> · Nsem`
+        // gravado por createFromBuilder. Quando presente, o PDF usa a tabela de
+        // circuitos (Local|Circuito|Semanas|Custo/semana|Total).
+        const circuitMatch = item.notes?.match(/^\[CIRCUITO\]\s*(.+?)\s*@\s*(.+?)\s*·/);
+        if (circuitMatch) {
+          return {
+            productName: item.productName || "",
+            volume: num(item.quantity),
+            semanas: itemSemanas,
+            unitPrice: num(item.unitPrice),
+            totalPrice: num(item.totalPrice),
+            circuitName: circuitMatch[1].trim(),
+            locationName: circuitMatch[2].trim(),
+          };
+        }
         const spotMatch = item.notes?.match(/Spot(30|15)s/);
         const insMatch = item.notes?.match(/(\d+)ins\/dia/);
         const cliMatch = item.notes?.match(/(\d+)cli\/mês/);
