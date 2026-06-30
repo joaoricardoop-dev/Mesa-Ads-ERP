@@ -119,6 +119,7 @@ export default function PriceTable() {
     [productsList, selectedProductId]
   );
   const isPriceBasedProduct = selectedProduct?.pricingMode === "price_based";
+  const isCpmProduct = selectedProduct?.pricingMode === "cpm";
   const isFixedQtyProduct = selectedProduct?.entryType === "fixed_quantities";
   const upsertTiersMutation = trpc.product.upsertTiers.useMutation({
     onSuccess: () => { refetchTiers(); toast.success("Faixas salvas!"); },
@@ -403,6 +404,10 @@ export default function PriceTable() {
   });
 
   const handleCreateCotacao = () => {
+    if (isCpmProduct) {
+      toast.error("Produto precificado pelo CPM do local. Use o montador de campanha para selecionar os espaços e gerar a cotação.");
+      return;
+    }
     if (selectedClientId === "none" && selectedLeadId === "none") {
       toast.error("Selecione um cliente ou lead");
       return;
@@ -613,13 +618,22 @@ export default function PriceTable() {
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportPdf}>
             <Download className="w-3.5 h-3.5" /> Exportar PDF
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => { setCotacaoNotes(""); const params = new URLSearchParams(window.location.search); if (!params.get("clientId")) setSelectedClientId("none"); if (!params.get("leadId")) setSelectedLeadId("none"); setCotacaoVolume(volume); setShowCotacaoDialog(true); }}>
+          <Button size="sm" className="gap-1.5" disabled={isCpmProduct} title={isCpmProduct ? "Produto precificado pelo CPM do local — gere a cotação pelo montador de campanha" : undefined} onClick={() => { setCotacaoNotes(""); const params = new URLSearchParams(window.location.search); if (!params.get("clientId")) setSelectedClientId("none"); if (!params.get("leadId")) setSelectedLeadId("none"); setCotacaoVolume(volume); setShowCotacaoDialog(true); }}>
             <Rocket className="w-3.5 h-3.5" /> Criar Cotação
           </Button>
         </div>
       }
     >
-      {isPriceBasedProduct ? (
+      {isCpmProduct ? (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-6 text-center text-sm text-muted-foreground">
+          <p className="font-medium text-foreground mb-1">Precificado pelo CPM do local</p>
+          <p>
+            Este produto é precificado a partir do CPM configurado em cada espaço (local) — a simulação de
+            custo/markup e faixas de volume não se aplica. Configure o CPM no cadastro de cada local e use o
+            montador de campanha para selecionar os espaços e gerar a cotação.
+          </p>
+        </div>
+      ) : isPriceBasedProduct ? (
         productTiers.length === 0 ? (
           <div className="rounded-lg border border-border/40 bg-muted/20 p-6 text-center text-sm text-muted-foreground">
             <p className="font-medium text-foreground mb-1">Nenhuma entrada de preço cadastrada</p>

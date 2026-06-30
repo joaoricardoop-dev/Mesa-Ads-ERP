@@ -1513,11 +1513,14 @@ export const quotationRouter = router({
       for (const item of input.items) {
         const prod = productMap.get(item.productId)!;
 
-        // ── Telas: preço DIÁRIO derivado do CPM (não usa tiers/markup) ──
-        // Total = diária (receita semanal CPM ÷ 7) × dias selecionados, com piso
-        // de 1 semana. Fonte única: shared/cpm-pricing.ts. Os ciclos seguem vivos
-        // por baixo (cyclesForDays) só para estoque/DRE — ver shared/period.ts.
-        if ((prod as any).tipo === "telas") {
+        // ── Modo CPM: preço DIÁRIO derivado do CPM do local (não usa tiers/markup) ──
+        // O DRIVER do preço é o modo de precificação ('cpm'), NÃO o tipo do
+        // produto — qualquer produto pode usar CPM do local. Telas migram para
+        // 'cpm' (mesmo comportamento). Total = diária (receita semanal CPM ÷ 7)
+        // × dias selecionados, com piso de 1 semana. Fonte única:
+        // shared/cpm-pricing.ts. Os ciclos seguem vivos por baixo (cyclesForDays)
+        // só para estoque/DRE — ver shared/period.ts.
+        if ((prod as any).pricingMode === "cpm") {
           const cpmCfg = item.restaurantId != null ? screenCpmMap.get(item.restaurantId) : undefined;
           const screenDays =
             item.days ??
@@ -1528,7 +1531,7 @@ export const quotationRouter = router({
           if (!daily) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: `A tela "${prod.name}" não tem precificação CPM configurada no local. Configure o CPM do local antes de cotar.`,
+              message: `O produto "${prod.name}" usa precificação por CPM do local, mas o local não tem CPM configurado. Configure o CPM do local antes de cotar.`,
             });
           }
           const finalTotal = daily.totalPrice;

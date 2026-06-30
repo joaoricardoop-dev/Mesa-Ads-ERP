@@ -73,7 +73,7 @@ interface BudgetItemState {
   productId: number | null;
   productName: string;
   productTipo?: string | null;
-  pricingMode: "cost_based" | "price_based";
+  pricingMode: "cost_based" | "price_based" | "cpm";
   entryType: "tiers" | "fixed_quantities";
   tiers: BudgetPricingTier[];
   hasTiers: boolean;
@@ -116,6 +116,14 @@ function makeBlankItem(defaultSemanas = 12, defaultPremissas = DEFAULT_PREMISSAS
 
 function getItemPricingInput(item: BudgetItemState): ItemPricingInput | null {
   if (!item.productId) return null;
+
+  // Produtos com pricingMode='cpm' são precificados pelo CPM do local (fonte
+  // única: shared/cpm-pricing.ts), o que exige seleção de locais — disponível
+  // apenas no montador de campanha (media-shop). Este simulador clássico de
+  // custo/markup não tem essa seleção, então NÃO calcula preço para cpm
+  // (evita exibir um custo enganoso). Retornar null exclui o item do cálculo,
+  // dos totais e da geração de cotação aqui.
+  if (item.pricingMode === "cpm") return null;
 
   if (item.pricingMode === "price_based") {
     if (!item.hasTiers || item.tiers.length === 0) return null;
@@ -375,6 +383,7 @@ function BudgetItemCard({ item, globalParams, onUpdate, onRemove, onAddTelasDual
   const colors = TIPO_COLORS[tipo] ?? TIPO_COLORS.outro;
 
   const isPriceBased = item.pricingMode === "price_based";
+  const isCpm = item.pricingMode === "cpm";
   const isFixedQty = item.entryType === "fixed_quantities";
   const isDisplayBatch = tipo === "telas" || tipo === "display";
   const isTelas = tipo === "telas";
@@ -604,8 +613,20 @@ function BudgetItemCard({ item, globalParams, onUpdate, onRemove, onAddTelasDual
             </div>
           )}
 
+          {/* CPM do local: precificado por local no montador de campanha */}
+          {!item.isCustomProduct && item.productId && isCpm && (
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground space-y-1">
+              <p className="font-semibold text-foreground">Precificado pelo CPM do local</p>
+              <p>
+                Este produto é precificado a partir do CPM configurado em cada local. O orçamento clássico
+                não seleciona locais, então o valor não é calculado aqui — use o montador de campanha
+                (Orçamento) para selecionar os espaços e gerar a cotação.
+              </p>
+            </div>
+          )}
+
           {/* Free quantity entry */}
-          {!item.isCustomProduct && item.productId && !tiersLoading && !item.hasTiers && !isPriceBased && (
+          {!item.isCustomProduct && item.productId && !tiersLoading && !item.hasTiers && !isPriceBased && !isCpm && (
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs text-muted-foreground mb-1 block">Quantidade</Label>
@@ -1262,7 +1283,7 @@ export default function BudgetCreator() {
       productId: product.id,
       productName: product.name,
       productTipo: product.tipo,
-      pricingMode: (product.pricingMode as "cost_based" | "price_based") ?? "cost_based",
+      pricingMode: (product.pricingMode as "cost_based" | "price_based" | "cpm") ?? "cost_based",
       entryType: (product.entryType as "tiers" | "fixed_quantities") ?? "tiers",
       tiers: [],
       hasTiers: false,

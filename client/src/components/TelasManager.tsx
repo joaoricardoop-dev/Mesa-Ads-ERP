@@ -482,7 +482,7 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
               onChange={(next) => setForm((f) => ({ ...f, screenOperatingHours: next }))}
               testIdPrefix="tela-op-cell"
             />
-            <p className="text-[10px] text-muted-foreground">Marque as faixas em que esta tela opera (clique no dia para a linha inteira). É apenas descritivo — a precificação vem do local.</p>
+            <p className="text-[10px] text-muted-foreground">Marque as faixas em que esta tela opera (clique no dia para a linha inteira, na hora para a coluna inteira, ou em "Tudo" para marcar todas de uma vez). É apenas descritivo — a precificação vem do local.</p>
             {form.horarioFuncionamento && form.screenOperatingHours.length === 0 && (
               <p className="text-[10px] text-muted-foreground">Horário antigo (texto): <span className="text-foreground/80">{form.horarioFuncionamento}</span></p>
             )}

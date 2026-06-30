@@ -22,3 +22,4 @@
 - [Google Maps loader & key behavior](google-maps-loader.md) — loadGoogleMaps() is canonical; missing key rejects→fallback, invalid→gm_authFailure; RestaurantsMap has a PARALLEL loader; real-SDK pins gated by RUN_REAL_MAPS=1.
 - [Server auto-geocode hook](server-auto-geocode.md) — autoGeocodeIfMissing in db.ts fills lat/lng on create/update only when missing+active+has address; never overwrites autocomplete coords; buildGeocodeQuery is the shared query source.
 - [Space is the unit of sale](space-is-unit-of-sale.md) — active_restaurants.screensCount+photoUrls is the canonical ecommerce source; telas optional; pending badge gates on offersScreenProduct (products.tipo='telas').
+- [pricingMode vs tipo](pricing-mode-vs-tipo.md) — PRICE decision branches on pricingMode (cost_based/price_based/cpm); operational semantics (digital/VIP/commissions/phases/audience/spot) stay on tipo.

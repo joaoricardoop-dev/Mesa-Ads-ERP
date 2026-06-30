@@ -652,13 +652,15 @@ function QuantityProductsSection({
   const addQuantityItem = useMediaShopStore((s) => s.addQuantityItem);
   const quantityCountForProduct = useMediaShopStore((s) => s.quantityCountForProduct);
 
-  // Produtos por quantidade = ativos e que NÃO são telas (telas vivem por local).
+  // Produtos por quantidade = ativos, não-telas e que NÃO são precificados por
+  // CPM do local (pricingMode='cpm' vive por local, não por quantidade — evita
+  // exibir/cobrar um preço por quantidade enganoso para produtos CPM).
   // Para anunciante/parceiro, só os marcados como visíveis ao perfil — mesma
   // checagem que o backend faz no submit, evita oferecer item que seria rejeitado.
   const products = useMemo(
     () =>
       (productsData ?? []).filter((p) => {
-        if (!p.isActive || p.tipo === "telas") return false;
+        if (!p.isActive || p.tipo === "telas" || p.pricingMode === "cpm") return false;
         if (audience === "anunciante") return p.visibleToAdvertisers;
         if (audience === "parceiro") return p.visibleToPartners;
         return true;

@@ -96,7 +96,7 @@ interface DiscountPriceTierRow {
 
 const emptyDiscountTier: DiscountTierForm = { priceMin: "", priceMax: "", discountPercent: "" };
 
-type PricingMode = "cost_based" | "price_based";
+type PricingMode = "cost_based" | "price_based" | "cpm";
 type EntryType = "tiers" | "fixed_quantities";
 type WorkflowTemplate = "fisico" | "eletronico_cliente_envia" | "ativacao_evento";
 
@@ -595,7 +595,7 @@ export default function Products() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className={cn("grid gap-3", form.pricingMode === "cpm" ? "grid-cols-1" : "grid-cols-2")}>
               <div>
                 <Label>Modo de Precificação</Label>
                 <Select value={form.pricingMode} onValueChange={v => setForm({ ...form, pricingMode: v as PricingMode })}>
@@ -603,20 +603,39 @@ export default function Products() {
                   <SelectContent>
                     <SelectItem value="cost_based">Baseado em Custo</SelectItem>
                     <SelectItem value="price_based">Baseado em Preço</SelectItem>
+                    <SelectItem value="cpm">CPM do local</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Tipo de Entrada</Label>
-                <Select value={form.entryType} onValueChange={v => setForm({ ...form, entryType: v as EntryType })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="tiers">Faixas de Volume</SelectItem>
-                    <SelectItem value="fixed_quantities">Quantidades Fixas</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {form.pricingMode !== "cpm" && (
+                <div>
+                  <Label>Tipo de Entrada</Label>
+                  <Select value={form.entryType} onValueChange={v => setForm({ ...form, entryType: v as EntryType })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tiers">Faixas de Volume</SelectItem>
+                      <SelectItem value="fixed_quantities">Quantidades Fixas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
+            {form.pricingMode === "cpm" && (
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground bg-muted rounded-md px-3 py-2 leading-relaxed">
+                  No modo <strong>CPM do local</strong>, o preço não usa custo/markup nem faixas de volume —
+                  ele é derivado do <strong>CPM configurado em cada espaço (local)</strong>. Configure o CPM
+                  no cadastro de cada local; produtos sem CPM no local não terão preço na cotação.
+                </div>
+                {!form.temDistribuicaoPorLocal && form.distributionType !== "local_especifico" && (
+                  <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2 leading-relaxed">
+                    Atenção: este produto não está vinculado a locais específicos. O CPM do local só resolve
+                    para itens com um local associado — habilite "Distribuição por local" ou use distribuição
+                    "Local específico" para garantir preço.
+                  </div>
+                )}
+              </div>
+            )}
             <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
               <h3 className="text-sm font-semibold text-foreground">Cálculo de Impressões</h3>
               <div className="grid grid-cols-3 gap-2">
@@ -952,13 +971,17 @@ function ProductRow({ product: p, expanded, onToggle, onEdit, onDelete, onEditTi
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold">Entradas de Precificação ({tiers.length})</h3>
                 <Badge variant="outline" className="text-[10px]">{p.entryType === "fixed_quantities" ? "Quantidades Exatas" : "Faixas de Volume"}</Badge>
-                <Badge variant="outline" className="text-[10px]">{p.pricingMode === "price_based" ? "Baseado em Preço" : "Baseado em Custo"}</Badge>
+                <Badge variant="outline" className="text-[10px]">{p.pricingMode === "cpm" ? "CPM do local" : p.pricingMode === "price_based" ? "Baseado em Preço" : "Baseado em Custo"}</Badge>
               </div>
               <Button size="sm" variant="outline" onClick={onEditTiers}>
                 <Pencil className="h-3 w-3 mr-1" /> Editar Entradas
               </Button>
             </div>
-            {tiers.length === 0 ? (
+            {p.pricingMode === "cpm" ? (
+              <p className="text-sm text-muted-foreground">
+                Precificado pelo <strong>CPM do local</strong> — o preço vem do CPM configurado no cadastro do espaço, não de faixas de custo/preço.
+              </p>
+            ) : tiers.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma entrada cadastrada</p>
             ) : (
               <div className="border rounded-md overflow-hidden">
@@ -1476,6 +1499,7 @@ function TiersDialog({ open, onOpenChange, productId, product, tiers, setTiers, 
   }, [open, existingTiers, productId, setTiers]);
 
   const inputCls = "h-8 text-xs font-mono px-2";
+  const isCpm = product?.pricingMode === "cpm";
   const isPriceBased = product?.pricingMode === "price_based";
   const isFixedQty = product?.entryType === "fixed_quantities";
 
@@ -1493,7 +1517,7 @@ function TiersDialog({ open, onOpenChange, productId, product, tiers, setTiers, 
         {product && (
           <div className="flex gap-2 text-xs text-muted-foreground">
             <Badge variant="outline">{isFixedQty ? "Quantidades Exatas" : "Faixas de Volume"}</Badge>
-            <Badge variant="outline">{isPriceBased ? "Baseado em Preço" : "Baseado em Custo"}</Badge>
+            <Badge variant="outline">{isCpm ? "CPM do local" : isPriceBased ? "Baseado em Preço" : "Baseado em Custo"}</Badge>
           </div>
         )}
         <div className="space-y-3">

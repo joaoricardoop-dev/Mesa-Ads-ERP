@@ -12,9 +12,10 @@ interface OperatingHoursGridProps {
 /**
  * Grade interativa de horário de funcionamento: 7 dias × 24 faixas de 1 hora.
  * Clicar numa célula liga/desliga a faixa; clicar no rótulo do dia liga/desliga
- * a linha inteira. Implementação ÚNICA da grade — reutilizada pelo cadastro do
- * Local e pelo cadastro de Tela. Os helpers de chave/rótulo vêm de
- * `shared/screen-schedule.ts` (fonte única).
+ * a linha inteira; clicar no rótulo da hora liga/desliga a coluna inteira; clicar
+ * no canto superior esquerdo marca/desmarca TUDO de uma vez. Implementação ÚNICA
+ * da grade — reutilizada pelo cadastro do Local e pelo cadastro de Tela. Os
+ * helpers de chave/rótulo vêm de `shared/screen-schedule.ts` (fonte única).
  */
 export function OperatingHoursGrid({ value, onChange, testIdPrefix = "op-cell" }: OperatingHoursGridProps) {
   const toggleCell = (day: number, hour: number) => {
@@ -32,15 +33,50 @@ export function OperatingHoursGrid({ value, onChange, testIdPrefix = "op-cell" }
     );
   };
 
+  const toggleHour = (hour: number) => {
+    const hourKeys = OPERATING_DAYS.map((d) => operatingCellKey(d.key, hour));
+    const allOn = hourKeys.every((k) => value.includes(k));
+    onChange(
+      allOn
+        ? value.filter((k) => !hourKeys.includes(k))
+        : Array.from(new Set([...value, ...hourKeys])),
+    );
+  };
+
+  const allKeys = OPERATING_DAYS.flatMap((d) => OPERATING_HOURS.map((h) => operatingCellKey(d.key, h)));
+  const allSelected = allKeys.length > 0 && allKeys.every((k) => value.includes(k));
+
+  const toggleAll = () => {
+    onChange(allSelected ? [] : [...allKeys]);
+  };
+
   return (
     <div className="overflow-x-auto -mx-1 px-1">
       <table className="border-separate border-spacing-1">
         <thead>
           <tr>
-            <th className="w-9" />
+            <th className="w-9 align-bottom">
+              <button
+                type="button"
+                onClick={toggleAll}
+                aria-pressed={allSelected}
+                data-testid={`${testIdPrefix}-all`}
+                title={allSelected ? "Desmarcar tudo" : "Marcar tudo"}
+                className="text-[9px] font-medium text-muted-foreground hover:text-foreground w-9 text-left leading-tight"
+              >
+                {allSelected ? "Limpar" : "Tudo"}
+              </button>
+            </th>
             {OPERATING_HOURS.map((h) => (
               <th key={h} className="align-bottom">
-                <div className="text-[8px] text-muted-foreground [writing-mode:vertical-rl] mx-auto whitespace-nowrap py-0.5">{operatingHourLabel(h)}</div>
+                <button
+                  type="button"
+                  onClick={() => toggleHour(h)}
+                  title={`Marcar/desmarcar coluna ${operatingHourLabel(h)}`}
+                  className="text-[8px] text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] mx-auto whitespace-nowrap py-0.5"
+                >
+                  {operatingHourLabel(h)}
+                </button>
               </th>
             ))}
           </tr>

@@ -537,6 +537,15 @@ export const parceiroPortalRouter = router({
         .limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado ou não disponível." });
 
+      // Produtos no modo CPM do local são precificados pelo CPM de cada espaço,
+      // não por volume/faixas — esta cotação rápida por volume não se aplica.
+      if ((product.pricingMode ?? "cost_based") === "cpm") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `O produto "${product.name}" é precificado pelo CPM do local e não pode ser cotado por volume aqui. Use o montador de campanha para selecionar os espaços.`,
+        });
+      }
+
       const [partner] = await db.select().from(partners).where(eq(partners.id, partnerId)).limit(1);
       if (!partner) throw new TRPCError({ code: "NOT_FOUND", message: "Parceiro não encontrado." });
 

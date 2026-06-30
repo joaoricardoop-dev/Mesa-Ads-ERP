@@ -926,7 +926,7 @@ export default function ActiveRestaurantForm() {
                             value={form.screenOperatingHours}
                             onChange={setOperatingHours}
                           />
-                          <p className="text-[10px] text-muted-foreground">Marque as faixas em que as telas operam (clique no dia para a linha inteira). O total de horas/semana alimenta a precificação por CPM.</p>
+                          <p className="text-[10px] text-muted-foreground">Marque as faixas em que as telas operam (clique no dia para a linha inteira, na hora para a coluna inteira, ou em "Tudo" para marcar todas de uma vez). O total de horas/semana alimenta a precificação por CPM.</p>
                         </div>
 
                         {(() => {

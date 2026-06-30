@@ -2391,6 +2391,22 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     name: "task_374_tela_screen_operating_hours_column",
     sql: `ALTER TABLE "telas" ADD COLUMN IF NOT EXISTS "screen_operating_hours" text;`,
   },
+  {
+    // Task #373 — "CPM do local" vira um modo de precificação nativo e
+    // explícito ('cpm'), disponível para QUALQUER produto independente do
+    // `tipo`. O ADD VALUE precisa rodar em transação separada do uso (PG não
+    // permite ADD VALUE + uso na mesma tx, erro 55P04). Por isso fica numa
+    // migration isolada — o backfill que usa o novo label vem na seguinte.
+    name: "task_373_add_cpm_pricing_mode",
+    sql: `ALTER TYPE "pricing_mode" ADD VALUE IF NOT EXISTS 'cpm';`,
+  },
+  {
+    // Task #373 — Backfill: produtos `telas` existentes já eram precificados
+    // implicitamente por CPM do local; agora isso vira o modo explícito 'cpm'
+    // (sem mudança de comportamento). Idempotente.
+    name: "task_373_backfill_telas_products_to_cpm",
+    sql: `UPDATE "products" SET "pricingMode" = 'cpm' WHERE "tipo" = 'telas' AND "pricingMode" <> 'cpm';`,
+  },
 ];
 
 /**

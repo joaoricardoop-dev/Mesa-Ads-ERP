@@ -294,6 +294,9 @@ function CreateQuotationDialog({
 
   const pricing = useMemo(() => {
     if (!selectedProduct || volumeNum <= 0) return null;
+    // Produtos cpm são precificados pelo CPM do local (montador de campanha) e
+    // não podem ser cotados por volume aqui — não calcula preview enganoso.
+    if ((selectedProduct.pricingMode ?? "cost_based") === "cpm") return null;
     const tier = getPricingTierForVolume(selectedProduct.tiers ?? [], volumeNum);
     if (!tier) return null;
     const irpj = sysPremissas.irpj / 100;
@@ -392,6 +395,13 @@ function CreateQuotationDialog({
             </Select>
           </div>
 
+          {(selectedProduct?.pricingMode ?? "cost_based") === "cpm" && (
+            <div className="text-xs text-primary bg-primary/10 border border-primary/20 rounded-lg px-3 py-2 leading-relaxed">
+              Este produto é precificado pelo <strong>CPM do local</strong> e não pode ser cotado por volume aqui.
+              Use o montador de campanha para selecionar os espaços e gerar a cotação.
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Volume (unidades)</Label>
@@ -482,7 +492,7 @@ function CreateQuotationDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!selectedProductId || !pricing || createMutation.isPending}
+            disabled={!selectedProductId || !pricing || createMutation.isPending || (selectedProduct?.pricingMode ?? "cost_based") === "cpm"}
             className="gap-2"
           >
             {createMutation.isPending ? (

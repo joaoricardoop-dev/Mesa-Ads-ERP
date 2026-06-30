@@ -66,11 +66,12 @@ export function quotePrice(params: {
 }): PriceQuote {
   const { product, tiers, discountTiers, volume, weeks, days, hasPartner, premissas, cpmConfig } = params;
 
-  // ── Telas: preço DIÁRIO derivado do CPM (fonte única: shared/cpm-pricing.ts).
-  // Deixa de ser por ciclo: total = diária × dias (mín. 7). O motor de
-  // markup/tiers não se aplica. Sem CPM configurado no local, a tela não tem
-  // preço (retorna zero — exige configuração).
-  if (product.tipo === "telas") {
+  // ── Modo CPM: preço DIÁRIO derivado do CPM do local (fonte única:
+  // shared/cpm-pricing.ts). O DRIVER é o modo de precificação ('cpm'), NÃO o
+  // tipo do produto. Total = diária × dias (mín. 7). O motor de markup/tiers
+  // não se aplica. Sem CPM configurado no local, o item não tem preço (retorna
+  // zero — exige configuração).
+  if (product.pricingMode === "cpm") {
     const daily = computeScreenDailyPricing(cpmConfig, days ?? 0);
     if (!daily) {
       return { unitPrice: 0, totalPrice: 0, baseTotal: 0, prazoDiscountPct: 0, volumeDiscountPct: 0 };

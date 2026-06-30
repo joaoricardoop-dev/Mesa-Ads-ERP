@@ -31,7 +31,7 @@ function calcUnitPrice(params: {
   comRestaurante: number;
   comComercialProduto: number;
   comParceiro: number;
-  pricingMode?: "cost_based" | "price_based";
+  pricingMode?: "cost_based" | "price_based" | "cpm";
   precoBaseTier?: number;
 }) {
   const { custoUnitario, frete, margem, artes, volume, irpj, comRestaurante, comComercialProduto, comParceiro, pricingMode = "cost_based", precoBaseTier = 0 } = params;
@@ -96,6 +96,25 @@ function ProductTable({ product, bvPercent, billingMode }: ProductTableProps) {
     () => tiers.map((t: any) => t.volumeMin).sort((a: number, b: number) => a - b),
     [tiers]
   );
+
+  // Produtos no modo CPM do local não usam faixas de custo/preço — o preço vem
+  // do CPM configurado em cada espaço. Sinaliza isso em vez de tabela de faixas.
+  if ((product.pricingMode ?? "cost_based") === "cpm") {
+    return (
+      <div className="bg-card border border-border/30 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 flex-wrap">
+          <Package className="w-4 h-4 text-primary" />
+          <span className="font-semibold text-sm">{product.name}</span>
+          <Badge variant="outline" className="text-xs text-primary border-primary/30 bg-primary/10">
+            Precificado pelo CPM do local
+          </Badge>
+          <span className="w-full text-xs text-muted-foreground mt-1">
+            O preço deste produto é calculado a partir do CPM configurado em cada espaço (local), não por faixas de volume.
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   if (tiers.length === 0) {
     return (
