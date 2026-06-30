@@ -59,6 +59,7 @@ import { EXCLUDED_CATEGORIES } from "@shared/excluded-categories";
 import { computeCpmPricing, screenSpaceMissingPhotos } from "@shared/cpm-pricing";
 import { parseOperatingHours } from "@shared/screen-schedule";
 import { OperatingHoursGrid } from "@/components/OperatingHoursGrid";
+import TelasManager from "@/components/TelasManager";
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const BUSY_HOURS_OPTIONS = ["06h–09h", "09h–12h", "12h–15h", "15h–18h", "18h–21h", "21h–00h", "00h–03h", "03h–06h"];
@@ -210,7 +211,8 @@ interface Socio {
 export default function ActiveRestaurantForm() {
   const [, navigate] = useLocation();
   const [matchEdit, params] = useRoute("/restaurantes/:id");
-  const editId = matchEdit && params?.id !== "novo" ? parseInt(params!.id) : null;
+  const parsedId = matchEdit && params?.id !== "novo" ? parseInt(params!.id, 10) : NaN;
+  const editId = Number.isFinite(parsedId) ? parsedId : null;
   const isEditing = editId !== null;
 
   const [form, setForm] = useState<FormData>(emptyForm);
@@ -844,9 +846,18 @@ export default function ActiveRestaurantForm() {
                   </Section>
 
                   <Section icon={<Monitor className="w-4 h-4" />} title="Inventário de Mídia / Telas">
-                    <p className="text-[10px] text-muted-foreground -mt-1">
-                      As telas (pontos de mídia) agora são gerenciadas como entidade própria. {isEditing ? "Acesse a aba \"Telas\" no perfil do local para adicionar, editar ou remover telas." : "Após salvar o local, acesse a aba \"Telas\" no perfil para cadastrar as telas."}
-                    </p>
+                    {isEditing && editId !== null ? (
+                      <TelasManager
+                        restaurantId={editId}
+                        defaultAddress={form.address}
+                        defaultLat={coords?.lat}
+                        defaultLng={coords?.lng}
+                      />
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground -mt-1">
+                        As telas (pontos de mídia) são gerenciadas como entidade própria. Salve o local primeiro para adicionar, editar ou remover telas deste espaço.
+                      </p>
+                    )}
                   </Section>
 
                   <Section icon={<Monitor className="w-4 h-4" />} title="Espaço de mídia (telas)">

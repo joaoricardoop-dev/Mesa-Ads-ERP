@@ -44,9 +44,13 @@ interface TelasManagerProps {
   defaultAddress?: string | null;
   defaultLat?: string | number | null;
   defaultLng?: string | number | null;
+  // Quando true, oculta os botões de adicionar/editar/remover e não abre o
+  // diálogo de cadastro — apenas visualiza as telas cadastradas. O cadastro/
+  // edição vive exclusivamente no formulário de edição do local.
+  readOnly?: boolean;
 }
 
-export default function TelasManager({ restaurantId, defaultAddress, defaultLat, defaultLng }: TelasManagerProps) {
+export default function TelasManager({ restaurantId, defaultAddress, defaultLat, defaultLng, readOnly = false }: TelasManagerProps) {
   const utils = trpc.useUtils();
   const listQ = trpc.tela.listByRestaurant.useQuery({ restaurantId });
   const telas = listQ.data ?? [];
@@ -87,9 +91,11 @@ export default function TelasManager({ restaurantId, defaultAddress, defaultLat,
             Inventário interno e <strong>opcional</strong>: o que se comercializa é o espaço (use "Nº de telas" e fotos no cadastro do local). Detalhar cada tela aqui nunca é obrigatório e não bloqueia a venda.
           </p>
         </div>
-        <Button onClick={openCreate} size="sm" className="gap-1.5" data-testid="button-add-tela">
-          <Plus className="w-3.5 h-3.5" /> Adicionar tela
-        </Button>
+        {!readOnly && (
+          <Button onClick={openCreate} size="sm" className="gap-1.5" data-testid="button-add-tela">
+            <Plus className="w-3.5 h-3.5" /> Adicionar tela
+          </Button>
+        )}
       </div>
 
       {listQ.isLoading ? (
@@ -116,12 +122,16 @@ export default function TelasManager({ restaurantId, defaultAddress, defaultLat,
                   <Badge variant={t.status === "active" ? "secondary" : "outline"} className="text-[10px]">
                     {t.status === "active" ? "Ativa" : "Inativa"}
                   </Badge>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(t)} data-testid={`button-edit-tela-${t.id}`}>
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-red-400" onClick={() => handleDelete(t)} data-testid={`button-delete-tela-${t.id}`}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  {!readOnly && (
+                    <>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(t)} data-testid={`button-edit-tela-${t.id}`}>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-red-400" onClick={() => handleDelete(t)} data-testid={`button-delete-tela-${t.id}`}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-muted-foreground">

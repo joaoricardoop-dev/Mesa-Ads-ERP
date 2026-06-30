@@ -834,6 +834,7 @@ export default function ActiveRestaurantProfile() {
                 defaultAddress={restaurant.address}
                 defaultLat={restaurant.lat}
                 defaultLng={restaurant.lng}
+                readOnly
               />
             </TabsContent>
 
