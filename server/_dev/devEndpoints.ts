@@ -617,6 +617,13 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
 
       // Base comum: campos NOT NULL preenchidos, config de mídia INCOMPLETA
       // (sem lat/lng nem CPM), status ativo.
+      // IMPORTANTE: o banco de teste é compartilhado e os espaços do badge são
+      // REUSADOS por nome entre execuções. Se um run anterior (ou outro spec)
+      // tiver preenchido lat/lng/CPM nesses espaços, o gate "Mídia incompleta"
+      // some e o teste falha. Por isso ZERAMOS explicitamente os campos de
+      // mídia aqui — assim a config volta a ser INCOMPLETA a cada semeadura,
+      // honrando a intenção documentada do fixture independente do estado
+      // residual do banco.
       const baseValues = {
         status: "active" as const,
         neighborhood: "Centro",
@@ -628,6 +635,14 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
         monthlyCustomers: 5000,
         city: "São Paulo",
         state: "SP",
+        lat: null,
+        lng: null,
+        screenCpm: null,
+        screenInsertionsPerHour: null,
+        screenImpactsPerInsertion: null,
+        screenWeeklyHours: null,
+        screenExposureSec: null,
+        photoUrls: null,
       };
 
       const ensureSpace = async (

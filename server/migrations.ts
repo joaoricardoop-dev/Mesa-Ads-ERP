@@ -2407,6 +2407,80 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     name: "task_373_backfill_telas_products_to_cpm",
     sql: `UPDATE "products" SET "pricingMode" = 'cpm' WHERE "tipo" = 'telas' AND "pricingMode" <> 'cpm';`,
   },
+  {
+    // Task #375 Fase B — DOOH unificado. Consolida o catálogo digital num ÚNICO
+    // produto "DOOH". Decisões do usuário:
+    //  • UM produto DOOH novo; locais apontam para ele OPCIONALMENTE (só os que
+    //    já ofereciam tela/janela — vínculo via product_locations não é
+    //    obrigatório por local).
+    //  • tipo = 'telas' (reaproveita o gate digital existente: sem comissão de
+    //    restaurante/produção/frete, gera repasse VIP) — sem mexer no gate.
+    //  • pricingMode = 'cpm' (preço vem do LOCAL: active_restaurants.screenCpm).
+    //  • Sem mais categoria 'janelas_digitais': a diferenciação de superfície
+    //    vive por LOCAL na tabela `telas` (telas.nome), não como tipo de produto.
+    //  • Histórico preservado: produtos digitais antigos são INATIVADOS (nunca
+    //    apagados); campanhas/cotações seguem apontando para eles.
+    // ORDEM (CRÍTICO): roda DEPOIS de `task_373_add_cpm_pricing_mode`, que faz o
+    // ALTER TYPE ADD VALUE 'cpm' numa transação separada (PG proíbe ADD VALUE +
+    // uso na mesma tx, erro 55P04). Por isso este bloco fica no FIM do array —
+    // usar 'cpm' antes do ADD VALUE quebraria em banco NOVO.
+    // Canônico = MENOR id entre os produtos (name='DOOH', tipo='telas'). Ele é
+    // reativado e normalizado e qualquer duplicado é inativado — garante UM único
+    // DOOH ativo. Idempotente: criação guardada por NOT EXISTS; repontar via ON
+    // CONFLICT; reativação/inativação são no-op em re-execução.
+    name: "task_375_consolidate_dooh_product",
+    sql: [
+      // 1. Produto DOOH canônico (só cria se ainda não existe nenhum).
+      `INSERT INTO "products"
+         ("name","description","tipo","pricingMode","isActive",
+          "visibleToAdvertisers","visibleToPartners","temDistribuicaoPorLocal",
+          "unitLabel","unitLabelPlural")
+       SELECT 'DOOH',
+              'Mídia digital DOOH — preço por CPM do local. As superfícies (telas/janelas) são nomeadas por local na tabela de telas.',
+              'telas','cpm',true,true,true,true,'inserção','inserções'
+       WHERE NOT EXISTS (
+         SELECT 1 FROM "products" WHERE "name" = 'DOOH' AND "tipo" = 'telas'
+       );`,
+      // 2. Normaliza o DOOH canônico (menor id): ativo + atributos canônicos.
+      //    Cobre o caso de um DOOH pré-existente inativo/desconfigurado.
+      `UPDATE "products"
+       SET "isActive" = true,
+           "pricingMode" = 'cpm',
+           "visibleToAdvertisers" = true,
+           "visibleToPartners" = true,
+           "temDistribuicaoPorLocal" = true,
+           "updatedAt" = now()
+       WHERE "id" = (
+         SELECT id FROM "products" WHERE "name" = 'DOOH' AND "tipo" = 'telas' ORDER BY id LIMIT 1
+       );`,
+      // 3. Repontar product_locations dos produtos digitais antigos -> DOOH.
+      //    GREATEST preserva a maior capacidade quando dois antigos colidem no
+      //    mesmo (DOOH, local). Mantém as linhas antigas intactas (produtos
+      //    antigos ficam inativos e somem do catálogo via filtro isActive).
+      `INSERT INTO "product_locations" ("productId","restaurantId","maxShares","cycleWeeks")
+       SELECT d.id, pl."restaurantId", MAX(pl."maxShares"), MAX(pl."cycleWeeks")
+       FROM "product_locations" pl
+       JOIN "products" p ON p.id = pl."productId"
+       CROSS JOIN (
+         SELECT id FROM "products" WHERE "name" = 'DOOH' AND "tipo" = 'telas' ORDER BY id LIMIT 1
+       ) d
+       WHERE p."tipo" IN ('telas','janelas_digitais') AND p.id <> d.id
+       GROUP BY d.id, pl."restaurantId"
+       ON CONFLICT ON CONSTRAINT "uq_product_location"
+       DO UPDATE SET
+         "maxShares"  = GREATEST("product_locations"."maxShares", EXCLUDED."maxShares"),
+         "cycleWeeks" = GREATEST("product_locations"."cycleWeeks", EXCLUDED."cycleWeeks");`,
+      // 4. Inativar TODOS os produtos digitais antigos exceto o DOOH canônico
+      //    (inclui eventuais DOOH duplicados) -> garante um único DOOH ativo.
+      `UPDATE "products"
+       SET "isActive" = false, "updatedAt" = now()
+       WHERE "tipo" IN ('telas','janelas_digitais')
+         AND "isActive" = true
+         AND "id" <> (
+           SELECT id FROM "products" WHERE "name" = 'DOOH' AND "tipo" = 'telas' ORDER BY id LIMIT 1
+         );`,
+    ],
+  },
 ];
 
 /**

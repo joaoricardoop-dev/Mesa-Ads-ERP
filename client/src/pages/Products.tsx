@@ -500,9 +500,15 @@ export default function Products() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.entries(tipoLabels) as [TipoProduct, string][]).map(([val, label]) => (
-                    <SelectItem key={val} value={val}>{label}</SelectItem>
-                  ))}
+                  {/* DOOH unificado (Task #375): 'janelas_digitais' deixou de ser
+                      categoria criável — a diferenciação de superfície vive por
+                      local (telas.nome). Mantida só quando se edita um produto
+                      legado já marcado como janela. */}
+                  {(Object.entries(tipoLabels) as [TipoProduct, string][])
+                    .filter(([val]) => val !== "janelas_digitais" || form.tipo === "janelas_digitais")
+                    .map(([val, label]) => (
+                      <SelectItem key={val} value={val}>{label}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

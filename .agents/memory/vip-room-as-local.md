@@ -42,12 +42,30 @@ bruto by default + migration, so a liquido room is a rare manual override.
 math in SQL. The real single-source fix is aggregates reading the AP ledger, but
 that breaks projection for not-yet-paid invoices — left as a deliberate gap.
 
-## DRE batch still on the legacy provider path (blocks DOOH consolidation)
+## DRE batch still on the legacy provider path (LIVE gap after DOOH consolidation)
 The per-phase DRE computation still derives VIP repasse from the product→provider
 link on a liquido-style base, NOT the new per-local attribution. It was
-deliberately not aligned. It HARD-BLOCKS the digital/DOOH consolidation phase:
-once products stop linking to a provider, DRE VIP collapses to 0. Align DRE to
-the per-local math before that phase.
+deliberately not aligned.
+**Now active, not hypothetical:** the digital catalog has been consolidated into a
+single canonical `DOOH` product (`tipo='telas'`, `pricingMode='cpm'`) with NO
+`vipProviderId`. So any campaign on DOOH yields DRE VIP repasse = 0 until the DRE
+batch is realigned to the per-local attribution (`calcVipRepasseLocal`). This is
+the outstanding follow-up — do it before trusting per-phase DRE VIP numbers for
+digital campaigns.
+
+## DOOH consolidation: one canonical product, gated by enum-ordering
+**Rule:** the canonical digital product is the MIN-id row with `name='DOOH' AND
+tipo='telas'`; all other telas/janelas_digitais products are inactivated (history
+kept, never deleted) and their `product_locations` repointed to DOOH.
+**Why:** "fonte única de verdade" — one digital product, one CPM source (the
+location's `screenCpm`). Surfaces (tela/janela names) live per-location in `telas`,
+not as product types; there is no `janelas_digitais` product going forward.
+**How to apply:** the consolidation migration MUST run AFTER the migration that
+does `ALTER TYPE pricing_mode ADD VALUE 'cpm'` — Postgres forbids ADD VALUE + use
+of the new enum value in the same transaction (55P04), so the ADD VALUE lives in
+its own committed migration and any `pricingMode='cpm'` write must come in a later
+one. Putting the consolidation before it silently fails on a FRESH db (runner
+logs+continues), leaving the catalog unconsolidated.
 
 ## Provider→local backfill matching
 Backfill marks a local as VIP by matching provider→local on normalized CNPJ then
