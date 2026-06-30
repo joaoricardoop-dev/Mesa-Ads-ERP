@@ -11,7 +11,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "echo 'Este projeto NAO usa drizzle-kit para migrar. O schema e gerenciado pelo runner custom em server/migrations.ts, aplicado no boot/deploy via runMigrations(). Para uma mudanca de schema: adicione uma migration idempotente em server/migrations.ts e rode o app (dev) ou faca deploy (prod). Os arquivos em drizzle/ sao apenas referencia.' && exit 1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
