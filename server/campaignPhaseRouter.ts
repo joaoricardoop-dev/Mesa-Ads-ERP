@@ -833,13 +833,13 @@ export const campaignPhaseRouter = router({
           item: campaignItems,
           productTipo: products.tipo,
           productName: products.name,
-          productVipProviderId: products.vipProviderId,
-          productVipProviderCommissionPercent: products.vipProviderCommissionPercent,
-          vipProviderRepassePercent: vipProviders.repassePercent,
+          roomIsVip: activeRestaurants.isVipRoom,
+          roomVipRepassePercent: activeRestaurants.vipRepassePercent,
+          roomVipBillingMode: activeRestaurants.vipBillingMode,
         })
         .from(campaignItems)
         .leftJoin(products, eq(products.id, campaignItems.productId))
-        .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId))
+        .leftJoin(activeRestaurants, eq(activeRestaurants.id, campaignItems.restaurantId))
         .where(eq(campaignItems.campaignPhaseId, input.phaseId));
 
       const itemsForCalc: PhaseItemLike[] = itemRows.map((r) => ({
@@ -849,9 +849,9 @@ export const campaignPhaseRouter = router({
         totalPrice: r.item.totalPrice,
         productionCost: r.item.productionCost ?? 0,
         freightCost: r.item.freightCost ?? 0,
-        vipProviderRepassePercent: r.vipProviderRepassePercent ?? null,
-        productVipProviderCommissionPercent: r.productVipProviderCommissionPercent ?? null,
-        vipProviderId: r.productVipProviderId ?? null,
+        isVipRoom: r.roomIsVip ?? false,
+        vipRepassePercent: r.roomVipRepassePercent ?? null,
+        vipBillingMode: (r.roomVipBillingMode as "bruto" | "liquido" | null) ?? null,
       }));
 
       const partner = await resolvePartnerForCampaignBasic(db, campaign);
@@ -1112,13 +1112,13 @@ export const campaignPhaseRouter = router({
           item: campaignItems,
           productTipo: products.tipo,
           productName: products.name,
-          productVipProviderId: products.vipProviderId,
-          productVipProviderCommissionPercent: products.vipProviderCommissionPercent,
-          vipProviderRepassePercent: vipProviders.repassePercent,
+          roomIsVip: activeRestaurants.isVipRoom,
+          roomVipRepassePercent: activeRestaurants.vipRepassePercent,
+          roomVipBillingMode: activeRestaurants.vipBillingMode,
         })
         .from(campaignItems)
         .leftJoin(products, eq(products.id, campaignItems.productId))
-        .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId))
+        .leftJoin(activeRestaurants, eq(activeRestaurants.id, campaignItems.restaurantId))
         .where(sql`${campaignItems.campaignPhaseId} IN (${sql.join(phaseIds.map((id) => sql`${id}`), sql`, `)})`);
 
       const itemsByPhase = new Map<number, typeof allItems>();
@@ -1177,9 +1177,9 @@ export const campaignPhaseRouter = router({
           totalPrice: r.item.totalPrice,
           productionCost: r.item.productionCost ?? 0,
           freightCost: r.item.freightCost ?? 0,
-          vipProviderRepassePercent: r.vipProviderRepassePercent ?? null,
-          productVipProviderCommissionPercent: r.productVipProviderCommissionPercent ?? null,
-          vipProviderId: r.productVipProviderId ?? null,
+          isVipRoom: r.roomIsVip ?? false,
+          vipRepassePercent: r.roomVipRepassePercent ?? null,
+          vipBillingMode: (r.roomVipBillingMode as "bruto" | "liquido" | null) ?? null,
         }));
         const overrides = extractOverridesFromPhase(phase);
         const f = calcPhaseFinancials({ items: itemsForCalc, campaign: campaignCtx, overrides, irpjRatePercent: irpjPct });

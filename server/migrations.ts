@@ -2329,11 +2329,13 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     // Idempotente: só toca locais ainda não marcados (is_vip_room = false).
     name: "task_375_backfill_vip_providers_into_locais",
     sql: [
-      // 1) Match por CNPJ normalizado (apenas dígitos).
+      // 1) Match por CNPJ normalizado (apenas dígitos). Migra TAMBÉM o
+      //    billingMode do provedor (bruto/liquido) — não hard-seta 'bruto',
+      //    senão provedores 'liquido' regrediriam de comportamento.
       `UPDATE "active_restaurants" ar
          SET "is_vip_room" = true,
              "vip_repasse_percent" = vp."repassePercent",
-             "vip_billing_mode" = 'bruto'
+             "vip_billing_mode" = vp."billingMode"
          FROM "vip_providers" vp
          WHERE vp."cnpj" IS NOT NULL AND ar."cnpj" IS NOT NULL
            AND regexp_replace(vp."cnpj", '\\D', '', 'g') <> ''
@@ -2344,10 +2346,50 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       `UPDATE "active_restaurants" ar
          SET "is_vip_room" = true,
              "vip_repasse_percent" = vp."repassePercent",
-             "vip_billing_mode" = 'bruto'
+             "vip_billing_mode" = vp."billingMode"
          FROM "vip_providers" vp
          WHERE lower(btrim(vp."name")) = lower(btrim(ar."name"))
            AND ar."is_vip_room" = false
+           AND NOT EXISTS (
+             SELECT 1 FROM "active_restaurants" a2
+             WHERE a2."cnpj" IS NOT NULL AND vp."cnpj" IS NOT NULL
+               AND regexp_replace(a2."cnpj", '\\D', '', 'g') <> ''
+               AND regexp_replace(a2."cnpj", '\\D', '', 'g') = regexp_replace(vp."cnpj", '\\D', '', 'g')
+           );`,
+    ],
+  },
+  {
+    // Task #375 — Correção: a 1ª versão do backfill acima hard-setava
+    // `vip_billing_mode = 'bruto'` para TODA sala VIP migrada, ignorando o modo
+    // real do provedor. Em bancos que já rodaram aquela versão (ex.: banco de
+    // teste), provedores 'liquido' ficaram errados. Esta migration re-sincroniza
+    // o modo (e o % de repasse) a partir do provedor casado por CNPJ/nome,
+    // SOMENTE quando o valor atual da sala diverge do provedor — idempotente e
+    // sem efeito em bancos que já receberam o backfill corrigido.
+    // ATENÇÃO: esta é uma correção one-time logo após a Fase A. Para salas que
+    // casam um provedor, ela SOBRESCREVE eventuais ajustes manuais de modo/% que
+    // tenham sido feitos entre o backfill antigo e esta migration (cenário raro:
+    // ninguém deveria ter editado ainda). Após rodar uma vez, vira no-op.
+    name: "task_375_resync_vip_billing_mode_from_provider",
+    sql: [
+      `UPDATE "active_restaurants" ar
+         SET "vip_billing_mode" = vp."billingMode",
+             "vip_repasse_percent" = vp."repassePercent"
+         FROM "vip_providers" vp
+         WHERE vp."cnpj" IS NOT NULL AND ar."cnpj" IS NOT NULL
+           AND regexp_replace(vp."cnpj", '\\D', '', 'g') <> ''
+           AND regexp_replace(vp."cnpj", '\\D', '', 'g') = regexp_replace(ar."cnpj", '\\D', '', 'g')
+           AND ar."is_vip_room" = true
+           AND (ar."vip_billing_mode" <> vp."billingMode"
+                OR ar."vip_repasse_percent" <> vp."repassePercent");`,
+      `UPDATE "active_restaurants" ar
+         SET "vip_billing_mode" = vp."billingMode",
+             "vip_repasse_percent" = vp."repassePercent"
+         FROM "vip_providers" vp
+         WHERE lower(btrim(vp."name")) = lower(btrim(ar."name"))
+           AND ar."is_vip_room" = true
+           AND (ar."vip_billing_mode" <> vp."billingMode"
+                OR ar."vip_repasse_percent" <> vp."repassePercent")
            AND NOT EXISTS (
              SELECT 1 FROM "active_restaurants" a2
              WHERE a2."cnpj" IS NOT NULL AND vp."cnpj" IS NOT NULL

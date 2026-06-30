@@ -42,16 +42,20 @@ bruto by default + migration, so a liquido room is a rare manual override.
 math in SQL. The real single-source fix is aggregates reading the AP ledger, but
 that breaks projection for not-yet-paid invoices — left as a deliberate gap.
 
-## DRE batch still on the legacy provider path (LIVE gap after DOOH consolidation)
-The per-phase DRE computation still derives VIP repasse from the product→provider
-link on a liquido-style base, NOT the new per-local attribution. It was
-deliberately not aligned.
-**Now active, not hypothetical:** the digital catalog has been consolidated into a
-single canonical `DOOH` product (`tipo='telas'`, `pricingMode='cpm'`) with NO
-`vipProviderId`. So any campaign on DOOH yields DRE VIP repasse = 0 until the DRE
-batch is realigned to the per-local attribution (`calcVipRepasseLocal`). This is
-the outstanding follow-up — do it before trusting per-phase DRE VIP numbers for
-digital campaigns.
+## Per-phase DRE VIP repasse = per-local (single source with the ledger)
+**Rule:** the per-phase DRE financials derive VIP repasse from the LOCATION
+(`active_restaurants` is-vip-room / repasse percent / billing mode), summing
+`calcVipRepasseLocal` over each digital VIP-room item — the SAME canonical math
+the AP ledger materializer uses. There is NO product→provider derivation in the
+DRE path.
+**Why:** the canonical digital product (`DOOH`) has no provider link, so a
+provider-based DRE yields repasse = 0 for every digital campaign — a live
+financial error. Anchoring on the location keeps the DRE, the ledger, and the
+public/PDF surfaces on one source.
+**How to apply:** a legacy single-rate VIP *override* still applies that rate to a
+net base (legacy behavior, preserved); absent an override, sum per-local repasse
+per digital VIP item, honoring each room's bruto/liquido mode. Never reintroduce a
+provider-keyed branch here.
 
 ## DOOH consolidation: one canonical product, gated by enum-ordering
 **Rule:** the canonical digital product is the MIN-id row with `name='DOOH' AND
