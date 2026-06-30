@@ -21,9 +21,9 @@ import {
   Info,
 } from "lucide-react";
 import { useState } from "react";
-import { CampaignConsolidated } from "@/components/campaign/CampaignConsolidated";
+// Task #383 — CampaignConsolidated (consolidado financeiro) não é mais renderizado na UI.
 import { getInvoiceBadgeMeta } from "@/components/campaign/InvoiceSchedule";
-import CampaignHealthDashboard from "@/components/campaign/CampaignHealthDashboard";
+// Task #383 — CampaignHealthDashboard (saúde financeira) não é mais renderizado na UI.
 
 function QuotationSection({ quotationId }: { quotationId: number }) {
   const [, setLocation] = useLocation();
@@ -371,8 +371,8 @@ export default function CampaignOverview() {
           </div>
         </div>
 
-        {/* Consolidado da Campanha (economics + cronograma de faturamento) */}
-        <CampaignConsolidated campaignId={campaignId} />
+        {/* Task #383 — Consolidado financeiro da campanha (receita prevista / margem /
+            cronograma) ocultado da UI. Receita segue no Dashboard e Dashboard Comercial. */}
 
         {!loadingCamp && campaign?.quotationId && (
           <QuotationSection quotationId={campaign.quotationId} />
@@ -460,9 +460,8 @@ export default function CampaignOverview() {
           </section>
         )}
 
-        {!loadingCamp && campaign && (
-          <CampaignHealthDashboard campaignId={campaignId} />
-        )}
+        {/* Task #383 — Saúde financeira da campanha (Receita vs Custo / DRE consolidado)
+            ocultada da UI junto com o módulo Financeiro. */}
       </div>
     </div>
   );

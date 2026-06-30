@@ -35,15 +35,8 @@ import Leads from "./pages/Leads";
 import Contacts from "./pages/Contacts";
 import ServiceOrders from "./pages/ServiceOrders";
 import BatchManagement from "./pages/BatchManagement";
-import FinancialDashboard from "./pages/financial/FinancialDashboard";
-import Invoicing from "./pages/financial/Invoicing";
-import OperationalCosts from "./pages/financial/OperationalCosts";
-import FinancialReport from "./pages/financial/FinancialReport";
-import PartnerCommissionReport from "./pages/financial/PartnerCommissionReport";
-import AccountsPayablePage from "./pages/financial/AccountsPayablePage";
-import FinancialGlossary from "./pages/financial/FinancialGlossary";
-import FinancialAuditLog from "./pages/financial/FinancialAuditLog";
-import BankReconciliation from "./pages/financial/BankReconciliation";
+// Task #383 — Páginas do módulo Financeiro não são mais importadas/rotadas na UI.
+// Os routers/cálculos financeiros do backend permanecem intactos (dependências do Comercial).
 import PriceTable from "./pages/PriceTable";
 import AnunciantePortal from "./pages/AnunciantePortal";
 import RestaurantePortal from "./pages/RestaurantePortal";
@@ -130,23 +123,16 @@ function Router() {
       <Route path="/clientes/:id" component={ClientDetail} />
       <Route path="/clientes" component={Clients} />
       <Route path="/cotacao/preview" component={QuotationPreview} />
-      <Route path="/financeiro" component={FinancialDashboard} />
-      <Route path="/financeiro/faturamento" component={Invoicing} />
-      <Route path="/financeiro/contas-pagar" component={AccountsPayablePage} />
-      <Route path="/financeiro/relatorios" component={FinancialReport} />
-      <Route path="/financeiro/conciliacao" component={BankReconciliation} />
-      <Route path="/financeiro/glossario" component={FinancialGlossary} />
-      <Route path="/financeiro/comissao-parceiros" component={PartnerCommissionReport} />
-      <Route path="/financeiro/auditoria" component={FinancialAuditLog} />
+      {/* Task #383 — Módulo Financeiro ocultado da UI. Toda rota /financeiro/* redireciona
+          para o Dashboard principal (links/bookmarks antigos resolvem numa página visível em
+          vez de 404). Backend/routers financeiros seguem intactos pois o Comercial depende
+          deles (cronograma de faturamento, criador de orçamento). */}
+      <Route path="/financeiro/*">{() => <Redirect to="/" />}</Route>
+      <Route path="/financeiro">{() => <Redirect to="/" />}</Route>
       {/* Task #375 — Provedores Sala VIP aposentado: a sala VIP virou um local
           (active_restaurants.is_vip_room) com o repasse no próprio cadastro do
           local. Rota/menu removidos do fluxo ativo; dados/histórico preservados. */}
       <Route path="/configuracoes/provedores-sala-vip">{() => <Redirect to="/restaurantes" />}</Route>
-      {/* Redirects (rotas antigas → novas) */}
-      <Route path="/financeiro/pagamentos">{() => <Redirect to="/financeiro/contas-pagar?tab=restaurant_commission" />}</Route>
-      <Route path="/financeiro/custos">{() => <Redirect to="/financeiro/contas-pagar?tab=supplier_cost" />}</Route>
-      <Route path="/financeiro/fornecedores">{() => <Redirect to="/producao?tab=suppliers" />}</Route>
-      <Route path="/financeiro/provedores-vip">{() => <Redirect to="/restaurantes" />}</Route>
       <Route path="/campanhas/:id/batch/:phaseId" component={CampaignDetail} />
       {/* Rota antiga mantida como alias pra não quebrar links existentes */}
       <Route path="/campanhas/:id/fase/:phaseId" component={CampaignDetail} />

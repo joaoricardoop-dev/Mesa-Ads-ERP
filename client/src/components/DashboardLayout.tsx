@@ -151,20 +151,9 @@ const NAV_ENTRIES: NavEntry[] = [
   { icon: Megaphone, label: "Campanhas", path: "/campanhas" },
   { icon: ClipboardList, label: "Ordens de Serviço", path: "/ordens-servico", allowedRoles: ["admin", "manager", "operacoes", "comercial"] },
   { icon: CalendarRange, label: "Calendário Ops", path: "/operacoes/calendario", allowedRoles: ["admin", "manager", "operacoes"] },
-  {
-    icon: Wallet,
-    label: "Financeiro",
-    allowedRoles: ["admin", "financeiro", "manager"],
-    items: [
-      { icon: BarChart3, label: "Dashboard", path: "/financeiro" },
-      { icon: Receipt, label: "Faturas a Receber", path: "/financeiro/faturamento" },
-      { icon: HandCoins, label: "Contas a Pagar", path: "/financeiro/contas-pagar" },
-      { icon: FileBarChart, label: "Relatórios", path: "/financeiro/relatorios" },
-      { icon: Wallet, label: "Conciliação Bancária", path: "/financeiro/conciliacao" },
-      { icon: BookOpen, label: "Glossário", path: "/financeiro/glossario" },
-      { icon: History, label: "Auditoria", path: "/financeiro/auditoria", adminOnly: true },
-    ],
-  },
+  // Task #383 — Módulo Financeiro ocultado da UI (números não confiáveis e fora de uso
+  // operacional). Backend/routers financeiros permanecem intactos pois o Comercial ainda
+  // depende deles. A receita continua visível no Dashboard e no Dashboard Comercial.
   {
     icon: UtensilsCrossed,
     label: "Locais",

@@ -83,7 +83,7 @@ import {
 import CampaignPhases from "@/components/CampaignPhases";
 import { BatchTimeline } from "@/components/BatchTimeline";
 import CampaignConsolidation from "@/components/CampaignConsolidation";
-import { BatchFinancialTab } from "@/components/campaign/BatchFinancialTab";
+// Task #383 — BatchFinancialTab (DRE do batch) não é mais renderizado na UI.
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -2230,7 +2230,7 @@ export default function CampaignDetail() {
               <TabsList className="bg-card border border-border/30 inline-flex w-auto min-w-full sm:w-auto">
                 <TabsTrigger value="resumo" className="gap-1.5 text-xs"><BarChart3 className="w-3.5 h-3.5" /> Painel</TabsTrigger>
                 <TabsTrigger value="consolidado" className="gap-1.5 text-xs"><CircleDollarSign className="w-3.5 h-3.5" /> Consolidado</TabsTrigger>
-                <TabsTrigger value="financeiro" className="gap-1.5 text-xs"><CircleDollarSign className="w-3.5 h-3.5" /> Financeiro</TabsTrigger>
+                {/* Task #383 — Aba Financeiro (DRE do batch / Receita vs Custo) ocultada. */}
                 <TabsTrigger value="restaurantes" className="gap-1.5 text-xs"><Store className="w-3.5 h-3.5" /> Distribuição</TabsTrigger>
                 <TabsTrigger value="cliente" className="gap-1.5 text-xs"><Building2 className="w-3.5 h-3.5" /> Cliente</TabsTrigger>
                 <TabsTrigger value="historico" className="gap-1.5 text-xs"><Clock className="w-3.5 h-3.5" /> Histórico</TabsTrigger>
@@ -3028,18 +3028,7 @@ export default function CampaignDetail() {
               <CampaignConsolidation campaignId={campaign.id} />
             </TabsContent>
 
-            <TabsContent value="financeiro" className="space-y-4">
-              {currentPhaseId != null ? (
-                <BatchFinancialTab campaignId={campaignId} phaseId={currentPhaseId} />
-              ) : (
-                <>
-                  <div className="text-xs text-muted-foreground px-1">
-                    Esta campanha não tem batches — exibindo visão consolidada.
-                  </div>
-                  <CampaignConsolidation campaignId={campaign.id} />
-                </>
-              )}
-            </TabsContent>
+            {/* Task #383 — Aba Financeiro removida (DRE do batch / Receita vs Custo). */}
 
             {/* ─── DISTRIBUIÇÃO ─── */}
             <TabsContent value="restaurantes" className="space-y-4">
