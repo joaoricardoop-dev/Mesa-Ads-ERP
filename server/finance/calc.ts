@@ -436,9 +436,13 @@ export interface PhaseItemLike {
   totalPrice?: string | number | null;
   productionCost?: string | number;
   freightCost?: string | number;
-  vipProviderRepassePercent?: string | number | null;
-  productVipProviderCommissionPercent?: string | number | null;
-  vipProviderId?: number | null;
+  // Repasse VIP por LOCAL (fonte única). Cada item aponta para um local
+  // (campaign_items.restaurantId). Se o local é sala VIP, o repasse sai daqui
+  // (active_restaurants.is_vip_room/vip_repasse_percent/vip_billing_mode) —
+  // não mais de products.vipProviderId. Mesma fonte que o materializador de AP.
+  isVipRoom?: boolean | null;
+  vipRepassePercent?: string | number | null;
+  vipBillingMode?: "bruto" | "liquido" | null;
 }
 
 export interface PhaseOverrides {
@@ -568,15 +572,23 @@ export function calcPhaseFinancials(input: {
   const restCommBase = num(campaign.restaurantCommission);
   const restCommEff = effNumeric(overrides.restaurantCommissionOverride, restCommBase);
 
-  // VIP rate base: media ponderada de productVipProviderCommissionPercent OU vipProviderRepassePercent
+  // Receita atribuída por item (respeita override de preço unitário do batch),
+  // usada como fatia do local p/ o repasse VIP por sala (fonte única).
+  const itemRev = (it: PhaseItemLike): number => {
+    if (it.totalPrice != null && upOverride == null) return num(it.totalPrice);
+    const unit = upOverride != null ? upOverride : num(it.unitPrice);
+    return it.quantity * unit;
+  };
+  // VIP rate base (badge/override): média ponderada do repasse do LOCAL
+  // (active_restaurants.vip_repasse_percent) sobre os itens digitais de sala VIP.
   const vipBase = (() => {
     if (!isDigital) return 0;
     let totW = 0; let acc = 0;
     for (const it of items) {
       if (!(it.productTipo === "telas" || it.productTipo === "janelas_digitais")) continue;
-      const w = it.totalPrice != null ? num(it.totalPrice) : it.quantity * num(it.unitPrice);
-      const rate = num(it.productVipProviderCommissionPercent ?? it.vipProviderRepassePercent ?? 0);
-      acc += rate * w;
+      if (!it.isVipRoom) continue;
+      const w = itemRev(it);
+      acc += num(it.vipRepassePercent) * w;
       totW += w;
     }
     return totW > 0 ? acc / totW : 0;
@@ -589,10 +601,43 @@ export function calcPhaseFinancials(input: {
   } else if (canalTipo === "restaurante") {
     canalValor = roundCents(receita * (restCommEff.value / 100));
   } else if (canalTipo === "vip") {
-    // Repasse VIP: base = receita − impostos − sellerComm (consistente com calcVipRepasse)
-    const sellerRateForVipBase = num(campaign.sellerCommission) / 100;
-    const baseVip = receita - impostos - (receita * sellerRateForVipBase);
-    canalValor = baseVip > 0 ? roundCents(baseVip * (vipEff.value / 100)) : 0;
+    if (vipEff.source === "override") {
+      // Override manual de % do batch: aplica a taxa única sobre a base líquida
+      // (impostos + comissão vendedor), preservando o comportamento legado.
+      const sellerRateForVipBase = num(campaign.sellerCommission) / 100;
+      const baseVip = receita - impostos - (receita * sellerRateForVipBase);
+      canalValor = baseVip > 0 ? roundCents(baseVip * (vipEff.value / 100)) : 0;
+    } else {
+      // Fonte única: repasse por LOCAL via calcVipRepasseLocal, somado sobre os
+      // itens digitais de sala VIP. Respeita bruto/liquido por sala — idêntico
+      // ao materializador de payables (cada item é a fatia atribuída ao local).
+      const synthCampaign: CampaignLike = {
+        id: 0,
+        isBonificada,
+        restaurantCommission: campaign.restaurantCommission,
+        sellerCommission: campaign.sellerCommission ?? 0,
+        productId: null,
+        clientId: 0,
+      };
+      let sum = 0;
+      for (const it of items) {
+        if (!(it.productTipo === "telas" || it.productTipo === "janelas_digitais")) continue;
+        if (!it.isVipRoom) continue;
+        const share = itemRev(it);
+        if (share <= 0) continue;
+        sum += calcVipRepasseLocal({
+          attributedShare: share,
+          invoice: { id: 0, campaignId: null, amount: share, issueDate: "1970-01-01" },
+          campaign: synthCampaign,
+          room: {
+            vipRepassePercent: it.vipRepassePercent ?? null,
+            vipBillingMode: it.vipBillingMode ?? null,
+          },
+          irpjRatePercent: input.irpjRatePercent,
+        });
+      }
+      canalValor = roundCents(sum);
+    }
   }
 
   const base = roundCents(receita - impostos - canalValor);

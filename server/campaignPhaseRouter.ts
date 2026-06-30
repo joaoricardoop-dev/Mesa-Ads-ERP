@@ -8,14 +8,14 @@ import {
   products,
   invoices,
   accountsPayable,
-  vipProviders,
+  activeRestaurants,
   partners,
   quotations,
   clients,
 } from "../drizzle/schema";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { calcPhaseFinancials, type PhaseItemLike, type PhaseOverrides } from "./finance/calc";
+import { calcPhaseFinancials, calcVipRepasseLocal, type PhaseItemLike, type PhaseOverrides } from "./finance/calc";
 import { getSystemConfig } from "./systemConfigRouter";
 import { materializePayablesForInvoice } from "./finance/payables";
 import { recordAudit } from "./finance/audit";
@@ -509,59 +509,51 @@ export const campaignPhaseRouter = router({
               item: campaignItems,
               productName: products.name,
               productTipo: products.tipo,
-              productVipProviderId: products.vipProviderId,
-              productVipProviderCommissionPercent: products.vipProviderCommissionPercent,
-              vipProviderRepassePercent: vipProviders.repassePercent,
+              roomIsVip: activeRestaurants.isVipRoom,
+              roomVipRepassePercent: activeRestaurants.vipRepassePercent,
+              roomVipBillingMode: activeRestaurants.vipBillingMode,
             })
             .from(campaignItems)
             .leftJoin(products, eq(products.id, campaignItems.productId))
-            .leftJoin(vipProviders, eq(vipProviders.id, products.vipProviderId))
+            .leftJoin(activeRestaurants, eq(activeRestaurants.id, campaignItems.restaurantId))
             .where(sql`${campaignItems.campaignPhaseId} IN (${sql.join(phaseIds.map((id) => sql`${id}`), sql`, `)})`)
         : [];
 
-      // Resolve % de repasse VIP (override do produto vence base do provedor).
-      // Só aplica em produtos digitais (telas/janelas) com provedor configurado.
-      // Bonificadas não geram repasse (consistente com financialRouter/calcVipRepasse).
+      // Repasse VIP por LOCAL (fonte única, idêntica ao materializador de AP e
+      // ao calcPhaseFinancials): só itens digitais (telas/janelas) cujo local é
+      // sala VIP geram repasse, via calcVipRepasseLocal (respeita bruto/liquido
+      // por sala). Bonificadas não geram repasse.
       const DIGITAL_TIPOS = new Set(["telas", "janelas_digitais"]);
       const isBonificada = !!campaign.isBonificada;
       const isDigitalItem = (i: typeof items[number]): boolean =>
         !!i.productTipo && DIGITAL_TIPOS.has(i.productTipo);
-      const vipRepasseRateForItem = (i: typeof items[number]): number => {
-        if (isBonificada) return 0;
-        if (!isDigitalItem(i)) return 0;
-        if (!i.productVipProviderId) return 0;
-        const override = i.productVipProviderCommissionPercent;
-        if (override != null && override !== "") {
-          const v = parseFloat(String(override));
-          if (Number.isFinite(v)) return v / 100;
-        }
-        const base = parseFloat(String(i.vipProviderRepassePercent ?? "0"));
-        return Number.isFinite(base) ? base / 100 : 0;
-      };
       const itemRevenue = (i: typeof items[number]): number =>
         i.item.totalPrice != null
           ? parseFloat(i.item.totalPrice)
           : i.item.quantity * parseFloat(i.item.unitPrice);
-      // Repasse VIP é cobrado SOBRE a receita líquida de impostos e comissão
-      // comercial — espelha calcVipRepasse / DRE da campanha.
-      const PIS_COFINS_RATE = 0.0365;
-      // IRPJ vem da premissa global (system_config) — fonte única; produtos
-      // não são mais fonte de alíquota.
-      const irpjRateGlobal = irpjPct / 100;
-      const sellerRate = (() => {
-        const v = parseFloat(String(campaign.sellerCommission ?? "0"));
-        return Number.isFinite(v) ? v / 100 : 0;
-      })();
-      const itemTaxes = (i: typeof items[number]): number => {
-        return itemRevenue(i) * (irpjRateGlobal + PIS_COFINS_RATE);
-      };
-      const itemSellerComm = (i: typeof items[number]): number =>
-        itemRevenue(i) * sellerRate;
       const itemVipRepasse = (i: typeof items[number]): number => {
-        const rate = vipRepasseRateForItem(i);
-        if (rate <= 0) return 0;
-        const base = itemRevenue(i) - itemTaxes(i) - itemSellerComm(i);
-        return base > 0 ? base * rate : 0;
+        if (isBonificada) return 0;
+        if (!isDigitalItem(i)) return 0;
+        if (!i.roomIsVip) return 0;
+        const share = itemRevenue(i);
+        if (share <= 0) return 0;
+        return calcVipRepasseLocal({
+          attributedShare: share,
+          invoice: { id: 0, campaignId: null, amount: share, issueDate: "1970-01-01" },
+          campaign: {
+            id: campaign.id,
+            isBonificada,
+            restaurantCommission: campaign.restaurantCommission ?? 0,
+            sellerCommission: campaign.sellerCommission ?? 0,
+            productId: null,
+            clientId: campaign.clientId,
+          },
+          room: {
+            vipRepassePercent: i.roomVipRepassePercent ?? null,
+            vipBillingMode: (i.roomVipBillingMode as "bruto" | "liquido" | null) ?? null,
+          },
+          irpjRatePercent: irpjPct,
+        });
       };
       // Regra "tela vs bolacha": digitais pulam produção/frete; físicos pulam VIP.
       const itemProductionCost = (i: typeof items[number]): number =>
