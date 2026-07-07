@@ -18,3 +18,9 @@ id = "ZzCyOGbCYqFAInagL1Mrs"
 uri = "file://exports/locais-parceiros-producao.xlsx"
 type = "table"
 title = "Locais Parceiros (Produção)"
+
+[[outputs]]
+id = "JMfGo_qdZx8jfxnML9yW4"
+uri = "file://exports/parceiros-locais.xlsx"
+type = "table"
+title = "Parceiros locais — contatos, público mensal e ticket médio"
