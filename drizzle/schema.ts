@@ -618,6 +618,7 @@ export const quotations = pgTable("quotations", {
   productId: integer("productId").references(() => products.id),
   partnerId: integer("partnerId").references(() => partners.id, { onDelete: "set null" }),
   periodStart: date("periodStart"),
+  periodEnd: date("periodEnd"),
   batchWeeks: integer("batchWeeks").default(4),
   createdBy: varchar("createdBy", { length: 255 }),
   isCustomProduct: boolean("isCustomProduct").default(false).notNull(),

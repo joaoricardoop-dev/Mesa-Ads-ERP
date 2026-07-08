@@ -136,6 +136,7 @@ export default function MediaBudget() {
       source: "internal",
       campaignName: campaignName.trim(),
       startDate,
+      endDate,
       estimatedTotal: plan.total,
       couponPercent: plan.couponPercent,
       isBonificada,

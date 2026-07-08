@@ -18,6 +18,17 @@ or recompute monthly/per-rest inline. Current callers: `QuotationDetail.tsx`,
 (`QuotationPreview` = unsaved simulator and `AnunciantePortal` = compact doc are
 intentionally out of scope — different data sources/documents.)
 
+## Veiculação period (quotations with items)
+For itemized quotations, top-level `semanas` is derived from the persisted
+quotation period `periodStart→periodEnd` (builder convention: inclusive days,
+`circuitWeeksForDays` = ceil/7); legacy rows without `periodEnd` fall back to
+the max item weeks parsed from notes. The PDF's lote table clamps the last
+lote's end date to `periodEnd`. **Why:** before this, `semanas` was undefined
+with items and the PDF defaulted to `cycles*4 = 4` weeks (1 lote), diverging
+from the registered period. Any new builder entrypoint MUST send `endDate` so
+`createFromBuilder` persists `quotations.periodEnd` (single source of the
+displayed period).
+
 **Why:** replit.md mandates "fonte única de verdade". Previously the same parse+math
 was duplicated inline across the internal screens and diverged (e.g. top-level
 `semanas` was set in one screen and left undefined in another).

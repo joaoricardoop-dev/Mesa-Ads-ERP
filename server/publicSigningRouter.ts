@@ -64,6 +64,7 @@ export function setupPublicSigningRoutes(app: express.Express) {
           cycles: quotations.cycles,
           batchWeeks: quotations.batchWeeks,
           periodStart: quotations.periodStart,
+          periodEnd: quotations.periodEnd,
           isCustomProduct: quotations.isCustomProduct,
           customProductName: quotations.customProductName,
           customProjectCost: quotations.customProjectCost,

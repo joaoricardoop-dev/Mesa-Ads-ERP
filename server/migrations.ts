@@ -2529,6 +2529,10 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     name: "add_circuit_pricing_to_telas",
     sql: `ALTER TABLE "telas" ADD COLUMN IF NOT EXISTS "insertions_per_week" integer; ALTER TABLE "telas" ADD COLUMN IF NOT EXISTS "cost_per_insertion" numeric(10, 2);`,
   },
+  {
+    name: "add_quotation_period_end",
+    sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "periodEnd" date;`,
+  },
 ];
 
 /**

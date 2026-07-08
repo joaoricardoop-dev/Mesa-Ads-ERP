@@ -1,6 +1,6 @@
 ---
 name: Orçamento cotas + line discount + mixed PDF tables
-description: Canonical discount order in media Orçamento, why the global coupon isn't persisted, and why a mixed-type proposal PDF must render one table per product type.
+description: Canonical discount order in media Orçamento, how the global coupon is persisted into totalValue, and why a mixed-type proposal PDF must render one table per product type.
 ---
 
 # Media Orçamento: cotas, per-line discount, and mixed PDF

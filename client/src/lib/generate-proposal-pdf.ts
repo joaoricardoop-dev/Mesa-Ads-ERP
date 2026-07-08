@@ -508,12 +508,25 @@ export async function generateProposalPdf(
     const [year, month, day] = data.periodStart.split("-").map(Number);
     const startBase = new Date(year, month - 1, day);
 
+    // Fim REAL do período cadastrado na cotação (quando persistido): o último
+    // lote é truncado nessa data para o PDF bater exatamente com o orçamento
+    // (semanas são cobradas por ceil, então a grade de lotes pode passar dela).
+    let periodEndDate: Date | null = null;
+    if (data.periodEnd) {
+      const [ey, em, ed] = data.periodEnd.split("-").map(Number);
+      const parsed = new Date(ey, em - 1, ed);
+      if (!isNaN(parsed.getTime())) periodEndDate = parsed;
+    }
+
     const batchRows: string[][] = [];
     for (let i = 0; i < numBatches; i++) {
       const bStart = new Date(startBase);
       bStart.setDate(bStart.getDate() + i * batchWks * 7);
       const bEnd = new Date(bStart);
       bEnd.setDate(bEnd.getDate() + batchWks * 7 - 1);
+      if (periodEndDate && bEnd.getTime() > periodEndDate.getTime()) {
+        bEnd.setTime(periodEndDate.getTime());
+      }
       const wksInBatch = Math.min(batchWks, totalWks - i * batchWks);
       batchRows.push([
         String(i + 1),

@@ -165,6 +165,7 @@ export const quotationRouter = router({
           partnerId: quotations.partnerId,
           partnerName: partners.name,
           periodStart: quotations.periodStart,
+          periodEnd: quotations.periodEnd,
           batchWeeks: quotations.batchWeeks,
           itemCount: sql<number>`(SELECT COUNT(*) FROM quotation_items WHERE "quotationId" = ${quotations.id})`,
         })
@@ -246,6 +247,7 @@ export const quotationRouter = router({
           partnerId: quotations.partnerId,
           partnerName: partners.name,
           periodStart: quotations.periodStart,
+          periodEnd: quotations.periodEnd,
           batchWeeks: quotations.batchWeeks,
         })
         .from(quotations)
@@ -1296,6 +1298,9 @@ export const quotationRouter = router({
       source: z.enum(["self_service_anunciante", "self_service_parceiro", "internal"]),
       campaignName: z.string().min(1),
       startDate: z.string().optional(),
+      // Fim do período de veiculação escolhido no builder. Persistido em
+      // quotations.periodEnd — fonte única do período exibido no PDF.
+      endDate: z.string().optional(),
       briefing: z.string().optional(),
       venueIds: z.array(z.number().int()).optional(),
       estimatedTotal: z.number().optional(),
@@ -1759,6 +1764,7 @@ export const quotationRouter = router({
         status: "rascunho",
         notes: notesText,
         periodStart: input.startDate || null,
+        periodEnd: input.endDate || null,
         source: input.source,
         isBonificada: input.isBonificada ?? false,
         hasPartnerDiscount: hasPartner,

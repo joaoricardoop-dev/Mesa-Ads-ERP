@@ -107,6 +107,7 @@ export function StepShop({ clientId, source, role, clientLabel }: Props) {
       source,
       campaignName: campaignName.trim(),
       startDate,
+      endDate,
       estimatedTotal: plan.total,
       couponPercent: plan.couponPercent,
       briefing: notes.trim() || undefined,

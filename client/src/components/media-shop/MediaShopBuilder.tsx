@@ -123,6 +123,7 @@ export function MediaShopBuilder({ clientId, source, onClose, onSuccess }: Media
       source,
       campaignName: campaignName.trim(),
       startDate,
+      endDate,
       // Mensagem do cliente vira briefing da cotação (campo livre do painel).
       briefing: notes.trim() || undefined,
       estimatedTotal: plan.total,

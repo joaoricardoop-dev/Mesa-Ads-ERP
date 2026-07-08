@@ -1,4 +1,6 @@
 import { PREMISSAS_DEFAULTS } from "./premissas";
+import { daysInRangeInclusive } from "./period";
+import { circuitWeeksForDays } from "./cpm-pricing";
 
 // Fonte única da MONTAGEM dos dados da proposta/OS.
 //
@@ -71,6 +73,7 @@ export interface ProposalPDFData {
   items?: ProposalItem[];
   isBonificada?: boolean;
   periodStart?: string;
+  periodEnd?: string;
   batchWeeks?: number;
   /** Custom product (Projeto Sob Medida) fields */
   isCustomProduct?: boolean;
@@ -179,6 +182,7 @@ export interface AssembleProposalInput {
     productName?: string | null;
     productUnitLabelPlural?: string | null;
     periodStart?: string | null;
+    periodEnd?: string | null;
     batchWeeks?: number | null;
     isCustomProduct?: boolean | null;
     customProductName?: string | null;
@@ -301,6 +305,16 @@ export function assembleProposalData(input: AssembleProposalInput): ProposalPDFD
       })
     : undefined;
 
+  // Semanas totais de veiculação (cotações com itens): derivadas do período
+  // persistido na cotação (periodStart→periodEnd) com a MESMA convenção do
+  // builder (dias inclusivos, ceil/7 — circuitWeeksForDays). Cotações antigas
+  // sem periodEnd caem para a maior duração entre as linhas persistidas
+  // (parseada das notes), evitando o antigo default de 4 semanas.
+  const rangeDays = daysInRangeInclusive(q.periodStart ?? null, q.periodEnd ?? null);
+  const itemsSemanas = items && items.length > 0
+    ? (rangeDays > 0 ? circuitWeeksForDays(rangeDays) : Math.max(...items.map((i) => i.semanas)))
+    : undefined;
+
   return {
     billingSchedule: (billingSchedule || []).map((b) => ({
       sequence: b.sequence,
@@ -318,7 +332,7 @@ export function assembleProposalData(input: AssembleProposalInput): ProposalPDFD
     numRestaurants: numRest,
     coastersPerRestaurant: numRest > 0 ? Math.round(q.coasterVolume / numRest) : q.coasterVolume,
     contractDuration: duration,
-    semanas: items ? undefined : duration * 4,
+    semanas: items ? itemsSemanas : duration * 4,
     pricePerRestaurant: pricePerRest,
     monthlyTotal,
     contractTotal: totalContractValue,
@@ -330,6 +344,7 @@ export function assembleProposalData(input: AssembleProposalInput): ProposalPDFD
     productUnitLabelPlural: q.productUnitLabelPlural || undefined,
     items,
     periodStart: q.periodStart || undefined,
+    periodEnd: q.periodEnd || undefined,
     batchWeeks: q.batchWeeks ?? 4,
     isCustomProduct: q.isCustomProduct ?? false,
     customProductName: q.customProductName || undefined,
