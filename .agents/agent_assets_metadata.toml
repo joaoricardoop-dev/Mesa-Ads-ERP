@@ -24,3 +24,9 @@ id = "JMfGo_qdZx8jfxnML9yW4"
 uri = "file://exports/parceiros-locais.xlsx"
 type = "table"
 title = "Parceiros locais — contatos, público mensal e ticket médio"
+
+[[outputs]]
+id = "D-L3-kMC-8EiTGausU3dS"
+uri = "file://exports/rede-mesa-ads.xlsx"
+type = "table"
+title = "Rede Mesa Ads — parceiros, locais e produtos"
