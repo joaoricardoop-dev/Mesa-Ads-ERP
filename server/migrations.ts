@@ -2611,6 +2611,28 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       END $$;
     `,
   },
+  {
+    // Produção perdeu objetos de schema DEPOIS das migrations que os criaram
+    // terem sido registradas em _applied_migrations (dropados por sync externo
+    // de schema no publish — ver replit.md "Publish dev↔prod drift"). Como o
+    // runner pula por nome, as migrations originais nunca re-aplicam. Esta
+    // migration re-cria os objetos ausentes de forma idempotente:
+    // quotations.periodEnd (quebrava TODO insert de cotação em prod) e a
+    // tabela user_restaurants.
+    name: "restore_dropped_prod_schema_period_end_and_user_restaurants",
+    sql: `
+      ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "periodEnd" date;
+      CREATE TABLE IF NOT EXISTS "user_restaurants" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "user_id" varchar NOT NULL,
+        "restaurant_id" integer NOT NULL REFERENCES "active_restaurants"("id") ON DELETE cascade,
+        "created_at" timestamp DEFAULT now() NOT NULL,
+        CONSTRAINT "uq_user_restaurant" UNIQUE ("user_id", "restaurant_id")
+      );
+      CREATE INDEX IF NOT EXISTS "idx_user_restaurants_user_id" ON "user_restaurants" ("user_id");
+      CREATE INDEX IF NOT EXISTS "idx_user_restaurants_restaurant_id" ON "user_restaurants" ("restaurant_id");
+    `,
+  },
 ];
 
 /**
