@@ -88,6 +88,36 @@ async function applyDrizzleBaseSchema(db: any) {
 
 export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
   {
+    // Task #397 — Reetiqueta notificações quotation_created antigas criadas
+    // ANTES do fix de vínculo: elas ficaram com leadId NULL e mensagem
+    // "Nova cotação self-service ... Sem cliente específico" mesmo quando a
+    // cotação correspondente estava corretamente vinculada a um lead.
+    // Casamos notificação ↔ cotação pelo quotationNumber presente na mensagem
+    // (formato fixo e único, sem risco de substring ambígua) e regravamos
+    // leadId/clientId + mensagem no MESMO formato que o código atual emite
+    // (quotationRouter.createFromBuilder): interna → "criada para lead X";
+    // self-service real → "criada por X (source)". Idempotente: após o
+    // update, n."leadId" deixa de ser NULL e a linha sai do WHERE.
+    name: "relabel_lead_quotation_notifications_task_397",
+    sql: `
+      UPDATE "crm_notifications" n
+         SET "leadId" = q."leadId",
+             "clientId" = COALESCE(n."clientId", q."clientId"),
+             "message" = CASE
+               WHEN COALESCE(q."source", 'internal') = 'internal'
+                 THEN 'Nova cotação interna ' || q."quotationNumber" || ' criada para lead ' || COALESCE(NULLIF(l."company", ''), l."name")
+               ELSE 'Nova cotação self-service ' || q."quotationNumber" || ' criada por ' || COALESCE(NULLIF(l."company", ''), l."name") || ' (' || q."source" || ')'
+             END
+        FROM "quotations" q
+        JOIN "leads" l ON l.id = q."leadId"
+       WHERE n."eventType" = 'quotation_created'
+         AND n."leadId" IS NULL
+         AND q."leadId" IS NOT NULL
+         AND position(q."quotationNumber" in n."message") > 0
+         AND n."message" LIKE '%self-service%';
+    `,
+  },
+  {
     name: "add_quotation_period_start",
     sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "periodStart" date; ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "batchWeeks" integer DEFAULT 4;`,
   },
