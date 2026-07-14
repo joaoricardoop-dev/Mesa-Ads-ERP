@@ -45,3 +45,12 @@ case. Fix pattern: prepend `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for every
 source column inside the same migration before the SELECT — this preserves real
 data where it exists and creates empty columns where the DB drifted, in one
 idempotent step.
+
+**FK constraints drift too — and by ACTION, not just existence.** Production
+never had `quotations.clientId → clients` at all (orphans accumulated), while
+the drizzle base SQL creates it with ON DELETE CASCADE. An existence-only
+`IF NOT EXISTS (pg_constraint by name)` guard silently keeps the wrong action.
+Fix pattern (task_400_v2 migration): in one DO-block, drop any FK on the column
+whose `confdeltype` differs from the desired action, then create the correct
+one; null orphan ids first so ADD CONSTRAINT validates. For rows carrying
+commercial/financial trail prefer SET NULL over CASCADE.

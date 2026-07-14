@@ -594,7 +594,11 @@ export const quotations = pgTable("quotations", {
   id: serial("id").primaryKey(),
   quotationNumber: varchar("quotationNumber", { length: 20 }).notNull().unique(),
   quotationName: varchar("quotationName", { length: 255 }),
-  clientId: integer("clientId").references(() => clients.id, { onDelete: "cascade" }),
+  // ON DELETE SET NULL (não cascade): apagar um cliente não pode destruir
+  // cotações — elas carregam trilha comercial/financeira (faturas, campanhas
+  // geradas). Task #400: produção tinha cotações órfãs porque a FK nunca
+  // existiu lá; a migration task_400 limpa os órfãos e cria a FK.
+  clientId: integer("clientId").references(() => clients.id, { onDelete: "set null" }),
   leadId: integer("leadId"),
   coasterVolume: integer("coasterVolume"),
   manualDiscountPercent: decimal("manualDiscountPercent", { precision: 5, scale: 2 }).default("0"),

@@ -2563,6 +2563,54 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     name: "add_quotation_period_end",
     sql: `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "periodEnd" date;`,
   },
+  {
+    // Task #400 — produção tinha cotações apontando para clientes apagados
+    // (a FK de quotations.clientId nunca existiu lá). Limpa os órfãos
+    // (clientId := NULL, preservando a cotação e sua trilha financeira) e
+    // cria a FK com ON DELETE SET NULL (nunca cascade: apagar cliente não
+    // pode destruir cotações). Também converte uma FK CASCADE pré-existente
+    // (schema base drizzle) para SET NULL. Idempotente: o UPDATE só afeta
+    // órfãos e o DO-block só dropa/cria quando a ação de delete diverge.
+    name: "task_400_quotations_client_fk_set_null_and_orphan_cleanup_v2",
+    sql: `
+      UPDATE "quotations" q SET "clientId" = NULL
+        WHERE q."clientId" IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM "clients" c WHERE c."id" = q."clientId");
+      DO $$
+      DECLARE
+        fk record;
+      BEGIN
+        -- Remove qualquer FK existente em quotations.clientId cuja ação de
+        -- delete NÃO seja SET NULL (ex.: o CASCADE do schema base drizzle).
+        FOR fk IN
+          SELECT con.conname
+          FROM pg_constraint con
+          JOIN pg_attribute att
+            ON att.attrelid = con.conrelid AND att.attnum = ANY (con.conkey)
+          WHERE con.conrelid = 'quotations'::regclass
+            AND con.contype = 'f'
+            AND att.attname = 'clientId'
+            AND con.confdeltype <> 'n'
+        LOOP
+          EXECUTE format('ALTER TABLE "quotations" DROP CONSTRAINT %I', fk.conname);
+        END LOOP;
+
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint con
+          JOIN pg_attribute att
+            ON att.attrelid = con.conrelid AND att.attnum = ANY (con.conkey)
+          WHERE con.conrelid = 'quotations'::regclass
+            AND con.contype = 'f'
+            AND att.attname = 'clientId'
+        ) THEN
+          ALTER TABLE "quotations"
+            ADD CONSTRAINT "quotations_clientId_clients_id_fk"
+            FOREIGN KEY ("clientId") REFERENCES "clients"("id") ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `,
+  },
 ];
 
 /**
