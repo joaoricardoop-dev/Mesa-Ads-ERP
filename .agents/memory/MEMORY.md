@@ -26,3 +26,4 @@
 - [pricingMode vs tipo](pricing-mode-vs-tipo.md) — PRICE decision branches on pricingMode (cost_based/price_based/cpm); operational semantics (digital/VIP/commissions/phases/audience/spot) stay on tipo.
 - [Orçamento cotas + line discount](orcamento-discount-order.md) — discount order line→coupon→BV; coupon persisted into totalValue server-side; mixed PDF = one table per product type.
 - [Circuit pricing e2e fixture](circuit-pricing-e2e-fixture.md) — telas need insertionsPerWeek+costPerInsertion or createFromBuilder 400s; dev-ensure-screen-location backfills; rows use circuito-card-*.
+- [Dev DB env split](dev-db-env-split.md) — dev workflow runs on DATABASE_URL_TEST (.replit override), not shell DATABASE_URL (helium); verify migrations against the right DB.
