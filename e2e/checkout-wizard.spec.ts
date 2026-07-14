@@ -42,6 +42,15 @@ async function ensureRestaurante(request: APIRequestContext) {
   if (!r.ok()) {
     console.warn(`[checkout-wizard] dev-ensure-restaurante falhou: ${r.status()}`);
   }
+  // Garante o inventário de telas precificado (circuito com inserções/semana +
+  // custo/inserção); o endpoint também faz backfill de telas legadas sem preço,
+  // sem o qual o createFromBuilder rejeita com BAD_REQUEST.
+  const s = await request.post("/api/dev-ensure-screen-location", { data: {} });
+  if (!s.ok()) {
+    console.warn(
+      `[checkout-wizard] dev-ensure-screen-location falhou: ${s.status()}`,
+    );
+  }
 }
 
 async function createInternalUser(request: APIRequestContext): Promise<DevUser> {
@@ -97,7 +106,10 @@ async function startMediaPlan(page: Page) {
 }
 
 async function addFirstLocation(page: Page) {
-  const firstLocal = page.locator("[data-testid^='local-card-']").first();
+  // A view (Lista/Cards/Mapa) é persistida por usuário; garante a Lista para
+  // que as linhas circuito-card-* existam independente do estado herdado.
+  await page.getByRole("button", { name: /^Lista$/i }).click();
+  const firstLocal = page.locator("[data-testid^='circuito-card-']").first();
   await expect(firstLocal).toBeVisible({ timeout: 15_000 });
   // LocationListRow (view "list", padrão) tem exatamente um botão: o toggle de
   // adicionar/remover. Clica nele para incluir o local no plano.
@@ -119,7 +131,10 @@ async function submitAndCaptureQuotation(page: Page): Promise<CreatedQuotation> 
   );
   await submit.click();
   const resp = await responsePromise;
-  expect(resp.ok(), `createFromBuilder failed: ${resp.status()}`).toBeTruthy();
+  expect(
+    resp.ok(),
+    `createFromBuilder failed: ${resp.status()} — ${await resp.text()}`,
+  ).toBeTruthy();
   const body = await resp.json();
   // httpBatchLink encapsula em array de { result: { data: { json } } }.
   const payload = Array.isArray(body) ? body[0] : body;
@@ -260,6 +275,92 @@ test.describe("checkout /montar-campanha — interno (client picker)", () => {
     } finally {
       if (createdId != null && adminUserId) {
         await deleteQuotationAsAdmin(page.request, adminUserId, createdId);
+      }
+    }
+  });
+
+  // Task #395 — usuário interno escolhe um LEAD no picker (sem conversão em
+  // cliente): a cotação sai vinculada ao lead e a notificação CRM traz o
+  // leadId + mensagem "interna" com o nome do lead (não mais "self-service …
+  // Sem cliente específico").
+  test("interno seleciona um lead no picker e a cotação/notificação ficam vinculadas ao lead", async ({
+    page,
+  }) => {
+    let createdId: number | null = null;
+    let leadId: number | null = null;
+    const leadCompany = "E2E Lead Wizard " + Date.now();
+    try {
+      await devLogin(page.request, internalUser!.id);
+
+      // Cria um lead de anunciante via tRPC (comercialProcedure).
+      const leadRes = await page.request.post("/api/trpc/lead.create?batch=1", {
+        data: {
+          "0": {
+            json: { type: "anunciante", name: "Contato E2E", company: leadCompany },
+          },
+        },
+        headers: { "content-type": "application/json" },
+      });
+      expect(leadRes.ok(), `lead.create failed: ${leadRes.status()}`).toBeTruthy();
+      const leadBody = await leadRes.json();
+      const leadPayload = Array.isArray(leadBody) ? leadBody[0] : leadBody;
+      leadId = leadPayload?.result?.data?.json?.id as number;
+      expect(leadId, "expected created lead id").toBeTruthy();
+
+      await page.goto("/montar-campanha");
+      await expect(
+        page.getByRole("heading", { name: /Selecione o cliente/i }),
+      ).toBeVisible();
+
+      // Busca e seleciona o lead recém-criado (entrada kind="lead").
+      await page.getByPlaceholder(/Buscar cliente ou lead/i).fill(leadCompany);
+      const pickLead = page.locator(`[data-testid='button-pick-lead-${leadId}']`);
+      await expect(pickLead).toBeVisible();
+      await pickLead.click();
+
+      await startMediaPlan(page);
+      await addFirstLocation(page);
+      await fillCampaignName(page, "E2E Checkout Lead " + Date.now());
+
+      const created = await submitAndCaptureQuotation(page);
+      createdId = created.id;
+      await expectSuccessScreen(page, created.quotationNumber, {
+        internal: true,
+      });
+
+      // Verifica a notificação CRM como admin: leadId preenchido e mensagem
+      // "interna" com o nome do lead.
+      await devLogin(page.request, adminUserId!);
+      const notifRes = await page.request.get(
+        "/api/trpc/notification.list?batch=1&input=" +
+          encodeURIComponent(
+            JSON.stringify({ "0": { json: { eventType: "quotation_created", limit: 50 } } }),
+          ),
+      );
+      expect(notifRes.ok(), `notification.list failed: ${notifRes.status()}`).toBeTruthy();
+      const notifBody = await notifRes.json();
+      const notifPayload = Array.isArray(notifBody) ? notifBody[0] : notifBody;
+      const rows = (notifPayload?.result?.data?.json ?? []) as Array<{
+        leadId: number | null;
+        message: string;
+      }>;
+      const notif = rows.find((n) => n.message.includes(created.quotationNumber));
+      expect(notif, "expected quotation_created notification").toBeTruthy();
+      expect(notif!.leadId).toBe(leadId);
+      expect(notif!.message).toContain("interna");
+      expect(notif!.message).toContain(leadCompany);
+      expect(notif!.message).not.toContain("Sem cliente específico");
+    } finally {
+      if (createdId != null && adminUserId) {
+        await deleteQuotationAsAdmin(page.request, adminUserId, createdId);
+      }
+      if (leadId != null) {
+        await devLogin(page.request, internalUser!.id);
+        await page.request.post("/api/trpc/lead.delete?batch=1", {
+          data: { "0": { json: { id: leadId } } },
+          headers: { "content-type": "application/json" },
+        });
+        await devLogout(page.request);
       }
     }
   });

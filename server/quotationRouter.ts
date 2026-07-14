@@ -1364,6 +1364,26 @@ export const quotationRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Cliente é obrigatório." });
       }
 
+      // Cotação vinculada a lead (Orçamento interno / wizard interno): resolve
+      // o lead para nomear a cotação e vincular a notificação CRM.
+      let lead: { name: string; company: string | null } | null = null;
+      if (input.leadId != null) {
+        // Somente usuários internos podem vincular cotação a lead (anunciante e
+        // parceiro não têm acesso ao CRM de leads).
+        if (userRole === "anunciante" || userRole === "parceiro") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas usuários internos podem vincular cotação a lead." });
+        }
+        const [leadRow] = await db.select({
+          name: leads.name,
+          company: leads.company,
+        })
+          .from(leads)
+          .where(eq(leads.id, input.leadId))
+          .limit(1);
+        if (!leadRow) throw new TRPCError({ code: "NOT_FOUND", message: "Lead não encontrado" });
+        lead = leadRow;
+      }
+
       const isPartnerFlow = userRole === "parceiro";
 
       if (userRole === "anunciante") {
@@ -1721,7 +1741,8 @@ export const quotationRouter = router({
         });
       }
 
-      const entityName = client?.company || client?.name || "Sem cliente específico";
+      const entityName =
+        client?.company || client?.name || lead?.company || lead?.name || "Sem cliente específico";
       const totalVolume = computedItems.reduce((sum, i) => sum + i.volume, 0);
       // Desconto global "Cupom %": aplicado APÓS o desconto de linha (já embutido
       // em computedItems[].totalPrice) como fator uniforme, de modo que
@@ -1834,11 +1855,17 @@ export const quotationRouter = router({
         });
       }
 
+      // Notificação CRM com vínculo real: leadId/clientId preenchidos e mensagem
+      // derivada da origem (interna vs self-service) — nunca mais "self-service
+      // ... Sem cliente específico" para cotações internas de lead.
       await createCrmNotification(db, {
         eventType: "quotation_created",
-        leadId: null,
+        leadId: input.leadId ?? null,
+        clientId: input.clientId ?? null,
         partnerId: client?.partnerId ?? null,
-        message: `Nova cotação self-service ${quotationNumber} criada por ${entityName} (${input.source})`,
+        message: input.source === "internal"
+          ? `Nova cotação interna ${quotationNumber} criada para ${lead ? `lead ${entityName}` : entityName}`
+          : `Nova cotação self-service ${quotationNumber} criada por ${entityName} (${input.source})`,
       });
 
       return created;

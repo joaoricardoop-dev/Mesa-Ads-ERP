@@ -540,7 +540,11 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
       // contagem — a tela aqui só prova que telas individuais são opcionais.
       const activeScreen = (
         await db
-          .select({ id: telas.id })
+          .select({
+            id: telas.id,
+            insertionsPerWeek: telas.insertionsPerWeek,
+            costPerInsertion: telas.costPerInsertion,
+          })
           .from(telas)
           .where(and(eq(telas.restaurantId, restaurantId), eq(telas.status, "active")))
           .limit(1)
@@ -551,8 +555,27 @@ export async function registerDevEndpoints(app: Express): Promise<void> {
           nome: "E2E Tela 1",
           categoria: "restaurante",
           status: "active",
+          // Preço do circuito (fonte única da cotação de telas):
+          // computeCircuitLineTotal exige inserções/semana + custo/inserção,
+          // senão o createFromBuilder rejeita com BAD_REQUEST.
+          insertionsPerWeek: 84,
+          costPerInsertion: "2.50",
         });
       }
+      // Backfill de TODAS as telas ativas sem preço de circuito (idempotente).
+      // O catálogo lista todos os locais do banco de teste; o e2e clica na
+      // primeira linha, então qualquer circuito sem preço quebraria o submit
+      // (computeCircuitLineTotal → BAD_REQUEST).
+      const { isNull, or } = await import("drizzle-orm");
+      await db
+        .update(telas)
+        .set({ insertionsPerWeek: 84, costPerInsertion: "2.50" })
+        .where(
+          and(
+            eq(telas.status, "active"),
+            or(isNull(telas.insertionsPerWeek), isNull(telas.costPerInsertion)),
+          ),
+        );
 
       res.json({
         restaurantId,

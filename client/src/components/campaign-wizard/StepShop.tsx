@@ -17,13 +17,14 @@ type ResolvedRole = "anunciante" | "parceiro" | "internal";
 
 interface Props {
   clientId: number | null;
+  leadId: number | null;
   source: Source;
   role: ResolvedRole;
   clientLabel: string | null;
   hasPartner: boolean;
 }
 
-export function StepShop({ clientId, source, role, clientLabel }: Props) {
+export function StepShop({ clientId, leadId, source, role, clientLabel }: Props) {
   const setSuccess = useWizardStore((s) => s.setSuccess);
 
   const { campaignName, startDate, endDate, notes, reset } = useMediaShopStore();
@@ -103,7 +104,7 @@ export function StepShop({ clientId, source, role, clientLabel }: Props) {
 
     createMutation.mutate({
       clientId: clientId ?? null,
-      leadId: null,
+      leadId: leadId ?? null,
       source,
       campaignName: campaignName.trim(),
       startDate,

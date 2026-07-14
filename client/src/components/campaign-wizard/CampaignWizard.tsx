@@ -111,7 +111,10 @@ function ResolvedFlow({
   autoClientId: number | null;
   onboardingComplete: boolean;
 }) {
-  type ClientChoice = { kind: "client"; id: number } | { kind: "none" };
+  type ClientChoice =
+    | { kind: "client"; id: number }
+    | { kind: "lead"; id: number }
+    | { kind: "none" };
   const [choice, setChoice] = useState<ClientChoice | null>(null);
 
   const effectiveChoice: ClientChoice | null =
@@ -140,6 +143,7 @@ function ResolvedFlow({
       <ClientPicker
         role={role}
         onPicked={(id) => setChoice({ kind: "client", id })}
+        onPickedLead={(id) => setChoice({ kind: "lead", id })}
         onSkip={() => setChoice({ kind: "none" })}
         onBack={() => {
           window.location.href = "/";
@@ -151,13 +155,14 @@ function ResolvedFlow({
   if (effectiveChoice == null) return null;
 
   const clientId = effectiveChoice.kind === "client" ? effectiveChoice.id : null;
+  const leadId = effectiveChoice.kind === "lead" ? effectiveChoice.id : null;
 
   if (step === "success") {
     return <StepSuccess role={role} />;
   }
 
   return (
-    <ResolvedWizard clientId={clientId} role={role} source={source} />
+    <ResolvedWizard clientId={clientId} leadId={leadId} role={role} source={source} />
   );
 }
 
@@ -165,10 +170,12 @@ type AdvertiserGet = RouterOutputs["advertiser"]["get"];
 
 function ResolvedWizard({
   clientId,
+  leadId,
   role,
   source,
 }: {
   clientId: number | null;
+  leadId: number | null;
   role: ResolvedRole;
   source: Source;
 }) {
@@ -178,8 +185,18 @@ function ResolvedWizard({
     { id: clientId ?? 0 },
     { enabled: clientId != null },
   );
+  const { data: leadData } = trpc.lead.get.useQuery(
+    { id: leadId ?? 0 },
+    { enabled: leadId != null },
+  );
   const c = client as AdvertiserGet | undefined;
-  const clientLabel = clientId == null ? "Sem cliente específico" : c?.company || c?.name || null;
+  const l = leadData as { company?: string | null; name?: string | null } | undefined;
+  const clientLabel =
+    clientId != null
+      ? c?.company || c?.name || null
+      : leadId != null
+        ? l?.company || l?.name || null
+        : "Sem cliente específico";
   const hasPartner = !!c?.partnerId || role === "parceiro";
 
   // Persistência do plano de mídia no servidor para anunciantes (Marketplace v2).
@@ -192,6 +209,7 @@ function ResolvedWizard({
       return (
         <StepShop
           clientId={clientId}
+          leadId={leadId}
           source={source}
           role={role}
           clientLabel={clientLabel}
@@ -339,11 +357,13 @@ type PickerEntry =
 function ClientPicker({
   role,
   onPicked,
+  onPickedLead,
   onSkip,
   onBack,
 }: {
   role: "parceiro" | "internal";
   onPicked: (id: number) => void;
+  onPickedLead: (id: number) => void;
   onSkip?: () => void;
   onBack: () => void;
 }) {
@@ -359,6 +379,10 @@ function ClientPicker({
     undefined,
     { enabled: isPartner },
   );
+  // Interno: lista leads de anunciante (mesma fonte do Orçamento interno) para
+  // permitir cotação vinculada ao lead SEM conversão forçada em cliente.
+  const { data: internalLeadsRaw = [], isLoading: internalLeadsLoading } =
+    trpc.lead.list.useQuery({ type: "anunciante" }, { enabled: !isPartner });
 
   const convertMutation = trpc.parceiroPortal.convertLeadToClient.useMutation({
     onSuccess: (created) => {
@@ -394,9 +418,21 @@ function ClientPicker({
           stage: l.stage ?? null,
         });
       }
+    } else {
+      for (const l of internalLeadsRaw as any[]) {
+        // Leads já convertidos em cliente aparecem na lista de clientes.
+        if (l.client_id || l.clientId || l.convertedToId) continue;
+        out.push({
+          kind: "lead",
+          id: l.id,
+          title: l.company || l.name || `Lead #${l.id}`,
+          subtitle: l.company && l.name && l.company !== l.name ? l.name : null,
+          stage: l.stage ?? null,
+        });
+      }
     }
     return out;
-  }, [clients, leads, isPartner]);
+  }, [clients, leads, internalLeadsRaw, isPartner]);
 
   const filtered = useMemo<PickerEntry[]>(() => {
     const q = query.trim().toLowerCase();
@@ -406,11 +442,17 @@ function ClientPicker({
     );
   }, [entries, query]);
 
-  const isLoading = clientsLoading || (isPartner && leadsLoading);
+  const isLoading =
+    clientsLoading || (isPartner ? leadsLoading : internalLeadsLoading);
 
   const handlePick = (entry: PickerEntry) => {
     if (entry.kind === "client") {
       onPicked(entry.id);
+      return;
+    }
+    // Interno: cotação fica vinculada ao lead diretamente (sem conversão).
+    if (!isPartner) {
+      onPickedLead(entry.id);
       return;
     }
     if (convertMutation.isPending) return;
@@ -439,18 +481,18 @@ function ClientPicker({
       </header>
       <div className="max-w-3xl mx-auto px-6 sm:px-10 py-10">
         <div className="text-[10px] uppercase tracking-[0.22em] text-mesa-neon mb-3">
-          {isPartner ? "escolha o cliente ou lead" : "escolha o cliente"}
+          escolha o cliente ou lead
         </div>
         <h1
           className="font-display font-semibold tracking-[-0.03em] text-chalk text-balance mb-3"
           style={{ fontSize: "var(--text-title)" }}
         >
-          {isPartner ? "Para qual cliente?" : "Selecione o cliente"}
+          {isPartner ? "Para qual cliente?" : "Selecione o cliente ou lead"}
         </h1>
         <p className="text-sm text-chalk-muted mb-8 max-w-xl">
           {isPartner
             ? "Escolha um dos seus clientes ou leads — ou crie um novo lead na hora."
-            : "Escolha o cliente para o qual a cotação será criada."}
+            : "Escolha o cliente ou lead para o qual a cotação será criada. Cotações de lead ficam vinculadas ao lead no CRM."}
         </p>
 
         <div className="relative max-w-md mb-5">
@@ -458,7 +500,7 @@ function ClientPicker({
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={isPartner ? "Buscar cliente ou lead..." : "Buscar cliente..."}
+            placeholder="Buscar cliente ou lead..."
             className="pl-9 bg-ink-900/70 border-hairline text-chalk placeholder:text-chalk-dim"
           />
         </div>
@@ -516,9 +558,7 @@ function ClientPicker({
         ) : filtered.length === 0 ? (
           <div className="rounded-xl border border-dashed border-hairline p-8 text-center">
             <p className="text-sm text-chalk-muted">
-              {isPartner
-                ? "Nenhum cliente ou lead encontrado."
-                : "Nenhum cliente encontrado."}
+              Nenhum cliente ou lead encontrado.
             </p>
           </div>
         ) : (

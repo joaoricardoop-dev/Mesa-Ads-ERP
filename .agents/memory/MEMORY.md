@@ -25,3 +25,4 @@
 - [Space is the unit of sale](space-is-unit-of-sale.md) — active_restaurants.screensCount+photoUrls is the canonical ecommerce source; telas optional; pending badge gates on offersScreenProduct (products.tipo='telas').
 - [pricingMode vs tipo](pricing-mode-vs-tipo.md) — PRICE decision branches on pricingMode (cost_based/price_based/cpm); operational semantics (digital/VIP/commissions/phases/audience/spot) stay on tipo.
 - [Orçamento cotas + line discount](orcamento-discount-order.md) — discount order line→coupon→BV; coupon persisted into totalValue server-side; mixed PDF = one table per product type.
+- [Circuit pricing e2e fixture](circuit-pricing-e2e-fixture.md) — telas need insertionsPerWeek+costPerInsertion or createFromBuilder 400s; dev-ensure-screen-location backfills; rows use circuito-card-*.
