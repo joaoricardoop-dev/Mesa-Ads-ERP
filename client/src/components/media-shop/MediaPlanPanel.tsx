@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -174,6 +174,26 @@ export function MediaPlanPanel({
 
   const plan = useMediaPlan();
   const totalItems = plan.items.length + plan.quantityItems.length;
+
+  // "Valor final (R$)": entrada inversa do cupom. A % continua a única fonte
+  // de verdade (couponPercent no store); aqui só derivamos a % a partir do
+  // valor final digitado. Draft local permite digitação fluida; conversão no
+  // blur/Enter.
+  const [finalValueDraft, setFinalValueDraft] = useState<string | null>(null);
+  const commitFinalValue = () => {
+    if (finalValueDraft === null) return;
+    const raw = finalValueDraft.trim().replace(",", ".");
+    setFinalValueDraft(null);
+    if (raw === "") return;
+    const v = Number(raw);
+    if (!Number.isFinite(v) || v < 0 || plan.subtotal <= 0) return;
+    if (v >= plan.subtotal) {
+      setCoupon(0);
+      return;
+    }
+    const pct = Math.min(100, Math.max(0, (1 - v / plan.subtotal) * 100));
+    setCoupon(Math.round(pct * 100) / 100);
+  };
 
   return (
     <div className="space-y-4">
@@ -466,6 +486,24 @@ export function MediaPlanPanel({
               className="h-8 w-20 text-right"
               value={couponPercent}
               onChange={(e) => setCoupon(Number(e.target.value) || 0)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <Label className="text-sm text-muted-foreground">Valor final (R$)</Label>
+            <Input
+              type="text"
+              inputMode="decimal"
+              className="h-8 w-28 text-right"
+              value={finalValueDraft ?? (plan.subtotal > 0 ? plan.total.toFixed(2) : "")}
+              onChange={(e) => setFinalValueDraft(e.target.value)}
+              onBlur={commitFinalValue}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitFinalValue();
+                  e.currentTarget.blur();
+                }
+              }}
             />
           </div>
           {plan.discount > 0 && (
