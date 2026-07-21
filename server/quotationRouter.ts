@@ -92,7 +92,11 @@ async function generateOSNumber(db: any) {
 // slice custom-digital, ver `calcCustomVipRepasse` + `materializeCustomVipRepasse`.
 import { computeQuotationCommissionMix } from "./finance/calc";
 import { computeScreenDailyPricing, computeCircuitLineTotal, clampCotas } from "../shared/cpm-pricing";
-import { applyLineDiscount, clampLineDiscountPercent } from "../shared/proposal-line-pricing";
+import {
+  applyLineDiscount,
+  clampLineDiscountPercent,
+  computeProposalLinePrices,
+} from "../shared/proposal-line-pricing";
 import { daysInRangeInclusive, cyclesForDays } from "../shared/period";
 
 export const quotationRouter = router({
@@ -1307,6 +1311,11 @@ export const quotationRouter = router({
       // Desconto global "Cupom %" (0–100), aplicado APÓS o desconto de linha
       // e ANTES da escala BV. Fonte única do total do contrato (totalValue).
       couponPercent: z.number().min(0).max(100).optional(),
+      // Âncora "valor final exato": quando presente (e menor que o subtotal),
+      // as linhas são escaladas para fechar EXATAMENTE neste total (via
+      // computeProposalLinePrices, fonte única do fechamento de centavos) e
+      // couponPercent é ignorado — só existe UMA âncora de desconto global.
+      targetTotal: z.number().min(0).optional(),
       estimatedImpressions: z.number().optional(),
       isBonificada: z.boolean().optional(),
       // Condições de pagamento (parcelas) opcionais; quando ausente o backend
@@ -1748,15 +1757,33 @@ export const quotationRouter = router({
       // em computedItems[].totalPrice) como fator uniforme, de modo que
       // sum(itens) continue == totalValue (fonte única do total do contrato) e o
       // PDF — que reescala as linhas para contractTotal — bata com a tela.
-      const couponPercent = Math.min(100, Math.max(0, input.couponPercent ?? 0));
-      const couponFactor = 1 - couponPercent / 100;
-      if (couponFactor !== 1) {
-        for (const item of computedItems) {
-          item.totalPrice = item.totalPrice * couponFactor;
-          item.unitPrice = item.unitPrice * couponFactor;
+      // Âncora "valor final exato" (targetTotal): tem precedência sobre a % —
+      // as linhas são escaladas para fechar EXATAMENTE no valor via
+      // computeProposalLinePrices (fonte única do fechamento de centavos).
+      const lineSubtotal = computedItems.reduce((sum, i) => sum + i.totalPrice, 0);
+      let totalValue: number;
+      if (
+        input.targetTotal != null &&
+        lineSubtotal > 0 &&
+        input.targetTotal < lineSubtotal
+      ) {
+        const scaled = computeProposalLinePrices(computedItems, input.targetTotal);
+        computedItems.forEach((item, idx) => {
+          item.totalPrice = scaled[idx].totalPrice;
+          item.unitPrice = scaled[idx].unitPrice;
+        });
+        totalValue = Math.round(input.targetTotal * 100) / 100;
+      } else {
+        const couponPercent = Math.min(100, Math.max(0, input.couponPercent ?? 0));
+        const couponFactor = 1 - couponPercent / 100;
+        if (couponFactor !== 1) {
+          for (const item of computedItems) {
+            item.totalPrice = item.totalPrice * couponFactor;
+            item.unitPrice = item.unitPrice * couponFactor;
+          }
         }
+        totalValue = computedItems.reduce((sum, i) => sum + i.totalPrice, 0);
       }
-      const totalValue = computedItems.reduce((sum, i) => sum + i.totalPrice, 0);
 
       const quotationNumber = await generateQuotationNumber(db);
       const quotationName = input.campaignName || generateQuotationName(entityName, totalVolume);

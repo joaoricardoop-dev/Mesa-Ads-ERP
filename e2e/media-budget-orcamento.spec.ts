@@ -152,4 +152,55 @@ test.describe("MediaBudget /comercial/orcamento — catálogo → plano → cota
       }
     }
   });
+
+  test("valor final exato: fixa R$ X e o total/totalValue fecham exatamente em X", async ({
+    page,
+  }) => {
+    expect(admin, "admin de teste indisponível").toBeTruthy();
+    expect(client, "cliente de teste indisponível").toBeTruthy();
+    const clientLabel = client!.company || client!.name || "";
+
+    let createdId: number | null = null;
+    try {
+      await devLoginAdmin(page.request);
+      await page.goto("/comercial/orcamento");
+      await expect(
+        page.getByRole("heading", { name: /^orçamento$/i }),
+      ).toBeVisible();
+
+      await pickClient(page, clientLabel);
+      await addFirstScreenLocation(page);
+
+      const campaignName = `E2E Valor Exato ${Date.now()}`;
+      await page.getByPlaceholder(/Verão 2026/i).fill(campaignName);
+
+      // Fixa um valor final "quebrado" que uma % com 2 casas raramente
+      // reproduziria com exatidão. Precisa ser < subtotal do plano.
+      const target = "123.45";
+      const valueField = page.locator('input[inputmode="decimal"]').first();
+      await expect(valueField).toBeVisible();
+      await valueField.fill(target);
+      await valueField.press("Enter");
+
+      // O Total exibido deve ser EXATAMENTE o valor digitado.
+      await expect(page.getByText("R$ 123,45").first()).toBeVisible();
+
+      const created = await submitAndCaptureQuotation(page);
+      createdId = created.id;
+
+      // totalValue persistido fecha exatamente no valor fixado.
+      const detail = await trpcQuery<{ totalValue: string }>(
+        page.request,
+        "quotation.get",
+        { id: created.id },
+      );
+      expect(Number(detail.totalValue)).toBeCloseTo(123.45, 2);
+      expect(detail.totalValue).toMatch(/^123\.45/);
+    } finally {
+      if (createdId != null) {
+        await page.context().clearCookies();
+        await deleteQuotationAsAdmin(page.request, createdId);
+      }
+    }
+  });
 });

@@ -128,6 +128,8 @@ export function MediaShopBuilder({ clientId, source, onClose, onSuccess }: Media
       briefing: notes.trim() || undefined,
       estimatedTotal: plan.total,
       couponPercent: plan.couponPercent,
+      // Âncora "valor final exato" (quando o comercial fixa o total).
+      targetTotal: plan.targetTotal ?? undefined,
       // Autosserviço nunca é bonificação e não define parcelas — o backend semeia
       // o cronograma default e o comercial ajusta depois.
       isBonificada: false,

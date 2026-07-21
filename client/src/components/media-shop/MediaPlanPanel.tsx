@@ -53,7 +53,8 @@ export interface MediaPlanQuantityItem extends MediaQuantityItem {
 }
 
 export function useMediaPlan() {
-  const { selected, quantityItems, startDate, endDate, couponPercent } = useMediaShopStore();
+  const { selected, quantityItems, startDate, endDate, couponPercent, targetTotal } =
+    useMediaShopStore();
   const sys = useSystemPremissas();
   const quotePremissas: QuotePremissas = useMemo(
     () => ({ ...sys.premissas, bvAgencia: sys.bvAgencia }),
@@ -107,18 +108,25 @@ export function useMediaPlan() {
     const screensSubtotal = items.reduce((s, i) => s + i.totalPrice, 0);
     const quantitySubtotal = qtyItems.reduce((s, i) => s + i.totalPrice, 0);
     const subtotal = screensSubtotal + quantitySubtotal;
-    const discount = subtotal * (couponPercent / 100);
-    const total = subtotal - discount;
+    // Âncora do desconto global (fonte única): OU valor final exato (targetTotal)
+    // OU % de cupom — nunca os dois. Com âncora de valor, o total É o valor
+    // digitado (sem passar por % arredondada) e a % vira derivada/informativa.
+    const valueAnchored = targetTotal != null && subtotal > 0 && targetTotal < subtotal;
+    const total = valueAnchored ? targetTotal : subtotal * (1 - couponPercent / 100);
+    const discount = subtotal - total;
+    const effectiveCouponPercent =
+      valueAnchored ? (subtotal > 0 ? (discount / subtotal) * 100 : 0) : couponPercent;
     return {
       items,
       quantityItems: qtyItems,
       days,
       subtotal,
       discount,
-      couponPercent,
+      couponPercent: effectiveCouponPercent,
+      targetTotal: valueAnchored ? targetTotal : null,
       total,
     };
-  }, [selected, quantityItems, days, couponPercent, quotePremissas]);
+  }, [selected, quantityItems, days, couponPercent, targetTotal, quotePremissas]);
 }
 
 export function MediaPlanPanel({
@@ -160,6 +168,7 @@ export function MediaPlanPanel({
     setDates,
     couponPercent,
     setCoupon,
+    setTargetTotal,
     notes,
     setNotes,
     updateItem,
@@ -175,24 +184,29 @@ export function MediaPlanPanel({
   const plan = useMediaPlan();
   const totalItems = plan.items.length + plan.quantityItems.length;
 
-  // "Valor final (R$)": entrada inversa do cupom. A % continua a única fonte
-  // de verdade (couponPercent no store); aqui só derivamos a % a partir do
-  // valor final digitado. Draft local permite digitação fluida; conversão no
-  // blur/Enter.
+  // "Valor final (R$)": âncora EXATA do desconto global. Ao confirmar, o valor
+  // digitado vira o total do plano (targetTotal no store) sem passar por %
+  // arredondada; a % exibida é derivada/informativa. Editar a % manualmente
+  // (setCoupon) volta ao modo por porcentagem e limpa a âncora. Draft local
+  // permite digitação fluida; conversão no blur/Enter.
   const [finalValueDraft, setFinalValueDraft] = useState<string | null>(null);
+  const valueAnchored = plan.targetTotal != null;
   const commitFinalValue = () => {
     if (finalValueDraft === null) return;
-    const raw = finalValueDraft.trim().replace(",", ".");
+    // Aceita "10000.50" e o formato BR "10.000,50": com vírgula, pontos são
+    // separador de milhar; sem vírgula, ponto é decimal.
+    const trimmed = finalValueDraft.trim();
     setFinalValueDraft(null);
-    if (raw === "") return;
-    const v = Number(raw);
-    if (!Number.isFinite(v) || v < 0 || plan.subtotal <= 0) return;
-    if (v >= plan.subtotal) {
+    if (trimmed === "") return;
+    const parsed = Number(
+      trimmed.includes(",") ? trimmed.replace(/\./g, "").replace(",", ".") : trimmed,
+    );
+    if (!Number.isFinite(parsed) || parsed < 0 || plan.subtotal <= 0) return;
+    if (parsed >= plan.subtotal) {
       setCoupon(0);
       return;
     }
-    const pct = Math.min(100, Math.max(0, (1 - v / plan.subtotal) * 100));
-    setCoupon(Math.round(pct * 100) / 100);
+    setTargetTotal(parsed);
   };
 
   return (
@@ -478,13 +492,18 @@ export function MediaPlanPanel({
         <CardContent className="space-y-2">
           <Row label="Subtotal" value={formatCurrency(plan.subtotal)} />
           <div className="flex items-center justify-between gap-2">
-            <Label className="text-sm text-muted-foreground">Cupom (%)</Label>
+            <Label className="text-sm text-muted-foreground">
+              {valueAnchored ? "Cupom (≈%)" : "Cupom (%)"}
+            </Label>
             <Input
               type="number"
               min={0}
               max={100}
-              className="h-8 w-20 text-right"
-              value={couponPercent}
+              step="any"
+              className="h-8 w-24 text-right"
+              value={
+                valueAnchored ? Math.round(plan.couponPercent * 10000) / 10000 : couponPercent
+              }
               onChange={(e) => setCoupon(Number(e.target.value) || 0)}
             />
           </div>
@@ -494,7 +513,14 @@ export function MediaPlanPanel({
               type="text"
               inputMode="decimal"
               className="h-8 w-28 text-right"
-              value={finalValueDraft ?? (plan.subtotal > 0 ? plan.total.toFixed(2) : "")}
+              value={
+                finalValueDraft ??
+                (valueAnchored
+                  ? plan.targetTotal!.toFixed(2)
+                  : plan.subtotal > 0
+                    ? plan.total.toFixed(2)
+                    : "")
+              }
               onChange={(e) => setFinalValueDraft(e.target.value)}
               onBlur={commitFinalValue}
               onKeyDown={(e) => {

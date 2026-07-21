@@ -111,6 +111,8 @@ export function StepShop({ clientId, leadId, source, role, clientLabel }: Props)
       endDate,
       estimatedTotal: plan.total,
       couponPercent: plan.couponPercent,
+      // Âncora "valor final exato" (quando fixada no painel do plano).
+      targetTotal: plan.targetTotal ?? undefined,
       briefing: notes.trim() || undefined,
       items: [...screenItems, ...qtyItems],
     });

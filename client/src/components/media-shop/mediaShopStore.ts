@@ -146,6 +146,13 @@ interface MediaShopState {
   campaignName: string;
   /** Cupom de desconto em % (0–100) aplicado sobre o subtotal (display). */
   couponPercent: number;
+  /**
+   * Âncora "valor final exato" do desconto global. Quando não-nula, o total do
+   * plano É exatamente este valor (sem passar por % arredondada) e a % exibida
+   * é derivada/informativa. Editar a % manualmente (setCoupon) limpa a âncora
+   * — só existe UMA âncora ativa por vez (fonte única do desconto global).
+   */
+  targetTotal: number | null;
   notes: string;
   /** Bonificação: exclui a cotação dos KPIs financeiros e dispensa cronograma. */
   isBonificada: boolean;
@@ -173,6 +180,8 @@ interface MediaShopState {
   setSchedule: (schedule: DraftParcela[]) => void;
   setCampaignName: (name: string) => void;
   setCoupon: (pct: number) => void;
+  /** Fixa o valor final exato (limpa quando `null`). */
+  setTargetTotal: (value: number | null) => void;
   setNotes: (notes: string) => void;
   /** Mescla um snapshot (ex.: draft do servidor) sobre o estado atual. */
   hydrate: (partial: Partial<MediaShopState>) => void;
@@ -196,6 +205,7 @@ export const useMediaShopStore = create<MediaShopState>()(
   quantityItems: [],
   campaignName: "",
   couponPercent: 0,
+  targetTotal: null,
   notes: "",
   isBonificada: false,
   schedule: [],
@@ -240,7 +250,14 @@ export const useMediaShopStore = create<MediaShopState>()(
   setBonificada: (isBonificada) => set({ isBonificada }),
   setSchedule: (schedule) => set({ schedule }),
   setCampaignName: (campaignName) => set({ campaignName }),
-  setCoupon: (couponPercent) => set({ couponPercent: Math.min(100, Math.max(0, couponPercent)) }),
+  setCoupon: (couponPercent) =>
+    set({ couponPercent: Math.min(100, Math.max(0, couponPercent)), targetTotal: null }),
+  setTargetTotal: (targetTotal) =>
+    set(
+      targetTotal == null || !Number.isFinite(targetTotal) || targetTotal < 0
+        ? { targetTotal: null }
+        : { targetTotal, couponPercent: 0 },
+    ),
   setNotes: (notes) => set({ notes }),
   hydrate: (partial) => set((s) => ({ ...s, ...partial })),
   reset: () =>
@@ -249,6 +266,7 @@ export const useMediaShopStore = create<MediaShopState>()(
       quantityItems: [],
       campaignName: "",
       couponPercent: 0,
+      targetTotal: null,
       notes: "",
       isBonificada: false,
       schedule: [],
@@ -272,6 +290,7 @@ export const useMediaShopStore = create<MediaShopState>()(
         quantityItems: s.quantityItems,
         campaignName: s.campaignName,
         couponPercent: s.couponPercent,
+        targetTotal: s.targetTotal,
         notes: s.notes,
       }),
     },

@@ -139,6 +139,9 @@ export default function MediaBudget() {
       endDate,
       estimatedTotal: plan.total,
       couponPercent: plan.couponPercent,
+      // Âncora "valor final exato": quando presente, o servidor fecha o
+      // totalValue exatamente neste valor (ignora couponPercent).
+      targetTotal: plan.targetTotal ?? undefined,
       isBonificada,
       schedule: isBonificada ? [] : schedule,
       items,
