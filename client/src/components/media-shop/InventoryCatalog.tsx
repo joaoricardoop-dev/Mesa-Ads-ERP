@@ -82,6 +82,11 @@ function circuitSetupStatus(circuit: CircuitRow, loc: LocationRow) {
   const missing: string[] = [];
   if (!circuitPricing(circuit, 7)) missing.push("preço do circuito (inserções/semana e custo/inserção)");
   if (loc.lat == null || loc.lng == null) missing.push("coordenadas (mapa)");
+  // Pendências por tela vindas do servidor (fonte única shared/screen-space.ts
+  // → telaSpacePendencias): grade de horário, loop/inserções, custo, impactos.
+  for (const p of (circuit as { pendencias?: string[] }).pendencias ?? []) {
+    if (!missing.includes(p)) missing.push(p);
+  }
   return { isComplete: missing.length === 0, missing };
 }
 

@@ -5,6 +5,7 @@ import { telas, activeRestaurants } from "../drizzle/schema";
 import { asc, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { parseOperatingHours } from "../shared/screen-schedule";
+import { materializeScreenSpace } from "./screenSpace";
 
 async function getDatabase() {
   const d = await getDb();
@@ -33,6 +34,9 @@ const telaFields = {
   // preço = inserções/semana × custo/inserção.
   insertionsPerWeek: z.number().int().min(0).optional().nullable(),
   costPerInsertion: z.number().min(0).optional().nullable(),
+  // Impactos por inserção DESTA tela — alimenta a derivação do Espaço de Mídia
+  // do local (shared/screen-space.ts).
+  impactsPerInsertion: z.number().min(0).optional().nullable(),
   // Fotos da tela: array de URLs. Gravado como JSON text na coluna photoUrls.
   photoUrls: z.array(z.string()).optional().nullable(),
   // Grade de horário de funcionamento: array de chaves "dia-hora" (fonte única
@@ -48,7 +52,7 @@ function toColumns(input: Record<string, unknown>) {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(input)) {
     if (k === "restaurantId" || k === "id") continue;
-    if (k === "lat" || k === "lng" || k === "costPerInsertion") {
+    if (k === "lat" || k === "lng" || k === "costPerInsertion" || k === "impactsPerInsertion") {
       out[k] = v == null ? null : String(v);
     } else if (k === "photoUrls" || k === "screenOperatingHours") {
       out[k] = Array.isArray(v) ? JSON.stringify(v) : null;
@@ -135,6 +139,9 @@ export const telaRouter = router({
         .insert(telas)
         .values({ restaurantId: input.restaurantId, ...(toColumns(input) as any) })
         .returning();
+      // Materializa o Espaço de Mídia do local a partir do inventário
+      // (fonte única shared/screen-space.ts).
+      await materializeScreenSpace(db, input.restaurantId);
       return parseRow(row);
     }),
 
@@ -148,6 +155,7 @@ export const telaRouter = router({
         .where(eq(telas.id, input.id))
         .returning();
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Tela não encontrada." });
+      await materializeScreenSpace(db, row.restaurantId);
       return parseRow(row);
     }),
 
@@ -157,6 +165,7 @@ export const telaRouter = router({
       const db = await getDatabase();
       const rows = await db.delete(telas).where(eq(telas.id, input.id)).returning();
       if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Tela não encontrada." });
+      await materializeScreenSpace(db, rows[0].restaurantId);
       return rows[0];
     }),
 });

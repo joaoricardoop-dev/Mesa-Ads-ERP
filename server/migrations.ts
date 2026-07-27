@@ -2633,6 +2633,13 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       CREATE INDEX IF NOT EXISTS "idx_user_restaurants_restaurant_id" ON "user_restaurants" ("restaurant_id");
     `,
   },
+  {
+    // Task #410 — impactos por inserção POR TELA. Alimenta a derivação do
+    // Espaço de Mídia do local (shared/screen-space.ts): média ponderada por
+    // inserções → active_restaurants.screen_impacts_per_insertion e CPM.
+    name: "task_410_add_impacts_per_insertion_to_telas",
+    sql: `ALTER TABLE "telas" ADD COLUMN IF NOT EXISTS "impacts_per_insertion" numeric(10, 2);`,
+  },
 ];
 
 /**

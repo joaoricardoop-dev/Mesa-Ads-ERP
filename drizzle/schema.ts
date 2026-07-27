@@ -467,6 +467,10 @@ export const telas = pgTable("telas", {
   // Substitui o CPM para DOOH; o circuito só tem preço quando ambos > 0.
   insertionsPerWeek: integer("insertions_per_week"),
   costPerInsertion: decimal("cost_per_insertion", { precision: 10, scale: 2 }),
+  // Impactos (pessoas alcançadas) por inserção DESTA tela. Alimenta a derivação
+  // do Espaço de Mídia do local (shared/screen-space.ts): média ponderada por
+  // inserções → active_restaurants.screen_impacts_per_insertion e CPM.
+  impactsPerInsertion: decimal("impacts_per_insertion", { precision: 10, scale: 2 }),
   // Fotos da tela (JSON array de URLs servidas por /api/tela-photo/serve/...).
   // Aparecem no ecommerce (/montar-campanha) junto do local.
   photoUrls: text("photoUrls"),

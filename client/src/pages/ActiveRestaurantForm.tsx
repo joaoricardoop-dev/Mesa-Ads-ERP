@@ -57,6 +57,7 @@ import {
 
 import { EXCLUDED_CATEGORIES } from "@shared/excluded-categories";
 import { computeCpmPricing, screenSpaceMissingPhotos } from "@shared/cpm-pricing";
+import { deriveScreenSpace } from "@shared/screen-space";
 import { parseOperatingHours } from "@shared/screen-schedule";
 import { OperatingHoursGrid } from "@/components/OperatingHoursGrid";
 import TelasManager from "@/components/TelasManager";
@@ -259,6 +260,15 @@ export default function ActiveRestaurantForm() {
     { id: editId! },
     { enabled: isEditing }
   );
+
+  // Inventário de telas do local: com ≥1 tela ATIVA, o "Espaço de mídia" vira
+  // read-only e os campos são DERIVADOS do inventário (fonte única:
+  // shared/screen-space.ts deriveScreenSpace).
+  const { data: telasList } = trpc.tela.listByRestaurant.useQuery(
+    { restaurantId: editId! },
+    { enabled: isEditing }
+  );
+  const spaceDerivation = deriveScreenSpace(telasList ?? []);
 
   useEffect(() => {
     if (existingRestaurant) {
@@ -864,6 +874,59 @@ export default function ActiveRestaurantForm() {
                     <p className="text-[10px] text-muted-foreground -mt-1">
                       O que se comercializa é o <strong>espaço</strong>. Informe o nº de telas do local (usado na audiência estimada) e adicione fotos do espaço para o ecommerce. A precificação das telas é por CPM (custo por mil impactos) — sem estes campos a tela fica sem preço nas cotações. O cadastro individual de telas é opcional.
                     </p>
+                    {spaceDerivation ? (
+                      // ── Modo DERIVADO: ≥1 tela ativa no inventário. Fonte
+                      // única: shared/screen-space.ts (deriveScreenSpace). Os
+                      // campos abaixo são read-only; edite as telas na aba
+                      // "Telas" para alterá-los.
+                      <div className="mt-2 space-y-3" data-testid="screen-space-derived-panel">
+                        <p className="text-[11px] text-muted-foreground">
+                          Este local tem <strong>{spaceDerivation.screensCount}</strong> tela(s) ativa(s) no inventário — os campos do espaço são <strong>derivados automaticamente</strong> das telas cadastradas. Para alterá-los, edite as telas na aba <strong>Telas</strong> abaixo.
+                        </p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 rounded-lg bg-muted/40 border border-border/30">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Nº de telas</div>
+                            <div className="text-sm font-semibold tabular-nums" data-testid="derived-screens-count">{spaceDerivation.screensCount}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Horas / semana</div>
+                            <div className="text-sm font-semibold tabular-nums" data-testid="derived-weekly-hours">{spaceDerivation.weeklyHours > 0 ? spaceDerivation.weeklyHours : "—"}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Inserções / hora</div>
+                            <div className="text-sm font-semibold tabular-nums" data-testid="derived-insertions-hour">{spaceDerivation.insertionsPerHour != null ? Math.round(spaceDerivation.insertionsPerHour) : "—"}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Impactos / inserção</div>
+                            <div className="text-sm font-semibold tabular-nums" data-testid="derived-impacts">{spaceDerivation.impactsPerInsertion != null ? spaceDerivation.impactsPerInsertion.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "—"}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Custo / inserção</div>
+                            <div className="text-sm font-semibold tabular-nums" data-testid="derived-cost">{spaceDerivation.costPerInsertion != null ? spaceDerivation.costPerInsertion.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">CPM (derivado)</div>
+                            <div className="text-sm font-semibold tabular-nums text-primary" data-testid="derived-cpm">{spaceDerivation.cpm != null ? spaceDerivation.cpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}</div>
+                          </div>
+                        </div>
+                        {spaceDerivation.pendencias.length > 0 && (
+                          <div className="p-3 rounded-lg border border-amber-500/40 bg-amber-500/5 space-y-1.5" data-testid="derived-pendencias">
+                            <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                              Configuração pendente — os campos com "—" só serão derivados quando TODAS as telas estiverem completas:
+                            </p>
+                            <ul className="text-[11px] text-muted-foreground list-disc pl-5 space-y-0.5">
+                              {spaceDerivation.pendencias.map((p) => (
+                                <li key={p.telaId} data-testid={`pendencia-tela-${p.telaId}`}>
+                                  <strong>{p.nome}</strong>: {p.missing.join("; ")}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                    <>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">Nº de telas do espaço</Label>
@@ -978,6 +1041,8 @@ export default function ActiveRestaurantForm() {
                       <p className="text-[11px] text-muted-foreground mt-3">
                         Este espaço não vende telas. Defina o <strong>nº de telas</strong> acima para configurar a precificação por CPM e o horário de funcionamento.
                       </p>
+                    )}
+                    </>
                     )}
 
                     <div

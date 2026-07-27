@@ -198,6 +198,7 @@ interface TelaFormState {
   dailyLoops: string;
   insertionsPerWeek: string;
   costPerInsertion: string;
+  impactsPerInsertion: string;
   photoUrls: string[];
   screenOperatingHours: string[];
   status: string;
@@ -232,6 +233,7 @@ function buildInitial(
       dailyLoops: editing.dailyLoops != null ? String(editing.dailyLoops) : "",
       insertionsPerWeek: editing.insertionsPerWeek != null ? String(editing.insertionsPerWeek) : "",
       costPerInsertion: editing.costPerInsertion != null ? String(editing.costPerInsertion) : "",
+      impactsPerInsertion: (editing as any).impactsPerInsertion != null ? String((editing as any).impactsPerInsertion) : "",
       photoUrls: Array.isArray(editing.photoUrls) ? editing.photoUrls : [],
       screenOperatingHours: parseOperatingHours((editing as any).screenOperatingHours),
       status: editing.status ?? "active",
@@ -255,6 +257,7 @@ function buildInitial(
     dailyLoops: "",
     insertionsPerWeek: "",
     costPerInsertion: "",
+    impactsPerInsertion: "",
     photoUrls: [],
     screenOperatingHours: [],
     status: "active",
@@ -399,6 +402,7 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
       dailyLoops: form.dailyLoops ? parseInt(form.dailyLoops) : null,
       insertionsPerWeek: form.insertionsPerWeek ? parseInt(form.insertionsPerWeek) : null,
       costPerInsertion: form.costPerInsertion ? parseFloat(form.costPerInsertion) : null,
+      impactsPerInsertion: form.impactsPerInsertion ? parseFloat(form.impactsPerInsertion) : null,
       photoUrls: form.photoUrls,
       screenOperatingHours: form.screenOperatingHours,
       status: form.status as "active" | "inactive",
@@ -518,6 +522,17 @@ export function TelaDialog({ open, onOpenChange, restaurantId, restaurantOptions
                   onChange={(e) => setForm((f) => ({ ...f, costPerInsertion: e.target.value }))}
                   placeholder="0,99"
                   data-testid="input-tela-cost-per-insertion"
+                />
+              </FieldWrap>
+              <FieldWrap label="Impactos / inserção">
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.impactsPerInsertion}
+                  onChange={(e) => setForm((f) => ({ ...f, impactsPerInsertion: e.target.value }))}
+                  placeholder="33,04"
+                  data-testid="input-tela-impacts-per-insertion"
                 />
               </FieldWrap>
             </div>

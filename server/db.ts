@@ -1170,7 +1170,28 @@ export async function updateActiveRestaurant(id: number, data: Partial<InsertAct
   // apenas quando o client NÃO enviou coordenadas novas). Em seguida, o fallback
   // de preenchimento cobre o caso de coords ainda ausentes.
   restaurant = (await regeocodeIfAddressChanged(restaurant, data, previous)) ?? restaurant;
-  return (await autoGeocodeIfMissing(restaurant)) ?? restaurant;
+  restaurant = (await autoGeocodeIfMissing(restaurant)) ?? restaurant;
+
+  // Espaço de Mídia: quando o local tem ≥1 tela ATIVA no inventário, os campos
+  // screen* são DERIVADOS das telas (fonte única shared/screen-space.ts) — a
+  // materialização re-aplica os derivados por cima de qualquer edição manual.
+  // Sem telas ativas, é no-op (modo manual preservado).
+  try {
+    const { materializeScreenSpace } = await import("./screenSpace");
+    const derived = await materializeScreenSpace(db, id);
+    if (derived) {
+      const refreshed = await db
+        .select()
+        .from(activeRestaurants)
+        .where(eq(activeRestaurants.id, id))
+        .limit(1);
+      restaurant = refreshed[0] ?? restaurant;
+    }
+  } catch (e) {
+    console.error("[updateActiveRestaurant] materializeScreenSpace:", (e as Error)?.message);
+  }
+
+  return restaurant;
 }
 
 export async function deleteActiveRestaurant(id: number) {

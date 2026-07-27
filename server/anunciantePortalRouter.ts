@@ -18,6 +18,7 @@ import {
 } from "../drizzle/schema";
 import { parseTelaPhotoUrls } from "./telaRouter";
 import { screenSpaceMissingPhotos } from "@shared/cpm-pricing";
+import { telaSpacePendencias } from "@shared/screen-space";
 import { and, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
@@ -211,6 +212,11 @@ export const anunciantePortalRouter = router({
           nome: telas.nome,
           insertionsPerWeek: telas.insertionsPerWeek,
           costPerInsertion: telas.costPerInsertion,
+          // Campos extras para pendências por tela (fonte única
+          // shared/screen-space.ts → telaSpacePendencias).
+          loopDuration: telas.loopDuration,
+          impactsPerInsertion: telas.impactsPerInsertion,
+          screenOperatingHours: telas.screenOperatingHours,
         })
         .from(telas)
         .where(
@@ -319,6 +325,9 @@ export const anunciantePortalRouter = router({
               nome: t.nome,
               insertionsPerWeek: t.insertionsPerWeek ?? null,
               costPerInsertion: t.costPerInsertion != null ? parseFloat(t.costPerInsertion) : null,
+              // Pendências de configuração da tela (fonte única
+              // shared/screen-space.ts) — alimentam o badge "config pendente".
+              pendencias: telaSpacePendencias(t),
             }));
 
         const totalAvailable = productSlots.reduce((sum, p) => sum + p.availableShares, 0);

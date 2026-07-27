@@ -14,6 +14,7 @@
 - [Self-service builder](self-service-builder.md) — anunciante/parceiro portals reuse media-shop builder via MediaShopBuilder; source must match role (server-enforced); no parallel builder.
 - [Media-shop catalog kinds](media-shop-catalog-kinds.md) — internal Orçamento splits inventory: telas=location-based (CPM) vs quantity products (bolachas/impressos, restaurantId null, volume tiers).
 - [Margem unit convention](margem-unit-convention.md) — product_pricing_tiers.margem stored as percent (50.00); calcUnitPriceAdv wants a fraction — divide by 100 at EVERY call site or price collapses to 0 ("Sob consulta").
+- [Screen space derived from telas](screen-space-derivation.md) — ≥1 active tela ⇒ location screen* fields are materialized from inventory (all-or-null weighted averages); builder-locais e2e local-card tests are stale.
 - [Screen metrics canonical source](screen-metrics-canonical.md) — shared/screen-metrics.ts is the only origin for inserções/dia default (CPM→dailyLoops, no constant) + exibições/alcance/frequência; per-item override doesn't touch registration or CPM price.
 - [Toast convention (sonner)](toast-convention.md) — no @/hooks/use-toast in repo; import { toast } from "sonner" and call toast.success/error.
 - [Builder shares media-shop store](builder-mediashop-shared.md) — /montar-campanha (StepShop) reuses mediaShopStore + MediaPlanPanel(variant) verbatim from internal Orçamento; store now persists to localStorage so BOTH screens survive reload.
