@@ -184,7 +184,7 @@ vi.mock("../db", () => ({
 import { appRouter } from "../routers";
 import { scheduleInvoicesForCampaign } from "./scheduleInvoices";
 import type { TrpcContext } from "../_core/context";
-import { campaigns, quotations } from "../../drizzle/schema";
+import { campaigns, quotations, leads } from "../../drizzle/schema";
 
 type MockedScheduler = ReturnType<typeof vi.fn> & typeof scheduleInvoicesForCampaign;
 const scheduleSpy = scheduleInvoicesForCampaign as unknown as MockedScheduler;
@@ -462,5 +462,61 @@ describe("quotation conversion without a direct client (lead-based)", () => {
     ).rejects.toThrow(/cliente vinculado/i);
 
     expect(fake.inserted.get(campaigns)).toBeUndefined();
+  });
+});
+
+// Task #414 — conversão manual "Converter em Anunciante" direto na cotação.
+describe("quotation.convertLeadToClient", () => {
+  it("links an existing client by e-mail, writes clientId back and moves the lead to 'ganho'", async () => {
+    const fake = dbHolder.current;
+    // 1) quotation lookup — lead-based, sem clientId.
+    fake.queueSelect([{ id: 9201, clientId: null, leadId: 555 }]);
+    // 2) resolveQuotationClient → lead.
+    fake.queueSelect([
+      { id: 555, name: "Lead Co", company: "Lead Co", cnpj: null, contactEmail: "lead@co.com", contactPhone: null },
+    ]);
+    // 3) resolveQuotationClient → cliente existente casado por e-mail.
+    fake.queueSelect([{ id: 77 }]);
+
+    const caller = appRouter.createCaller(makeComercialContext());
+    const result = await caller.quotation.convertLeadToClient({ id: 9201 });
+
+    expect(result).toEqual({ clientId: 77, mode: "linked_existing" });
+
+    const quotationUpdates = fake.updates
+      .filter((u) => u.table === quotations)
+      .map((u) => u.set as Record<string, unknown>);
+    expect(quotationUpdates.some((s) => s.clientId === 77)).toBe(true);
+
+    // Lead movido no CRM de forma coerente com a conversão manual do quadro.
+    const leadUpdates = fake.updates
+      .filter((u) => u.table === leads)
+      .map((u) => u.set as Record<string, unknown>);
+    expect(leadUpdates).toHaveLength(1);
+    expect(leadUpdates[0]).toMatchObject({
+      stage: "ganho",
+      clientId: 77,
+      convertedToType: "anunciante",
+      convertedToId: 77,
+    });
+  });
+
+  it("is idempotent: a quotation that already has a clientId returns it without touching the lead", async () => {
+    const fake = dbHolder.current;
+    fake.queueSelect([{ id: 9202, clientId: 42, leadId: 555 }]);
+
+    const caller = appRouter.createCaller(makeComercialContext());
+    const result = await caller.quotation.convertLeadToClient({ id: 9202 });
+
+    expect(result).toEqual({ clientId: 42, mode: "already_client" });
+    expect(fake.updates).toHaveLength(0);
+  });
+
+  it("throws a friendly BAD_REQUEST when the quotation has no lead", async () => {
+    const fake = dbHolder.current;
+    fake.queueSelect([{ id: 9203, clientId: null, leadId: null }]);
+
+    const caller = appRouter.createCaller(makeComercialContext());
+    await expect(caller.quotation.convertLeadToClient({ id: 9203 })).rejects.toThrow(/vinculada a um lead/i);
   });
 });

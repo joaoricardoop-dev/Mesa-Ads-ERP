@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveQuotationClientId } from "./resolveQuotationClient";
+import { resolveQuotationClientId, resolveQuotationClient } from "./resolveQuotationClient";
 import { clients, leads, quotations } from "../../drizzle/schema";
 
 // ── Table-aware fake DB ──────────────────────────────────────────────────────
@@ -150,6 +150,33 @@ describe("resolveQuotationClientId", () => {
     expect(result).toBeNull();
     expect(inserts).toHaveLength(0);
     expect(updates).toHaveLength(0);
+  });
+
+  it("links an existing client by CNPJ when the e-mail does not match (Task #414)", async () => {
+    // O fake devolve o mesmo conjunto `clients` para qualquer select; para
+    // simular "e-mail não casa, CNPJ casa" basta um lead SEM e-mail com CNPJ.
+    const { db, inserts, updates } = makeFakeDb({
+      leads: [{ id: 8, name: "Delta", company: null, cnpj: "11222333000144", contactEmail: null, contactPhone: null }],
+      clients: [{ id: 555 }],
+    });
+    const result = await resolveQuotationClient(db, {
+      id: 15,
+      clientId: null,
+      leadId: 8,
+    });
+    expect(result).toEqual({ clientId: 555, mode: "linked_existing" });
+    expect(inserts).toHaveLength(0);
+    expect(updates[0].set).toMatchObject({ clientId: 555 });
+  });
+
+  it("reports mode 'created' when a new client is inserted", async () => {
+    const { db } = makeFakeDb({
+      leads: [{ id: 10, name: "Nova Co", company: null, cnpj: null, contactEmail: "n@co.com", contactPhone: null }],
+      clients: [],
+      newClientId: 700,
+    });
+    const result = await resolveQuotationClient(db, { id: 16, clientId: null, leadId: 10 });
+    expect(result).toEqual({ clientId: 700, mode: "created" });
   });
 
   it("falls back to company name when the lead has no name", async () => {

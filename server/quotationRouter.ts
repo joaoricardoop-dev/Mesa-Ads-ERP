@@ -14,7 +14,7 @@ import { ensureDefaultQuotationSchedule, seedCampaignScheduleFromQuotation, read
 import { scheduleMatchesTotal } from "../shared/billingSchedule";
 import { withUniqueRetry, describeDbError } from "./utils/uniqueNumberRetry";
 import { nextNumber } from "./utils/numberCounter";
-import { resolveQuotationClientId } from "./utils/resolveQuotationClient";
+import { resolveQuotationClientId, resolveQuotationClient } from "./utils/resolveQuotationClient";
 import { getSystemConfig, type SystemPremissas } from "./systemConfigRouter";
 
 const SELF_SERVICE_USER_ID = "self_service";
@@ -473,6 +473,51 @@ export const quotationRouter = router({
         .where(eq(quotations.id, input.quotationId))
         .returning();
       return updated;
+    }),
+
+  // Task #414 — conversão manual "Converter em Anunciante" direto na cotação.
+  // Reusa a fonte única resolveQuotationClient (dedupe por e-mail/CNPJ) e move
+  // o lead no CRM da mesma forma que a conversão manual do quadro de Leads
+  // (stage "ganho" + convertedToType "anunciante"). Idempotente: cotação que
+  // já tem clientId apenas retorna o vínculo existente.
+  convertLeadToClient: comercialProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDatabase();
+
+      const [quotation] = await db
+        .select({ id: quotations.id, clientId: quotations.clientId, leadId: quotations.leadId })
+        .from(quotations)
+        .where(eq(quotations.id, input.id))
+        .limit(1);
+      if (!quotation) throw new TRPCError({ code: "NOT_FOUND", message: "Cotação não encontrada" });
+
+      if (quotation.clientId) {
+        return { clientId: quotation.clientId, mode: "already_client" as const };
+      }
+      if (!quotation.leadId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Esta cotação não está vinculada a um lead." });
+      }
+
+      const { clientId, mode } = await resolveQuotationClient(db, quotation);
+      if (!clientId || mode === "unresolvable") {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lead da cotação não encontrado." });
+      }
+
+      // Move o lead no CRM de forma coerente com a conversão manual do quadro
+      // de Leads (createClientMutation → lead.update stage "ganho").
+      await db
+        .update(leads)
+        .set({
+          stage: "ganho",
+          clientId,
+          convertedToType: "anunciante",
+          convertedToId: clientId,
+          updatedAt: new Date(),
+        })
+        .where(eq(leads.id, quotation.leadId));
+
+      return { clientId, mode };
     }),
 
   update: comercialProcedure

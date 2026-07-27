@@ -181,6 +181,22 @@ export default function QuotationDetail() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
+  const convertLeadMutation = trpc.quotation.convertLeadToClient.useMutation({
+    onSuccess: (data) => {
+      utils.quotation.get.invalidate({ id: quotationId });
+      utils.quotation.list.invalidate();
+      utils.advertiser.list.invalidate();
+      if (data.mode === "created") {
+        toast.success("Lead convertido em anunciante! Novo cliente criado.");
+      } else if (data.mode === "linked_existing") {
+        toast.success("Já existia um cliente com o mesmo e-mail/CNPJ — a cotação foi vinculada a ele.");
+      } else {
+        toast.success("Cotação já estava vinculada a um cliente.");
+      }
+    },
+    onError: (err) => toast.error(`Erro ao converter: ${err.message}`),
+  });
+
   const statusChangeMutation = trpc.quotation.update.useMutation({
     onSuccess: () => { utils.quotation.get.invalidate({ id: quotationId }); utils.quotation.list.invalidate(); toast.success("Status atualizado!"); },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -371,6 +387,18 @@ export default function QuotationDetail() {
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
+              {quotation.leadId && !quotation.clientId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-8 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                  disabled={convertLeadMutation.isPending}
+                  onClick={() => convertLeadMutation.mutate({ id: quotationId })}
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  {convertLeadMutation.isPending ? "Convertendo..." : "Converter em Anunciante"}
+                </Button>
+              )}
               {!isTerminal && (
                 <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={openEdit}>
                   <Pencil className="w-3.5 h-3.5" /> Editar
