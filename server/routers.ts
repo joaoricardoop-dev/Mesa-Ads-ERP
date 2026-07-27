@@ -826,15 +826,10 @@ export const appRouter = router({
           dailyLoops: z.number().int().optional().nullable(),
           descricao: z.string().optional(),
           horarioFuncionamento: z.string().optional(),
-          // Nº de telas do espaço (fonte única da quantidade de telas).
-          screensCount: z.number().int().min(0).optional(),
-          // ── Precificação de telas por CPM (fonte única) ──
-          screenCpm: z.string().optional().nullable(),
-          screenInsertionsPerHour: z.number().int().optional().nullable(),
-          screenImpactsPerInsertion: z.string().optional().nullable(),
-          screenWeeklyHours: z.string().optional().nullable(),
-          screenOperatingHours: z.string().optional().nullable(),
-          screenExposureSec: z.number().int().optional().nullable(),
+          // Task #417: os campos screen* do Espaço de Mídia NÃO são mais
+          // aceitos aqui — são exclusivamente MATERIALIZADOS a partir do
+          // inventário de telas (server/screenSpace.ts). Chaves desconhecidas
+          // enviadas por clients antigos são descartadas pelo zod.
           // ── Sala VIP (repasse no próprio local — Task #375) ──
           isVipRoom: z.boolean().optional(),
           vipRepassePercent: z.string().optional(),
@@ -907,15 +902,10 @@ export const appRouter = router({
           dailyLoops: z.number().int().optional().nullable(),
           descricao: z.string().optional(),
           horarioFuncionamento: z.string().optional(),
-          // Nº de telas do espaço (fonte única da quantidade de telas).
-          screensCount: z.number().int().min(0).optional(),
-          // ── Precificação de telas por CPM (fonte única) ──
-          screenCpm: z.string().optional().nullable(),
-          screenInsertionsPerHour: z.number().int().optional().nullable(),
-          screenImpactsPerInsertion: z.string().optional().nullable(),
-          screenWeeklyHours: z.string().optional().nullable(),
-          screenOperatingHours: z.string().optional().nullable(),
-          screenExposureSec: z.number().int().optional().nullable(),
+          // Task #417: campos screen* removidos do input — o Espaço de Mídia
+          // é derivado exclusivamente do inventário de telas (materialização
+          // em server/screenSpace.ts). Clients antigos que ainda enviarem
+          // essas chaves têm os valores descartados pelo zod.
           // ── Sala VIP (repasse no próprio local — Task #375) ──
           isVipRoom: z.boolean().optional(),
           vipRepassePercent: z.string().optional(),

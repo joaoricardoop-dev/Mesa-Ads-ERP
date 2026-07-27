@@ -1172,21 +1172,19 @@ export async function updateActiveRestaurant(id: number, data: Partial<InsertAct
   restaurant = (await regeocodeIfAddressChanged(restaurant, data, previous)) ?? restaurant;
   restaurant = (await autoGeocodeIfMissing(restaurant)) ?? restaurant;
 
-  // Espaço de Mídia: quando o local tem ≥1 tela ATIVA no inventário, os campos
-  // screen* são DERIVADOS das telas (fonte única shared/screen-space.ts) — a
-  // materialização re-aplica os derivados por cima de qualquer edição manual.
-  // Sem telas ativas, é no-op (modo manual preservado).
+  // Espaço de Mídia (Task #417): os campos screen* são SEMPRE materializados a
+  // partir do inventário de telas (fonte única shared/screen-space.ts) — com
+  // telas ativas, derivados; sem telas ativas, limpos (screensCount=0, resto
+  // NULL). Recarrega sempre para o payload refletir o estado persistido.
   try {
     const { materializeScreenSpace } = await import("./screenSpace");
-    const derived = await materializeScreenSpace(db, id);
-    if (derived) {
-      const refreshed = await db
-        .select()
-        .from(activeRestaurants)
-        .where(eq(activeRestaurants.id, id))
-        .limit(1);
-      restaurant = refreshed[0] ?? restaurant;
-    }
+    await materializeScreenSpace(db, id);
+    const refreshed = await db
+      .select()
+      .from(activeRestaurants)
+      .where(eq(activeRestaurants.id, id))
+      .limit(1);
+    restaurant = refreshed[0] ?? restaurant;
   } catch (e) {
     console.error("[updateActiveRestaurant] materializeScreenSpace:", (e as Error)?.message);
   }

@@ -3,7 +3,7 @@ name: Screen space derived from telas inventory
 description: When a location has ≥1 active tela, active_restaurants.screen* fields are derived/materialized from the telas inventory, never edited manually.
 ---
 
-Rule: `shared/screen-space.ts` (deriveScreenSpace) is the ONLY origin of a location's Espaço de Mídia fields when the location has ≥1 ACTIVE tela. The server materializer persists derived values into `active_restaurants.screen*` on every tela create/update/delete AND at the end of updateActiveRestaurant (so manual edits are overwritten). Non-derivable fields become NULL — never silently keep old manual values. No active telas → manual mode untouched.
+Rule: `shared/screen-space.ts` (deriveScreenSpace) is the ONLY origin of a location's Espaço de Mídia fields — ALWAYS. The server materializer persists derived values into `active_restaurants.screen*` on every tela create/update/delete AND at the end of updateActiveRestaurant. Non-derivable fields become NULL — never silently keep old values. No active telas → materializer CLEARS the columns (screensCount=0, rest NULL); there is no manual mode and no screen* inputs anywhere (form + tRPC schemas stripped).
 
 **Why:** the screen* columns are read by catalog, quotations, CPM pricing and portals; letting the form and the inventory both write them created divergent CPM/insertions between screens.
 

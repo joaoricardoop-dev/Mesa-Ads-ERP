@@ -56,10 +56,8 @@ import {
 } from "@shared/rating-config";
 
 import { EXCLUDED_CATEGORIES } from "@shared/excluded-categories";
-import { computeCpmPricing, screenSpaceMissingPhotos } from "@shared/cpm-pricing";
+import { screenSpaceMissingPhotos } from "@shared/cpm-pricing";
 import { deriveScreenSpace } from "@shared/screen-space";
-import { parseOperatingHours } from "@shared/screen-schedule";
-import { OperatingHoursGrid } from "@/components/OperatingHoursGrid";
 import TelasManager from "@/components/TelasManager";
 
 const BUSY_DAYS_OPTIONS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -119,17 +117,8 @@ interface FormData {
   dailyLoops: number;
   descricao: string;
   horarioFuncionamento: string;
-  // Nº de telas do espaço (fonte única da quantidade de telas na audiência).
-  screensCount: number;
   // Fotos do espaço (exibidas no ecommerce junto do local).
   photoUrls: string[];
-  // ── Precificação de telas por CPM (fonte única: shared/cpm-pricing.ts) ──
-  screenCpm: string;
-  screenInsertionsPerHour: number;
-  screenImpactsPerInsertion: string;
-  screenWeeklyHours: string;
-  screenOperatingHours: string[];
-  screenExposureSec: number;
   // ── Sala VIP (repasse no próprio local — Task #375) ──
   isVipRoom: boolean;
   vipRepassePercent: string;
@@ -189,14 +178,7 @@ const emptyForm: FormData = {
   dailyLoops: 0,
   descricao: "",
   horarioFuncionamento: "",
-  screensCount: 0,
   photoUrls: [],
-  screenCpm: "",
-  screenInsertionsPerHour: 0,
-  screenImpactsPerInsertion: "",
-  screenWeeklyHours: "",
-  screenOperatingHours: [],
-  screenExposureSec: 0,
   isVipRoom: false,
   vipRepassePercent: "30.00",
   vipBillingMode: "bruto",
@@ -346,14 +328,7 @@ export default function ActiveRestaurantForm() {
         dailyLoops: (existingRestaurant as any).dailyLoops || 0,
         descricao: (existingRestaurant as any).descricao || "",
         horarioFuncionamento: (existingRestaurant as any).horarioFuncionamento || "",
-        screensCount: (existingRestaurant as any).screensCount || 0,
         photoUrls: parsePhotoUrls((existingRestaurant as any).photoUrls),
-        screenCpm: (existingRestaurant as any).screenCpm != null ? String((existingRestaurant as any).screenCpm) : "",
-        screenInsertionsPerHour: (existingRestaurant as any).screenInsertionsPerHour || 0,
-        screenImpactsPerInsertion: (existingRestaurant as any).screenImpactsPerInsertion != null ? String((existingRestaurant as any).screenImpactsPerInsertion) : "",
-        screenWeeklyHours: (existingRestaurant as any).screenWeeklyHours != null ? String((existingRestaurant as any).screenWeeklyHours) : "",
-        screenOperatingHours: parseOperatingHours((existingRestaurant as any).screenOperatingHours),
-        screenExposureSec: (existingRestaurant as any).screenExposureSec || 0,
         isVipRoom: !!(existingRestaurant as any).isVipRoom,
         vipRepassePercent: (existingRestaurant as any).vipRepassePercent != null ? String((existingRestaurant as any).vipRepassePercent) : "30.00",
         vipBillingMode: (existingRestaurant as any).vipBillingMode || "bruto",
@@ -429,11 +404,6 @@ export default function ActiveRestaurantForm() {
     }));
   };
 
-  // Grade de horário de funcionamento das telas. A contagem de células
-  // selecionadas é a fonte única de screenWeeklyHours (1 célula = 1 hora).
-  const setOperatingHours = (next: string[]) =>
-    setForm(prev => ({ ...prev, screenOperatingHours: next, screenWeeklyHours: String(next.length) }));
-
   const toggleCategory = (cat: string) => {
     setForm(prev => ({
       ...prev,
@@ -447,7 +417,7 @@ export default function ActiveRestaurantForm() {
   // no ecommerce de telas até ter ao menos uma foto (mesma regra do server:
   // screenSpaceMissingPhotos). Mostrado depois do toast de sucesso.
   const warnIfNotPublishable = () => {
-    if (screenSpaceMissingPhotos({ screensCount: form.screensCount, photoCount: form.photoUrls.length })) {
+    if (screenSpaceMissingPhotos({ screensCount: spaceDerivation?.screensCount ?? 0, photoCount: form.photoUrls.length })) {
       toast.warning(
         "Este espaço vende telas mas está sem fotos: não aparecerá no ecommerce de telas até você adicionar ao menos uma foto.",
       );
@@ -535,14 +505,7 @@ export default function ActiveRestaurantForm() {
       dailyLoops: form.dailyLoops || null,
       descricao: form.descricao || undefined,
       horarioFuncionamento: form.horarioFuncionamento || undefined,
-      screensCount: form.screensCount || 0,
       photoUrls: JSON.stringify(form.photoUrls),
-      screenCpm: form.screenCpm.trim() !== "" ? form.screenCpm.trim() : null,
-      screenInsertionsPerHour: form.screenInsertionsPerHour || null,
-      screenImpactsPerInsertion: form.screenImpactsPerInsertion.trim() !== "" ? form.screenImpactsPerInsertion.trim() : null,
-      screenWeeklyHours: form.screenWeeklyHours.trim() !== "" ? form.screenWeeklyHours.trim() : null,
-      screenOperatingHours: form.screenOperatingHours.length > 0 ? JSON.stringify(form.screenOperatingHours) : null,
-      screenExposureSec: form.screenExposureSec || null,
       // ── Sala VIP (repasse no próprio local — fonte única; Task #375) ──
       isVipRoom: form.isVipRoom,
       vipRepassePercent: form.isVipRoom ? (form.vipRepassePercent.trim() || "30.00") : undefined,
@@ -856,6 +819,9 @@ export default function ActiveRestaurantForm() {
                   </Section>
 
                   <Section icon={<Monitor className="w-4 h-4" />} title="Inventário de Mídia / Telas">
+                    <p className="text-[10px] text-muted-foreground -mt-1">
+                      O inventário de telas é a <strong>fonte única</strong> do Espaço de Mídia: CPM, inserções, impactos, custo e horário de funcionamento são <strong>calculados automaticamente</strong> a partir das telas cadastradas. Sem telas ativas (ou com telas incompletas), o espaço fica <strong>sem preço</strong> e marcado como pendente nas cotações e no ecommerce.
+                    </p>
                     {isEditing && editId !== null ? (
                       <TelasManager
                         restaurantId={editId}
@@ -868,12 +834,7 @@ export default function ActiveRestaurantForm() {
                         As telas (pontos de mídia) são gerenciadas como entidade própria. Salve o local primeiro para adicionar, editar ou remover telas deste espaço.
                       </p>
                     )}
-                  </Section>
 
-                  <Section icon={<Monitor className="w-4 h-4" />} title="Espaço de mídia (telas)">
-                    <p className="text-[10px] text-muted-foreground -mt-1">
-                      O que se comercializa é o <strong>espaço</strong>. Informe o nº de telas do local (usado na audiência estimada) e adicione fotos do espaço para o ecommerce. A precificação das telas é por CPM (custo por mil impactos) — sem estes campos a tela fica sem preço nas cotações. O cadastro individual de telas é opcional.
-                    </p>
                     {spaceDerivation ? (
                       // ── Modo DERIVADO: ≥1 tela ativa no inventário. Fonte
                       // única: shared/screen-space.ts (deriveScreenSpace). Os
@@ -926,134 +887,20 @@ export default function ActiveRestaurantForm() {
                         )}
                       </div>
                     ) : (
-                    <>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Nº de telas do espaço</Label>
-                        <Input
-                          type="number" step="1" min="0" inputMode="numeric"
-                          value={form.screensCount || ""}
-                          onChange={(e) => setForm(p => ({ ...p, screensCount: parseInt(e.target.value || "0", 10) }))}
-                          placeholder="0"
-                          className="bg-background border-border/30 h-9 text-sm"
-                          data-testid="input-screens-count"
-                        />
-                        <p className="text-[10px] text-muted-foreground">0 = este espaço não vende telas (nunca alerta "config pendente").</p>
-                      </div>
-                    </div>
-
-                    {form.screensCount > 0 ? (
-                      <>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">CPM (R$ / mil impactos)</Label>
-                            <Input
-                              type="number" step="0.01" min="0" inputMode="decimal"
-                              value={form.screenCpm}
-                              onChange={(e) => setForm(p => ({ ...p, screenCpm: e.target.value }))}
-                              placeholder="29.90"
-                              className="bg-background border-border/30 h-9 text-sm"
-                              data-testid="input-screen-cpm"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">Inserções por hora</Label>
-                            <Input
-                              type="number" step="1" min="0" inputMode="numeric"
-                              value={form.screenInsertionsPerHour || ""}
-                              onChange={(e) => setForm(p => ({ ...p, screenInsertionsPerHour: parseInt(e.target.value || "0", 10) }))}
-                              placeholder="10"
-                              className="bg-background border-border/30 h-9 text-sm"
-                              data-testid="input-screen-insertions-hour"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">Impactos por inserção</Label>
-                            <Input
-                              type="number" step="0.01" min="0" inputMode="decimal"
-                              value={form.screenImpactsPerInsertion}
-                              onChange={(e) => setForm(p => ({ ...p, screenImpactsPerInsertion: e.target.value }))}
-                              placeholder="33.04"
-                              className="bg-background border-border/30 h-9 text-sm"
-                              data-testid="input-screen-impacts"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">Tempo de exposição (seg) <span className="opacity-60">· informativo</span></Label>
-                            <Input
-                              type="number" step="1" min="0" inputMode="numeric"
-                              value={form.screenExposureSec || ""}
-                              onChange={(e) => setForm(p => ({ ...p, screenExposureSec: parseInt(e.target.value || "0", 10) }))}
-                              placeholder="10"
-                              className="bg-background border-border/30 h-9 text-sm"
-                              data-testid="input-screen-exposure"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2 mt-4">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs text-muted-foreground">Horário de funcionamento <span className="opacity-60">· define horas/semana</span></Label>
-                            <span className="text-[11px] text-muted-foreground tabular-nums" data-testid="operating-hours-total">{form.screenOperatingHours.length} h/semana</span>
-                          </div>
-                          <OperatingHoursGrid
-                            value={form.screenOperatingHours}
-                            onChange={setOperatingHours}
-                          />
-                          <p className="text-[10px] text-muted-foreground">Marque as faixas em que as telas operam (clique no dia para a linha inteira, na hora para a coluna inteira, ou em "Tudo" para marcar todas de uma vez). O total de horas/semana alimenta a precificação por CPM.</p>
-                        </div>
-
-                        {(() => {
-                          const preview = computeCpmPricing({
-                            cpm: parseFloat(form.screenCpm),
-                            insertionsPerHour: form.screenInsertionsPerHour,
-                            impactsPerInsertion: parseFloat(form.screenImpactsPerInsertion),
-                            weeklyHours: parseFloat(form.screenWeeklyHours),
-                          });
-                          if (!preview) {
-                            return (
-                              <p className="text-[11px] text-muted-foreground mt-3">
-                                Preencha CPM, inserções/hora, impactos/inserção e marque o horário de funcionamento para ver o preço estimado.
-                              </p>
-                            );
-                          }
-                          const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-                          const num = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-                          return (
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 p-3 rounded-lg bg-muted/40 border border-border/30" data-testid="screen-cpm-preview">
-                              <div>
-                                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Inserções / semana</div>
-                                <div className="text-sm font-semibold tabular-nums">{num(preview.weeklyInsertions)}</div>
-                              </div>
-                              <div>
-                                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Preço por inserção</div>
-                                <div className="text-sm font-semibold tabular-nums">{brl(preview.pricePerInsertion)}</div>
-                              </div>
-                              <div>
-                                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Preço / semana · por anunciante (por tela)</div>
-                                <div className="text-sm font-semibold tabular-nums text-primary">{brl(preview.weeklyRevenue)}</div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </>
-                    ) : (
-                      <p className="text-[11px] text-muted-foreground mt-3">
-                        Este espaço não vende telas. Defina o <strong>nº de telas</strong> acima para configurar a precificação por CPM e o horário de funcionamento.
+                      <p className="text-[11px] text-muted-foreground mt-2" data-testid="screen-space-empty-state">
+                        Nenhuma tela ativa no inventário — <strong>cadastre as telas para precificar este espaço</strong>. Sem telas, o local fica sem preço de mídia e aparece como "Config. pendente" no catálogo e nas cotações.
                       </p>
-                    )}
-                    </>
                     )}
 
                     <div
-                      className={`space-y-2 mt-4 pt-4 border-t border-border/30 ${form.screensCount > 0 && form.photoUrls.length === 0 ? "-mx-4 px-4 -mb-4 pb-4 rounded-b-xl border border-amber-500/40 bg-amber-500/5" : ""}`}
+                      className={`space-y-2 mt-4 pt-4 border-t border-border/30 ${(spaceDerivation?.screensCount ?? 0) > 0 && form.photoUrls.length === 0 ? "-mx-4 px-4 -mb-4 pb-4 rounded-b-xl border border-amber-500/40 bg-amber-500/5" : ""}`}
                       data-testid="space-photos-section"
                     >
                       <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <ImagePlus className="w-3.5 h-3.5" />
                         Fotos do espaço <span className="opacity-60">· exibidas no ecommerce</span>
                       </Label>
-                      {form.screensCount > 0 && form.photoUrls.length === 0 && (
+                      {(spaceDerivation?.screensCount ?? 0) > 0 && form.photoUrls.length === 0 && (
                         <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1.5" data-testid="space-photos-warning">
                           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                           Este espaço vende telas mas ainda não tem fotos. Adicione ao menos uma para o card do ecommerce ficar completo.

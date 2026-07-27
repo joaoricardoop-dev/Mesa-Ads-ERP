@@ -14,7 +14,7 @@
 - [Self-service builder](self-service-builder.md) — anunciante/parceiro portals reuse media-shop builder via MediaShopBuilder; source must match role (server-enforced); no parallel builder.
 - [Media-shop catalog kinds](media-shop-catalog-kinds.md) — internal Orçamento splits inventory: telas=location-based (CPM) vs quantity products (bolachas/impressos, restaurantId null, volume tiers).
 - [Margem unit convention](margem-unit-convention.md) — product_pricing_tiers.margem stored as percent (50.00); calcUnitPriceAdv wants a fraction — divide by 100 at EVERY call site or price collapses to 0 ("Sob consulta").
-- [Screen space derived from telas](screen-space-derivation.md) — ≥1 active tela ⇒ location screen* fields are materialized from inventory (all-or-null weighted averages); builder-locais e2e local-card tests are stale.
+- [Screen space derived from telas](screen-space-derivation.md) — screen* fields ALWAYS materialized from inventory (cleared to null/0 when no active telas); builder-locais e2e local-card tests are stale.
 - [Screen metrics canonical source](screen-metrics-canonical.md) — shared/screen-metrics.ts is the only origin for inserções/dia default (CPM→dailyLoops, no constant) + exibições/alcance/frequência; per-item override doesn't touch registration or CPM price.
 - [Toast convention (sonner)](toast-convention.md) — no @/hooks/use-toast in repo; import { toast } from "sonner" and call toast.success/error.
 - [Builder shares media-shop store](builder-mediashop-shared.md) — /montar-campanha (StepShop) reuses mediaShopStore + MediaPlanPanel(variant) verbatim from internal Orçamento; store now persists to localStorage so BOTH screens survive reload.
@@ -23,7 +23,7 @@
 - [/montar-campanha cart draft](montar-campanha-cart-draft.md) — builder persists cart to DB campaign_drafts per clientId; e2e must clear via dev-clear-cart-draft (resolve advertiser clientId) or state leaks across runs.
 - [Google Maps loader & key behavior](google-maps-loader.md) — loadGoogleMaps() is canonical; missing key rejects→fallback, invalid→gm_authFailure; RestaurantsMap has a PARALLEL loader; real-SDK pins gated by RUN_REAL_MAPS=1.
 - [Server auto-geocode hook](server-auto-geocode.md) — autoGeocodeIfMissing in db.ts fills lat/lng on create/update only when missing+active+has address; never overwrites autocomplete coords; buildGeocodeQuery is the shared query source.
-- [Space is the unit of sale](space-is-unit-of-sale.md) — active_restaurants.screensCount+photoUrls is the canonical ecommerce source; telas optional; pending badge gates on offersScreenProduct (products.tipo='telas').
+- [Space is the unit of sale](space-is-unit-of-sale.md) — ecommerce sells the space, but ALL screen* fields are materialized from telas (no manual mode); pending badge gates on offersScreenProduct.
 - [pricingMode vs tipo](pricing-mode-vs-tipo.md) — PRICE decision branches on pricingMode (cost_based/price_based/cpm); operational semantics (digital/VIP/commissions/phases/audience/spot) stay on tipo.
 - [Orçamento cotas + line discount](orcamento-discount-order.md) — discount order line→coupon→BV; coupon persisted into totalValue server-side; mixed PDF = one table per product type.
 - [Circuit pricing e2e fixture](circuit-pricing-e2e-fixture.md) — telas need insertionsPerWeek+costPerInsertion or createFromBuilder 400s; dev-ensure-screen-location backfills; rows use circuito-card-*.

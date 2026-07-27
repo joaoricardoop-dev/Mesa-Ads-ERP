@@ -476,7 +476,9 @@ export const telas = pgTable("telas", {
   photoUrls: text("photoUrls"),
   // Grade de horário de funcionamento (7 dias × 24h). Mesmo formato canônico
   // do Local: JSON text de array de chaves "dia-hora" (shared/screen-schedule).
-  // DESCRITIVO apenas — NÃO entra na precificação (o preço vem do Local).
+  // Task #410/#417: grade de horário POR TELA — entra na derivação do Espaço
+  // de Mídia (shared/screen-space.ts): união das grades = horas/semana do
+  // espaço; com loop_duration define as inserções/semana da tela.
   screenOperatingHours: text("screen_operating_hours"),
   status: statusEnum("status").default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

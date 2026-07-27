@@ -4,8 +4,9 @@
 // deriveScreenSpace) e persistidos aqui — assim catálogo, cotação e portais
 // continuam lendo as mesmas colunas de sempre, agora com uma única origem.
 // Campos não deriváveis (pendências no inventário) viram NULL — nunca caem em
-// silêncio nos valores manuais antigos. Sem telas ativas, nada é tocado (modo
-// manual preservado).
+// silêncio nos valores manuais antigos. Task #417: sem telas ativas, os campos
+// materializados são LIMPOS (screensCount=0, demais NULL) — não existe mais
+// modo manual; o inventário é a única fonte do Espaço de Mídia.
 
 import { eq } from "drizzle-orm";
 import { telas, activeRestaurants } from "../drizzle/schema";
@@ -31,12 +32,40 @@ export async function materializeScreenSpace(
     .where(eq(telas.restaurantId, restaurantId));
 
   const derived = deriveScreenSpace(rows);
-  if (!derived) return null; // sem telas ativas → modo manual, não toca nada
+  if (!derived) {
+    // Sem telas ativas → limpa os campos materializados para o espaço não
+    // continuar "precificado" com valores antigos em catálogo/cotações.
+    await db
+      .update(activeRestaurants)
+      .set({
+        screensCount: 0,
+        screenOperatingHours: null,
+        screenWeeklyHours: null,
+        screenInsertionsPerHour: null,
+        screenImpactsPerInsertion: null,
+        screenCpm: null,
+        screenExposureSec: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(activeRestaurants.id, restaurantId));
+    return null;
+  }
+
+  // Exposição (s) por inserção do espaço = média simples do spotDuration das
+  // telas ativas que o informam (campo informativo; não entra na precificação).
+  const activeSpots = rows
+    .filter((r: any) => r.status === "active" && r.spotDuration != null && Number(r.spotDuration) > 0)
+    .map((r: any) => Number(r.spotDuration));
+  const exposureSec =
+    activeSpots.length > 0
+      ? Math.round(activeSpots.reduce((a: number, b: number) => a + b, 0) / activeSpots.length)
+      : null;
 
   await db
     .update(activeRestaurants)
     .set({
       screensCount: derived.screensCount,
+      screenExposureSec: exposureSec,
       screenOperatingHours:
         derived.operatingHours.length > 0 ? JSON.stringify(derived.operatingHours) : null,
       screenWeeklyHours: derived.weeklyHours > 0 ? derived.weeklyHours.toFixed(2) : null,

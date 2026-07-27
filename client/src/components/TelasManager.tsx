@@ -88,7 +88,7 @@ export default function TelasManager({ restaurantId, defaultAddress, defaultLat,
             <Monitor className="w-4 h-4 text-primary" /> Telas do local
           </h3>
           <p className="text-xs text-muted-foreground">
-            Inventário interno e <strong>opcional</strong>: o que se comercializa é o espaço (use "Nº de telas" e fotos no cadastro do local). Detalhar cada tela aqui nunca é obrigatório e não bloqueia a venda.
+            <strong>Fonte única do Espaço de Mídia</strong>: os dados do espaço (CPM, inserções, impactos, custo e horário) são calculados automaticamente a partir das telas cadastradas aqui. Sem telas ativas e completas, o espaço fica sem preço nas cotações e no ecommerce.
           </p>
         </div>
         {!readOnly && (

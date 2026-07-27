@@ -2640,7 +2640,94 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
     name: "task_410_add_impacts_per_insertion_to_telas",
     sql: `ALTER TABLE "telas" ADD COLUMN IF NOT EXISTS "impacts_per_insertion" numeric(10, 2);`,
   },
+  {
+    // Task #417 — inventário de telas vira a ÚNICA fonte do Espaço de Mídia.
+    // Backfill: locais que só tinham configuração MANUAL de espaço (screen*)
+    // ganham telas retro-preenchidas a partir desses valores, para não perder
+    // preço na transição. Duas frentes, ambas idempotentes:
+    //   1. Local que vende telas (screensCount>0) e não tem NENHUMA tela →
+    //      cria "Tela 1..N" ativas com grade/custo/impactos do local e
+    //      insertions_per_week = (inserções/hora × horas/semana) ÷ N, para a
+    //      derivação agregada reproduzir exatamente os valores manuais.
+    //   2. Telas existentes com campos faltantes → preenche do local (só onde
+    //      está NULL/vazio; nunca sobrescreve valor já configurado na tela).
+    // A rematerialização das colunas screen* roda em código logo após as
+    // migrations (rematerializeAllScreenSpaces).
+    name: "task_417_backfill_telas_from_manual_space",
+    sql: [
+      `
+      INSERT INTO "telas" ("restaurantId", "nome", "insertions_per_week", "cost_per_insertion", "impacts_per_insertion", "screen_operating_hours")
+      SELECT r.id,
+             'Tela ' || gs.n,
+             CASE WHEN r."screen_insertions_per_hour" IS NOT NULL AND r."screen_weekly_hours" IS NOT NULL
+                  THEN FLOOR(ROUND(r."screen_insertions_per_hour" * r."screen_weekly_hours") / GREATEST(r."screensCount", 1))::int
+                       + CASE WHEN gs.n = 1
+                              THEN ROUND(r."screen_insertions_per_hour" * r."screen_weekly_hours")::int
+                                   - FLOOR(ROUND(r."screen_insertions_per_hour" * r."screen_weekly_hours") / GREATEST(r."screensCount", 1))::int * GREATEST(r."screensCount", 1)
+                              ELSE 0 END END,
+             CASE WHEN r."screen_cpm" IS NOT NULL AND COALESCE(r."screen_impacts_per_insertion", 0) > 0
+                  THEN ROUND(r."screen_cpm" * r."screen_impacts_per_insertion" / 1000, 2) END,
+             r."screen_impacts_per_insertion",
+             NULLIF(NULLIF(r."screen_operating_hours", ''), '[]')
+        FROM "active_restaurants" r
+        CROSS JOIN LATERAL generate_series(1, GREATEST(r."screensCount", 1)) AS gs(n)
+       WHERE r."screensCount" > 0
+         AND NOT EXISTS (SELECT 1 FROM "telas" t WHERE t."restaurantId" = r.id);
+      `,
+      `
+      UPDATE "telas" t SET
+        "impacts_per_insertion" = COALESCE(t."impacts_per_insertion", r."screen_impacts_per_insertion"),
+        "screen_operating_hours" = COALESCE(NULLIF(NULLIF(t."screen_operating_hours", ''), '[]'), NULLIF(NULLIF(r."screen_operating_hours", ''), '[]')),
+        "cost_per_insertion" = COALESCE(t."cost_per_insertion",
+          CASE WHEN r."screen_cpm" IS NOT NULL AND COALESCE(r."screen_impacts_per_insertion", 0) > 0
+               THEN ROUND(r."screen_cpm" * r."screen_impacts_per_insertion" / 1000, 2) END),
+        "insertions_per_week" = COALESCE(t."insertions_per_week",
+          CASE WHEN t."loop_duration" IS NULL AND r."screen_insertions_per_hour" IS NOT NULL AND r."screen_weekly_hours" IS NOT NULL
+               THEN ROUND(r."screen_insertions_per_hour" * r."screen_weekly_hours" / GREATEST(cnt.n, 1))::int END)
+        FROM "active_restaurants" r,
+             LATERAL (SELECT COUNT(*)::int AS n FROM "telas" t2 WHERE t2."restaurantId" = r.id AND t2."status" = 'active') cnt
+       WHERE t."restaurantId" = r.id
+         AND (t."impacts_per_insertion" IS NULL
+           OR COALESCE(NULLIF(t."screen_operating_hours", ''), '[]') = '[]'
+           OR t."cost_per_insertion" IS NULL
+           OR (t."insertions_per_week" IS NULL AND t."loop_duration" IS NULL));
+      `,
+    ],
+  },
 ];
+
+/**
+ * Task #417 — rematerializa as colunas screen* de TODOS os locais com telas
+ * ativas a partir do inventário (fonte única shared/screen-space.ts). Roda UMA
+ * vez após o backfill SQL acima (tracker em `_applied_migrations`); depois, a
+ * materialização contínua fica por conta dos hooks de create/update/delete de
+ * tela e de updateActiveRestaurant.
+ */
+export async function rematerializeAllScreenSpaces(db: any) {
+  // v2: varre TODOS os locais (não só os com telas ativas) — locais sem telas
+  // ativas precisam ter os screen* manuais legados LIMPOS pela materialização.
+  const TRACKER = "task_417_rematerialize_screen_spaces_v2";
+  const done = await db.execute(sql.raw(
+    `SELECT 1 FROM "_applied_migrations" WHERE "name" = '${TRACKER}' LIMIT 1;`,
+  ));
+  const doneRows: any[] = Array.isArray(done) ? (done as any[]) : ((done as any)?.rows ?? []);
+  if (doneRows.length > 0) return;
+
+  const res = await db.execute(sql.raw(
+    `SELECT "id" FROM "active_restaurants";`,
+  ));
+  const rows: any[] = Array.isArray(res) ? (res as any[]) : ((res as any)?.rows ?? []);
+  const { materializeScreenSpace } = await import("./screenSpace");
+  let n = 0;
+  for (const row of rows) {
+    const derived = await materializeScreenSpace(db, Number(row.id));
+    if (derived) n++;
+  }
+  await db.execute(sql.raw(
+    `INSERT INTO "_applied_migrations" ("name") VALUES ('${TRACKER}') ON CONFLICT ("name") DO NOTHING;`,
+  ));
+  console.log(`[Migrations] task_417: Espaço de Mídia rematerializado para ${n} locais.`);
+}
 
 /**
  * Backfill Task #286 — vincula clientes às cotações órfãs já existentes.
@@ -2925,6 +3012,17 @@ export async function runMigrations() {
   } catch (err: any) {
     console.warn(
       "[Migrations] log_unmatched_vip_providers_task_375 falhou:",
+      err?.message?.split("\n")[0],
+    );
+  }
+
+  // Task #417 — rematerializa o Espaço de Mídia de todos os locais com telas
+  // ativas após o backfill do inventário (roda uma vez; tracker interno).
+  try {
+    await rematerializeAllScreenSpaces(db);
+  } catch (err: any) {
+    console.warn(
+      "[Migrations] task_417_rematerialize_screen_spaces falhou:",
       err?.message?.split("\n")[0],
     );
   }
