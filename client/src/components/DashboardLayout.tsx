@@ -45,6 +45,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useClerk } from "@clerk/clerk-react";
 import type { User } from "@shared/models/auth";
+import { INTERNAL_ROLES } from "@shared/const";
 import type { Impersonation } from "../App";
 import {
   BarChart3,
@@ -85,6 +86,8 @@ import {
   Sparkles,
   ListChecks,
   CalendarRange,
+  Truck,
+  Monitor,
   SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
@@ -135,6 +138,7 @@ const NAV_ENTRIES: NavEntry[] = [
   {
     icon: DollarSign,
     label: "Comercial",
+    allowedRoles: ["admin", "comercial", "operacoes", "financeiro", "manager"],
     items: [
       { icon: BarChart3, label: "Dashboard", path: "/comercial/dashboard" },
       { icon: Calculator, label: "Simulador", path: "/comercial/simulador" },
@@ -146,8 +150,8 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: Handshake, label: "Parceiros", path: "/comercial/parceiros" },
     ],
   },
-  { icon: Building2, label: "Anunciantes", path: "/clientes" },
-  { icon: Megaphone, label: "Campanhas", path: "/campanhas" },
+  { icon: Building2, label: "Anunciantes", path: "/clientes", allowedRoles: ["admin", "comercial", "operacoes", "financeiro", "manager"] },
+  { icon: Megaphone, label: "Campanhas", path: "/campanhas", allowedRoles: ["admin", "comercial", "operacoes", "financeiro", "manager"] },
   { icon: ClipboardList, label: "Ordens de Serviço", path: "/ordens-servico", allowedRoles: ["admin", "manager", "operacoes", "comercial"] },
   { icon: CalendarRange, label: "Calendário Ops", path: "/operacoes/calendario", allowedRoles: ["admin", "manager", "operacoes"] },
   // Task #383 — Módulo Financeiro ocultado da UI (números não confiáveis e fora de uso
@@ -156,12 +160,26 @@ const NAV_ENTRIES: NavEntry[] = [
   {
     icon: UtensilsCrossed,
     label: "Locais",
+    allowedRoles: ["admin", "comercial", "operacoes", "financeiro", "manager"],
     items: [
       { icon: UtensilsCrossed, label: "Lista", path: "/restaurantes" },
       { icon: MapPin, label: "Mapa", path: "/restaurantes/mapa" },
     ],
   },
-  { icon: Image, label: "Biblioteca", path: "/biblioteca" },
+  { icon: Image, label: "Biblioteca", path: "/biblioteca", allowedRoles: ["admin", "comercial", "operacoes", "financeiro", "manager"] },
+  {
+    icon: ClipboardList,
+    label: "Backoffice",
+    allowedRoles: ["admin", "manager", "backoffice"],
+    items: [
+      { icon: BarChart3, label: "Painel", path: "/backoffice" },
+      { icon: Package, label: "Produção de Bolachas", path: "/backoffice/producao" },
+      { icon: Truck, label: "Distribuição", path: "/backoffice/distribuicao" },
+      { icon: Monitor, label: "Telas", path: "/backoffice/telas" },
+      { icon: Handshake, label: "Permutas", path: "/backoffice/permutas" },
+      { icon: FileBarChart, label: "Relatórios", path: "/backoffice/relatorios" },
+    ],
+  },
   {
     icon: Settings,
     label: "Configurações",
@@ -171,8 +189,8 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: ListChecks, label: "Listas & Categorias", path: "/configuracoes/listas", adminOnly: true },
       { icon: SlidersHorizontal, label: "Premissas Financeiras", path: "/configuracoes/premissas", adminOnly: true },
       { icon: Calculator, label: "Simulador de Preços", path: "/comercial/tabela-precos", adminOnly: true },
-      { icon: DollarSign, label: "Economics", path: "/economics" },
-      { icon: Factory, label: "Produção", path: "/producao" },
+      { icon: DollarSign, label: "Economics", path: "/economics", allowedRoles: ["admin", "comercial", "operacoes", "financeiro", "manager"] },
+      { icon: Factory, label: "Produção", path: "/producao", allowedRoles: ["admin", "comercial", "operacoes", "financeiro", "manager"] },
       { icon: Layers, label: "Batches", path: "/configuracoes/batches", adminOnly: true },
       { icon: FileText, label: "Termos Padrão", path: "/configuracoes/termos", adminOnly: true },
       { icon: Users, label: "Gestão de Usuários", path: "/configuracoes/usuarios", adminOnly: true },
@@ -248,8 +266,7 @@ function DashboardLayoutContent({
   });
   const queryClient = useQueryClient();
 
-  const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
-  const isInternalUser = INTERNAL_ROLES.includes(user.role || "");
+  const isInternalUser = INTERNAL_ROLES.includes(user.role as any);
 
   const [aiOpen, setAiOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState<Message[]>([

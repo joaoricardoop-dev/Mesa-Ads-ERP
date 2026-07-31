@@ -1,5 +1,6 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "@shared/models/auth";
+import { INTERNAL_ROLES } from "@shared/const";
 import { getAuth } from "@clerk/express";
 import { authStorage } from "../replit_integrations/auth";
 
@@ -72,8 +73,7 @@ export async function createContext(
     }
   }
 
-  const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
-  if (user && INTERNAL_ROLES.includes(user.role || "")) {
+  if (user && INTERNAL_ROLES.includes(user.role as any)) {
     const impClientId = opts.req.headers["x-impersonate-client-id"];
     const impRestaurantId = opts.req.headers["x-impersonate-restaurant-id"];
     if (impClientId) {

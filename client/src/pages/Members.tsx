@@ -1,5 +1,6 @@
 import { useState } from "react";
 import PageContainer from "@/components/PageContainer";
+import { INTERNAL_ROLES } from "@shared/const";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +54,7 @@ import {
   Building2,
   Store,
   Handshake,
+  ClipboardList,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -82,6 +84,11 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof S
     label: "Gerente",
     color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
     icon: ShieldCheck,
+  },
+  backoffice: {
+    label: "Backoffice",
+    color: "bg-lime-500/20 text-lime-400 border-lime-500/30",
+    icon: ClipboardList,
   },
   restaurante: {
     label: "Local",
@@ -201,7 +208,6 @@ export default function Members() {
 
 
 
-  const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
   const EXTERNAL_ROLES = ["anunciante", "restaurante", "parceiro"];
 
   const searchFiltered = membersList.filter(
@@ -211,11 +217,11 @@ export default function Members() {
       (m.email || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const internos = searchFiltered.filter((m) => INTERNAL_ROLES.includes(m.role || ""));
+  const internos = searchFiltered.filter((m) => INTERNAL_ROLES.includes(m.role as any));
   const externos = searchFiltered.filter((m) => EXTERNAL_ROLES.includes(m.role || ""));
   const filtered = segment === "internos" ? internos : externos;
 
-  const internosTotal = membersList.filter((m) => INTERNAL_ROLES.includes(m.role || "")).length;
+  const internosTotal = membersList.filter((m) => INTERNAL_ROLES.includes(m.role as any)).length;
   const externosTotal = membersList.filter((m) => EXTERNAL_ROLES.includes(m.role || "")).length;
   const adminCount = membersList.filter((m) => m.role === "admin").length;
   const activeCount = membersList.filter((m) => m.isActive !== false).length;
@@ -628,6 +634,18 @@ export default function Members() {
                 <li>✓ Leads e OS</li>
                 <li>✓ Dashboard financeiro</li>
                 <li className="text-red-400/60">✗ Gestão de usuários</li>
+              </ul>
+            </div>
+            <div className="bg-background/50 border border-lime-500/20 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <ClipboardList className="w-4 h-4 text-lime-400" />
+                <h4 className="text-sm font-semibold text-lime-400">Backoffice</h4>
+              </div>
+              <ul className="text-xs text-muted-foreground space-y-1.5">
+                <li>✓ Rotina de bolachas (produção/distribuição)</li>
+                <li>✓ Verificação diária de telas</li>
+                <li>✓ Permutas e relatórios</li>
+                <li className="text-red-400/60">✗ Comercial / Financeiro / Campanhas</li>
               </ul>
             </div>
             <div className="bg-background/50 border border-teal-500/20 rounded-lg p-4">

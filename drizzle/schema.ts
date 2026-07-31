@@ -1673,4 +1673,212 @@ export const billingScheduleItems = pgTable("billing_schedule_items", {
 export type BillingScheduleItem = typeof billingScheduleItems.$inferSelect;
 export type InsertBillingScheduleItem = typeof billingScheduleItems.$inferInsert;
 
+// ─── Backoffice: rotina operacional (bolachas/telas/permutas) ───────────────
+// Substitui a planilha Controle-Mesa-Ads.xlsx. Convive, sem sincronizar, com
+// o pipeline de campanha existente (campaigns.status/campaignPhases) — ver
+// nota em server/backofficeRouter.ts. Papel de acesso: "backoffice" (Gabriel).
+
+export const backofficeProductionStatusEnum = pgEnum("backoffice_production_status", [
+  "aguardando_arte",
+  "arte_enviada_fornecedor",
+  "prova_recebida",
+  "prova_aprovada",
+  "em_producao",
+  "em_transporte",
+  "recebida",
+]);
+
+export const backofficeMovementTypeEnum = pgEnum("backoffice_movement_type", [
+  "entrega_inicial",
+  "reposicao",
+  "retirada",
+]);
+
+export const backofficeReportingFrequencyEnum = pgEnum("backoffice_reporting_frequency", [
+  "diaria",
+  "semanal",
+]);
+
+export const backofficeReportTypeEnum = pgEnum("backoffice_report_type", [
+  "relatoria_diaria_telas",
+  "relatoria_semanal_telas",
+  "relatorio_semanal_bolachas",
+  "relatorio_semanal_interno",
+  "relatoria_mensal_telas",
+  "relatorio_mensal_geral",
+]);
+
+// Pipeline de produção de bolachas: arte → fornecedor → prova → produção →
+// frete → recebimento. Não substitui service_orders (documento formal com
+// assinatura) — é o acompanhamento granular do dia a dia.
+export const backofficeProductionOrders = pgTable("backoffice_production_orders", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaignId").references(() => campaigns.id, { onDelete: "set null" }),
+  supplierId: integer("supplierId").references(() => suppliers.id, { onDelete: "set null" }),
+  label: varchar("label", { length: 255 }).notNull(),
+  quantity: integer("quantity").notNull(),
+  status: backofficeProductionStatusEnum("status").default("aguardando_arte").notNull(),
+  artReceivedAt: date("artReceivedAt"),
+  artSentToSupplierAt: date("artSentToSupplierAt"),
+  proofReceivedAt: date("proofReceivedAt"),
+  proofApprovedAt: date("proofApprovedAt"),
+  shippedAt: date("shippedAt"),
+  receivedAt: date("receivedAt"),
+  trackingCode: varchar("trackingCode", { length: 100 }),
+  freightProvider: varchar("freightProvider", { length: 150 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_backoffice_production_orders_campaign_id").on(t.campaignId),
+  index("idx_backoffice_production_orders_supplier_id").on(t.supplierId),
+  index("idx_backoffice_production_orders_status").on(t.status),
+]);
+
+export type BackofficeProductionOrder = typeof backofficeProductionOrders.$inferSelect;
+export type InsertBackofficeProductionOrder = typeof backofficeProductionOrders.$inferInsert;
+
+// Movimentos de bolachas por restaurante: entrega inicial, reposição, retirada.
+export const backofficeDistributionMovements = pgTable("backoffice_distribution_movements", {
+  id: serial("id").primaryKey(),
+  productionOrderId: integer("productionOrderId").references(() => backofficeProductionOrders.id, { onDelete: "set null" }),
+  restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  movementType: backofficeMovementTypeEnum("movementType").notNull(),
+  quantity: integer("quantity").notNull(),
+  movementDate: date("movementDate").notNull(),
+  performedBy: varchar("performedBy", { length: 255 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_backoffice_distribution_movements_restaurant_id").on(t.restaurantId),
+  index("idx_backoffice_distribution_movements_production_order_id").on(t.productionOrderId),
+  index("idx_backoffice_distribution_movements_date").on(t.movementDate),
+]);
+
+export type BackofficeDistributionMovement = typeof backofficeDistributionMovements.$inferSelect;
+export type InsertBackofficeDistributionMovement = typeof backofficeDistributionMovements.$inferInsert;
+
+// Contagem semanal de estoque de bolachas por restaurante (rotina de quinta).
+export const backofficeStockCounts = pgTable("backoffice_stock_counts", {
+  id: serial("id").primaryKey(),
+  restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  weekOf: date("weekOf").notNull(), // segunda-feira da semana contada
+  countedQuantity: integer("countedQuantity").notNull(),
+  needsRestock: boolean("needsRestock").default(false).notNull(),
+  needsPickup: boolean("needsPickup").default(false).notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_backoffice_stock_counts_restaurant_id").on(t.restaurantId),
+  index("idx_backoffice_stock_counts_week_of").on(t.weekOf),
+  unique("uq_backoffice_stock_count_restaurant_week").on(t.restaurantId, t.weekOf),
+]);
+
+export type BackofficeStockCount = typeof backofficeStockCounts.$inferSelect;
+export type InsertBackofficeStockCount = typeof backofficeStockCounts.$inferInsert;
+
+// Verificação diária de tela: está ligada? internet funcionando? Por tela
+// física (telas.id) — um restaurante pode ter mais de uma.
+export const backofficeScreenChecks = pgTable("backoffice_screen_checks", {
+  id: serial("id").primaryKey(),
+  telaId: integer("telaId").notNull().references(() => telas.id, { onDelete: "cascade" }),
+  checkDate: date("checkDate").notNull(),
+  isOnline: boolean("isOnline").notNull(),
+  internetOk: boolean("internetOk").notNull(),
+  issue: text("issue"),
+  actionTaken: text("actionTaken"),
+  resolvedAt: timestamp("resolvedAt"),
+  performedBy: varchar("performedBy", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_backoffice_screen_checks_tela_id").on(t.telaId),
+  index("idx_backoffice_screen_checks_date").on(t.checkDate),
+  index("idx_backoffice_screen_checks_online").on(t.isOnline),
+  unique("uq_backoffice_screen_check_tela_date").on(t.telaId, t.checkDate),
+]);
+
+export type BackofficeScreenCheck = typeof backofficeScreenChecks.$inferSelect;
+export type InsertBackofficeScreenCheck = typeof backofficeScreenChecks.$inferInsert;
+
+// Material do cliente recebido por local, pra veiculação de telas. Distinto
+// de campaigns.materialReceivedDate (nível campanha, uma data só) — este é
+// por restaurante. Não referencia telas.id: hoje não existe vínculo
+// estruturado entre campanha e tela específica (ver campaignItems).
+export const backofficeScreenMaterial = pgTable("backoffice_screen_material", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaignId").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  materialReceived: boolean("materialReceived").default(false).notNull(),
+  materialReceivedAt: date("materialReceivedAt"),
+  reportingFrequency: backofficeReportingFrequencyEnum("reportingFrequency"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_backoffice_screen_material_campaign_id").on(t.campaignId),
+  index("idx_backoffice_screen_material_restaurant_id").on(t.restaurantId),
+  unique("uq_backoffice_screen_material_campaign_restaurant").on(t.campaignId, t.restaurantId),
+]);
+
+export type BackofficeScreenMaterial = typeof backofficeScreenMaterial.$inferSelect;
+export type InsertBackofficeScreenMaterial = typeof backofficeScreenMaterial.$inferInsert;
+
+// Log de relatoria enviada (diária/semanal/mensal), solto de campanha —
+// distinto de campaignReports, que é sempre por campaignId.
+export const backofficeReports = pgTable("backoffice_reports", {
+  id: serial("id").primaryKey(),
+  reportType: backofficeReportTypeEnum("reportType").notNull(),
+  referenceLabel: varchar("referenceLabel", { length: 100 }).notNull(),
+  recipientLabel: varchar("recipientLabel", { length: 255 }),
+  sentAt: date("sentAt").notNull(),
+  sentBy: varchar("sentBy", { length: 255 }),
+  linkUrl: text("linkUrl"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_backoffice_reports_type").on(t.reportType),
+  index("idx_backoffice_reports_sent_at").on(t.sentAt),
+]);
+
+export type BackofficeReport = typeof backofficeReports.$inferSelect;
+export type InsertBackofficeReport = typeof backofficeReports.$inferInsert;
+
+// Permutas: acordo de troca com restaurante parceiro. Não confundir com
+// `partners` (agências/indicadores comerciais) — conceito de negócio diferente.
+export const permutas = pgTable("permutas", {
+  id: serial("id").primaryKey(),
+  restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  description: varchar("description", { length: 500 }).notNull(),
+  totalValue: decimal("totalValue", { precision: 12, scale: 2 }).notNull(),
+  startDate: date("startDate"),
+  endDate: date("endDate"),
+  contractSigned: boolean("contractSigned").default(false).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_permutas_restaurant_id").on(t.restaurantId),
+]);
+
+export type Permuta = typeof permutas.$inferSelect;
+export type InsertPermuta = typeof permutas.$inferInsert;
+
+// Lançamentos de consumo de uma permuta. Saldo = totalValue - SUM(amount),
+// calculado em runtime na query (não denormalizado, evita ficar desatualizado).
+export const permutaConsumptions = pgTable("permuta_consumptions", {
+  id: serial("id").primaryKey(),
+  permutaId: integer("permutaId").notNull().references(() => permutas.id, { onDelete: "cascade" }),
+  consumptionDate: date("consumptionDate").notNull(),
+  description: varchar("description", { length: 500 }),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_permuta_consumptions_permuta_id").on(t.permutaId),
+  index("idx_permuta_consumptions_date").on(t.consumptionDate),
+]);
+
+export type PermutaConsumption = typeof permutaConsumptions.$inferSelect;
+export type InsertPermutaConsumption = typeof permutaConsumptions.$inferInsert;
+
 export * from "../shared/models/auth";

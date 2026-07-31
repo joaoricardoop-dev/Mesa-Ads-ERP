@@ -11,6 +11,7 @@ import { ExternalShell } from "./components/ExternalShell";
 import DevToolsPanel from "./components/DevToolsPanel";
 import { useAuth } from "./hooks/use-auth";
 import { SignIn, SignUp, useClerk } from "@clerk/clerk-react";
+import { INTERNAL_ROLES } from "@shared/const";
 import { ShieldX } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
@@ -64,6 +65,12 @@ import ParceiroLeads from "./pages/ParceiroLeads";
 import BudgetCreator from "./pages/BudgetCreator";
 import MediaBudget from "./pages/MediaBudget";
 import ComercialDashboard from "./pages/ComercialDashboard";
+import BackofficeDashboard from "./pages/backoffice/BackofficeDashboard";
+import ProductionBoard from "./pages/backoffice/ProductionBoard";
+import DistributionBoard from "./pages/backoffice/DistributionBoard";
+import ScreenChecks from "./pages/backoffice/ScreenChecks";
+import Permutas from "./pages/backoffice/Permutas";
+import BackofficeReports from "./pages/backoffice/BackofficeReports";
 
 function AnuncianteRouter() {
   return (
@@ -144,6 +151,12 @@ function Router() {
       <Route path="/economics" component={Economics} />
       <Route path="/producao" component={Production} />
       <Route path="/operacoes/calendario" component={OperationsCalendar} />
+      <Route path="/backoffice" component={BackofficeDashboard} />
+      <Route path="/backoffice/producao" component={ProductionBoard} />
+      <Route path="/backoffice/distribuicao" component={DistributionBoard} />
+      <Route path="/backoffice/telas" component={ScreenChecks} />
+      <Route path="/backoffice/permutas" component={Permutas} />
+      <Route path="/backoffice/relatorios" component={BackofficeReports} />
       <Route path="/configuracoes/premissas" component={AdminConfiguracoes} />
       <Route path="/configuracoes/batches" component={BatchManagement} />
       <Route path="/configuracoes/termos" component={TermTemplates} />
@@ -533,13 +546,11 @@ function AuthenticatedApp() {
     return <ClerkLoginPage />;
   }
 
-  const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
-
   let effectiveUser = devRoleOverride && user
     ? { ...user, role: devRoleOverride, ...(devRoleOverride === "anunciante" && devClientIdOverride ? { clientId: devClientIdOverride } : {}) }
     : user;
 
-  if (impersonation && user && INTERNAL_ROLES.includes(user.role || "")) {
+  if (impersonation && user && INTERNAL_ROLES.includes(user.role as any)) {
     effectiveUser = {
       ...user,
       role: impersonation.role,
@@ -549,7 +560,7 @@ function AuthenticatedApp() {
     };
   }
 
-  const isImpersonating = impersonation !== null && user && INTERNAL_ROLES.includes(user.role || "");
+  const isImpersonating = impersonation !== null && user && INTERNAL_ROLES.includes(user.role as any);
   const isAnunciante = effectiveUser?.role === "anunciante";
   const isRestaurante = effectiveUser?.role === "restaurante";
   const isParceiro = effectiveUser?.role === "parceiro";

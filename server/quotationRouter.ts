@@ -1,4 +1,5 @@
 import { comercialProcedure, protectedProcedure, router } from "./_core/trpc";
+import { INTERNAL_ROLES } from "@shared/const";
 import { z } from "zod";
 import { getDb } from "./db";
 import { quotations, campaigns, clients, campaignHistory, serviceOrders, quotationRestaurants, activeRestaurants, campaignRestaurants, leads, campaignBatches, campaignBatchAssignments, products, partners, quotationItems, productPricingTiers, productDiscountPriceTiers, invoices, seasonalMultipliers, campaignPhases, campaignItems, opportunities, telas } from "../drizzle/schema";
@@ -1399,8 +1400,7 @@ export const quotationRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await getDatabase();
       const userRole = ctx.user.role || "user";
-      const INTERNAL_ROLES = ["admin", "comercial", "manager", "operacoes", "financeiro"];
-      const isInternal = INTERNAL_ROLES.includes(userRole);
+      const isInternal = INTERNAL_ROLES.includes(userRole as any);
 
       let client: { name: string; company: string | null; partnerId: number | null } | null = null;
       if (input.clientId != null) {

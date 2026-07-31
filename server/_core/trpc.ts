@@ -75,6 +75,10 @@ export const comercialProcedure = createRoleProcedure(["comercial", "manager"]);
 export const operacoesProcedure = createRoleProcedure(["operacoes", "manager"]);
 export const financeiroProcedure = createRoleProcedure(["financeiro", "manager"]);
 export const internalProcedure = createRoleProcedure(["comercial", "operacoes", "financeiro", "manager"]);
+// Rotina operacional do Backoffice (bolachas/telas/permutas) — estagiário +
+// manager. Separado de internalProcedure de propósito: não deve herdar acesso
+// às mutations de campanha/comercial/financeiro que operacoesProcedure etc. têm.
+export const backofficeProcedure = createRoleProcedure(["backoffice", "manager"]);
 export const anuncianteProcedure = createRoleProcedure(["anunciante"]);
 // Leitura do inventário do marketplace (locais/produtos/disponibilidade). É
 // read-only e compartilhada entre o portal do anunciante/parceiro e o ecommerce

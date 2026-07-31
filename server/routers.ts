@@ -22,6 +22,7 @@ import { anunciantePortalRouter } from "./anunciantePortalRouter";
 import { seasonalMultiplierRouter } from "./seasonalMultiplierRouter";
 import { bankRouter } from "./bankRouter";
 import { opsRouter } from "./opsRouter";
+import { backofficeRouter } from "./backofficeRouter";
 import { comercialDashboardRouter } from "./comercialDashboardRouter";
 import { configOptionRouter } from "./configOptionRouter";
 import { telaRouter } from "./telaRouter";
@@ -111,6 +112,7 @@ export const appRouter = router({
   seasonalMultiplier: seasonalMultiplierRouter,
   bank: bankRouter,
   ops: opsRouter,
+  backoffice: backofficeRouter,
   comercialDashboard: comercialDashboardRouter,
   configOption: configOptionRouter,
   tela: telaRouter,
@@ -255,7 +257,7 @@ export const appRouter = router({
         isCloser: z.boolean(),
       }))
       .mutation(async ({ input }) => {
-        const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
+        const { INTERNAL_ROLES } = await import("@shared/const");
         const { createClerkClient } = await import("@clerk/express");
         const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
 
@@ -425,8 +427,8 @@ export const appRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Parceiros devem ser vinculados a um parceiro cadastrado." });
         }
 
-        const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager"];
-        const isInternal = INTERNAL_ROLES.includes(input.role);
+        const { INTERNAL_ROLES } = await import("@shared/const");
+        const isInternal = INTERNAL_ROLES.includes(input.role as any);
         const isSdr = isInternal ? !!input.isSdr : false;
         const isCloser = isInternal ? !!input.isCloser : false;
 

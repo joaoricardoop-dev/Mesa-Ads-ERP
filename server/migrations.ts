@@ -2694,6 +2694,154 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       `,
     ],
   },
+  {
+    // Módulo Backoffice — rotina operacional (bolachas/telas/permutas) do
+    // estagiário Gabriel, substituindo Controle-Mesa-Ads.xlsx. 8 tabelas +
+    // 4 enums novos, todos aditivos (nenhuma tabela existente é alterada).
+    // backoffice_screen_checks referencia "telas" (não "active_restaurants"):
+    // um local pode ter mais de uma tela, e a verificação é por tela física.
+    name: "backoffice_module_bolachas_telas_permutas",
+    sql: [
+      `
+      DO $$ BEGIN CREATE TYPE "backoffice_production_status" AS ENUM ('aguardando_arte', 'arte_enviada_fornecedor', 'prova_recebida', 'prova_aprovada', 'em_producao', 'em_transporte', 'recebida'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+      DO $$ BEGIN CREATE TYPE "backoffice_movement_type" AS ENUM ('entrega_inicial', 'reposicao', 'retirada'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+      DO $$ BEGIN CREATE TYPE "backoffice_reporting_frequency" AS ENUM ('diaria', 'semanal'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+      DO $$ BEGIN CREATE TYPE "backoffice_report_type" AS ENUM ('relatoria_diaria_telas', 'relatoria_semanal_telas', 'relatorio_semanal_bolachas', 'relatorio_semanal_interno', 'relatoria_mensal_telas', 'relatorio_mensal_geral'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+      `,
+      `
+      CREATE TABLE IF NOT EXISTS "backoffice_production_orders" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "campaignId" integer REFERENCES "campaigns"("id") ON DELETE SET NULL,
+        "supplierId" integer REFERENCES "suppliers"("id") ON DELETE SET NULL,
+        "label" varchar(255) NOT NULL,
+        "quantity" integer NOT NULL,
+        "status" "backoffice_production_status" DEFAULT 'aguardando_arte' NOT NULL,
+        "artReceivedAt" date,
+        "artSentToSupplierAt" date,
+        "proofReceivedAt" date,
+        "proofApprovedAt" date,
+        "shippedAt" date,
+        "receivedAt" date,
+        "trackingCode" varchar(100),
+        "freightProvider" varchar(150),
+        "notes" text,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_production_orders_campaign_id" ON "backoffice_production_orders" ("campaignId");
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_production_orders_supplier_id" ON "backoffice_production_orders" ("supplierId");
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_production_orders_status" ON "backoffice_production_orders" ("status");
+      `,
+      `
+      CREATE TABLE IF NOT EXISTS "backoffice_distribution_movements" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "productionOrderId" integer REFERENCES "backoffice_production_orders"("id") ON DELETE SET NULL,
+        "restaurantId" integer NOT NULL REFERENCES "active_restaurants"("id") ON DELETE cascade,
+        "movementType" "backoffice_movement_type" NOT NULL,
+        "quantity" integer NOT NULL,
+        "movementDate" date NOT NULL,
+        "performedBy" varchar(255),
+        "notes" text,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_distribution_movements_restaurant_id" ON "backoffice_distribution_movements" ("restaurantId");
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_distribution_movements_production_order_id" ON "backoffice_distribution_movements" ("productionOrderId");
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_distribution_movements_date" ON "backoffice_distribution_movements" ("movementDate");
+      `,
+      `
+      CREATE TABLE IF NOT EXISTS "backoffice_stock_counts" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "restaurantId" integer NOT NULL REFERENCES "active_restaurants"("id") ON DELETE cascade,
+        "weekOf" date NOT NULL,
+        "countedQuantity" integer NOT NULL,
+        "needsRestock" boolean DEFAULT false NOT NULL,
+        "needsPickup" boolean DEFAULT false NOT NULL,
+        "resolvedAt" timestamp,
+        "notes" text,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        CONSTRAINT "uq_backoffice_stock_count_restaurant_week" UNIQUE ("restaurantId", "weekOf")
+      );
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_stock_counts_restaurant_id" ON "backoffice_stock_counts" ("restaurantId");
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_stock_counts_week_of" ON "backoffice_stock_counts" ("weekOf");
+      `,
+      `
+      CREATE TABLE IF NOT EXISTS "backoffice_screen_checks" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "telaId" integer NOT NULL REFERENCES "telas"("id") ON DELETE cascade,
+        "checkDate" date NOT NULL,
+        "isOnline" boolean NOT NULL,
+        "internetOk" boolean NOT NULL,
+        "issue" text,
+        "actionTaken" text,
+        "resolvedAt" timestamp,
+        "performedBy" varchar(255),
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        CONSTRAINT "uq_backoffice_screen_check_tela_date" UNIQUE ("telaId", "checkDate")
+      );
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_screen_checks_tela_id" ON "backoffice_screen_checks" ("telaId");
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_screen_checks_date" ON "backoffice_screen_checks" ("checkDate");
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_screen_checks_online" ON "backoffice_screen_checks" ("isOnline");
+      `,
+      `
+      CREATE TABLE IF NOT EXISTS "backoffice_screen_material" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "campaignId" integer NOT NULL REFERENCES "campaigns"("id") ON DELETE cascade,
+        "restaurantId" integer NOT NULL REFERENCES "active_restaurants"("id") ON DELETE cascade,
+        "materialReceived" boolean DEFAULT false NOT NULL,
+        "materialReceivedAt" date,
+        "reportingFrequency" "backoffice_reporting_frequency",
+        "notes" text,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL,
+        CONSTRAINT "uq_backoffice_screen_material_campaign_restaurant" UNIQUE ("campaignId", "restaurantId")
+      );
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_screen_material_campaign_id" ON "backoffice_screen_material" ("campaignId");
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_screen_material_restaurant_id" ON "backoffice_screen_material" ("restaurantId");
+      `,
+      `
+      CREATE TABLE IF NOT EXISTS "backoffice_reports" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "reportType" "backoffice_report_type" NOT NULL,
+        "referenceLabel" varchar(100) NOT NULL,
+        "recipientLabel" varchar(255),
+        "sentAt" date NOT NULL,
+        "sentBy" varchar(255),
+        "linkUrl" text,
+        "notes" text,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_reports_type" ON "backoffice_reports" ("reportType");
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_reports_sent_at" ON "backoffice_reports" ("sentAt");
+      `,
+      `
+      CREATE TABLE IF NOT EXISTS "permutas" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "restaurantId" integer NOT NULL REFERENCES "active_restaurants"("id") ON DELETE cascade,
+        "description" varchar(500) NOT NULL,
+        "totalValue" numeric(12, 2) NOT NULL,
+        "startDate" date,
+        "endDate" date,
+        "contractSigned" boolean DEFAULT false NOT NULL,
+        "notes" text,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_permutas_restaurant_id" ON "permutas" ("restaurantId");
+      `,
+      `
+      CREATE TABLE IF NOT EXISTS "permuta_consumptions" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "permutaId" integer NOT NULL REFERENCES "permutas"("id") ON DELETE cascade,
+        "consumptionDate" date NOT NULL,
+        "description" varchar(500),
+        "amount" numeric(12, 2) NOT NULL,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_permuta_consumptions_permuta_id" ON "permuta_consumptions" ("permutaId");
+      CREATE INDEX IF NOT EXISTS "idx_permuta_consumptions_date" ON "permuta_consumptions" ("consumptionDate");
+      `,
+    ],
+  },
 ];
 
 /**

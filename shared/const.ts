@@ -31,3 +31,12 @@ export const CAMPAIGN_TERM_SLUG = "contratacao-campanha";
 
 /** Caminho da página pública que renderiza um termo por slug. */
 export const PUBLIC_TERM_PATH = (slug: string) => `/termo/${slug}`;
+
+/**
+ * Papéis internos (staff) — fonte única. Antes duplicado manualmente em vários
+ * arquivos (server/_core/context.ts, server/routers.ts, server/quotationRouter.ts,
+ * client/src/App.tsx, DashboardLayout.tsx, Members.tsx); todos devem importar
+ * daqui. "backoffice" é o papel do estagiário de operações (rotina de
+ * bolachas/telas/permutas).
+ */
+export const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager", "backoffice"] as const;
