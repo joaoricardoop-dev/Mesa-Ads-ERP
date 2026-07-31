@@ -756,6 +756,7 @@ const checklistRouter = router({
       stalledOrders,
       dailyFreqRows,
       manualCompletions,
+      weekManualCompletions,
     ] = await Promise.all([
       db.select({ id: telas.id }).from(telas).where(eq(telas.status, "active")),
       db.select({ telaId: backofficeScreenChecks.telaId }).from(backofficeScreenChecks).where(eq(backofficeScreenChecks.checkDate, today)),
@@ -787,6 +788,15 @@ const checklistRouter = router({
         .select()
         .from(backofficeChecklistCompletions)
         .where(eq(backofficeChecklistCompletions.itemDate, today)),
+      db
+        .select()
+        .from(backofficeChecklistCompletions)
+        .where(
+          and(
+            gte(backofficeChecklistCompletions.itemDate, weekStart),
+            lte(backofficeChecklistCompletions.itemDate, weekEnd),
+          ),
+        ),
     ]);
 
     const checkedTelaIds = new Set(todayChecks.map((c) => c.telaId));
@@ -798,6 +808,10 @@ const checklistRouter = router({
     const reportTypesThisWeek = new Set(weekReports.map((r) => r.reportType));
     const reportSentToday = (type: string) => weekReports.some((r) => r.reportType === type && r.sentAt === today);
     const manualDone = new Set(manualCompletions.map((c) => c.itemKey));
+    const weekManualDone = new Set(weekManualCompletions.map((c) => c.itemKey));
+    // Dia da semana do dia de negócio (0=Dom … 5=Sexta, 6=Sáb)
+    const businessDow = new Date(`${today}T00:00:00Z`).getUTCDay();
+    const isFriday = businessDow === 5;
 
     type Item = {
       key: string;
@@ -830,14 +844,6 @@ const checklistRouter = router({
         "/backoffice/telas",
       ),
       mk(
-        "contagem_semanal",
-        "Contagem semanal de bolachas",
-        contagensPendentes > 0 ? `${contagensPendentes} restaurante(s) sem contagem na semana` : "Contagens da semana em dia",
-        "semanal",
-        restaurantsWithBolachas.length > 0 && contagensPendentes === 0,
-        "/backoffice/distribuicao",
-      ),
-      mk(
         "producao_andamento",
         "Revisar produção parada",
         stalledOrders.length > 0 ? `${stalledOrders.length} pedido(s) sem avanço há 3+ dias` : "Nenhum pedido parado",
@@ -846,6 +852,32 @@ const checklistRouter = router({
         "/backoffice/producao",
       ),
     ];
+
+    // Contagem semanal: aparece só até ser concluída na semana (uma vez por semana).
+    // Se foi concluída hoje, ainda aparece marcada; concluída em dia anterior, some.
+    const contagemAutoDone = restaurantsWithBolachas.length > 0 && contagensPendentes === 0;
+    const contagemDoneThisWeek = contagemAutoDone || weekManualDone.has("contagem_semanal");
+    if (!contagemDoneThisWeek || manualDone.has("contagem_semanal") || contagemAutoDone) {
+      items.splice(
+        1,
+        0,
+        mk(
+          "contagem_semanal",
+          "Contagem semanal de bolachas",
+          contagensPendentes > 0 ? `${contagensPendentes} restaurante(s) sem contagem na semana` : "Contagens da semana em dia",
+          "semanal",
+          contagemAutoDone,
+          "/backoffice/distribuicao",
+        ),
+      );
+    }
+
+    // Redes sociais — itens diários manuais.
+    items.push(
+      mk("post_instagram", "Post do Instagram", null, "diaria", false, null),
+      mk("story_instagram", "Story do Instagram", null, "diaria", false, null),
+      mk("post_linkedin", "Post do LinkedIn", null, "diaria", false, null),
+    );
 
     if (dailyFreqRows.length > 0) {
       items.push(
@@ -860,11 +892,12 @@ const checklistRouter = router({
       );
     }
 
-    const weeklyReports: Array<[string, string]> = [
+    // Relatórios semanais só entram no checklist na sexta-feira.
+    const weeklyReports: Array<[string, string]> = isFriday ? [
       ["relatoria_semanal_telas", "Relatoria semanal — Telas"],
       ["relatorio_semanal_bolachas", "Relatório semanal — Bolachas"],
       ["relatorio_semanal_interno", "Relatório semanal — Interno"],
-    ];
+    ] : [];
     for (const [type, label] of weeklyReports) {
       items.push(
         mk(
