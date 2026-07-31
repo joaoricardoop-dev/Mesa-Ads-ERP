@@ -2842,6 +2842,59 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       `,
     ],
   },
+  {
+    // Task #420 — Backoffice guiado: checklist diário (só as marcações
+    // manuais; itens são derivados em runtime), trilha de auditoria da
+    // produção, log de edições de checks de tela, contagem semanal vinculável
+    // a campanha, anexo de material, relatório por campanha e permuta por tela.
+    name: "task_420_backoffice_guided_routine",
+    sql: [
+      `
+      CREATE TABLE IF NOT EXISTS "backoffice_checklist_completions" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "itemKey" varchar(100) NOT NULL,
+        "itemDate" date NOT NULL,
+        "completedBy" varchar(255),
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        CONSTRAINT "uq_backoffice_checklist_item_date" UNIQUE ("itemKey", "itemDate")
+      );
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_checklist_completions_date" ON "backoffice_checklist_completions" ("itemDate");
+      `,
+      `
+      CREATE TABLE IF NOT EXISTS "backoffice_production_logs" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "productionOrderId" integer NOT NULL REFERENCES "backoffice_production_orders"("id") ON DELETE cascade,
+        "action" varchar(50) NOT NULL,
+        "details" text NOT NULL,
+        "performedBy" varchar(255),
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_production_logs_order_id" ON "backoffice_production_logs" ("productionOrderId");
+      `,
+      `
+      CREATE TABLE IF NOT EXISTS "backoffice_screen_check_logs" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "checkId" integer NOT NULL REFERENCES "backoffice_screen_checks"("id") ON DELETE cascade,
+        "telaId" integer NOT NULL,
+        "details" text NOT NULL,
+        "performedBy" varchar(255),
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_screen_check_logs_check_id" ON "backoffice_screen_check_logs" ("checkId");
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_screen_check_logs_tela_id" ON "backoffice_screen_check_logs" ("telaId");
+      `,
+      `
+      ALTER TABLE "backoffice_stock_counts" ADD COLUMN IF NOT EXISTS "campaignId" integer REFERENCES "campaigns"("id") ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_stock_counts_campaign_id" ON "backoffice_stock_counts" ("campaignId");
+      ALTER TABLE "backoffice_screen_material" ADD COLUMN IF NOT EXISTS "attachmentUrl" text;
+      ALTER TABLE "backoffice_screen_material" ADD COLUMN IF NOT EXISTS "attachmentName" varchar(255);
+      ALTER TABLE "backoffice_reports" ADD COLUMN IF NOT EXISTS "campaignId" integer REFERENCES "campaigns"("id") ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS "idx_backoffice_reports_campaign_id" ON "backoffice_reports" ("campaignId");
+      ALTER TABLE "permutas" ADD COLUMN IF NOT EXISTS "telaId" integer REFERENCES "telas"("id") ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS "idx_permutas_tela_id" ON "permutas" ("telaId");
+      `,
+    ],
+  },
 ];
 
 /**

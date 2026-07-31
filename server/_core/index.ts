@@ -17,6 +17,7 @@ import { setupPublicSigningRoutes } from "../publicSigningRouter";
 import { setupPublicTermsRoutes } from "../publicTermsRouter";
 import { setupPublicLogoUploadRoutes, setupAuthenticatedLogoUploadRoutes } from "../logoUploadRouter";
 import { setupPublicTelaPhotoRoutes, setupAuthenticatedTelaPhotoRoutes } from "../telaPhotoRouter";
+import { setupBackofficeMaterialRoutes } from "../backofficeMaterialRouter";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 import { runMigrations } from "../migrations";
 import { exchangeCode } from "../melhorEnvioService";
@@ -108,6 +109,7 @@ async function startServer() {
 
   setupAuthenticatedLogoUploadRoutes(app);
   setupAuthenticatedTelaPhotoRoutes(app);
+  setupBackofficeMaterialRoutes(app);
 
   app.get("/api/auth/user", async (req, res) => {
     try {

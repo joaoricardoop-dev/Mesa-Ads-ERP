@@ -44,6 +44,8 @@ function mondayOf(d: Date): string {
 export default function DistributionBoard() {
   const utils = trpc.useUtils();
   const { data: restaurants = [] } = trpc.activeRestaurant.list.useQuery();
+  const { data: campaignsData } = trpc.campaign.list.useQuery();
+  const campaignsList = campaignsData?.items ?? [];
 
   // ── Movimentos ──
   const [moveOpen, setMoveOpen] = useState(false);
@@ -61,7 +63,7 @@ export default function DistributionBoard() {
 
   // ── Contagem semanal ──
   const [countOpen, setCountOpen] = useState(false);
-  const [countForm, setCountForm] = useState({ restaurantId: "", weekOf: mondayOf(new Date()), countedQuantity: "", needsRestock: false, needsPickup: false, notes: "" });
+  const [countForm, setCountForm] = useState({ restaurantId: "", weekOf: mondayOf(new Date()), countedQuantity: "", needsRestock: false, needsPickup: false, campaignId: "", notes: "" });
   const [onlyPending, setOnlyPending] = useState(true);
   const { data: counts = [], isLoading: loadingCounts } = trpc.backoffice.stockCount.list.useQuery({ onlyPending });
   const upsertCount = trpc.backoffice.stockCount.upsert.useMutation({
@@ -142,6 +144,7 @@ export default function DistributionBoard() {
                 <TableRow>
                   <TableHead>Semana</TableHead>
                   <TableHead>Restaurante</TableHead>
+                  <TableHead>Campanha</TableHead>
                   <TableHead className="text-right">Contado</TableHead>
                   <TableHead>Ação necessária</TableHead>
                   <TableHead>Status</TableHead>
@@ -149,14 +152,15 @@ export default function DistributionBoard() {
               </TableHeader>
               <TableBody>
                 {loadingCounts ? (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
                 ) : counts.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Nenhuma contagem por aqui.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhuma contagem por aqui.</TableCell></TableRow>
                 ) : (
                   counts.map((c: any) => (
                     <TableRow key={c.id}>
                       <TableCell className="text-xs">{c.weekOf}</TableCell>
                       <TableCell className="text-sm">{c.restaurantName || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{c.campaignName || "—"}</TableCell>
                       <TableCell className="text-right font-mono text-xs">{c.countedQuantity}</TableCell>
                       <TableCell className="text-xs">
                         {c.needsRestock && <Badge variant="outline" className="text-amber-400 border-amber-500/30 mr-1">Repor</Badge>}
@@ -256,6 +260,16 @@ export default function DistributionBoard() {
               <Label>Quantidade contada *</Label>
               <Input type="number" min={0} value={countForm.countedQuantity} onChange={(e) => setCountForm({ ...countForm, countedQuantity: e.target.value })} />
             </div>
+            <div className="grid gap-2">
+              <Label>Campanha (opcional)</Label>
+              <Select value={countForm.campaignId || "none"} onValueChange={(v) => setCountForm({ ...countForm, campaignId: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Sem campanha vinculada" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem campanha vinculada</SelectItem>
+                  {campaignsList.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox checked={countForm.needsRestock} onCheckedChange={(v) => setCountForm({ ...countForm, needsRestock: !!v })} />
@@ -283,6 +297,7 @@ export default function DistributionBoard() {
                   countedQuantity: Number(countForm.countedQuantity),
                   needsRestock: countForm.needsRestock,
                   needsPickup: countForm.needsPickup,
+                  campaignId: countForm.campaignId ? Number(countForm.campaignId) : null,
                   notes: countForm.notes.trim() || undefined,
                 });
               }}

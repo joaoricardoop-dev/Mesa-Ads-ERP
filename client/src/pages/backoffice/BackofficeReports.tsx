@@ -33,6 +33,7 @@ const REPORT_LABELS: Record<string, string> = {
 };
 
 const EMPTY_FORM = {
+  campaignId: "",
   reportType: "relatoria_semanal_telas",
   referenceLabel: "",
   recipientLabel: "",
@@ -45,6 +46,8 @@ const EMPTY_FORM = {
 export default function BackofficeReports() {
   const utils = trpc.useUtils();
   const { data: reports = [], isLoading } = trpc.backoffice.report.list.useQuery({});
+  const { data: campaignsData } = trpc.campaign.list.useQuery();
+  const campaignsList = campaignsData?.items ?? [];
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -70,6 +73,7 @@ export default function BackofficeReports() {
             <TableRow>
               <TableHead>Enviado em</TableHead>
               <TableHead>Tipo</TableHead>
+              <TableHead>Campanha</TableHead>
               <TableHead>Referência</TableHead>
               <TableHead>Destinatário</TableHead>
               <TableHead>Por</TableHead>
@@ -78,9 +82,9 @@ export default function BackofficeReports() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
             ) : reports.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 <FileBarChart className="w-6 h-6 mx-auto mb-2 opacity-40" /> Nenhum relatório registrado ainda.
               </TableCell></TableRow>
             ) : (
@@ -88,6 +92,7 @@ export default function BackofficeReports() {
                 <TableRow key={r.id}>
                   <TableCell className="text-xs">{r.sentAt}</TableCell>
                   <TableCell className="text-xs">{REPORT_LABELS[r.reportType] || r.reportType}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{r.campaignName || "—"}</TableCell>
                   <TableCell className="text-sm">{r.referenceLabel}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{r.recipientLabel || "—"}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{r.sentBy || "—"}</TableCell>
@@ -111,6 +116,16 @@ export default function BackofficeReports() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(REPORT_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Campanha (opcional)</Label>
+              <Select value={form.campaignId || "none"} onValueChange={(v) => setForm({ ...form, campaignId: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Sem campanha vinculada" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem campanha vinculada</SelectItem>
+                  {campaignsList.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -146,6 +161,7 @@ export default function BackofficeReports() {
               onClick={() => {
                 if (!form.referenceLabel.trim()) { toast.error("Informe a referência."); return; }
                 createReport.mutate({
+                  campaignId: form.campaignId ? Number(form.campaignId) : undefined,
                   reportType: form.reportType as any,
                   referenceLabel: form.referenceLabel.trim(),
                   recipientLabel: form.recipientLabel.trim() || undefined,

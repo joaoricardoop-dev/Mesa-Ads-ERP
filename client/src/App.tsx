@@ -71,6 +71,7 @@ import DistributionBoard from "./pages/backoffice/DistributionBoard";
 import ScreenChecks from "./pages/backoffice/ScreenChecks";
 import Permutas from "./pages/backoffice/Permutas";
 import BackofficeReports from "./pages/backoffice/BackofficeReports";
+import BackofficeCampaigns from "./pages/backoffice/BackofficeCampaigns";
 
 function AnuncianteRouter() {
   return (
@@ -155,6 +156,7 @@ function Router() {
       <Route path="/backoffice/producao" component={ProductionBoard} />
       <Route path="/backoffice/distribuicao" component={DistributionBoard} />
       <Route path="/backoffice/telas" component={ScreenChecks} />
+      <Route path="/backoffice/campanhas" component={BackofficeCampaigns} />
       <Route path="/backoffice/permutas" component={Permutas} />
       <Route path="/backoffice/relatorios" component={BackofficeReports} />
       <Route path="/configuracoes/premissas" component={AdminConfiguracoes} />

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Package } from "lucide-react";
+import { Plus, Package, History } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
   aguardando_arte: "Aguardando arte",
@@ -59,6 +59,11 @@ export default function ProductionBoard() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM);
+  const [logsFor, setLogsFor] = useState<{ id: number; label: string } | null>(null);
+  const { data: logs = [], isLoading: loadingLogs } = trpc.backoffice.production.logs.useQuery(
+    { productionOrderId: logsFor?.id ?? 0 },
+    { enabled: !!logsFor },
+  );
 
   const utils = trpc.useUtils();
   const { data: orders = [], isLoading } = trpc.backoffice.production.list.useQuery(
@@ -144,13 +149,14 @@ export default function ProductionBoard() {
               <TableHead className="text-right">Qtd</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Rastreio</TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
             ) : orders.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 <Package className="w-6 h-6 mx-auto mb-2 opacity-40" /> Nenhum pedido de produção ainda.
               </TableCell></TableRow>
             ) : (
@@ -183,6 +189,11 @@ export default function ProductionBoard() {
                     </Select>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{o.trackingCode || "—"}</TableCell>
+                  <TableCell>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setLogsFor({ id: o.id, label: o.label })} data-testid={`production-logs-${o.id}`}>
+                      <History className="w-3.5 h-3.5 mr-1" />Histórico
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -240,6 +251,34 @@ export default function ProductionBoard() {
               {createMutation.isPending ? "Criando..." : "Criar pedido"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!logsFor} onOpenChange={(o) => !o && setLogsFor(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Histórico — {logsFor?.label}</DialogTitle>
+            <DialogDescription>Todas as atualizações deste pedido, da mais recente para a mais antiga.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 overflow-y-auto space-y-2">
+            {loadingLogs ? (
+              <p className="text-xs text-muted-foreground text-center py-4">Carregando...</p>
+            ) : logs.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">Nenhuma atualização registrada ainda.</p>
+            ) : (
+              logs.map((l: any) => (
+                <div key={l.id} className="rounded-lg border border-border/30 px-3 py-2">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className="text-[10px]">{l.action}</Badge>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(l.createdAt).toLocaleString("pt-BR")}{l.performedBy ? ` · ${l.performedBy}` : ""}
+                    </span>
+                  </div>
+                  <p className="text-xs mt-1">{l.details}</p>
+                </div>
+              ))
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </PageContainer>

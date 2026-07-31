@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Handshake, Receipt } from "lucide-react";
+import { Plus, Handshake, Receipt, Monitor } from "lucide-react";
 
 function money(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -34,13 +34,19 @@ export default function Permutas() {
   const { data: permutasList = [], isLoading } = trpc.backoffice.permuta.list.useQuery();
   const { data: restaurants = [] } = trpc.activeRestaurant.list.useQuery();
 
+  const EMPTY_FORM = { restaurantId: "", scope: "bar", telaId: "", description: "", totalValue: "", startDate: "", endDate: "", contractSigned: false, notes: "" };
   const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState({ restaurantId: "", description: "", totalValue: "", startDate: "", endDate: "", contractSigned: false, notes: "" });
+  const [form, setForm] = useState(EMPTY_FORM);
+  // Telas do restaurante escolhido, para permuta por tela específica.
+  const { data: telasList = [] } = trpc.tela.listByRestaurant.useQuery(
+    { restaurantId: Number(form.restaurantId) },
+    { enabled: form.scope === "tela" && !!form.restaurantId },
+  );
   const createPermuta = trpc.backoffice.permuta.create.useMutation({
     onSuccess: () => {
       utils.backoffice.permuta.list.invalidate();
       setCreateOpen(false);
-      setForm({ restaurantId: "", description: "", totalValue: "", startDate: "", endDate: "", contractSigned: false, notes: "" });
+      setForm(EMPTY_FORM);
       toast.success("Permuta cadastrada!");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -73,6 +79,7 @@ export default function Permutas() {
           <TableHeader>
             <TableRow>
               <TableHead>Restaurante</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Acordo</TableHead>
               <TableHead className="text-right">Valor total</TableHead>
               <TableHead className="text-right">Consumido</TableHead>
@@ -83,9 +90,9 @@ export default function Permutas() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
             ) : permutasList.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                 <Handshake className="w-6 h-6 mx-auto mb-2 opacity-40" /> Nenhuma permuta cadastrada ainda.
               </TableCell></TableRow>
             ) : (
@@ -94,6 +101,15 @@ export default function Permutas() {
                 return (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium text-sm">{p.restaurantName || "—"}</TableCell>
+                    <TableCell>
+                      {p.telaId ? (
+                        <Badge variant="outline" className="text-sky-400 border-sky-500/30 inline-flex items-center gap-1">
+                          <Monitor className="w-3 h-3" />{p.telaNome || `Tela #${p.telaId}`}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">Bar</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground max-w-xs truncate">{p.description}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{money(Number(p.totalValue))}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{money(Number(p.consumed))}</TableCell>
@@ -122,13 +138,37 @@ export default function Permutas() {
           <div className="grid gap-3 py-2">
             <div className="grid gap-2">
               <Label>Restaurante *</Label>
-              <Select value={form.restaurantId} onValueChange={(v) => setForm({ ...form, restaurantId: v })}>
+              <Select value={form.restaurantId} onValueChange={(v) => setForm({ ...form, restaurantId: v, telaId: "" })}>
                 <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
                   {(restaurants as any[]).map((r: any) => <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-2">
+              <Label>Vinculada a *</Label>
+              <Select value={form.scope} onValueChange={(v) => setForm({ ...form, scope: v, telaId: "" })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bar">Bar / restaurante inteiro</SelectItem>
+                  <SelectItem value="tela">Tela específica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {form.scope === "tela" && (
+              <div className="grid gap-2">
+                <Label>Tela *</Label>
+                <Select value={form.telaId} onValueChange={(v) => setForm({ ...form, telaId: v })}>
+                  <SelectTrigger><SelectValue placeholder={form.restaurantId ? "Selecione a tela..." : "Escolha o restaurante primeiro"} /></SelectTrigger>
+                  <SelectContent>
+                    {(telasList as any[]).map((t: any) => <SelectItem key={t.id} value={String(t.id)}>{t.nome || `Tela #${t.id}`}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {form.restaurantId && (telasList as any[]).length === 0 && (
+                  <p className="text-[10px] text-amber-400">Este restaurante não tem telas cadastradas.</p>
+                )}
+              </div>
+            )}
             <div className="grid gap-2">
               <Label>O que foi acordado *</Label>
               <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} placeholder="Ex: Consumo da equipe em chopp e porções" />
@@ -158,8 +198,10 @@ export default function Permutas() {
               disabled={createPermuta.isPending}
               onClick={() => {
                 if (!form.restaurantId || !form.description.trim() || !form.totalValue) { toast.error("Preencha restaurante, acordo e valor."); return; }
+                if (form.scope === "tela" && !form.telaId) { toast.error("Selecione a tela da permuta."); return; }
                 createPermuta.mutate({
                   restaurantId: Number(form.restaurantId),
+                  telaId: form.scope === "tela" ? Number(form.telaId) : undefined,
                   description: form.description.trim(),
                   totalValue: form.totalValue,
                   startDate: form.startDate || undefined,

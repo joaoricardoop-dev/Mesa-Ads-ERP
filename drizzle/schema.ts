@@ -1769,8 +1769,10 @@ export const backofficeStockCounts = pgTable("backoffice_stock_counts", {
   resolvedAt: timestamp("resolvedAt"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  campaignId: integer("campaignId").references(() => campaigns.id, { onDelete: "set null" }),
 }, (t) => [
   index("idx_backoffice_stock_counts_restaurant_id").on(t.restaurantId),
+  index("idx_backoffice_stock_counts_campaign_id").on(t.campaignId),
   index("idx_backoffice_stock_counts_week_of").on(t.weekOf),
   unique("uq_backoffice_stock_count_restaurant_week").on(t.restaurantId, t.weekOf),
 ]);
@@ -1812,6 +1814,8 @@ export const backofficeScreenMaterial = pgTable("backoffice_screen_material", {
   materialReceived: boolean("materialReceived").default(false).notNull(),
   materialReceivedAt: date("materialReceivedAt"),
   reportingFrequency: backofficeReportingFrequencyEnum("reportingFrequency"),
+  attachmentUrl: text("attachmentUrl"),
+  attachmentName: varchar("attachmentName", { length: 255 }),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -1828,6 +1832,7 @@ export type InsertBackofficeScreenMaterial = typeof backofficeScreenMaterial.$in
 // distinto de campaignReports, que é sempre por campaignId.
 export const backofficeReports = pgTable("backoffice_reports", {
   id: serial("id").primaryKey(),
+  campaignId: integer("campaignId").references(() => campaigns.id, { onDelete: "set null" }),
   reportType: backofficeReportTypeEnum("reportType").notNull(),
   referenceLabel: varchar("referenceLabel", { length: 100 }).notNull(),
   recipientLabel: varchar("recipientLabel", { length: 255 }),
@@ -1839,16 +1844,68 @@ export const backofficeReports = pgTable("backoffice_reports", {
 }, (t) => [
   index("idx_backoffice_reports_type").on(t.reportType),
   index("idx_backoffice_reports_sent_at").on(t.sentAt),
+  index("idx_backoffice_reports_campaign_id").on(t.campaignId),
 ]);
 
 export type BackofficeReport = typeof backofficeReports.$inferSelect;
 export type InsertBackofficeReport = typeof backofficeReports.$inferInsert;
+
+// Checklist diário do backoffice: os itens em si são DERIVADOS em runtime
+// (telas sem check, contagens em atraso, relatorias pendentes...) — esta
+// tabela só guarda a marcação manual "feito" por item/dia, então o checklist
+// "renasce" vazio a cada dia automaticamente.
+export const backofficeChecklistCompletions = pgTable("backoffice_checklist_completions", {
+  id: serial("id").primaryKey(),
+  itemKey: varchar("itemKey", { length: 100 }).notNull(),
+  itemDate: date("itemDate").notNull(),
+  completedBy: varchar("completedBy", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_backoffice_checklist_completions_date").on(t.itemDate),
+  unique("uq_backoffice_checklist_item_date").on(t.itemKey, t.itemDate),
+]);
+
+export type BackofficeChecklistCompletion = typeof backofficeChecklistCompletions.$inferSelect;
+
+// Trilha de auditoria dos pedidos de produção: cada create/update grava uma
+// linha descrevendo o que mudou — nada é sobrescrito sem rastro.
+export const backofficeProductionLogs = pgTable("backoffice_production_logs", {
+  id: serial("id").primaryKey(),
+  productionOrderId: integer("productionOrderId").notNull().references(() => backofficeProductionOrders.id, { onDelete: "cascade" }),
+  action: varchar("action", { length: 50 }).notNull(), // 'criado' | 'atualizado'
+  details: text("details").notNull(),
+  performedBy: varchar("performedBy", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_backoffice_production_logs_order_id").on(t.productionOrderId),
+]);
+
+export type BackofficeProductionLog = typeof backofficeProductionLogs.$inferSelect;
+
+// Log de edições de um check de tela já lançado (o histórico de checks em si
+// são as linhas de backoffice_screen_checks, uma por tela×dia).
+export const backofficeScreenCheckLogs = pgTable("backoffice_screen_check_logs", {
+  id: serial("id").primaryKey(),
+  checkId: integer("checkId").notNull().references(() => backofficeScreenChecks.id, { onDelete: "cascade" }),
+  telaId: integer("telaId").notNull(),
+  details: text("details").notNull(),
+  performedBy: varchar("performedBy", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_backoffice_screen_check_logs_check_id").on(t.checkId),
+  index("idx_backoffice_screen_check_logs_tela_id").on(t.telaId),
+]);
+
+export type BackofficeScreenCheckLog = typeof backofficeScreenCheckLogs.$inferSelect;
 
 // Permutas: acordo de troca com restaurante parceiro. Não confundir com
 // `partners` (agências/indicadores comerciais) — conceito de negócio diferente.
 export const permutas = pgTable("permutas", {
   id: serial("id").primaryKey(),
   restaurantId: integer("restaurantId").notNull().references(() => activeRestaurants.id, { onDelete: "cascade" }),
+  // Permuta por tela: quando preenchido, o acordo é vinculado a uma tela
+  // específica do restaurante (não só ao bar como um todo).
+  telaId: integer("telaId").references(() => telas.id, { onDelete: "set null" }),
   description: varchar("description", { length: 500 }).notNull(),
   totalValue: decimal("totalValue", { precision: 12, scale: 2 }).notNull(),
   startDate: date("startDate"),
@@ -1859,6 +1916,7 @@ export const permutas = pgTable("permutas", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
   index("idx_permutas_restaurant_id").on(t.restaurantId),
+  index("idx_permutas_tela_id").on(t.telaId),
 ]);
 
 export type Permuta = typeof permutas.$inferSelect;

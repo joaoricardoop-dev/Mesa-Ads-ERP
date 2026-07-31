@@ -176,6 +176,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { icon: Package, label: "Produção de Bolachas", path: "/backoffice/producao" },
       { icon: Truck, label: "Distribuição", path: "/backoffice/distribuicao" },
       { icon: Monitor, label: "Telas", path: "/backoffice/telas" },
+      { icon: Megaphone, label: "Campanhas", path: "/backoffice/campanhas" },
       { icon: Handshake, label: "Permutas", path: "/backoffice/permutas" },
       { icon: FileBarChart, label: "Relatórios", path: "/backoffice/relatorios" },
     ],
