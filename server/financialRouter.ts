@@ -29,9 +29,11 @@ import { recordAudit } from "./finance/audit";
 import { audited } from "./finance/auditMiddleware";
 import { financialAuditLog } from "../drizzle/schema";
 import { getSystemConfig } from "./systemConfigRouter";
+import { canAccess } from "@shared/const";
 
-function requireFinancialAccess(role: string | null) {
-  if (role !== "admin" && role !== "financeiro" && role !== "manager") {
+// Task #426 — avalia contra o CONJUNTO de papéis efetivos do usuário (multi-papel).
+function requireFinancialAccess(user: { role?: string | null; roles?: string[] | null }) {
+  if (!canAccess(user, ["financeiro", "manager"])) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito ao módulo financeiro" });
   }
 }
@@ -259,7 +261,7 @@ function uniqueIds(arr: (number | null | undefined)[]): number[] {
 
 export const financialRouter = router({
   dashboard: protectedProcedure.query(async ({ ctx }) => {
-    requireFinancialAccess(ctx.user.role);
+    requireFinancialAccess(ctx.user);
     const db = await getDatabase();
 
     const now = new Date();
@@ -438,7 +440,7 @@ export const financialRouter = router({
   }),
 
   dashboardExpanded: protectedProcedure.query(async ({ ctx }) => {
-    requireFinancialAccess(ctx.user.role);
+    requireFinancialAccess(ctx.user);
     const db = await getDatabase();
 
     const now = new Date();
@@ -717,7 +719,7 @@ export const financialRouter = router({
       endDate: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const conditions = [];
@@ -831,7 +833,7 @@ export const financialRouter = router({
       receivedDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const campaign = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
@@ -946,7 +948,7 @@ export const financialRouter = router({
       receivedDate: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const { id, ...fields } = input;
       const [before] = await db.select().from(invoices).where(eq(invoices.id, id));
@@ -1010,7 +1012,7 @@ export const financialRouter = router({
       receivedDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [before] = await db.select().from(invoices).where(eq(invoices.id, input.id));
       if (!before) throw new TRPCError({ code: "NOT_FOUND", message: "Fatura não encontrada" });
@@ -1060,7 +1062,7 @@ export const financialRouter = router({
   revertInvoicePayment: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [before] = await db.select().from(invoices).where(eq(invoices.id, input.id));
 
@@ -1090,7 +1092,7 @@ export const financialRouter = router({
   cancelInvoice: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [before] = await db.select().from(invoices).where(eq(invoices.id, input.id));
 
@@ -1126,7 +1128,7 @@ export const financialRouter = router({
       endDate: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const conditions = [];
@@ -1171,7 +1173,7 @@ export const financialRouter = router({
       proofUrl: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [before] = await db.select().from(restaurantPayments).where(eq(restaurantPayments.id, input.id));
       // Roteia pelo helper de dual-write para que o ledger
@@ -1198,7 +1200,7 @@ export const financialRouter = router({
       endDate: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const conditions = [];
@@ -1393,7 +1395,7 @@ export const financialRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const existing = await db.select().from(operationalCosts).where(eq(operationalCosts.campaignId, input.campaignId));
@@ -1453,7 +1455,7 @@ export const financialRouter = router({
   report: protectedProcedure
     .input(z.object({ startDate: z.string(), endDate: z.string() }))
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const paidInvoices = await db
@@ -1610,7 +1612,7 @@ export const financialRouter = router({
       regime: z.enum(["competencia", "caixa"]).optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const regime = input?.regime || "competencia";
@@ -1806,7 +1808,7 @@ export const financialRouter = router({
     }),
 
   campaignsForInvoice: protectedProcedure.query(async ({ ctx }) => {
-    requireFinancialAccess(ctx.user.role);
+    requireFinancialAccess(ctx.user);
     const db = await getDatabase();
 
     const rows = await db
@@ -1849,7 +1851,7 @@ export const financialRouter = router({
   partnerCommissionReport: protectedProcedure
     .input(z.object({ campaignId: z.number() }))
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId)).limit(1);
@@ -2028,7 +2030,7 @@ export const financialRouter = router({
   listPartnerCampaigns: protectedProcedure
     .input(z.object({ partnerId: z.number().optional() }))
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       let partnerIds: number[] = [];
@@ -2132,7 +2134,7 @@ export const financialRouter = router({
     }),
 
   listAllPartners: protectedProcedure.query(async ({ ctx }) => {
-    requireFinancialAccess(ctx.user.role);
+    requireFinancialAccess(ctx.user);
     const db = await getDatabase();
     const rows = await db.select({ id: partners.id, name: partners.name, commissionPercent: partners.commissionPercent }).from(partners).where(eq(partners.status, "active"));
     return rows;
@@ -2153,7 +2155,7 @@ export const financialRouter = router({
       competenceMonth: z.string().optional(), // YYYY-MM — regime de competência
     }).optional())
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const conditions = [];
       if (input?.campaignId) conditions.push(eq(accountsPayable.campaignId, input.campaignId));
@@ -2210,7 +2212,7 @@ export const financialRouter = router({
       ]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [row] = await db.insert(accountsPayable).values({
         campaignId: input.campaignId,
@@ -2237,7 +2239,7 @@ export const financialRouter = router({
       proofUrl: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const updated = await db
         .update(accountsPayable)
@@ -2264,7 +2266,7 @@ export const financialRouter = router({
       status: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const { id, ...fields } = input;
       const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -2291,7 +2293,7 @@ export const financialRouter = router({
       proofUrl: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [updated] = await db
         .update(accountsPayable)
@@ -2312,7 +2314,7 @@ export const financialRouter = router({
   })
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       await db.delete(accountsPayable).where(eq(accountsPayable.id, input.id));
       return { ok: true };
@@ -2331,7 +2333,7 @@ export const financialRouter = router({
   })
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [existing] = await db.select().from(invoices).where(eq(invoices.id, input.id));
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Fatura não encontrada" });
@@ -2358,7 +2360,7 @@ export const financialRouter = router({
   })
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       await db.delete(operationalCosts).where(eq(operationalCosts.id, input.id));
       return { ok: true };
@@ -2367,7 +2369,7 @@ export const financialRouter = router({
   generateCampaignPayables: protectedProcedure
     .input(z.object({ campaignId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
       if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
@@ -2427,7 +2429,7 @@ export const financialRouter = router({
       invoiceAmount: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
       if (!campaign) throw new TRPCError({ code: "NOT_FOUND" });
@@ -2549,7 +2551,7 @@ export const financialRouter = router({
       endDate: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const now = new Date();
@@ -2679,7 +2681,7 @@ export const financialRouter = router({
   // Finrefac #7 — Inadimplência com aging buckets (0-30, 30-60, 60-90, 90+).
   // ────────────────────────────────────────────────────────────────────────────
   delinquency: protectedProcedure.query(async ({ ctx }) => {
-    requireFinancialAccess(ctx.user.role);
+    requireFinancialAccess(ctx.user);
     const db = await getDatabase();
     const today = new Date().toISOString().split("T")[0];
 
@@ -2744,7 +2746,7 @@ export const financialRouter = router({
   // Janela: últimos 90 dias; comparação com 90 dias anteriores para tendência.
   // ────────────────────────────────────────────────────────────────────────────
   dso: protectedProcedure.query(async ({ ctx }) => {
-    requireFinancialAccess(ctx.user.role);
+    requireFinancialAccess(ctx.user);
     const db = await getDatabase();
     const now = new Date();
     const today = now.toISOString().split("T")[0];
@@ -2784,7 +2786,7 @@ export const financialRouter = router({
   // Finrefac #7 — Funil: Cotação → Fatura → Recebido (YTD).
   // ────────────────────────────────────────────────────────────────────────────
   funnel: protectedProcedure.query(async ({ ctx }) => {
-    requireFinancialAccess(ctx.user.role);
+    requireFinancialAccess(ctx.user);
     const db = await getDatabase();
     const now = new Date();
     const ytdStart = `${now.getFullYear()}-01-01`;
@@ -2850,7 +2852,7 @@ export const financialRouter = router({
       dueOffsetDays: z.number().int().min(0).max(120).default(15),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, input.campaignId));
@@ -2887,7 +2889,7 @@ export const financialRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const [inv] = await db.select().from(invoices).where(eq(invoices.id, input.id));

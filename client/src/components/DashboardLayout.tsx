@@ -45,7 +45,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useClerk } from "@clerk/clerk-react";
 import type { User } from "@shared/models/auth";
-import { INTERNAL_ROLES } from "@shared/const";
+import { getEffectiveRoles, hasAnyRole, isInternalUser as checkInternalUser } from "@shared/const";
 import type { Impersonation } from "../App";
 import {
   BarChart3,
@@ -267,7 +267,9 @@ function DashboardLayoutContent({
   });
   const queryClient = useQueryClient();
 
-  const isInternalUser = INTERNAL_ROLES.includes(user.role as any);
+  // Task #426 — avalia contra o CONJUNTO de papéis efetivos (multi-papel).
+  const effectiveRoles = getEffectiveRoles(user);
+  const isInternalUser = checkInternalUser(user);
 
   const [aiOpen, setAiOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState<Message[]>([
@@ -415,10 +417,10 @@ function DashboardLayoutContent({
           <SidebarContent className="gap-0 px-2 py-2">
             <SidebarMenu>
               {(user.role === "anunciante" ? ANUNCIANTE_NAV_ENTRIES : user.role === "restaurante" ? RESTAURANTE_NAV_ENTRIES : user.role === "parceiro" ? PARCEIRO_NAV_ENTRIES : NAV_ENTRIES).map((entry) => {
-                const userRole = user.role || "";
+                // Task #426 — basta UM dos papéis efetivos estar na lista.
                 const canSee = (item: { adminOnly?: boolean; allowedRoles?: string[] }) => {
-                  if (item.adminOnly && userRole !== "admin") return false;
-                  if (item.allowedRoles && !item.allowedRoles.includes(userRole)) return false;
+                  if (item.adminOnly && !effectiveRoles.includes("admin")) return false;
+                  if (item.allowedRoles && !effectiveRoles.some((r) => item.allowedRoles!.includes(r))) return false;
                   return true;
                 };
 
@@ -481,7 +483,7 @@ function DashboardLayoutContent({
                       {user.firstName || user.email || "-"}
                     </p>
                     <p className="text-[10px] text-muted-foreground truncate mt-1">
-                      {{admin: "Administrador", comercial: "Comercial", operacoes: "Operações", financeiro: "Financeiro", manager: "Gerente", anunciante: "Anunciante", restaurante: "Local"}[user.role || ""] || user.role || "—"}
+                      {effectiveRoles.map((r) => ({admin: "Administrador", comercial: "Comercial", operacoes: "Operações", financeiro: "Financeiro", manager: "Gerente", backoffice: "Backoffice", anunciante: "Anunciante", restaurante: "Local", parceiro: "Parceiro"} as Record<string, string>)[r] || r).join(" · ") || "—"}
                     </p>
                   </div>
                 </button>
@@ -614,9 +616,9 @@ function DashboardLayoutContent({
           </div>
           <div className="flex items-center gap-1">
             <NotificationBell
-              isAdmin={user.role === "admin"}
+              isAdmin={effectiveRoles.includes("admin")}
               isAnunciante={user.role === "anunciante"}
-              isAssignee={["comercial", "operacoes", "financeiro", "manager"].includes(user.role ?? "")}
+              isAssignee={hasAnyRole(user, ["comercial", "operacoes", "financeiro", "manager"])}
             />
             <button
               onClick={toggleTheme}

@@ -148,6 +148,7 @@ async function startServer() {
           const clerkUser = await clerkClient.users.getUser(userId);
           const meta = (clerkUser.publicMetadata || {}) as any;
           const role = meta.role || "anunciante";
+          const roles: string[] = Array.isArray(meta.roles) && meta.roles.length > 0 ? meta.roles : [role];
           const isSelfRegistered = !meta.role;
 
           const clientId = meta.clientId || null;
@@ -160,6 +161,7 @@ async function startServer() {
             lastName: clerkUser.lastName || meta.lastName || null,
             profileImageUrl: clerkUser.imageUrl || null,
             role,
+            roles,
             clientId: clientId ? Number(clientId) : null,
             restaurantId: restaurantId ? Number(restaurantId) : null,
             partnerId: partnerId ? Number(partnerId) : null,

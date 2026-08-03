@@ -6,7 +6,7 @@ export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   listUsers(): Promise<User[]>;
-  updateUserRole(id: string, role: string): Promise<User | undefined>;
+  updateUserRole(id: string, role: string, roles?: string[]): Promise<User | undefined>;
   updateUserActive(id: string, isActive: boolean): Promise<User | undefined>;
   updateUserTags(id: string, tags: { isSdr: boolean; isCloser: boolean }): Promise<User | undefined>;
 }
@@ -51,12 +51,12 @@ class AuthStorage implements IAuthStorage {
     return db.select().from(users);
   }
 
-  async updateUserRole(id: string, role: string): Promise<User | undefined> {
+  async updateUserRole(id: string, role: string, roles?: string[]): Promise<User | undefined> {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
     const [user] = await db
       .update(users)
-      .set({ role, updatedAt: new Date() })
+      .set({ role, roles: roles ?? [role], updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
     return user;

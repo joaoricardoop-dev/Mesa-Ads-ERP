@@ -40,3 +40,52 @@ export const PUBLIC_TERM_PATH = (slug: string) => `/termo/${slug}`;
  * bolachas/telas/permutas).
  */
 export const INTERNAL_ROLES = ["admin", "comercial", "operacoes", "financeiro", "manager", "backoffice"] as const;
+
+/**
+ * Papéis externos — sempre EXCLUSIVOS: não se misturam entre si nem com
+ * papéis internos (Task #426).
+ */
+export const EXTERNAL_ROLES = ["anunciante", "restaurante", "parceiro"] as const;
+
+type RoleBearer = { role?: string | null; roles?: string[] | null } | null | undefined;
+
+/**
+ * Fonte única dos "papéis efetivos" de um usuário (Task #426 — múltiplos
+ * papéis internos). Regras:
+ *  - `role` (papel primário) sempre faz parte do conjunto.
+ *  - `roles` (jsonb) adiciona papéis internos extras.
+ *  - Se o papel primário é EXTERNO, o conjunto é APENAS ele — externos são
+ *    exclusivos, e isso mantém a impersonação segura (role sobrescrito para
+ *    "anunciante"/"restaurante" anula os papéis internos do array).
+ *  - Papéis externos dentro de `roles` são ignorados quando o primário é
+ *    interno (defesa em profundidade; a escrita já valida).
+ */
+export function getEffectiveRoles(user: RoleBearer): string[] {
+  if (!user) return [];
+  const primary = user.role || null;
+  if (primary && (EXTERNAL_ROLES as readonly string[]).includes(primary)) return [primary];
+  const set = new Set<string>();
+  if (primary) set.add(primary);
+  if (Array.isArray(user.roles)) {
+    for (const r of user.roles) {
+      if (typeof r === "string" && (INTERNAL_ROLES as readonly string[]).includes(r)) set.add(r);
+    }
+  }
+  return Array.from(set);
+}
+
+/** True se ALGUM papel efetivo do usuário está na lista (sem passe de admin). */
+export function hasAnyRole(user: RoleBearer, allowed: readonly string[]): boolean {
+  return getEffectiveRoles(user).some((r) => allowed.includes(r));
+}
+
+/** True se o usuário é admin OU tem algum papel efetivo na lista permitida. */
+export function canAccess(user: RoleBearer, allowed: readonly string[]): boolean {
+  const roles = getEffectiveRoles(user);
+  return roles.includes("admin") || roles.some((r) => allowed.includes(r));
+}
+
+/** True se o usuário tem algum papel interno (staff). */
+export function isInternalUser(user: RoleBearer): boolean {
+  return hasAnyRole(user, INTERNAL_ROLES);
+}

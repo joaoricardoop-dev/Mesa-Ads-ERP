@@ -28,4 +28,5 @@
 - [Orçamento cotas + line discount](orcamento-discount-order.md) — discount order line→coupon→BV; coupon persisted into totalValue server-side; mixed PDF = one table per product type.
 - [Circuit pricing e2e fixture](circuit-pricing-e2e-fixture.md) — telas need insertionsPerWeek+costPerInsertion or createFromBuilder 400s; dev-ensure-screen-location backfills; rows use circuito-card-*.
 - [Business dates in America/Sao_Paulo](business-date-timezone.md) — server "today"/week logic must use business tz, not UTC ISO slice, or daily lists reset ~21h local.
+- [Multi-role internal users](multi-role-users.md) — users.roles jsonb set + shared helpers (getEffectiveRoles/canAccess) are the only way to gate; external roles exclusive; sync Clerk metadata roles on every write.
 - [Dev DB env split](dev-db-env-split.md) — dev workflow runs on DATABASE_URL_TEST (.replit override), not shell DATABASE_URL (helium); verify migrations against the right DB.

@@ -1,6 +1,15 @@
 import { useState } from "react";
 import PageContainer from "@/components/PageContainer";
-import { INTERNAL_ROLES } from "@shared/const";
+import { INTERNAL_ROLES, getEffectiveRoles, isInternalUser } from "@shared/const";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -127,6 +136,7 @@ export default function Members() {
     firstName: string;
     lastName: string;
     role: string;
+    roles: string[];
     clientId: number | null;
     partnerId: number | null;
     isSdr: boolean;
@@ -136,6 +146,7 @@ export default function Members() {
     firstName: "",
     lastName: "",
     role: "comercial",
+    roles: ["comercial"],
     clientId: null,
     partnerId: null,
     isSdr: false,
@@ -174,7 +185,7 @@ export default function Members() {
       utils.members.list.invalidate();
       utils.members.listInvitations.invalidate();
       setCreateDialogOpen(false);
-      setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null, partnerId: null, isSdr: false, isCloser: false });
+      setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", roles: ["comercial"], clientId: null, partnerId: null, isSdr: false, isCloser: false });
       toast.success(`Convite enviado para ${data.email}! O usuário receberá um e-mail para criar sua conta.`);
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -217,13 +228,26 @@ export default function Members() {
       (m.email || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const internos = searchFiltered.filter((m) => INTERNAL_ROLES.includes(m.role as any));
-  const externos = searchFiltered.filter((m) => EXTERNAL_ROLES.includes(m.role || ""));
+  const internos = searchFiltered.filter((m) => isInternalUser(m));
+  const externos = searchFiltered.filter((m) => !isInternalUser(m) && EXTERNAL_ROLES.includes(m.role || ""));
   const filtered = segment === "internos" ? internos : externos;
 
-  const internosTotal = membersList.filter((m) => INTERNAL_ROLES.includes(m.role as any)).length;
-  const externosTotal = membersList.filter((m) => EXTERNAL_ROLES.includes(m.role || "")).length;
-  const adminCount = membersList.filter((m) => m.role === "admin").length;
+  const internosTotal = membersList.filter((m) => isInternalUser(m)).length;
+  const externosTotal = membersList.filter((m) => !isInternalUser(m) && EXTERNAL_ROLES.includes(m.role || "")).length;
+  const adminCount = membersList.filter((m) => getEffectiveRoles(m).includes("admin")).length;
+
+  // Task #426 — alterna um papel interno no conjunto do usuário. O papel
+  // primário é preservado enquanto continuar no conjunto; senão vira o 1º.
+  const toggleMemberRole = (member: { id: string; role: string | null; roles?: string[] | null }, r: string) => {
+    const current = getEffectiveRoles(member);
+    const next = current.includes(r) ? current.filter((x) => x !== r) : [...current, r];
+    if (next.length === 0) {
+      toast.error("O usuário precisa ter pelo menos um papel.");
+      return;
+    }
+    const primary = next.includes(member.role || "") ? (member.role as string) : next[0];
+    updateRoleMutation.mutate({ userId: member.id, role: primary, roles: next });
+  };
   const activeCount = membersList.filter((m) => m.isActive !== false).length;
   const inactiveCount = membersList.filter((m) => m.isActive === false).length;
 
@@ -233,7 +257,7 @@ export default function Members() {
       description="Cadastrar, gerenciar papéis e permissões dos usuários da plataforma"
       actions={
         <Button onClick={() => {
-          setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", clientId: null, partnerId: null, isSdr: false, isCloser: false });
+          setCreateForm({ email: "", firstName: "", lastName: "", role: "comercial", roles: ["comercial"], clientId: null, partnerId: null, isSdr: false, isCloser: false });
           setCreateDialogOpen(true);
         }}>
           <Send className="w-4 h-4 mr-2" />
@@ -366,26 +390,89 @@ export default function Members() {
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <Select
-                      value={member.role || "comercial"}
-                      onValueChange={(role) => {
-                        updateRoleMutation.mutate({ userId: member.id, role });
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs border-border/30 bg-background/50 w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(ROLE_CONFIG).map(([value, config]) => (
-                          <SelectItem key={value} value={value}>
-                            <span className="flex items-center gap-1.5">
-                              <config.icon className={`w-3 h-3 ${config.color.split(" ")[1]}`} />
-                              {config.label}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {isInternalUser(member) ? (
+                      /* Task #426 — usuários internos podem acumular papéis. */
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            disabled={updateRoleMutation.isPending}
+                            className="flex flex-wrap items-center gap-1 min-h-8 px-2 py-1 rounded-md border border-border/30 bg-background/50 hover:border-border transition-colors max-w-[180px] disabled:opacity-50"
+                            title="Gerenciar papéis"
+                          >
+                            {getEffectiveRoles(member).map((r) => {
+                              const cfg = ROLE_CONFIG[r] || ROLE_CONFIG.comercial;
+                              return (
+                                <Badge key={r} variant="outline" className={`text-[10px] px-1.5 py-0 ${cfg.color}`}>
+                                  {cfg.label}
+                                </Badge>
+                              );
+                            })}
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-52">
+                          <DropdownMenuLabel className="text-xs">Papéis internos</DropdownMenuLabel>
+                          {INTERNAL_ROLES.map((r) => {
+                            const cfg = ROLE_CONFIG[r];
+                            const checked = getEffectiveRoles(member).includes(r);
+                            return (
+                              <DropdownMenuCheckboxItem
+                                key={r}
+                                checked={checked}
+                                disabled={updateRoleMutation.isPending}
+                                onSelect={(e) => e.preventDefault()}
+                                onCheckedChange={() => toggleMemberRole(member, r)}
+                                className="text-xs"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <cfg.icon className={`w-3 h-3 ${cfg.color.split(" ")[1]}`} />
+                                  {cfg.label}
+                                </span>
+                              </DropdownMenuCheckboxItem>
+                            );
+                          })}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel className="text-xs">Converter para externo</DropdownMenuLabel>
+                          {EXTERNAL_ROLES.map((r) => {
+                            const cfg = ROLE_CONFIG[r];
+                            return (
+                              <DropdownMenuItem
+                                key={r}
+                                disabled={updateRoleMutation.isPending}
+                                onClick={() => updateRoleMutation.mutate({ userId: member.id, role: r, roles: [r] })}
+                                className="text-xs"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <cfg.icon className={`w-3 h-3 ${cfg.color.split(" ")[1]}`} />
+                                  {cfg.label}
+                                </span>
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <Select
+                        value={member.role || "comercial"}
+                        onValueChange={(role) => {
+                          updateRoleMutation.mutate({ userId: member.id, role, roles: [role] });
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs border-border/30 bg-background/50 w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(ROLE_CONFIG).map(([value, config]) => (
+                            <SelectItem key={value} value={value}>
+                              <span className="flex items-center gap-1.5">
+                                <config.icon className={`w-3 h-3 ${config.color.split(" ")[1]}`} />
+                                {config.label}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     {member.role === "parceiro" && (
                       <button
                         className="flex items-center gap-1 text-[10px] text-violet-400 hover:text-violet-300 transition-colors"
@@ -759,10 +846,10 @@ export default function Members() {
               />
             </div>
             <div className="grid gap-2">
-              <Label>Papel</Label>
+              <Label>Papel {INTERNAL_ROLES.includes(createForm.role as any) ? "principal" : ""}</Label>
               <Select
                 value={createForm.role}
-                onValueChange={(role) => setCreateForm({ ...createForm, role })}
+                onValueChange={(role) => setCreateForm({ ...createForm, role, roles: [role] })}
               >
                 <SelectTrigger className="bg-background border-border/30">
                   <SelectValue />
@@ -779,6 +866,37 @@ export default function Members() {
                 </SelectContent>
               </Select>
             </div>
+            {INTERNAL_ROLES.includes(createForm.role as any) && (
+              <div className="grid gap-2">
+                <Label>Papéis adicionais</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {INTERNAL_ROLES.filter((r) => r !== createForm.role).map((r) => {
+                    const cfg = ROLE_CONFIG[r];
+                    const active = createForm.roles.includes(r);
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setCreateForm({
+                          ...createForm,
+                          roles: active ? createForm.roles.filter((x) => x !== r) : [...createForm.roles, r],
+                        })}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                          active
+                            ? "bg-primary/20 text-primary border-primary/30"
+                            : "bg-transparent text-muted-foreground border-border/40 hover:border-border"
+                        }`}
+                      >
+                        {cfg.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Usuários internos podem acumular papéis (ex.: Comercial + Financeiro).
+                </p>
+              </div>
+            )}
             {!["anunciante", "restaurante", "parceiro"].includes(createForm.role) && (
               <div className="grid gap-2">
                 <Label>Tags</Label>

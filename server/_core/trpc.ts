@@ -1,4 +1,4 @@
-import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
+import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG, getEffectiveRoles } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
@@ -31,7 +31,7 @@ export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
-    if (!ctx.user || ctx.user.role !== 'admin') {
+    if (!ctx.user || !getEffectiveRoles(ctx.user).includes('admin')) {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
 
@@ -53,8 +53,10 @@ function createRoleProcedure(allowedRoles: string[]) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
       }
 
-      const userRole = ctx.user.role || "user";
-      if (userRole !== "admin" && !allowedRoles.includes(userRole)) {
+      // Task #426 — basta UM dos papéis efetivos do usuário estar na lista.
+      // Admin continua com acesso total.
+      const userRoles = getEffectiveRoles(ctx.user);
+      if (!userRoles.includes("admin") && !userRoles.some((r) => allowedRoles.includes(r))) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Você não tem permissão para acessar este recurso.",

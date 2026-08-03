@@ -2895,6 +2895,17 @@ export const MIGRATIONS: Array<{ name: string; sql: string | string[] }> = [
       `,
     ],
   },
+  {
+    // Task #426 — múltiplos papéis internos por usuário. `users.role` continua
+    // sendo o papel primário (compatibilidade); `roles` (jsonb array) guarda o
+    // conjunto completo. Backfill: papel único existente vira o conjunto
+    // inicial. Externos permanecem exclusivos (validado na escrita).
+    name: "task_426_users_multi_roles",
+    sql: [
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "roles" jsonb;`,
+      `UPDATE "users" SET "roles" = to_jsonb(ARRAY["role"]) WHERE "roles" IS NULL AND "role" IS NOT NULL;`,
+    ],
+  },
 ];
 
 /**

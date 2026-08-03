@@ -16,12 +16,14 @@ import {
 import { audited } from "./finance/auditMiddleware";
 import { recordAudit } from "./finance/audit";
 import type { DbClient } from "./finance/payables";
+import { canAccess } from "@shared/const";
 import { parseOfx } from "./bank/parsers/ofx";
 import { parseCsv } from "./bank/parsers/csv";
 import type { ParsedTransaction } from "./bank/parsers/types";
 
-function requireFinancialAccess(role: string | null) {
-  if (role !== "admin" && role !== "financeiro" && role !== "manager") {
+// Task #426 — avalia contra o CONJUNTO de papéis efetivos do usuário (multi-papel).
+function requireFinancialAccess(user: { role?: string | null; roles?: string[] | null }) {
+  if (!canAccess(user, ["financeiro", "manager"])) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito ao módulo financeiro" });
   }
 }
@@ -91,7 +93,7 @@ function scoreMatch(
 export const bankRouter = router({
   // ── Bank accounts CRUD ──────────────────────────────────────────────────
   listAccounts: protectedProcedure.query(async ({ ctx }) => {
-    requireFinancialAccess(ctx.user.role);
+    requireFinancialAccess(ctx.user);
     const db = await getDatabase();
     return db
       .select()
@@ -109,7 +111,7 @@ export const bankRouter = router({
       currency: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [row] = await db
         .insert(bankAccounts)
@@ -135,7 +137,7 @@ export const bankRouter = router({
       active: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const { id, ...fields } = input;
       const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -153,7 +155,7 @@ export const bankRouter = router({
   deleteAccount: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       await db.delete(bankAccounts).where(eq(bankAccounts.id, input.id));
       return { ok: true };
@@ -170,7 +172,7 @@ export const bankRouter = router({
       kind: z.enum(["ofx", "csv"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const text = decodeUpload(input.content, input.encoding);
@@ -223,7 +225,7 @@ export const bankRouter = router({
       kind: z.enum(["ofx", "csv"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const text = decodeUpload(input.content, input.encoding);
@@ -291,7 +293,7 @@ export const bankRouter = router({
       type: z.enum(["credit", "debit"]).optional(),
     }))
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const cond = [eq(bankTransactions.bankAccountId, input.bankAccountId)];
       if (input.reconciled !== undefined) cond.push(eq(bankTransactions.reconciled, input.reconciled));
@@ -313,7 +315,7 @@ export const bankRouter = router({
       type: z.enum(["credit", "debit"]),
     }))
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       if (input.type === "credit") {
@@ -364,7 +366,7 @@ export const bankRouter = router({
   suggestMatches: protectedProcedure
     .input(z.object({ transactionId: z.number() }))
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [txn] = await db
         .select()
@@ -473,7 +475,7 @@ export const bankRouter = router({
       })).min(1),
     }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
 
       const [txn] = await db
@@ -619,7 +621,7 @@ export const bankRouter = router({
   })
     .input(z.object({ transactionId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [txn] = await db
         .select()
@@ -679,7 +681,7 @@ export const bankRouter = router({
   summary: protectedProcedure
     .input(z.object({ bankAccountId: z.number() }))
     .query(async ({ ctx, input }) => {
-      requireFinancialAccess(ctx.user.role);
+      requireFinancialAccess(ctx.user);
       const db = await getDatabase();
       const [unrec] = await db
         .select({

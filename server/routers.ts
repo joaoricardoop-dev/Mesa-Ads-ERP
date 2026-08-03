@@ -186,13 +186,15 @@ export const appRouter = router({
 
         const mapped = allClerkUsers.map((cu) => {
           const meta = cu.publicMetadata as any;
+          const role = meta?.role || "anunciante";
           return {
             id: cu.id,
             email: cu.emailAddresses?.[0]?.emailAddress || null,
             firstName: cu.firstName || null,
             lastName: cu.lastName || null,
             profileImageUrl: cu.imageUrl || null,
-            role: meta?.role || "anunciante",
+            role,
+            roles: (Array.isArray(meta?.roles) && meta.roles.length > 0 ? meta.roles : [role]) as string[],
             isActive: !cu.banned,
             clientId: meta?.clientId ? Number(meta.clientId) : null,
             partnerId: meta?.partnerId ? Number(meta.partnerId) : null,
@@ -213,6 +215,7 @@ export const appRouter = router({
               lastName: u.lastName,
               profileImageUrl: u.profileImageUrl,
               role: u.role,
+              roles: u.roles,
               clientId: u.clientId,
               partnerId: u.partnerId,
               isActive: u.isActive,
@@ -226,8 +229,23 @@ export const appRouter = router({
       }),
 
     updateRole: adminProcedure
-      .input(z.object({ userId: z.string(), role: z.string() }))
+      // Task #426 — aceita múltiplos papéis internos. `roles` opcional (default
+      // [role]); `role` continua sendo o papel primário. Externos são exclusivos.
+      .input(z.object({ userId: z.string(), role: z.string(), roles: z.array(z.string()).min(1).optional() }))
       .mutation(async ({ input }) => {
+        const { INTERNAL_ROLES, EXTERNAL_ROLES } = await import("@shared/const");
+        let roles = Array.from(new Set(input.roles && input.roles.length > 0 ? input.roles : [input.role]));
+        if (!roles.includes(input.role)) roles = [input.role, ...roles];
+
+        const hasExternal = roles.some((r) => (EXTERNAL_ROLES as readonly string[]).includes(r));
+        if (hasExternal && roles.length > 1) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Papéis externos (anunciante, restaurante, parceiro) são exclusivos e não podem ser combinados." });
+        }
+        const invalid = roles.find((r) => !(INTERNAL_ROLES as readonly string[]).includes(r) && !(EXTERNAL_ROLES as readonly string[]).includes(r));
+        if (invalid) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Papel inválido: ${invalid}` });
+        }
+
         const { createClerkClient } = await import("@clerk/express");
         const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
 
@@ -237,6 +255,7 @@ export const appRouter = router({
             publicMetadata: {
               ...clerkUser.publicMetadata,
               role: input.role,
+              roles,
             },
           });
         } catch (err: any) {
@@ -244,7 +263,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao atualizar papel no Clerk." });
         }
 
-        const user = await authStorage.updateUserRole(input.userId, input.role);
+        const user = await authStorage.updateUserRole(input.userId, input.role, roles);
         if (!user) return undefined;
         const { passwordHash: _, ...safe } = user;
         return safe;
@@ -268,8 +287,10 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado no Clerk." });
         }
 
-        const role = (clerkUser.publicMetadata as any)?.role || "anunciante";
-        if (!INTERNAL_ROLES.includes(role)) {
+        const tagMeta = (clerkUser.publicMetadata as any) || {};
+        const { getEffectiveRoles } = await import("@shared/const");
+        const tagRoles = getEffectiveRoles({ role: tagMeta.role || "anunciante", roles: Array.isArray(tagMeta.roles) ? tagMeta.roles : null });
+        if (!tagRoles.some((r) => (INTERNAL_ROLES as readonly string[]).includes(r))) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Tags SDR/Closer só podem ser atribuídas a usuários internos." });
         }
 
@@ -317,6 +338,7 @@ export const appRouter = router({
             publicMetadata: {
               ...clerkUser.publicMetadata,
               role: newRole,
+              roles: [newRole],
               partnerId: input.partnerId,
             },
           });
@@ -327,7 +349,7 @@ export const appRouter = router({
 
         const [updated] = await db
           .update(usersTable)
-          .set({ partnerId: input.partnerId, role: newRole, updatedAt: new Date() })
+          .set({ partnerId: input.partnerId, role: newRole, roles: [newRole], updatedAt: new Date() })
           .where(eq(usersTable.id, input.userId))
           .returning();
         if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado." });
@@ -414,6 +436,7 @@ export const appRouter = router({
         firstName: z.string().min(1),
         lastName: z.string().optional(),
         role: z.string().default("comercial"),
+        roles: z.array(z.string()).min(1).optional(),
         clientId: z.number().nullable().optional(),
         partnerId: z.number().nullable().optional(),
         isSdr: z.boolean().optional(),
@@ -427,10 +450,20 @@ export const appRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Parceiros devem ser vinculados a um parceiro cadastrado." });
         }
 
-        const { INTERNAL_ROLES } = await import("@shared/const");
+        const { INTERNAL_ROLES, EXTERNAL_ROLES } = await import("@shared/const");
         const isInternal = INTERNAL_ROLES.includes(input.role as any);
         const isSdr = isInternal ? !!input.isSdr : false;
         const isCloser = isInternal ? !!input.isCloser : false;
+
+        // Task #426 — conjunto de papéis do convite. Externos são exclusivos;
+        // internos podem acumular (todos precisam ser internos válidos).
+        let roles = Array.from(new Set(input.roles && input.roles.length > 0 ? input.roles : [input.role]));
+        if (!roles.includes(input.role)) roles = [input.role, ...roles];
+        if (!isInternal) {
+          roles = [input.role];
+        } else if (roles.some((r) => !(INTERNAL_ROLES as readonly string[]).includes(r))) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Papéis internos não podem ser combinados com papéis externos." });
+        }
 
         const { createClerkClient } = await import("@clerk/express");
         const { appUrl } = await import("./_core/appUrl");
@@ -442,6 +475,7 @@ export const appRouter = router({
             emailAddress: email,
             publicMetadata: {
               role: input.role,
+              roles,
               clientId: input.role === "anunciante" ? input.clientId : null,
               partnerId: input.role === "parceiro" ? input.partnerId : null,
               firstName: input.firstName,
@@ -1251,6 +1285,7 @@ export const appRouter = router({
         if (!db) return [];
         const { clients: clientsTable } = await import("../drizzle/schema");
         const { eq, asc } = await import("drizzle-orm");
+        const { canAccess: canAccessRoles } = await import("@shared/const");
         const userRole = ctx.user.role || "user";
         let partnerId: number | null = null;
         if (userRole === "parceiro") {
@@ -1258,7 +1293,7 @@ export const appRouter = router({
           if (!partnerId) {
             throw new TRPCError({ code: "FORBIDDEN", message: "Usuário não vinculado a um parceiro." });
           }
-        } else if (["admin", "comercial", "manager", "operacoes", "financeiro"].includes(userRole)) {
+        } else if (canAccessRoles(ctx.user, ["comercial", "manager", "operacoes", "financeiro"])) {
           partnerId = input?.partnerId ?? null;
         } else {
           throw new TRPCError({ code: "FORBIDDEN", message: "Sem permissão." });

@@ -11,7 +11,7 @@ import { ExternalShell } from "./components/ExternalShell";
 import DevToolsPanel from "./components/DevToolsPanel";
 import { useAuth } from "./hooks/use-auth";
 import { SignIn, SignUp, useClerk } from "@clerk/clerk-react";
-import { INTERNAL_ROLES } from "@shared/const";
+import { isInternalUser } from "@shared/const";
 import { ShieldX } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
@@ -549,20 +549,21 @@ function AuthenticatedApp() {
   }
 
   let effectiveUser = devRoleOverride && user
-    ? { ...user, role: devRoleOverride, ...(devRoleOverride === "anunciante" && devClientIdOverride ? { clientId: devClientIdOverride } : {}) }
+    ? { ...user, role: devRoleOverride, roles: [devRoleOverride], ...(devRoleOverride === "anunciante" && devClientIdOverride ? { clientId: devClientIdOverride } : {}) }
     : user;
 
-  if (impersonation && user && INTERNAL_ROLES.includes(user.role as any)) {
+  if (impersonation && user && isInternalUser(user)) {
     effectiveUser = {
       ...user,
       role: impersonation.role,
+      roles: [impersonation.role],
       ...(impersonation.clientId ? { clientId: impersonation.clientId } : {}),
       ...(impersonation.restaurantId ? { restaurantId: impersonation.restaurantId } : {}),
       ...(impersonation.partnerId ? { partnerId: impersonation.partnerId } : {}),
     };
   }
 
-  const isImpersonating = impersonation !== null && user && INTERNAL_ROLES.includes(user.role as any);
+  const isImpersonating = impersonation !== null && user && isInternalUser(user);
   const isAnunciante = effectiveUser?.role === "anunciante";
   const isRestaurante = effectiveUser?.role === "restaurante";
   const isParceiro = effectiveUser?.role === "parceiro";

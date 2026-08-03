@@ -18,6 +18,10 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role").default("anunciante"),
+  // Task #426 — múltiplos papéis internos por usuário. `role` permanece como
+  // papel primário (compatibilidade); `roles` guarda o conjunto completo.
+  // Externos (anunciante/restaurante/parceiro) continuam exclusivos.
+  roles: jsonb("roles").$type<string[]>(),
   isActive: boolean("is_active").default(true),
   passwordHash: varchar("password_hash"),
   mustChangePassword: boolean("must_change_password").default(false),

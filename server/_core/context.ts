@@ -40,6 +40,7 @@ export async function createContext(
           const clerkUser = await clerkClient.users.getUser(auth.userId);
           const meta = (clerkUser.publicMetadata as any) || {};
           const role = meta.role || "anunciante";
+          const roles: string[] = Array.isArray(meta.roles) && meta.roles.length > 0 ? meta.roles : [role];
           const clientId = meta.clientId || null;
           const restaurantId = meta.restaurantId || null;
           const partnerId = meta.partnerId || null;
@@ -51,6 +52,7 @@ export async function createContext(
             lastName: clerkUser.lastName || null,
             profileImageUrl: clerkUser.imageUrl || null,
             role,
+            roles,
             clientId: clientId ? Number(clientId) : null,
             restaurantId: restaurantId ? Number(restaurantId) : null,
             partnerId: partnerId ? Number(partnerId) : null,
@@ -76,11 +78,14 @@ export async function createContext(
   if (user && INTERNAL_ROLES.includes(user.role as any)) {
     const impClientId = opts.req.headers["x-impersonate-client-id"];
     const impRestaurantId = opts.req.headers["x-impersonate-restaurant-id"];
+    // Task #426: além do role primário, zera o array de papéis — external
+    // primário já anula papéis internos em getEffectiveRoles, mas mantemos
+    // o objeto coerente.
     if (impClientId) {
-      user = { ...user, role: "anunciante", clientId: parseInt(String(impClientId), 10) };
+      user = { ...user, role: "anunciante", roles: ["anunciante"], clientId: parseInt(String(impClientId), 10) };
     }
     if (impRestaurantId) {
-      user = { ...user, role: "restaurante", restaurantId: parseInt(String(impRestaurantId), 10) };
+      user = { ...user, role: "restaurante", roles: ["restaurante"], restaurantId: parseInt(String(impRestaurantId), 10) };
     }
   }
 

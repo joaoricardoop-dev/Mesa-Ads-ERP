@@ -1400,7 +1400,8 @@ export const quotationRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await getDatabase();
       const userRole = ctx.user.role || "user";
-      const isInternal = INTERNAL_ROLES.includes(userRole as any);
+      const { isInternalUser } = await import("@shared/const");
+      const isInternal = isInternalUser(ctx.user);
 
       let client: { name: string; company: string | null; partnerId: number | null } | null = null;
       if (input.clientId != null) {
