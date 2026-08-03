@@ -134,11 +134,12 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
 
   const days = daysInRangeInclusive(startDate, endDate);
 
-  const { data, isLoading } = trpc.anunciantePortal.listAvailableLocations.useQuery({
-    startDate,
-    endDate,
-    neighborhood: neighborhood || undefined,
-  });
+  const { data, isLoading, isError, error, refetch } =
+    trpc.anunciantePortal.listAvailableLocations.useQuery({
+      startDate,
+      endDate,
+      neighborhood: neighborhood || undefined,
+    });
 
   const locations = useMemo(() => (data ?? []) as LocationRow[], [data]);
 
@@ -291,7 +292,9 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
           <p className="text-sm text-muted-foreground">
             {isLoading
               ? "Carregando inventário…"
-              : `${filtered.length} local(is) de telas · período de ${days} dia(s)`}
+              : isError
+                ? "Erro ao carregar inventário"
+                : `${filtered.length} local(is) de telas · período de ${days} dia(s)`}
           </p>
           {!isLoading && pendingCount > 0 && (
             <Button
@@ -341,6 +344,23 @@ export function InventoryCatalog({ audience = "internal" }: { audience?: Catalog
         <div className="flex items-center justify-center py-16 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
         </div>
+      ) : isError ? (
+        // Falha ao carregar o inventário (ex.: erro de banco/schema no servidor)
+        // NÃO é "0 locais": mostramos o erro explicitamente com opção de retry.
+        <Card data-testid="inventory-error">
+          <CardContent className="py-12 text-center space-y-3">
+            <AlertTriangle className="mx-auto h-6 w-6 text-destructive" />
+            <p className="text-sm font-medium text-destructive">
+              Erro ao carregar o inventário de telas
+            </p>
+            <p className="text-xs text-muted-foreground max-w-md mx-auto">
+              {error?.message ?? "Falha inesperada ao consultar os locais disponíveis."}
+            </p>
+            <Button type="button" size="sm" variant="outline" onClick={() => refetch()}>
+              Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
       ) : view === "map" ? (
         <CatalogMap
           locations={byCategory}

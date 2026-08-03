@@ -109,6 +109,7 @@ export const anunciantePortalRouter = router({
         .optional(),
     )
     .query(async ({ input, ctx }) => {
+      try {
       const db = await getDatabase();
       const { productType, neighborhood, startDate, endDate, category } = input ?? {};
       // Audiência pública do marketplace (anunciante/parceiro). Para esses perfis,
@@ -377,6 +378,22 @@ export const anunciantePortalRouter = router({
       });
 
       return payload;
+      } catch (err) {
+        // Erros de banco (ex.: "column does not exist" por schema de produção
+        // desatualizado) devem aparecer como log/erro CLARO — nunca virar
+        // catálogo vazio silencioso na UI do Orçamento.
+        if (err instanceof TRPCError) throw err;
+        const detail = err instanceof Error ? err.message : String(err);
+        console.error(
+          "[anunciantePortal.listAvailableLocations] falha ao consultar inventário:",
+          err,
+        );
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Erro ao carregar o inventário de locais/telas: ${detail}`,
+          cause: err,
+        });
+      }
     }),
 
   // Para um conjunto de restaurantes selecionados, retorna os produtos
