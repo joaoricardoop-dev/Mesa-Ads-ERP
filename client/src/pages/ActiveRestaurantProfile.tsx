@@ -160,7 +160,7 @@ function calcRestaurantRevenue(c: any) {
 
 export default function ActiveRestaurantProfile() {
   const [, navigate] = useLocation();
-  const [match, params] = useRoute("/restaurantes/perfil/:id");
+  const [match, params] = useRoute("/locais/perfil/:id");
   const restaurantId = match ? parseInt(params!.id) : 0;
 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -308,7 +308,7 @@ export default function ActiveRestaurantProfile() {
   const generateAccountInviteMutation = trpc.activeRestaurant.generateAccountInvite.useMutation({
     onSuccess: (data) => {
       utils.term.list.invalidate();
-      const inviteUrl = `${window.location.origin}/locais/convite/${data.inviteToken}`;
+      const inviteUrl = `${window.location.origin}/cadastro-local/convite/${data.inviteToken}`;
       setGeneratedInviteUrl(inviteUrl);
     },
     onError: (err) => toast.error(err.message),
@@ -351,7 +351,7 @@ export default function ActiveRestaurantProfile() {
       <div className="h-full flex flex-col overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <p className="text-muted-foreground">Local não encontrado</p>
-          <Button variant="outline" onClick={() => navigate("/restaurantes")}>Voltar</Button>
+          <Button variant="outline" onClick={() => navigate("/locais")}>Voltar</Button>
         </div>
       </div>
     );
@@ -366,7 +366,7 @@ export default function ActiveRestaurantProfile() {
         <div className="border-b border-border/20 bg-card/30 px-4 lg:px-6 py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/restaurantes")}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/locais")}>
                 <ArrowLeft className="w-4 h-4" />
               </Button>
               <RestaurantAvatar name={restaurant.name} logoUrl={restaurant.logoUrl} size="md" />
@@ -380,7 +380,7 @@ export default function ActiveRestaurantProfile() {
                 <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
                   <MapPin className="w-3 h-3" /> {restaurant.neighborhood} · ID #{restaurant.id}
                   {parentRestaurant && (
-                    <span className="flex items-center gap-1 text-primary cursor-pointer" onClick={() => navigate(`/restaurantes/perfil/${parentRestaurant.id}`)}>
+                    <span className="flex items-center gap-1 text-primary cursor-pointer" onClick={() => navigate(`/locais/perfil/${parentRestaurant.id}`)}>
                       <Link2 className="w-3 h-3" /> Filial de {parentRestaurant.name}
                     </span>
                   )}
@@ -388,7 +388,7 @@ export default function ActiveRestaurantProfile() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => navigate(`/restaurantes/${restaurant.id}`)}>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => navigate(`/locais/${restaurant.id}`)}>
                 <Pencil className="w-3.5 h-3.5" /> Editar
               </Button>
               {restaurant.instagram && (
@@ -1202,7 +1202,7 @@ export default function ActiveRestaurantProfile() {
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
                   <p className="text-xs text-muted-foreground mb-1">Este restaurante é filial de:</p>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(`/restaurantes/perfil/${parentRestaurant.id}`)}>
+                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(`/locais/perfil/${parentRestaurant.id}`)}>
                       <Store className="w-4 h-4 text-primary" />
                       <span className="text-sm font-semibold">{parentRestaurant.name}</span>
                       <span className="text-xs text-muted-foreground">{parentRestaurant.neighborhood}</span>
@@ -1222,7 +1222,7 @@ export default function ActiveRestaurantProfile() {
                 <div className="space-y-2">
                   {branches.map((b) => (
                     <div key={b.id} className="bg-card border border-border/30 rounded-lg p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate(`/restaurantes/perfil/${b.id}`)}>
+                      <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate(`/locais/perfil/${b.id}`)}>
                         <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
                           <Store className="w-4 h-4 text-primary" />
                         </div>

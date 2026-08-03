@@ -162,8 +162,8 @@ const NAV_ENTRIES: NavEntry[] = [
     label: "Locais",
     allowedRoles: ["admin", "comercial", "operacoes", "financeiro", "manager"],
     items: [
-      { icon: UtensilsCrossed, label: "Lista", path: "/restaurantes" },
-      { icon: MapPin, label: "Mapa", path: "/restaurantes/mapa" },
+      { icon: UtensilsCrossed, label: "Lista", path: "/locais" },
+      { icon: MapPin, label: "Mapa", path: "/locais/mapa" },
     ],
   },
   { icon: Image, label: "Biblioteca", path: "/biblioteca", allowedRoles: ["admin", "comercial", "operacoes", "financeiro", "manager"] },

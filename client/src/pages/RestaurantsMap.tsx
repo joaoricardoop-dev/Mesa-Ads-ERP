@@ -275,7 +275,7 @@ export default function RestaurantsMap() {
       {/* Header */}
       <div className="border-b border-border/20 bg-card/30 px-4 py-3 flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/restaurantes")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/locais")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
@@ -303,7 +303,7 @@ export default function RestaurantsMap() {
               )}
             </Button>
           )}
-          <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => navigate("/restaurantes")}>
+          <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={() => navigate("/locais")}>
             <UtensilsCrossed className="w-3.5 h-3.5" /> Lista
           </Button>
         </div>
@@ -490,7 +490,7 @@ export default function RestaurantsMap() {
                     </a>
                   )}
                   <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs h-8"
-                    onClick={() => navigate(`/restaurantes/perfil/${selected.id}`)}>
+                    onClick={() => navigate(`/locais/perfil/${selected.id}`)}>
                     <ChevronRight className="w-3.5 h-3.5" /> Ver Perfil
                   </Button>
                 </div>

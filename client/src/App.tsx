@@ -121,15 +121,24 @@ function Router() {
       <Route path="/comercial/contatos" component={Contacts} />
       <Route path="/comercial/parceiros/:id" component={PartnerDetail} />
       <Route path="/comercial/parceiros" component={Partners} />
-      <Route path="/restaurantes/mapa" component={RestaurantsMap} />
+      {/* Task #429 — rotas internas renomeadas de /restaurantes* para /locais*.
+          As URLs antigas redirecionam logo abaixo para não quebrar bookmarks. */}
+      <Route path="/locais/mapa" component={RestaurantsMap} />
       {/* Task #387 — Página standalone "Telas" removida (cadastro vive só na edição
           do local). Links/bookmarks antigos redirecionam para a lista de locais em
-          vez de cair no formulário de edição via /restaurantes/:id. */}
-      <Route path="/restaurantes/telas">{() => <Redirect to="/restaurantes" />}</Route>
-      <Route path="/restaurantes/perfil/:id" component={ActiveRestaurantProfile} />
-      <Route path="/restaurantes/novo" component={ActiveRestaurantForm} />
-      <Route path="/restaurantes/:id" component={ActiveRestaurantForm} />
-      <Route path="/restaurantes" component={ActiveRestaurantsPage} />
+          vez de cair no formulário de edição via /locais/:id. */}
+      <Route path="/locais/telas">{() => <Redirect to="/locais" />}</Route>
+      <Route path="/locais/perfil/:id" component={ActiveRestaurantProfile} />
+      <Route path="/locais/novo" component={ActiveRestaurantForm} />
+      <Route path="/locais/:id" component={ActiveRestaurantForm} />
+      <Route path="/locais" component={ActiveRestaurantsPage} />
+      {/* Redirects das URLs antigas /restaurantes* */}
+      <Route path="/restaurantes/mapa">{() => <Redirect to="/locais/mapa" />}</Route>
+      <Route path="/restaurantes/telas">{() => <Redirect to="/locais" />}</Route>
+      <Route path="/restaurantes/perfil/:id">{(params) => <Redirect to={`/locais/perfil/${params.id}`} />}</Route>
+      <Route path="/restaurantes/novo">{() => <Redirect to="/locais/novo" />}</Route>
+      <Route path="/restaurantes/:id">{(params) => <Redirect to={`/locais/${params.id}`} />}</Route>
+      <Route path="/restaurantes">{() => <Redirect to="/locais" />}</Route>
       <Route path="/clientes/:id" component={ClientDetail} />
       <Route path="/clientes" component={Clients} />
       <Route path="/cotacao/preview" component={QuotationPreview} />
@@ -142,7 +151,7 @@ function Router() {
       {/* Task #375 — Provedores Sala VIP aposentado: a sala VIP virou um local
           (active_restaurants.is_vip_room) com o repasse no próprio cadastro do
           local. Rota/menu removidos do fluxo ativo; dados/histórico preservados. */}
-      <Route path="/configuracoes/provedores-sala-vip">{() => <Redirect to="/restaurantes" />}</Route>
+      <Route path="/configuracoes/provedores-sala-vip">{() => <Redirect to="/locais" />}</Route>
       <Route path="/campanhas/:id/batch/:phaseId" component={CampaignDetail} />
       {/* Rota antiga mantida como alias pra não quebrar links existentes */}
       <Route path="/campanhas/:id/fase/:phaseId" component={CampaignDetail} />
@@ -424,7 +433,7 @@ function ClerkLoginPage() {
         </button>
 
         <a
-          href="/locais"
+          href="/cadastro-local"
           className="mt-3 text-sm block text-[#a6a6aa] hover:text-[#f5f5f3] transition-colors text-center"
         >
           É um local parceiro? <span className="text-[#00e640] hover:underline cursor-pointer font-medium">Cadastre-se aqui</span>
@@ -670,6 +679,23 @@ function PublicRestaurantOnboarding() {
   return <RestaurantOnboarding />;
 }
 
+// Task #429 — /locais era o onboarding público e agora é a lista interna de
+// locais. Visitantes não autenticados vão para /cadastro-local; usuários
+// autenticados caem no app normal (a rota interna /locais resolve a lista).
+function LegacyLocaisRoute() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect to="/cadastro-local" />;
+  }
+
+  return <AuthenticatedApp />;
+}
+
 function App() {
   useEffect(() => {
     captureTrackingFromUrl();
@@ -681,9 +707,14 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Switch>
-            <Route path="/locais/convite/:token" component={RestaurantInviteAccept} />
-            <Route path="/locais" component={PublicRestaurantOnboarding} />
-            <Route path="/parceiro/convite/:token">{(params) => <Redirect to={`/locais/convite/${params.token}`} />}</Route>
+            {/* Task #429 — onboarding público movido de /locais para /cadastro-local
+                (a rota interna /locais agora é a lista de locais de mídia).
+                Links antigos redirecionam para não quebrar convites já enviados. */}
+            <Route path="/cadastro-local/convite/:token" component={RestaurantInviteAccept} />
+            <Route path="/cadastro-local" component={PublicRestaurantOnboarding} />
+            <Route path="/locais/convite/:token">{(params) => <Redirect to={`/cadastro-local/convite/${params.token}`} />}</Route>
+            <Route path="/locais">{() => <LegacyLocaisRoute />}</Route>
+            <Route path="/parceiro/convite/:token">{(params) => <Redirect to={`/cadastro-local/convite/${params.token}`} />}</Route>
             <Route path="/parceiro">{() => <Redirect to={`/${window.location.search}`} />}</Route>
             <Route path="/montar-campanha">
               {() => (

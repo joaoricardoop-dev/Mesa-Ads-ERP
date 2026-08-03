@@ -99,7 +99,7 @@ export default function Contacts() {
     if (c.clientId) {
       navigate(`/clientes/${c.clientId}`);
     } else if (c.restaurantId) {
-      navigate(`/restaurantes/perfil/${c.restaurantId}`);
+      navigate(`/locais/perfil/${c.restaurantId}`);
     }
   }
 

@@ -1259,7 +1259,7 @@ export const appRouter = router({
           status: "enviado",
         }).returning();
 
-        const inviteUrl = `/locais/convite/${token}`;
+        const inviteUrl = `/cadastro-local/convite/${token}`;
         return { ...created, inviteToken: token, inviteUrl };
       }),
 

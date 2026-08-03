@@ -193,7 +193,7 @@ interface Socio {
 
 export default function ActiveRestaurantForm() {
   const [, navigate] = useLocation();
-  const [matchEdit, params] = useRoute("/restaurantes/:id");
+  const [matchEdit, params] = useRoute("/locais/:id");
   const parsedId = matchEdit && params?.id !== "novo" ? parseInt(params!.id, 10) : NaN;
   const editId = Number.isFinite(parsedId) ? parsedId : null;
   const isEditing = editId !== null;
@@ -429,7 +429,7 @@ export default function ActiveRestaurantForm() {
       utils.activeRestaurant.list.invalidate();
       toast.success("Local cadastrado!");
       warnIfNotPublishable();
-      navigate("/restaurantes");
+      navigate("/locais");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
@@ -439,7 +439,7 @@ export default function ActiveRestaurantForm() {
       utils.activeRestaurant.list.invalidate();
       toast.success("Local atualizado!");
       warnIfNotPublishable();
-      navigate("/restaurantes");
+      navigate("/locais");
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
@@ -528,7 +528,7 @@ export default function ActiveRestaurantForm() {
       <div className="flex-1 overflow-y-auto">
         <div className="border-b border-border/20 bg-card/30 px-4 lg:px-6 py-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/restaurantes")}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/locais")}>
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
@@ -1065,7 +1065,7 @@ export default function ActiveRestaurantForm() {
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t border-border/20">
-                <Button variant="outline" onClick={() => navigate("/restaurantes")}>Cancelar</Button>
+                <Button variant="outline" onClick={() => navigate("/locais")}>Cancelar</Button>
                 <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending || !form.name.trim()} className="gap-2 px-6">
                   <CheckCircle2 className="w-4 h-4" />
                   {isEditing ? "Salvar Alterações" : "Cadastrar Local"}

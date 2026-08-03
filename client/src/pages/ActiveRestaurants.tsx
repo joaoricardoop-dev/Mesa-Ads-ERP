@@ -46,6 +46,7 @@ import {
   AlertTriangle,
   MapPin,
   ImageOff,
+  Download,
 } from "lucide-react";
 import { screenSetupStatus } from "@shared/cpm-pricing";
 import {
@@ -129,6 +130,62 @@ const EXCLUDED_CATEGORIES = [
 
 type SortOption = "name" | "ratingScore";
 
+// ─── Exportação CSV (Task #429) ───────────────────────────────────────────
+const CATEGORIA_LABELS: Record<string, string> = {
+  restaurante: "Restaurante",
+  academia: "Academia",
+  condominio: "Condomínio",
+  ponto_transporte: "Ponto de Transporte",
+  comercial: "Comercial",
+};
+
+interface ExportField {
+  key: string;
+  label: string;
+  default: boolean;
+  get: (r: any) => string | number | null | undefined;
+}
+
+const EXPORT_FIELDS: ExportField[] = [
+  { key: "name", label: "Nome", default: true, get: (r) => r.name },
+  { key: "address", label: "Endereço", default: true, get: (r) => r.address },
+  { key: "neighborhood", label: "Bairro", default: true, get: (r) => r.neighborhood },
+  { key: "city", label: "Cidade", default: true, get: (r) => r.city },
+  { key: "state", label: "Estado", default: false, get: (r) => r.state },
+  { key: "cep", label: "CEP", default: false, get: (r) => r.cep },
+  { key: "categoria", label: "Tipo", default: true, get: (r) => CATEGORIA_LABELS[r.categoria] || r.categoria },
+  { key: "status", label: "Status", default: true, get: (r) => (r.status === "active" ? "Ativo" : "Inativo") },
+  { key: "contactName", label: "Contato", default: true, get: (r) => r.contactName },
+  { key: "contactType", label: "Tipo de Contato", default: false, get: (r) => CONTACT_TYPE_LABELS[r.contactType] || r.contactType },
+  { key: "whatsapp", label: "Telefone/WhatsApp", default: true, get: (r) => r.whatsapp },
+  { key: "email", label: "E-mail", default: true, get: (r) => r.email },
+  { key: "instagram", label: "Instagram", default: false, get: (r) => r.instagram },
+  { key: "socialClass", label: "Classe Social", default: false, get: (r) => formatSocialClass(r.socialClass) },
+  { key: "tableCount", label: "Mesas", default: false, get: (r) => r.tableCount },
+  { key: "seatCount", label: "Assentos", default: false, get: (r) => r.seatCount },
+  { key: "monthlyCustomers", label: "Clientes/Mês", default: false, get: (r) => r.monthlyCustomers },
+  { key: "ratingScore", label: "Rating", default: false, get: (r) => (r.ratingScore != null ? String(r.ratingScore).replace(".", ",") : "") },
+  { key: "screensCount", label: "Nº de Telas", default: true, get: (r) => r.screensCount },
+  { key: "screenCpm", label: "CPM (R$)", default: false, get: (r) => (r.screenCpm != null ? String(r.screenCpm).replace(".", ",") : "") },
+  { key: "lat", label: "Latitude", default: false, get: (r) => r.lat },
+  { key: "lng", label: "Longitude", default: false, get: (r) => r.lng },
+  { key: "pixKey", label: "Chave PIX", default: false, get: (r) => r.pixKey },
+  { key: "notes", label: "Observações", default: false, get: (r) => r.notes },
+];
+
+// Separador ";" — padrão que o Excel pt-BR reconhece ao abrir CSV direto.
+function csvEscape(value: string | number | null | undefined): string {
+  const s = value == null ? "" : String(value);
+  if (/[";\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function buildCsv(rows: any[], fields: ExportField[]): string {
+  const header = fields.map((f) => csvEscape(f.label)).join(";");
+  const lines = rows.map((r) => fields.map((f) => csvEscape(f.get(r))).join(";"));
+  return [header, ...lines].join("\r\n");
+}
+
 interface FormData {
   name: string;
   address: string;
@@ -201,6 +258,10 @@ export default function ActiveRestaurantsPage() {
   const [sortBy, setSortBy] = useState<SortOption>("name");
   const [onlyMediaPending, setOnlyMediaPending] = useState(false);
   const [onlyPhotosPending, setOnlyPhotosPending] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFields, setExportFields] = useState<string[]>(
+    () => EXPORT_FIELDS.filter((f) => f.default).map((f) => f.key),
+  );
 
   const utils = trpc.useUtils();
   const { data: restaurants = [] } = trpc.activeRestaurant.list.useQuery();
@@ -402,6 +463,39 @@ export default function ActiveRestaurantsPage() {
     }));
   };
 
+  const toggleExportField = (key: string) => {
+    setExportFields((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  };
+
+  const allExportSelected = exportFields.length === EXPORT_FIELDS.length;
+
+  const handleExportCsv = () => {
+    const fields = EXPORT_FIELDS.filter((f) => exportFields.includes(f.key));
+    if (fields.length === 0) {
+      toast.error("Selecione ao menos um campo para exportar.");
+      return;
+    }
+    if (filtered.length === 0) {
+      toast.error("Nenhum local para exportar com os filtros atuais.");
+      return;
+    }
+    // BOM UTF-8 para o Excel reconhecer acentos corretamente.
+    const csv = "\uFEFF" + buildCsv(filtered, fields);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `locais-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setExportOpen(false);
+    toast.success(`CSV exportado com ${filtered.length} local(is).`);
+  };
+
   const toggleCategory = (cat: string) => {
     setForm(prev => ({
       ...prev,
@@ -430,7 +524,15 @@ export default function ActiveRestaurantsPage() {
                 : `Preencher coordenadas (${missingCoordsCount})`}
             </Button>
           )}
-          <Button onClick={() => navigate("/restaurantes/novo")} className="gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setExportOpen(true)}
+            data-testid="button-export-csv"
+          >
+            <Download className="w-4 h-4" /> Exportar CSV
+          </Button>
+          <Button onClick={() => navigate("/locais/novo")} className="gap-2">
             <Plus className="w-4 h-4" /> Novo Local
           </Button>
         </div>
@@ -494,7 +596,7 @@ export default function ActiveRestaurantsPage() {
                 <div key={r.id} className="bg-card border border-border/30 rounded-lg overflow-hidden">
                   <div
                     className="p-4 cursor-pointer hover:bg-card/80 transition-colors"
-                    onClick={() => navigate(`/restaurantes/perfil/${r.id}`)}
+                    onClick={() => navigate(`/locais/perfil/${r.id}`)}
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -567,7 +669,7 @@ export default function ActiveRestaurantsPage() {
                       </div>
 
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar" onClick={() => navigate(`/restaurantes/${r.id}`)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar" onClick={() => navigate(`/locais/${r.id}`)}>
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" title="Excluir" onClick={() => setDeleteId(r.id)}>
@@ -581,6 +683,55 @@ export default function ActiveRestaurantsPage() {
             })
           )}
         </div>
+
+        {/* ─── Diálogo de exportação CSV (Task #429) ─── */}
+        <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Exportar CSV</DialogTitle>
+            </DialogHeader>
+            <p className="text-xs text-muted-foreground -mt-2">
+              {filtered.length} local(is) serão exportados (respeitando busca e filtros ativos).
+              Escolha os campos:
+            </p>
+            <div className="flex items-center gap-2 border-b border-border/30 pb-2">
+              <Checkbox
+                id="export-all"
+                checked={allExportSelected}
+                onCheckedChange={(checked) =>
+                  setExportFields(checked ? EXPORT_FIELDS.map((f) => f.key) : [])
+                }
+                data-testid="checkbox-export-all"
+              />
+              <Label htmlFor="export-all" className="text-sm font-medium cursor-pointer">
+                Selecionar todos
+              </Label>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 max-h-72 overflow-y-auto pr-1">
+              {EXPORT_FIELDS.map((f) => (
+                <div key={f.key} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`export-${f.key}`}
+                    checked={exportFields.includes(f.key)}
+                    onCheckedChange={() => toggleExportField(f.key)}
+                    data-testid={`checkbox-export-${f.key}`}
+                  />
+                  <Label htmlFor={`export-${f.key}`} className="text-sm cursor-pointer">
+                    {f.label}
+                  </Label>
+                </div>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setExportOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleExportCsv} className="gap-2" data-testid="button-export-csv-confirm">
+                <Download className="w-4 h-4" /> Exportar ({exportFields.length} campos)
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-3xl bg-card border-border/30 max-h-[85vh] overflow-y-auto">
